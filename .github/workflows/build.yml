@@ -27,7 +27,7 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "Achievement_Watcher" "Achievement_watcher.py"
+        pyinstaller --noconfirm --onefile --windowed --name "AchievementWatcher" "achievement_watcher.py"
 
     - name: Upload EXE to Release
       uses: softprops/action-gh-release@v2
