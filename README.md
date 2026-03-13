@@ -22,4 +22,6 @@ Many thanks
 
 to tomlogic    https://github.com/tomlogic/pinmame-nvram-maps 
 
-and francisdb  https://github.com/francisdb/vpxtool!
+and francisdb  https://github.com/francisdb/vpxtool
+
+
