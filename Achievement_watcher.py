@@ -37,6 +37,7 @@ from watcher_core import (
     APP_DIR, AppConfig, CloudSync, Watcher,
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
+    KBDLLHOOKSTRUCT, GlobalKeyHook,
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, vk_to_name_en,
