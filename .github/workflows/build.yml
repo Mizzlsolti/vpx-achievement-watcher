@@ -30,7 +30,7 @@ jobs:
 
     - name: Build EXE with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --name "Achievement_Watcher" "achievement_watcher.py"
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --name "Achievement_Watcher" "Achievement_watcher.py"
 
     - name: Upload EXE as Artifact
       uses: actions/upload-artifact@v4
