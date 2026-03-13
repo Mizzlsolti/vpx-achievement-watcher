@@ -3,6 +3,7 @@
 📊 Highlights & Overlays: After a game (or at the touch of a button on the keyboard/controller), transparent info windows appear directly above the pinball machine. These show the best actions of the game and statistics. Supports portrait mode specifically for pinball cabinets.
 
 ⚔️ Challenge Modes like Pinball FX
+
 Timed: Achieve the maximum score in 3 or 5 minutes.
 Flip Challenge: How many points can you score with a limited number of pinball finger strokes? Select your difficulty level (e.g., Pro = Only 100 flips!).
 
