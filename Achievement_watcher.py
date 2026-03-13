@@ -6747,6 +6747,7 @@ class MainWindow(QMainWindow):
         
         icon = self._get_icon()
         self.setWindowIcon(icon)
+        QApplication.instance().setWindowIcon(icon)
         
         if "player_id" not in self.cfg.OVERLAY:
             self.cfg.OVERLAY["player_id"] = str(uuid.uuid4())[:4]
@@ -10964,3 +10965,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
