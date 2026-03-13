@@ -26,8 +26,10 @@ to tomlogic    https://github.com/tomlogic/pinmame-nvram-maps
 
 and francisdb  https://github.com/francisdb/vpxtool
 
+
+
 ## Screenshots
 
-<img src="docs/images/Watchermain.png" width="700" alt="Watcher">
+![Watcher](docs/Images/Watchermain.png)
 
-<img src="docs/images/Overlay.png" width="700" alt="Overlay">
+![Overlay](docs/Images/Overlay.png)
