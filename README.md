@@ -4,7 +4,8 @@
 
 ⚔️ Challenge Modes like Pinball FX
 
-Timed: Achieve the maximum score in 3 or 5 minutes.
+Timed Challenge: Achieve the maximum score in 3 or 5 minutes.
+
 Flip Challenge: How many points can you score with a limited number of pinball finger strokes? Select your difficulty level (e.g., Pro = Only 100 flips!).
 
 🔔 Feedback: Displays small pop-up notifications (toasts) directly after the  game when you achieve a success and offers optional voice output for challenge events.
