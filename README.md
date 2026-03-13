@@ -18,6 +18,7 @@ Flip Challenge: How many points can you score with a limited number of pinball f
 
 🛡️ Fair play & anti-cheat To keep the leaderboards fair, local saves and scores are protected by hash signatures. 
 
+https://github.com/vpinball
 
 The achievement watcher uses nvram maps and vpxtool.
 Many thanks 
