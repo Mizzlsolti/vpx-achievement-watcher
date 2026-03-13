@@ -8,7 +8,7 @@ import hashlib
 import os, sys, time, json, re, glob, threading, uuid
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, ClassVar
 from collections import defaultdict, Counter
 from PyQt6.QtGui import QFontMetrics
 
@@ -360,6 +360,35 @@ class AppConfig:
     CLOUD_ENABLED: bool = True
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
 
+    ALLOWED_OVERLAY_KEYS: ClassVar[List[str]] = [
+        "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw",
+        "lines_per_category", "font_family", "overlay_auto_close",
+        "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+
+        "toggle_input_source", "toggle_vk", "toggle_joy_button",
+        "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
+        "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
+        "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
+
+        "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape",
+        "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
+
+        "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape",
+        "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
+
+        "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape",
+        "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
+
+        "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape",
+        "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
+
+        "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
+        "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
+
+        "player_name", "player_id", "flip_counter_goal_total",
+        "challenges_voice_volume", "challenges_voice_mute",
+    ]
+
     @staticmethod
     def load(path: str = CONFIG_FILE) -> "AppConfig":
         if not os.path.exists(path):
@@ -370,38 +399,9 @@ class AppConfig:
 
             ov = dict(DEFAULT_OVERLAY)
             loaded_ov = data.get("OVERLAY", {})
-            
-            allowed_keys = [
-                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
-                "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved", 
-                
-                "toggle_input_source", "toggle_vk", "toggle_joy_button",
-                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
-                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
-                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
-                
-                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
-                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
-                
-                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
-                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
-                
-                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
-                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
-                
-                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
-                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
-                
-                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
-                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
-                
-                "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute"
-            ]
-            
+
             for k in list(loaded_ov.keys()):
-                if k not in allowed_keys:
+                if k not in AppConfig.ALLOWED_OVERLAY_KEYS:
                     del loaded_ov[k]
                     
             ov.update(loaded_ov)
@@ -422,36 +422,8 @@ class AppConfig:
         try:
             clean_overlay = {}
             ov = getattr(self, "OVERLAY", {})
-            allowed_keys = [
-                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
-                "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved", 
-                
-                "toggle_input_source", "toggle_vk", "toggle_joy_button",
-                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
-                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
-                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
-                
-                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
-                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
-                
-                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
-                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
-                
-                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
-                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
-                
-                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
-                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
-                
-                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
-                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
-                
-                "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute"
-            ]
-            
-            for k in allowed_keys:
+
+            for k in AppConfig.ALLOWED_OVERLAY_KEYS:
                 if k in ov:
                     clean_overlay[k] = ov[k]
 
@@ -851,7 +823,11 @@ class CloudSync:
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
     SUMMARY_FILENAME = "session_latest.summary.json"
-    
+
+    # -------------------------------------------------------------------------
+    # Initialization & Setup
+    # -------------------------------------------------------------------------
+
     def __init__(self, cfg: AppConfig, bridge: "Bridge"):
         self.cfg = cfg
         self.bridge = bridge
@@ -1599,6 +1575,10 @@ class Watcher:
             return
         threading.Thread(target=self._prefetch_worker, daemon=True).start()
 
+    # -------------------------------------------------------------------------
+    # NVRAM Map Loading & Decoding
+    # -------------------------------------------------------------------------
+
     @staticmethod
     def _to_int(v, default=2):
         if isinstance(v, int):
@@ -2132,6 +2112,10 @@ class Watcher:
         "mode compl", "annihil", "martn.", "strobe"
     ]
 
+    # -------------------------------------------------------------------------
+    # VPX Process & Window Management
+    # -------------------------------------------------------------------------
+
     def _find_vpx_pid(self) -> Optional[int]:
         if not win32gui:
             return None
@@ -2327,6 +2311,10 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[CHALLENGE] _kill_vpx_process failed: {e}", "WARN")
 
+
+    # -------------------------------------------------------------------------
+    # Challenge & Flipper Input Handling
+    # -------------------------------------------------------------------------
 
     def start_timed_challenge(self, total_seconds: int = 190):
         try:
@@ -2835,6 +2823,10 @@ class Watcher:
             return True
         except Exception:
             return False
+
+    # -------------------------------------------------------------------------
+    # Session & Score Analysis
+    # -------------------------------------------------------------------------
 
     @staticmethod
     def _extract_numeric(value):
@@ -3448,6 +3440,10 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
 
+    # -------------------------------------------------------------------------
+    # Achievement Evaluation & Persistence
+    # -------------------------------------------------------------------------
+
     def _evaluate_achievements(self, rom: str, start_audits: dict, end_audits: dict, duration_sec: int) -> tuple[list[str], list[str], list[dict]]:
         global_rules = self._collect_global_rules_for_rom(rom)
 
@@ -3838,7 +3834,11 @@ class Watcher:
             self.last_unlocked_achievements = out
         except Exception:
             pass
-  
+
+    # -------------------------------------------------------------------------
+    # Session Lifecycle Management
+    # -------------------------------------------------------------------------
+
     def on_session_start(self, table_or_rom: str, is_rom: bool = False):
         if is_rom:
             self.current_rom = table_or_rom
@@ -4097,7 +4097,11 @@ class Watcher:
             return None
 
         return {"table": clean_table, "rom": rom, "vpx_file": vpx_path or ""}
-    
+
+    # -------------------------------------------------------------------------
+    # Monitoring Loop & Thread Control
+    # -------------------------------------------------------------------------
+
     def _thread_main(self):
         log(self.cfg, ">>> watcher thread running")
         active_rom = None
