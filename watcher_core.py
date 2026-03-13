@@ -88,7 +88,64 @@ _joyGetPosEx.restype = wintypes.UINT
 RIDEV_INPUTSINK = 0x00000100
 WM_KEYDOWN = 0x0100
 WM_SYSKEYDOWN = 0x0104
-WM_HOTKEY = 0x0312 
+WM_HOTKEY = 0x0312
+WH_KEYBOARD_LL = 13
+
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [
+        ("vkCode", wintypes.DWORD),
+        ("scanCode", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_void_p),
+    ]
+
+class GlobalKeyHook:
+    def __init__(self, bindings: list[dict]):
+        self._user32 = ctypes.windll.user32
+        self._kernel32 = ctypes.windll.kernel32
+        self._hook = None
+        self._proc = None
+        self._bindings = list(bindings or [])
+
+    def update_bindings(self, bindings: list[dict]):
+        self._bindings = list(bindings or [])
+
+    def _callback(self, nCode, wParam, lParam):
+        try:
+            if nCode == 0 and wParam in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+                vk = int(kb.vkCode)
+                for b in self._bindings:
+                    try:
+                        want = int(b.get("get_vk", lambda: -1)())
+                    except Exception:
+                        want = -1
+                    if want and vk == want:
+                        cb = b.get("on_press")
+                        if cb:
+                            from PyQt6.QtCore import QTimer
+                            QTimer.singleShot(0, cb)
+        except Exception:
+            pass
+        return self._user32.CallNextHookEx(self._hook, nCode, wParam, lParam)
+
+    def install(self):
+        if self._hook:
+            return
+        CMPFUNC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM)
+        self._proc = CMPFUNC(self._callback)
+        hMod = self._kernel32.GetModuleHandleW(None)
+        self._hook = self._user32.SetWindowsHookExW(WH_KEYBOARD_LL, self._proc, hMod, 0)
+
+    def uninstall(self):
+        if self._hook:
+            try:
+                self._user32.UnhookWindowsHookEx(self._hook)
+            except Exception:
+                pass
+        self._hook = None
+        self._proc = None
 
 class RAWINPUTDEVICE(ctypes.Structure):
     _fields_ = [
