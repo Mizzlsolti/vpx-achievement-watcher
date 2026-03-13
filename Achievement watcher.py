@@ -211,7 +211,7 @@ def parse_vpx_flipper_bindings(ini_path: str) -> dict:
         return out
     try:
         cp = configparser.ConfigParser(strict=False)
-        cp.optionxform = str  # preserve case
+        cp.optionxform = str
         with open(ini_path, "r", encoding="utf-8", errors="ignore") as f:
             cp.read_file(f)
 
@@ -393,7 +393,6 @@ class AppConfig:
                 "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
                 "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
                 
-                # FIX: Hier haben die Positionen für das Mini Info Overlay gefehlt!
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
@@ -445,7 +444,6 @@ class AppConfig:
                 "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
                 "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
                 
-                # FIX: Und natürlich müssen sie auch beim Speichern erlaubt sein!
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
@@ -507,7 +505,6 @@ def ensure_vpxtool(cfg: AppConfig) -> str | None:
         data = _fetch_bytes_url(VPXTOOL_URL, timeout=30)
         ensure_dir(os.path.dirname(VPXTOOL_PATH))
         
-        # Zip-Datei im Arbeitsspeicher entpacken
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             with open(VPXTOOL_PATH, "wb") as f:
                 f.write(z.read("vpxtool.exe"))
@@ -536,8 +533,8 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
     except Exception:
         key = str(vpx_path)
     if not hasattr(run_vpxtool_get_rom, "_warned_keys"):
-        run_vpxtool_get_rom._warned_keys = set()  # type: ignore[attr-defined]
-    warned = run_vpxtool_get_rom._warned_keys      # type: ignore[attr-defined]
+        run_vpxtool_get_rom._warned_keys = set()
+    warned = run_vpxtool_get_rom._warned_keys 
 
     cmd = [exe, "romname", vpx_path]
     try:
@@ -560,12 +557,10 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
         if lines:
             rom = lines[-1].strip().strip('"').strip("'")
             if re.fullmatch(r"[A-Za-z0-9_]+", rom or ""):
-                # bei Erfolg Warn-Status zurücksetzen
                 if key in warned:
                     warned.discard(key)
                 return rom
 
-        # fallback parse aus gesamter Ausgabe
         m = re.search(r"\b([A-Za-z0-9_]{2,})\b", out)
         if m:
             if key in warned:
@@ -654,13 +649,11 @@ def _raw_save_json(path, obj):
 # ==========================================
 # ANTI-CHEAT SECURITY
 # ==========================================
-ANTI_CHEAT_SALT = "VPX_S3cr3t_H4sh_9921!"  # Geheimer Schlüssel (kannst du beliebig ändern)
+ANTI_CHEAT_SALT = "VPX_S3cr3t_H4sh_9921!"
 
 def _generate_signature(data: dict) -> str:
-    # Erstellt einen unveränderlichen Hash aus den Daten
     d = dict(data)
-    d.pop("_signature", None) # Signatur selbst nicht mit-hashen
-    # dict zu string konvertieren (sortiert, damit es immer exakt gleich ist)
+    d.pop("_signature", None)
     s = json.dumps(d, sort_keys=True, separators=(',', ':'))
     return hashlib.sha256((s + ANTI_CHEAT_SALT).encode('utf-8')).hexdigest()
 
@@ -668,15 +661,12 @@ def _is_secure_path(path: str) -> bool:
     """Prüft, ob eine Datei durch Anti-Cheat geschützt werden soll."""
     if not path: return False
     p = path.lower().replace("\\", "/")
-    
-    # Ausnahmen: Config, NVRAM-Maps und Custom Achievements bleiben ungeschützt,
-    # damit man sie leicht teilen oder per Hand anpassen kann.
+
     if p.endswith("config.json"): return False
     if "nvram_maps" in p: return False
     if "custom_achievements" in p: return False
     if p.endswith("index.json") or p.endswith("romnames.json"): return False
     
-    # Nur JSON-Dateien signieren
     if not p.endswith(".json"): return False
     
     return True
@@ -686,7 +676,6 @@ def load_json(path, default=None):
     if data is None:
         return default
         
-    # Security Check beim Laden
     if _is_secure_path(path) and isinstance(data, dict):
         sig = data.pop("_signature", None)
         if not sig:
@@ -705,7 +694,6 @@ def load_json(path, default=None):
     return data
 
 def save_json(path, obj):
-    # Signatur automatisch beim Speichern hinzufügen
     if _is_secure_path(path) and isinstance(obj, dict):
         try:
             obj["_signature"] = _generate_signature(obj)
@@ -713,7 +701,6 @@ def save_json(path, obj):
             pass
     return _raw_save_json(path, obj)
 
-# Aliase für Rückwärtskompatibilität, falls wir sie im Code noch irgendwo aufrufen
 secure_save_json = save_json
 secure_load_json = load_json
 
@@ -767,7 +754,6 @@ class CloudSync:
     @staticmethod
     def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
-        # Blockiert Upload wenn Cloud aus, ROM fehlt, Score 0 oder Name auf Standard ("Player") steht
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0 or not pname or pname.lower() == "player":
             return
         
@@ -813,7 +799,6 @@ class CloudSync:
     @staticmethod
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
-        # Blockiert Upload wenn Cloud aus, ROM fehlt, oder Name auf Standard ("Player") steht
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0 or not pname or pname.lower() == "player":
             return
             
@@ -895,7 +880,6 @@ class Watcher:
         self.include_current_segment_in_overlay = True
         self._control_fields_cache: Dict[str, List[dict]] = {}  
         
-        # --- FIX: Diese Variablen haben gefehlt ---
         self.snapshot_mode = True
         self.snap_initialized = False
         self.field_stats = {}
@@ -1146,8 +1130,6 @@ class Watcher:
                     return False
                 return found
 
-            # Kein harter Timeout mehr:
-            # solange Session aktiv ist, regelmäßig prüfen
             while not self._stop.is_set():
                 try:
                     if not self.game_active:
@@ -1281,8 +1263,6 @@ class Watcher:
         if os.path.exists(path):
             return
 
-        # FIX: priority_set am allerersten Punkt initialisieren, 
-        # damit es immer existiert, egal was danach passiert!
         priority_set = set()
         
         fields_meta, _ = self.load_map_for_rom(rom)
@@ -1364,7 +1344,6 @@ class Watcher:
         int_fields = [k for k, v in audits.items() if isinstance(v, int)]
         plausible = [k for k in int_fields if self._plausible_counter(k) and ok_label(k)]
 
-        # MAP-FIRST ordering
         map_fields = self._map_fields_for_rom(rom)
         ordered = uniq([*priority_fields, *map_fields, *plausible]) or map_fields or plausible or int_fields
         ordered = [f for f in ordered if ok_label(f)]
@@ -1448,7 +1427,6 @@ class Watcher:
             log(self.cfg, f"[ROM_SPEC] created {path} with {len(rules)} session-only rules (included priority fields)")
 
     def _ach_persist_after_session(self, end_audits: dict, duration_sec: int, nplayers: int):
-        # HARTE BLOCKADE
         if not self.current_rom or not self._has_any_map(self.current_rom):
             return
             
@@ -1540,8 +1518,6 @@ class Watcher:
 
         ensure_file(f_index(self.cfg), INDEX_URL)
         ensure_file(f_romnames(self.cfg), ROMNAMES_URL)
-
-        # vpxtool bootstrap (same pattern as maps)
         try:
             ensure_vpxtool(self.cfg)
         except Exception as e:
@@ -1713,7 +1689,6 @@ class Watcher:
             add_gs("extra_balls", "Extra Balls")
             add_gs("tilt_warnings", "Tilt Warnings")
 
-        # NEU: Extrahiere alles aus audits, adjustments, high_scores und mode_champions
         def _extract_nested(node, parent_label="", top_key=""):
             if isinstance(node, dict):
                 if ("start" in node or "offset" in node):
@@ -1781,12 +1756,10 @@ class Watcher:
         if not rom:
             return None, None, None
 
-        # 1) exact hit
         fields, src = self._try_load_map_for(rom)
         if fields:
             return fields, src, rom
 
-        # 2) family / alias fallback
         for cand in self._all_rom_candidates(rom):
             if cand.lower() == rom.lower():
                 continue
@@ -1805,7 +1778,6 @@ class Watcher:
         try:
             if fields and matched and matched.lower() != (rom or "").lower():
                 log(self.cfg, f"[MAP] family fallback: {rom} -> {matched}")
-                # Erfolg: no-map dedupe für ROM zurücksetzen
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
@@ -1819,7 +1791,6 @@ class Watcher:
                     log(self.cfg, f"[MAP] no nvram map found for ROM '{rom}' (after family fallback)", "WARN")
                     no_map_set.add(key)
             else:
-                # exakter Treffer => no-map dedupe zurücksetzen
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
@@ -1942,7 +1913,6 @@ class Watcher:
             return None
         window = raw[offset: offset + size]
         
-        # NEU: Textfelder (z. B. Initialen) direkt in Strings umwandeln
         if enc in ("ch", "ascii", "string"):
             return "".join(chr(b) for b in window if 32 <= b <= 126).strip()
 
@@ -2060,7 +2030,6 @@ class Watcher:
                 if offset < 0 or offset + size > len(raw):
                     continue
 
-                # NEU: Bei Text/Timestamp-Encodings den Autofix auslassen, sonst wird der Text zerstört
                 if enc in ("ch", "ascii", "string", "wpc_rtc"):
                     val = self._decode_field_value(raw, fld)
                     if val is not None:
@@ -2266,7 +2235,7 @@ class Watcher:
                 return True
             win32gui.EnumWindows(_cb, None)
             if not pids:
-                return True  # nichts zu tun
+                return True 
             k32 = ctypes.windll.kernel32
             SYNCHRONIZE = 0x00100000
             handles = []
@@ -2307,14 +2276,11 @@ class Watcher:
         try:
             import ctypes, subprocess, time
             from ctypes import wintypes
-
-            # 1) Alt+F4 für Player zuerst
             try:
                 self._alt_f4_visual_pinball_player(wait_ms=800)
             except Exception as e:
                 log(self.cfg, f"[CHALLENGE] Alt+F4 path failed: {e}", "WARN")
 
-            # 2) Danach WM_CLOSE an Player + Editor
             try:
                 import win32gui, win32con
                 def _cb(hwnd, _):
@@ -2334,7 +2300,6 @@ class Watcher:
             except Exception:
                 pass
 
-            # 3) Verifizieren – ist noch ein VPinball* da?
             try:
                 deadline = time.time() + 1.8
                 while time.time() < deadline:
@@ -2346,7 +2311,6 @@ class Watcher:
             except Exception:
                 pass
 
-            # 4) Fallback: harte Kills aller bekannten Binärnamen
             try:
                 for img in ("VPinballX64.exe", "VPinballX.exe", "VPinballX_GL.exe", "VPinball.exe"):
                     try:
@@ -2515,7 +2479,6 @@ class Watcher:
         if not self._flip.get("active"):
             return
         try:
-            # 1) Finalen Snapshot einsammeln
             audits_now = None
             try:
                 audits_now, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
@@ -2542,7 +2505,7 @@ class Watcher:
             ch = getattr(self, "challenge", {}) or {}
             ch["active"] = False
             ch["pending_kill_at"] = None
-            ch["completed"] = True  # <--- NEU: Stempel "Erfolgreich absolviert"
+            ch["completed"] = True 
             self.challenge = ch
             log(self.cfg, "[CHALLENGE] flip finished – Alt+F4 + WM_CLOSE executed")
         except Exception as e:
@@ -2595,7 +2558,7 @@ class Watcher:
                 "end_at": None,
                 "pending_kill_at": None,
                 "suppress_big_overlay_once": True,
-                "threshold": int(goal_total), # <--- BUGFIX: Hier fehlte das Speichern des Ziels!
+                "threshold": int(goal_total), 
             })
             self.challenge = ch
 
@@ -2645,7 +2608,6 @@ class Watcher:
             log(self.cfg, "[CHALLENGE] flip stopped")
 
     def _clear_challenge_state(self):
-        # FIX: UI-Elemente und Inputs sicher abräumen
         try:
             self.bridge.flip_counter_total_hide.emit()
         except Exception:
@@ -2678,13 +2640,10 @@ class Watcher:
                 return
             now = time.time()
 
-            # --- NEU: ABBRUCH-ERKENNUNG ---
-            # Wenn das Player-Fenster (z. B. durch ESC) geschlossen wurde:
             if not self._vp_player_visible():
                 log(self.cfg, "[CHALLENGE] VPX Player window closed early. Aborting challenge.")
                 kind = str(ch.get("kind", "")).lower()
                 
-                # Zwinge die Overlays, sich sofort zu verstecken
                 if kind == "timed":
                     self.stop_timed_challenge()
                 elif kind == "flip":
@@ -2700,12 +2659,10 @@ class Watcher:
                 ch["pending_kill_at"] = None
                 self.challenge = ch
                 return
-            # --------------------------------
 
             if ch.get("kind") == "timed":
                 end_at = float(ch.get("end_at", 0.0) or 0.0)
                 if now >= end_at:
-                    # 1) Finalen Snapshot versuchen
                     try:
                         time.sleep(0.15)
                     except Exception:
@@ -2738,7 +2695,7 @@ class Watcher:
 
                     ch["active"] = False
                     ch["pending_kill_at"] = None
-                    ch["completed"] = True  # <--- NEU: Stempel "Erfolgreich absolviert"
+                    ch["completed"] = True 
                     self.challenge = ch
                     log(self.cfg, "[CHALLENGE] timed finished – Alt+F4 + WM_CLOSE executed")
                     return
@@ -2785,14 +2742,10 @@ class Watcher:
     def _challenge_record_result(self, kind: str, end_audits: dict, duration_sec: int):
         try:
             ch = getattr(self, "challenge", {}) or {}
-            
-            # === DER HARTE BLOCKER ===
-            # Wenn der Spieler mutwillig abbricht, hat die Challenge den "completed" 
-            # Status nie erhalten. Wir verwerfen das Ergebnis kommentarlos!
+
             if not ch.get("completed", False):
                 log(self.cfg, f"[CHALLENGE] Aborted early by player. Score NOT recorded/uploaded.")
                 return
-            # =========================
 
             now = time.time()
             started_at = float(ch.get("started_at", now))
@@ -2924,7 +2877,6 @@ class Watcher:
                 
             l = str(label).lower()
             
-            # 1. Rausch-Filter: System-Einstellungen ignorieren
             if any(noise in l for noise in ["max ", "count", "system", "percent", "boost", "allow", "level"]):
                 continue
 
@@ -2934,7 +2886,6 @@ class Watcher:
                 if any(w in l for w in words):
                     matched_keys.append(key)
             
-            # 3. Doppelzählungen verhindern
             if "super_jackpot" in matched_keys and "jackpot" in matched_keys:
                 matched_keys.remove("jackpot")
             if "triple_jackpot" in matched_keys and "jackpot" in matched_keys:
@@ -2944,13 +2895,11 @@ class Watcher:
             if "mode_completed" in matched_keys and "mode_starts" in matched_keys:
                 matched_keys.remove("mode_starts")
                 
-            # NEU: Ein Jackpot ist kein Multiball-Start, auch wenn "m.b." im Namen steht!
             if "jackpot" in matched_keys and "multiball" in matched_keys:
                 matched_keys.remove("multiball")
             if "super_jackpot" in matched_keys and "multiball" in matched_keys:
                 matched_keys.remove("multiball")
                 
-            # 4. In die Highlight-Liste aufnehmen
             for key in matched_keys:
                 events[key] = events.get(key, 0) + int(val)
                 
@@ -3244,7 +3193,6 @@ class Watcher:
             return out
         start = start or {}
         
-        # Diese Standard-Werte verstopfen nur die Listen, wir filtern sie!
         ignore_list = {"current_ball", "game over", "tilted", "credits", "player_count", "1 player games", "2 player games", "3 player games", "4 player games"}
         
         for k, ve in end.items():
@@ -3320,7 +3268,6 @@ class Watcher:
         play_sec = int(player.get("active_play_seconds", 0.0))
         rules = self._collect_player_rules_for_rom(rom)
 
-        # NEU: Lade bereits freigeschaltete Session-Achievements für dieses ROM
         state = self._ach_state_load()
         unlocked_session = state.get("session", {}).get(rom, [])
         def _get_title(e):
@@ -3332,7 +3279,6 @@ class Watcher:
         for rule in rules:
             title = rule.get("title") or "Achievement"
             
-            # NEU: Wenn bereits in der Vergangenheit freigeschaltet -> überspringen
             if title.strip() in already_unlocked:
                 continue
 
@@ -3461,7 +3407,6 @@ class Watcher:
 
         save_json(os.path.join(active_dir, f"{self.current_rom}_P1.json"), payload)
 
-        # Optional: alte P2..P4 Artefakte entfernen
         try:
             for pid_old in (2, 3, 4):
                 fp = os.path.join(active_dir, f"{self.current_rom}_P{pid_old}.json")
@@ -3475,7 +3420,6 @@ class Watcher:
         return active_dir
 
     def _persist_and_toast_achievements(self, end_audits: dict, duration_sec: int):
-        # HARTE BLOCKADE: Keine Map = Keine Achievements!
         if not self.current_rom or not self._has_any_map(self.current_rom):
             log(self.cfg, f"[ACH] Evaluation skipped: No NVRAM map found for '{self.current_rom}'")
             return
@@ -3864,7 +3808,6 @@ class Watcher:
                 else:
                     title = str(t).strip()
                     
-                # NEU: Entfernt die "(Session)" und "(Global)" Tags aus der Anzeige
                 title = title.replace(" (Session)", "").replace(" (Global)", "")
                 
                 if title:
@@ -3945,11 +3888,7 @@ class Watcher:
         is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip")
         ch_aborted = is_challenge and not ch.get("completed", False)
 
-        # ==========================================
-        # 1. SOFORTIGE VISUELLE BEREINIGUNG (Ganz oben!)
-        # ==========================================
         if is_challenge:
-            # Overlays sofort abschießen, bevor irgendetwas anderes berechnet oder gewartet wird!
             try:
                 if hasattr(self.bridge, "flip_counter_total_hide"):
                     self.bridge.flip_counter_total_hide.emit()
@@ -3979,7 +3918,6 @@ class Watcher:
             except Exception:
                 pass
 
-        # ALLES AB HIER IN EINEN TRY/FINALLY BLOCK PACKEN!
         try:
             end_ts = time.time()
             duration_sec = int(end_ts - (self.start_time or end_ts))
@@ -4022,9 +3960,6 @@ class Watcher:
                 int(duration_sec)
             )
 
-            # ==========================================
-            # REGULÄRE SESSION ODER CHALLENGE SPEICHERN
-            # ==========================================
             if is_challenge:
                 log(self.cfg, f"[SESSION END] Challenge finished: rom={self.current_rom}, duration={duration_str}. Skipping NVRAM dumps and regular achievements.")
                 try:
@@ -4036,7 +3971,6 @@ class Watcher:
                     log(self.cfg, f"[CHALLENGE] result finalize failed: {e}", "WARN")
             else:
                 log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
-                # Lokale Highlights speichern
                 try:
                     self._export_summary(end_audits, duration_sec)
                 except Exception as e:
@@ -4052,7 +3986,6 @@ class Watcher:
                 except Exception as e:
                     log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
 
-                # CLOUD PROGRESS UPLOAD - Nur noch Session/Tisch-spezifisch!
                 if self.current_rom and self._has_any_map(self.current_rom):
                     try:
                         s_rules = self._collect_player_rules_for_rom(self.current_rom)
@@ -4066,7 +3999,6 @@ class Watcher:
                         if total_achs > 0:
                             state = self._ach_state_load()
                             
-                            # Auch hier nur die Session-Freischaltungen zählen
                             unlocked_titles = set()
                             for e in state.get("session", {}).get(self.current_rom, []):
                                 t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
@@ -4077,7 +4009,6 @@ class Watcher:
                     except Exception as e:
                         log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
-            # WUNSCH 1: Overlay am Ende der Session blockieren, wenn es keine Map gibt!
             try:
                 if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True) and not is_challenge:
                     if self.current_rom and self._has_any_map(self.current_rom):
@@ -4087,9 +4018,6 @@ class Watcher:
             except Exception as e:
                 log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
-        # ==========================================
-        # AUFRÄUMEN (WIRD IMMER AUSGEFÜHRT!)
-        # ==========================================
         finally:
             self.current_table = None
             self.current_rom = None
@@ -4136,13 +4064,11 @@ class Watcher:
             alt = os.path.join(self.cfg.TABLES_DIR, table_fragment)
             vpx_path = alt if os.path.isfile(alt) else None
 
-        # ROM-Cache lazy anlegen (damit __init__ nicht geändert werden muss)
         cache = getattr(self, "_rom_detect_cache", None)
         if not isinstance(cache, dict):
             cache = {"vpx_path": None, "rom": None, "ts": 0.0}
             self._rom_detect_cache = cache
 
-        # 1) ROM über vpxtool (mit Cache)
         rom = None
         if vpx_path and os.path.isfile(vpx_path):
             now = time.time()
@@ -4150,7 +4076,6 @@ class Watcher:
             cache_rom = cache.get("rom")
             cache_ts = float(cache.get("ts") or 0.0)
 
-            # gleicher Tisch + frischer Cache => kein erneuter vpxtool call
             if cache_path == vpx_path and cache_rom and (now - cache_ts) < 120:
                 rom = cache_rom
             else:
@@ -4164,8 +4089,6 @@ class Watcher:
 
         clean_table = table_fragment[:-4] if table_fragment.lower().endswith(".vpx") else table_fragment
 
-        # 2) Wenn vpxtool keinen ROM liefert:
-        #    -> KEIN Mini-Overlay, nur Log und Session nicht starten
         if not rom:
             try:
                 log(self.cfg, f"[ROM] vpxtool failed for table '{vpx_filename}'", "WARN")
@@ -4180,8 +4103,7 @@ class Watcher:
         active_rom = None
         if not hasattr(self, "_last_live_export_ts"):
             self._last_live_export_ts = 0.0
-        self._missing_table_ticks = 0  # NEU: Zähler für fehlenden Fokus
-
+        self._missing_table_ticks = 0  
         while not self._stop.is_set():
             now_loop = time.time()
             dt = now_loop - getattr(self, "_last_tick_time", now_loop)
@@ -4196,7 +4118,7 @@ class Watcher:
                 upd = None
 
             if upd:
-                self._missing_table_ticks = 0  # Wieder gefunden -> Zähler reset
+                self._missing_table_ticks = 0  
                 rom = (upd.get("rom") or "").strip()
 
                 if active_rom is None and rom:
@@ -4270,9 +4192,9 @@ class Watcher:
                             log(self.cfg, f"[BALL] update failed: {e}", "WARN")
             else:
                 if active_rom is not None:
-                    # NEU: Wir beenden nicht sofort, sondern zählen erst hoch!
+
                     self._missing_table_ticks += 1
-                    if self._missing_table_ticks >= 4:  # Nach ca. 2 Sekunden wirklich beenden
+                    if self._missing_table_ticks >= 4: 
                         self.on_session_end()
                         active_rom = None
                         self._missing_table_ticks = 0
@@ -4333,7 +4255,6 @@ class Bridge(QObject):
     flip_counter_total_update = pyqtSignal(int, int, int)
     flip_counter_total_hide = pyqtSignal()   
     
-    # --- NEU: Signale für Prefetch-Fortschritt ---
     prefetch_started = pyqtSignal()
     prefetch_progress = pyqtSignal(str)
     prefetch_finished = pyqtSignal(str)                     
@@ -4744,8 +4665,6 @@ class OverlayWindow(QWidget):
         self.body.setGeometry(body_x, body_top, body_w, max(80, body_h))
 
     def _apply_scale(self, scale_pct: int):
-        # HIER GEÄNDERT: Die harte Begrenzung auf min. 50% (0.5) und min. 10pt wurde entfernt!
-        # Jetzt darf die Schrift auch bis auf 30% mitschrumpfen, ohne dass rechts etwas abgeschnitten wird.
         r = scale_pct / 100.0
         body_pt = max(4, int(round(self._base_body_size * r)))
         title_pt = max(6, int(round(body_pt * 1.35)))
@@ -4912,14 +4831,11 @@ class OverlayWindow(QWidget):
         self._current_title = "Highlights" if session_title is None else session_title
         self._render_fixed_columns()
 
-        # --- NEU: Lokalen Achievement Progress berechnen ---
         total_achs = 0
         unlocked_total = 0
         pct = 0.0
         try:
-            # Hier blockieren wir die Berechnung, wenn die Map fehlt!
             if rom_name and rom_name != "Unknown ROM" and self.parent_gui.watcher._has_any_map(rom_name):
-                # NUR noch Session/Tisch-spezifische Achievements für die Leiste nutzen!
                 s_rules = self.parent_gui.watcher._collect_player_rules_for_rom(rom_name)
                 
                 unique_achs = set()
@@ -4941,12 +4857,10 @@ class OverlayWindow(QWidget):
         except Exception:
             pass
 
-        # --- NEU: Lokalen Achievement Progress berechnen ---
         total_achs = 0
         unlocked_total = 0
         pct = 0.0
         try:
-            # Hier blockieren wir die Berechnung, wenn die Map fehlt!
             if rom_name and rom_name != "Unknown ROM" and self.parent_gui.watcher._has_any_map(rom_name):
                 g_rules = self.parent_gui.watcher._collect_global_rules_for_rom(rom_name)
                 s_rules = self.parent_gui.watcher._collect_player_rules_for_rom(rom_name)
@@ -4961,7 +4875,6 @@ class OverlayWindow(QWidget):
         except Exception:
             pass
 
-        # Arcade Styling
         style = """
         <style>
           table.hltable { border-collapse: collapse; margin: 0 auto; width: auto; font-size: 1.1em; }
@@ -4987,12 +4900,10 @@ class OverlayWindow(QWidget):
             
             lines.append(f"<div class='rom-title'>{esc(rom_name)}</div>")
             
-            # --- NEU: Progress Bar Rendern (repariert für Qt HTML) ---
             if total_achs > 0:
                 safe_pct = max(0.1, min(100.0, pct))
                 rem_pct = 100.0 - safe_pct
                 
-                # Sehr clean, nur die Zahlen zentriert in Weiß
                 bar_html = f"""
                 <div style='text-align: center; color: #FFFFFF; font-weight: bold; font-size: 1.15em; margin-bottom: 0.3em;'>
                     {unlocked_total} / {total_achs} ({pct}%)
@@ -5014,10 +4925,8 @@ class OverlayWindow(QWidget):
             else:
                 lines.append("<div style='margin-bottom: 1.8em;'></div>")
 
-            # Master-Tabelle
             lines.append("<table align='center' style='border-collapse: collapse; margin: 0 auto; width: auto;'><tr>")
             
-            # LINKE SPALTE: HIGHLIGHTS
             lines.append("<td valign='top' style='padding-right: 20px; border-right: 1px solid rgba(255, 255, 255, 0.4);'>")
             lines.append("<table class='hltable'>")
             has_high = False
@@ -5038,7 +4947,6 @@ class OverlayWindow(QWidget):
                 lines.append("<div style='text-align:center; color:#888; margin-top:1em;'>(No Highlights yet)</div>")
             lines.append("</td>")
 
-            # RECHTE SPALTE: DELTAS
             lines.append("<td valign='top' style='padding-left: 20px; border:none;'>")
             lines.append("<table class='hltable'>")
             
@@ -5191,7 +5099,6 @@ class MiniInfoOverlay(QWidget):
         img = self._render_message_image(html)
 
         if self._portrait_mode:
-            # HIER IST DER FIX: -90 für CCW, 90 für Normal
             angle = -90 if self._rotate_ccw else 90
             img = img.transformed(QTransform().rotate(angle), Qt.TransformationMode.SmoothTransformation)
 
@@ -5260,7 +5167,6 @@ def read_active_players(base_dir: str):
     if not p1_files:
         return []
 
-    # Nimm die neueste P1-Datei
     p1_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
     fp = p1_files[0]
 
@@ -6016,16 +5922,13 @@ class OverlayPositionPicker(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         geo = self._safe_screen_geo()
         
-        # Start-Koordinaten ermitteln
         if bool(ov.get("use_xy", False)):
             x0 = int(ov.get("pos_x", 100))
             y0 = int(ov.get("pos_y", 100))
         else:
-            # Bei frischer Installation: Zentriert auf dem Hauptbildschirm platzieren!
             x0 = int(geo.left() + (geo.width() - self._w) // 2)
             y0 = int(geo.top() + (geo.height() - self._h) // 2)
             
-        # Verhindern, dass es im Nichts landet (Clamping)
         w_clamp = min(self._w, geo.width())
         h_clamp = min(self._h, geo.height())
         
@@ -6037,8 +5940,6 @@ class OverlayPositionPicker(QWidget):
         self.raise_()
 
     def _safe_screen_geo(self) -> QRect:
-        # Keine Box über alle Monitore spannen, da das bei 
-        # unterschiedlichen Monitoren leere "Schattenzonen" erzeugt!
         try:
             scr = QApplication.primaryScreen()
             if scr:
@@ -6132,8 +6033,7 @@ class AchToastWindow(QWidget):
         self._title = str(title or "").strip()
         self._rom = str(rom or "").strip()
         self._seconds = max(1, int(seconds))
-        self._is_closing = False  # NEU: Verhindert doppeltes Auslösen
-
+        self._is_closing = False  
         self.setWindowTitle("Achievement")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -6166,7 +6066,6 @@ class AchToastWindow(QWidget):
             except Exception:
                 pass
             
-            # WICHTIG: Signal nur senden, wenn wir nicht schon am Schließen sind
             if not getattr(self, "_is_closing", False):
                 self._is_closing = True
                 try:
@@ -6178,7 +6077,6 @@ class AchToastWindow(QWidget):
         self._render_and_place()
 
     def closeEvent(self, e):
-        # Falls das Fenster extern geschlossen wird (z.B. App-Exit)
         if not getattr(self, "_is_closing", False):
             self._is_closing = True
             try:
@@ -6307,7 +6205,7 @@ class AchToastWindow(QWidget):
             self.show()
             self.raise_()
             try:
-                import win32gui, win32con  # type: ignore
+                import win32gui, win32con 
                 hwnd = int(self.winId())
                 win32gui.SetWindowPos(
                     hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
@@ -6346,7 +6244,6 @@ class AchToastManager(QObject):
 
     def _on_finished(self):
         self._active_window = None
-        # Gib der GUI kurz Zeit das alte Fenster sauber zu entsorgen, dann das nächste
         QTimer.singleShot(250, self._show_next)
 
 class ChallengeCountdownOverlay(QWidget):
@@ -6384,10 +6281,9 @@ class ChallengeCountdownOverlay(QWidget):
             self._left = 0
             try:
                 self._timer.stop()
-                self._render_and_place()  # 00:00 zeigen
+                self._render_and_place()  
             except Exception:
                 pass
-            # WICHTIG: VPX NICHT hier schließen – Watcher übernimmt den Kill
             QTimer.singleShot(200, self.close)
             return
         self._render_and_place()
@@ -6467,7 +6363,7 @@ class ChallengeSelectOverlay(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._pulse_t = 0.0
         self._pulse_timer = QTimer(self)
-        self._pulse_timer.setInterval(50)  # ~20 FPS
+        self._pulse_timer.setInterval(50) 
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._pulse_timer.start()
         self._pix = None
@@ -6852,7 +6748,6 @@ class MainWindow(QMainWindow):
         icon = self._get_icon()
         self.setWindowIcon(icon)
         
-        # NEU: Player ID sauber in der OVERLAY Config speichern (verhindert den .get()/.set() Fehler)
         if "player_id" not in self.cfg.OVERLAY:
             self.cfg.OVERLAY["player_id"] = str(uuid.uuid4())[:4]
             self.cfg.save()
@@ -6860,7 +6755,6 @@ class MainWindow(QMainWindow):
         self.main_tabs = QTabWidget()
         self.setCentralWidget(self.main_tabs)
 
-        # Signal Connections (Unverändert)
         self.bridge.overlay_trigger.connect(self._on_overlay_trigger)
         self.bridge.overlay_show.connect(self._show_overlay_latest)
         self.bridge.mini_info_show.connect(self._on_mini_info_show)
@@ -6883,17 +6777,15 @@ class MainWindow(QMainWindow):
         self._prefetch_blink_state = False
         self._prefetch_msg = ""
 
-        # --- NEUE TAB-STRUKTUR AUFBAUEN ---
         self._build_tab_dashboard()
         self._build_tab_appearance()
         self._build_tab_controls()
         self._build_tab_stats()
-        self._build_tab_progress()         # <-- NEU!
-        self._build_tab_available_maps()   # <-- NEU!
+        self._build_tab_progress()        
+        self._build_tab_available_maps()   
         self._build_tab_cloud() 
         self._build_tab_system()
 
-        # Watcher Hintergrund-Prozesse (Unverändert)
         self.register_flip_counter_handlers()
 
         self.timer_stats = QTimer(self)
@@ -6910,7 +6802,6 @@ class MainWindow(QMainWindow):
         self.overlay_auto_close_timer.setSingleShot(True)
         self.overlay_auto_close_timer.timeout.connect(self._hide_overlay)
 
-        # Joystick polling
         self._joy_toggle_last_mask = 0
         self._joy_toggle_timer = QTimer(self)
         self._joy_toggle_timer.setInterval(50)
@@ -6927,8 +6818,6 @@ class MainWindow(QMainWindow):
             self.tray.setContextMenu(menu)
             self.tray.show()
             
-            # --- NEU: Info-Bubble mit leichter Verzögerung ---
-            # Wir nutzen einfach das global vorhandene QTimer
             QTimer.singleShot(1500, lambda: self.tray.showMessage(
                 "VPX Achievement Watcher", 
                 "Watcher is running in the background!", 
@@ -6955,7 +6844,7 @@ class MainWindow(QMainWindow):
         self.watcher.start()
 
         self._apply_theme()
-        self._check_for_updates() # <-- HIER EINFÜGEN
+        self._check_for_updates() 
         self._init_tooltips_main()
         self._init_overlay_tooltips()
 
@@ -7069,18 +6958,14 @@ class MainWindow(QMainWindow):
         try:
             goal = int(self.cfg.OVERLAY.get("flip_counter_goal_total", 400))
             
-            # Schließe einen alten Test, falls man mehrmals klickt
             if getattr(self, "_flip_total_test_win", None):
                 try: 
                     self._flip_total_test_win.close()
                 except Exception: 
                     pass
                     
-            # WICHTIG: Das Fenster muss in 'self' gespeichert werden, 
-            # sonst löscht Python es sofort wieder aus dem Arbeitsspeicher!
             self._flip_total_test_win = FlipCounterOverlay(self, total=123, remaining=max(0, goal - 123), goal=goal)
             
-            # Nach 6 Sekunden automatisch wieder schließen
             QTimer.singleShot(6000, lambda: (self._flip_total_test_win.close() if self._flip_total_test_win else None))
         except Exception:
             pass
@@ -7348,7 +7233,6 @@ class MainWindow(QMainWindow):
                 pass
             return
 
-        # --- NEU: Prüfen ob NVRAM Map existiert ---
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not current_rom or not self.watcher._has_any_map(current_rom):
@@ -7364,7 +7248,6 @@ class MainWindow(QMainWindow):
                 return
         except Exception:
             pass
-        # ------------------------------------------
 
         try:
             if getattr(self, "_challenge_select", None):
@@ -7415,7 +7298,6 @@ class MainWindow(QMainWindow):
     def _on_ch_timer_portrait_toggle(self, state: int):
         is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
         self.cfg.OVERLAY["ch_timer_portrait"] = bool(is_checked)
-        # NEU: Flip Counter direkt mit aktualisieren
         self.cfg.OVERLAY["flip_counter_portrait"] = bool(is_checked)
         self.cfg.save()
         try:
@@ -7423,7 +7305,6 @@ class MainWindow(QMainWindow):
                 self._ch_timer_picker.apply_portrait_from_cfg()
         except Exception:
             pass
-        # NEU: Flip Counter Position-Picker auch updaten
         try:
             if hasattr(self, "_flip_counter_picker") and isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
                 self._flip_counter_picker.apply_portrait_from_cfg()
@@ -7433,7 +7314,6 @@ class MainWindow(QMainWindow):
     def _on_ch_timer_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
         self.cfg.OVERLAY["ch_timer_rotate_ccw"] = bool(is_ccw)
-        # NEU: Flip Counter CCW direkt mit aktualisieren
         self.cfg.OVERLAY["flip_counter_rotate_ccw"] = bool(is_ccw)
         self.cfg.save()
         try:
@@ -7441,7 +7321,6 @@ class MainWindow(QMainWindow):
                 self._ch_timer_picker.apply_portrait_from_cfg()
         except Exception:
             pass
-        # NEU: Flip Counter Position-Picker auch updaten
         try:
             if hasattr(self, "_flip_counter_picker") and isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
                 self._flip_counter_picker.apply_portrait_from_cfg()
@@ -7735,7 +7614,6 @@ class MainWindow(QMainWindow):
                         dur_s = int(it.get("duration_sec", 0) or 0)
                         ts = str(it.get("ts", "") or "")
                         
-                        # NEU: Hole Difficulty String (oder fallback auf Target Flips bei alten Einträgen)
                         diff_str = it.get("difficulty", "")
                         if not diff_str:
                             tf = int(it.get("target_flips", 0) or 0)
@@ -7770,7 +7648,6 @@ class MainWindow(QMainWindow):
                     except Exception:
                         continue
 
-            # Sortierung: neueste zuerst
             timed_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
             flip_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
 
@@ -7928,7 +7805,6 @@ class MainWindow(QMainWindow):
                         msg = ctypes.wintypes.MSG.from_address(int(message))
                         if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN):
                             vk = int(msg.wParam)
-                            # Nur echte Tasten binden – reine Modifier überspringen
                             if vk in (0x10, 0x11, 0x12, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5):
                                 return False, 0
                             mods = self.self_ref._get_hotkey_mods_now()
@@ -7987,7 +7863,6 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def keyPressEvent(self, event):
-        # Das repariert den Absturz und lässt dich wieder normal tippen!
         super().keyPressEvent(event)
 
     def _open_flip_difficulty_overlay(self):
@@ -8052,7 +7927,6 @@ class MainWindow(QMainWindow):
                 pass
             return
 
-        # --- NEU: Harte Blockade für Hotkey wenn Map fehlt ---
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not current_rom or not self.watcher._has_any_map(current_rom):
@@ -8069,7 +7943,6 @@ class MainWindow(QMainWindow):
                 return
         except Exception:
             pass
-        # -----------------------------------------------------
 
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
             try:
@@ -8380,7 +8253,6 @@ class MainWindow(QMainWindow):
         """
         app.setStyleSheet(pinball_arcade_style)
 
-        # Die großen Spezial-Buttons anpassen
         self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
         self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
         self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
@@ -8620,7 +8492,6 @@ class MainWindow(QMainWindow):
         self.cmb_cloud_category.addItems(["Achievement Progress", "Timed Challenge", "Flip Challenge"])        
         self.cmb_cloud_category.currentIndexChanged.connect(self._on_cloud_cat_changed)
         
-        # NEU: Dropdown für Flip Difficulty (standardmäßig versteckt)
         self.cmb_cloud_diff = QComboBox()
         self.cmb_cloud_diff.addItems(["All Difficulties", "Pro", "Difficult", "Medium", "Easy"])
         self.cmb_cloud_diff.hide() 
@@ -8634,7 +8505,7 @@ class MainWindow(QMainWindow):
         
         lay_ctrl.addWidget(QLabel("Category:"))
         lay_ctrl.addWidget(self.cmb_cloud_category)
-        lay_ctrl.addWidget(self.cmb_cloud_diff) # Hier eingefügt
+        lay_ctrl.addWidget(self.cmb_cloud_diff)
         lay_ctrl.addWidget(QLabel("ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
@@ -8647,7 +8518,6 @@ class MainWindow(QMainWindow):
         self.main_tabs.addTab(tab, "☁️ Cloud")
 
     def _on_cloud_cat_changed(self, idx: int):
-        # Zeige das Difficulty-Dropdown nur, wenn "Flip Challenge" (Index 2) ausgewählt ist
         if idx == 2:
             self.cmb_cloud_diff.show()
         else:
@@ -8680,7 +8550,6 @@ class MainWindow(QMainWindow):
             else:
                 data = CloudSync.fetch_data(self.cfg, f"scores/{category}/{rom}")
                 if data:
-                    # NEU: Herausfiltern der anderen Schwierigkeitsgrade
                     if category == "flip" and selected_diff != "All Difficulties":
                         filtered_data = []
                         for row in data:
@@ -8730,7 +8599,6 @@ class MainWindow(QMainWindow):
             
         html = [css, f"<div class='title'>Leaderboard: {rom.upper()} ({title_cat})</div>"]
         
-        # Brauchen wir die Extra-Spalte für die Difficulty? Nur wenn "All Difficulties" gewählt ist.
         show_diff_col = (category == "flip" and (not selected_diff or selected_diff == "All Difficulties"))
         
         if category == "progress":
@@ -8781,10 +8649,7 @@ class MainWindow(QMainWindow):
             
         html.append("</table>")
         return "".join(html)
-
-    # ==========================================
-    # TAB: LOCAL PROGRESS
-    # ==========================================
+        
     def _build_tab_progress(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -8810,7 +8675,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
         self.main_tabs.addTab(tab, "📈 Progress")
         
-        # FIX: Leichtes Delay beim Start, damit die Datenbank im Hintergrund fertig laden kann!
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(2000, self._refresh_progress_roms)
 
@@ -8820,12 +8684,10 @@ class MainWindow(QMainWindow):
         
         roms = set()
         
-        # Hole ROMs aus den Freischaltungen
         state = self.watcher._ach_state_load()
         roms.update(state.get("global", {}).keys())
         roms.update(state.get("session", {}).keys())
         
-        # Hole ROMs aus der Session History
         stats_dir = os.path.join(self.cfg.BASE, "session_stats")
         if os.path.isdir(stats_dir):
             for fn in os.listdir(stats_dir):
@@ -8836,7 +8698,6 @@ class MainWindow(QMainWindow):
                         
         valid_roms = sorted([r for r in roms if self.watcher._has_any_map(r)])
         
-        # "Global" immer als ersten Eintrag hinzufügen!
         self.cmb_progress_rom.addItem("Global")
         
         if valid_roms:
@@ -8856,7 +8717,6 @@ class MainWindow(QMainWindow):
         all_rules = []
 
         if rom == "Global":
-            # NUR die globalen Achievements laden
             import json, os
             gp = f_global_ach(self.cfg)
             if os.path.exists(gp):
@@ -8866,13 +8726,11 @@ class MainWindow(QMainWindow):
                         all_rules = data.get("rules", [])
                 except Exception:
                     pass
-            # Globale Freischaltungen aus allen gespielten ROMs sammeln
             for r_key, entries in state.get("global", {}).items():
                 for e in entries:
                     t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
                     unlocked_titles.add(t)
         else:
-            # NUR Session-Achievements für diesen spezifischen Tisch laden (keine Globalen mehr)
             s_rules = self.watcher._collect_player_rules_for_rom(rom)
             
             seen_rule_titles = set()
@@ -8883,7 +8741,6 @@ class MainWindow(QMainWindow):
                         seen_rule_titles.add(t)
                         all_rules.append(r)
             
-            # Nur Session-Freischaltungen für diesen Tisch sammeln
             for e in state.get("session", {}).get(rom, []):
                 t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
                 unlocked_titles.add(t)
@@ -8911,12 +8768,10 @@ class MainWindow(QMainWindow):
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
-        # Zeigt an, ob wir Global oder eine ROM ansehen
         rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
         html.append(f"<div style='font-size:1.4em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
         html.append(f"<div style='font-size:1.2em; color:#FF7F00; text-align:center; margin-bottom:15px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
         
-        # 4 SPALTEN TABELLE (Für die Achievements selbst)
         html.append("<table>")
         COLUMNS = 4
         for i in range(0, len(cells), COLUMNS):
@@ -8931,7 +8786,6 @@ class MainWindow(QMainWindow):
         
         final_html = "".join(html)
 
-        # SCROLL-POSITION BEIBEHALTEN
         try:
             sb = self.progress_view.verticalScrollBar()
             old_val = sb.value()
@@ -8940,9 +8794,6 @@ class MainWindow(QMainWindow):
         except Exception:
             self.progress_view.setHtml(final_html)
             
-    # ==========================================
-    # TAB: VERFÜGBARE MAPS & TISCHE (AVAILABLE MAPS)
-    # ==========================================
     def _build_tab_available_maps(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
@@ -8973,7 +8824,6 @@ class MainWindow(QMainWindow):
         self.maps_view.setHtml("<div style='color:#00E5FF; text-align:center; font-size:1.2em; margin-top:20px;'>Loading maps from database... Please wait.</div>")
         QApplication.processEvents()
         
-        # Zeigt ALLE verfügbaren Maps an (auch die, die noch nicht heruntergeladen wurden)
         index_roms = list(self.watcher.INDEX.keys())
         all_roms = sorted(list(set(index_roms)))
         
@@ -8997,10 +8847,8 @@ class MainWindow(QMainWindow):
         html = ["<style>table {width:100%; border-collapse:collapse;} th {text-align:left; color:#FF7F00; padding:8px; border-bottom:2px solid #555; background:#111;} td {padding:6px 8px; border-bottom:1px solid #333; color:#DDD; font-weight:bold;}</style>"]
         html.append(f"<div style='margin-bottom:15px; color:#00E5FF; font-weight:bold;'>The online database currently contains NVRAM maps for {len(self._all_maps_cache)} tables.</div>")
         
-        # Header für 2 Spalten (Table | ROM | Table | ROM)
         html.append("<table><tr><th>Table Name</th><th>ROM Identifier</th><th style='border-left: 2px solid #555; padding-left:15px;'>Table Name</th><th>ROM Identifier</th></tr>")
         
-        # Zuerst alle passenden Einträge filtern
         filtered_items = []
         for rom, title in self._all_maps_cache:
             if query in rom.lower() or query in title.lower():
@@ -9008,15 +8856,12 @@ class MainWindow(QMainWindow):
                 if len(filtered_items) > 800: # UI-Freeze Schutz
                     break
                     
-        # In 2er Blöcken nebeneinander rendern
         for i in range(0, len(filtered_items), 2):
             title1, rom1 = filtered_items[i]
             html.append("<tr>")
             
-            # Erste Spalte
             html.append(f"<td>{title1}</td><td style='color:#888;'>{rom1}</td>")
             
-            # Zweite Spalte (falls vorhanden)
             if i + 1 < len(filtered_items):
                 title2, rom2 = filtered_items[i + 1]
                 html.append(f"<td style='border-left: 2px solid #333; padding-left:15px;'>{title2}</td><td style='color:#888;'>{rom2}</td>")
@@ -9243,7 +9088,6 @@ class MainWindow(QMainWindow):
                     else:
                         title = str(e).strip()
                         
-                    # NEU: Verstecke die Tags auch in der Übersicht
                     title = title.replace(" (Session)", "").replace(" (Global)", "")
                     
                     if title:
@@ -9271,8 +9115,7 @@ class MainWindow(QMainWindow):
             html_pl = build_columns_html(session_map)
             self.ach_view_pl.setHtml(html_pl)
         except Exception:
-            pass  # <--- HIER HAT DAS EXCEPT GEFEHLT!
-
+            pass 
         try:
             if hasattr(self, "cmb_progress_rom"):
                 self._on_progress_rom_changed()
@@ -9526,8 +9369,7 @@ class MainWindow(QMainWindow):
             return rom, b""      
       
     def _build_global_parsed_nvram_html(self) -> str:
-        # padding in 'em' statt 'px' -> skaliert gleichmäßig mit der Schriftgröße!
-        # width: 100% entfernt, damit die Tabelle ihre natürliche, kompakte Größe behält
+
         style = """
         <style>
           table { border-collapse: collapse; }
@@ -9559,7 +9401,6 @@ class MainWindow(QMainWindow):
         if not rom:
             return style + "<div align='center'>(Global Snapshot: ROM unknown)</div>"
 
-        # Alle lesbaren Daten holen
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
 
         if not audits:
@@ -9567,7 +9408,6 @@ class MainWindow(QMainWindow):
 
         meta = f"<div class='meta'><b>ROM:</b> {rom} &nbsp;&nbsp; <b>All NVRAM values</b></div>"
         
-        # --- MEHRSPALTEN-LOGIK ---
         COLUMNS = 5
         
         rows = ["<tr>"]
@@ -9594,7 +9434,6 @@ class MainWindow(QMainWindow):
                     rows.append("<td></td><td></td>")
             rows.append("</tr>")
 
-        # HIER GEÄNDERT: Alles in zentrierte HTML-Container verpackt (<div align='center'> und <table align='center'>)
         return style + f"<div align='center'>{meta}<table align='center'>" + "".join(rows) + "</table></div>"
       
     @staticmethod
@@ -9685,7 +9524,6 @@ class MainWindow(QMainWindow):
         active_deltas = {}
         playtime_str = ""
 
-        # 1. PREFER LIVE DATA (if game is active)
         try:
             if hasattr(self, "watcher") and getattr(self.watcher, "game_active", False):
                 player_data = self.watcher.players.get(1, {})
@@ -9700,7 +9538,6 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        # 2. PERSISTENT FALLBACK TO session_latest.summary.json (when game is closed)
         if not active_deltas:
             try:
                 import json
@@ -9712,7 +9549,6 @@ class MainWindow(QMainWindow):
                         if p_list:
                             p1 = p_list[0]
                             saved_deltas = p1.get("deltas", {})
-                            # Filter here as well: Only show values > 0!
                             for k, v in saved_deltas.items():
                                 if int(v) > 0:
                                     active_deltas[k] = int(v)
@@ -9759,7 +9595,6 @@ class MainWindow(QMainWindow):
         return style + "".join(html_lines)
 
     def update_stats(self):
-        # 1. Lade Daten (wie vorher)
         stats_dir = os.path.join(self.cfg.BASE, "session_stats")
         content = ""
         if os.path.isdir(stats_dir):
@@ -9793,7 +9628,6 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
 
-        # 2. Nutze ab jetzt die NEUEN, isolierten GUI-Methoden:
         try:
             if "global" in self.stats_views:
                 html_global = self._gui_stats_global_html()
@@ -9809,7 +9643,6 @@ class MainWindow(QMainWindow):
             pass
 
     def _gui_stats_global_html(self) -> str:
-        # Dunkles GUI-Theme passend zum Arcade-Look (Schrift hell, Titel weiß)
         style = """
         <style>
           table { border-collapse: collapse; margin-top: 10px; }
@@ -9902,7 +9735,6 @@ class MainWindow(QMainWindow):
         def esc(x) -> str:
             return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        # Dunkles GUI-Theme passend zum Arcade-Look (Schrift hell, Titel weiß, Werte orange)
         style = """
         <style>
           table { border-collapse: collapse; margin-top: 10px; }
@@ -10127,7 +9959,6 @@ class MainWindow(QMainWindow):
             for p in combined_players:
                 p["deltas"] = active_deltas
 
-            # NUR diese EINE Seite wird erstellt! Keine Global Snapshots mehr!
             sections.append({
                 "kind": "combined_players",
                 "players": combined_players,
@@ -10376,7 +10207,6 @@ class MainWindow(QMainWindow):
     def _on_overlay_test_clicked(self):
         self._ensure_overlay()
         
-        # Wir generieren realistische Dummy-Daten für den Test
         dummy_data = {
             "players": [{
                 "id": 1,
@@ -10397,7 +10227,6 @@ class MainWindow(QMainWindow):
             }]
         }
         
-        # Wir täuschen kurz einen aktiven ROM-Namen vor, damit das Overlay schick aussieht
         old_rom = getattr(self.watcher, "current_rom", None)
         self.watcher.current_rom = "test_pinball_table"
         
@@ -10406,10 +10235,8 @@ class MainWindow(QMainWindow):
             self.overlay.show()
             self.overlay.raise_()
             
-            # Das Test-Overlay nach 10 Sekunden automatisch wieder schließen
             QTimer.singleShot(10000, self._hide_overlay)
         finally:
-            # Den echten Zustand wiederherstellen
             self.watcher.current_rom = old_rom
 
     def _on_toggle_keyboard_event(self):
@@ -10420,7 +10247,6 @@ class MainWindow(QMainWindow):
         if getattr(self, "_overlay_busy", False):
             return
             
-        # BUGFIX: Wenn eines der Challenge-Menüs offen ist, blockieren wir das große Overlay komplett!
         try:
             if getattr(self, "_challenge_select", None) and self._challenge_select.isVisible():
                 return
@@ -10493,7 +10319,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 ch_ov_visible = False
                 diff_ov_visible = False
-            # Auch hier blockieren, wenn das Challenge- oder Difficulty-Menü offen ist
             if ch_ov_visible or diff_ov_visible or self._challenge_is_active():
                 return
             self._cycle_overlay_button()
@@ -10601,7 +10426,6 @@ class MainWindow(QMainWindow):
         cancelled = {"flag": False}
         start_ts = time.time()
         
-        # Diese Funktion updatet den Text für BEIDE Varianten exakt gleich
         def update_lbl():
             elapsed = time.time() - start_ts
             rem = max(0.0, 10.0 - elapsed)
@@ -10611,7 +10435,6 @@ class MainWindow(QMainWindow):
 
         update_lbl()
         
-        # Ein Filter, der auf Windows-Ebene IMMER die ESC-Taste fängt (egal ob Joystick oder Keyboard)
         class _UnifiedFilter(QAbstractNativeEventFilter):
             def __init__(self, parent_ref):
                 super().__init__()
@@ -10627,17 +10450,15 @@ class MainWindow(QMainWindow):
                         if msg.message in (0x0100, 0x0104): # WM_KEYDOWN, WM_SYSKEYDOWN
                             vk = int(msg.wParam)
                             
-                            # IMMER ESC abbrechen!
                             if vk == 0x1B:
                                 self._done = True
                                 cancelled["flag"] = True
                                 QTimer.singleShot(0, dlg.reject)
                                 return True, 0
                                 
-                            # Wenn wir auf Keyboard warten, die Taste speichern
                             if not is_joy:
                                 if vk in (0x10, 0x11, 0x12, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5):
-                                    return False, 0 # Reine Modifier ignorieren
+                                    return False, 0 
                                     
                                 lp = int(msg.lParam)
                                 scancode = (lp >> 16) & 0xFF
@@ -10684,7 +10505,6 @@ class MainWindow(QMainWindow):
                 
             elapsed = update_lbl()
             
-            # Joystick-Abfrage läuft parallel zum ESC-Fänger
             if is_joy:
                 try:
                     mask = _read_buttons_mask()
@@ -11030,7 +10850,6 @@ class MainWindow(QMainWindow):
         self._update_prefetch_label()
 
     def _update_prefetch_label(self):
-        # Blink-Effekt durch Wechsel zwischen Knallrot und Dunkelgrau
         color = "#FF3B30" if getattr(self, "_prefetch_blink_state", False) else "#333333"
         html = (
             f"🔴 Watcher: PREFETCH IN PROGRESS - {self._prefetch_msg} "
@@ -11047,14 +10866,12 @@ class MainWindow(QMainWindow):
             pass
         self.status_label.setText(f"🟢 {msg}")
         self.status_label.setStyleSheet("font-size: 11pt; color: #00B050; padding: 10px;")
-        # Nach 10 Sekunden automatisch zum sauberen Dashboard-State zurückspringen
         QTimer.singleShot(10000, self._reset_status_label)
 
     def _reset_status_label(self):
         self.status_label.setText("🟢 Watcher: RUNNING...")
         self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
 
-    # Überschreibe auch kurz die restart-Funktion, damit nach einem Engine-Neustart der Status korrekt formatiert wird
     def _restart_watcher(self):
         try:
             if self.watcher:
@@ -11066,7 +10883,6 @@ class MainWindow(QMainWindow):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        # Wir legen die aktuelle Version fest
         CURRENT_VERSION = "2.2"
         
         def _task():
@@ -11088,27 +10904,23 @@ class MainWindow(QMainWindow):
                 if data and isinstance(data, dict):
                     latest = str(data.get("latest_version", CURRENT_VERSION))
                     
-                    # Hilfsfunktion: Wandelt "2.2" in (2, 2) um, damit man sauber vergleichen kann
                     def parse_v(v_str):
                         try:
                             return tuple(map(int, str(v_str).split('.')))
                         except Exception:
                             return (0,)
                     
-                    # Prüfe ob die Cloud-Version strikt GRÖSSER ist als die lokale Version
                     if parse_v(latest) > parse_v(CURRENT_VERSION):
                         from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                         msg = f"An important update is available!\n\nCurrent version: {CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
                         QMetaObject.invokeMethod(self, "_show_update_warning", Qt.ConnectionType.QueuedConnection, Q_ARG(str, msg))
             except Exception as e:
-                pass # Wenn Offline, einfach ignorieren
+                pass 
                 
-        # Im Hintergrund starten, damit die GUI nicht einfriert
         threading.Thread(target=_task, daemon=True).start()
 
     @pyqtSlot(str)
     def _show_update_warning(self, msg: str):
-        # Zeigt ein Fenster an, das man wegklicken muss
         QMessageBox.warning(self, "Update available!", msg)
      
 def main():
@@ -11150,4 +10962,5 @@ def main():
     sys.exit(code)
 
 if __name__ == "__main__":
+
     main()
