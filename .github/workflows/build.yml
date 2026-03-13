@@ -33,7 +33,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: AchievementWatcher
-        path: dist/AchievementWatcher.exe
+        path: dist/Achievement_Watcher.exe
 
     - name: Upload EXE to Release
       uses: softprops/action-gh-release@v2
