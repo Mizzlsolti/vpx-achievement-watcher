@@ -130,13 +130,23 @@ class CloudStatsMixin:
                         rom = it.get("rom", "")
                         sc = fmt_score(it.get("score", 0))
                         dur = self._fmt_hms(int(it.get("duration_sec", 0)))
-                        table_title = _html.escape(romnames.get(rom, ""))
+                        table_title = romnames.get(rom, "")
+                        rom_escaped = _html.escape(rom)
+                        # QTextBrowser only shows tooltips for <a> anchor elements,
+                        # not for plain <td> elements, so wrap the ROM name in a
+                        # styled anchor that looks like plain text.
+                        title_attr = f"title='{_html.escape(table_title, quote=True)}' " if table_title else ""
+                        rom_cell = (
+                            f"<a href='rom://{rom_escaped}' {title_attr}"
+                            f"style='color:inherit; text-decoration:none; font-weight:bold;'>"
+                            f"{rom_escaped}</a>"
+                        )
 
                         if is_flip:
                             diff_label = it.get("difficulty", "-")
-                            rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left'>{rom_cell}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                         else:
-                            rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left'>{rom_cell}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                     body = "".join(rows)
                 
                 return f"<h4>{title}</h4><table width='100%'>{head}{body}</table>"
@@ -185,6 +195,7 @@ class CloudStatsMixin:
         ch_tab = QWidget()
         ch_layout = QVBoxLayout(ch_tab)
         self.ch_results_view = QTextBrowser()
+        self.ch_results_view.setOpenLinks(False)
         ch_layout.addWidget(QLabel("<b>Latest Challenge Results</b>"))
         ch_layout.addWidget(self.ch_results_view)
         self.stats_tabs.addTab(ch_tab, "⚔️ Challenge Leaderboards")
@@ -215,7 +226,7 @@ class CloudStatsMixin:
         self.cmb_cloud_diff.hide() 
         
         self.txt_cloud_rom = QLineEdit()
-        self.txt_cloud_rom.setPlaceholderText("Enter ROM Name (e.g. afm_113b)")
+        self.txt_cloud_rom.setPlaceholderText("Enter ROM or Table Name (e.g. afm_113b or Addams Family)")
         
         self.btn_cloud_fetch = QPushButton("Fetch Highscores ☁️")
         self.btn_cloud_fetch.setStyleSheet("background:#00E5FF; color:black; font-weight:bold;")
@@ -224,13 +235,13 @@ class CloudStatsMixin:
         lay_ctrl.addWidget(QLabel("Category:"))
         lay_ctrl.addWidget(self.cmb_cloud_category)
         lay_ctrl.addWidget(self.cmb_cloud_diff)
-        lay_ctrl.addWidget(QLabel("ROM:"))
+        lay_ctrl.addWidget(QLabel("ROM / Table:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
         layout.addWidget(grp_controls)
         
         self.cloud_view = QTextBrowser()
-        self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM and click Fetch)</div>")
+        self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM or Table Name and click Fetch)</div>")
         layout.addWidget(self.cloud_view)
         
         self.main_tabs.addTab(tab, "☁️ Cloud")
