@@ -1931,7 +1931,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         
         # Cloud Tab
         _set_tip("cmb_cloud_category", "Select the leaderboard category you want to view.")
-        _set_tip("txt_cloud_rom", "Type a ROM name (e.g. afm_113b) or a Table Name (e.g. Addams Family). Both are supported.")
+        _set_tip("txt_cloud_rom", "Type the ROM name exactly as it appears in VPX (e.g. afm_113b).")
         _set_tip("btn_cloud_fetch", "Download and display the global highscores from the cloud.")
         
         # System Tab
