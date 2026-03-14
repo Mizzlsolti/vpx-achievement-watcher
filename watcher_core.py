@@ -154,8 +154,8 @@ VK_LSHIFT = 0xA0
 VK_RSHIFT = 0xA1
 
 # Heat Challenge rate constants (units per second unless noted)
-HEAT_HOLD_RATE = 30.0      # heat gained per second while flipper is held
-HEAT_PRESS_BURST = 10.0    # instant heat added on initial flipper press
+HEAT_HOLD_RATE = 22.5      # heat gained per second while flipper is held
+HEAT_PRESS_BURST = 7.5     # instant heat added on initial flipper press
 HEAT_COOLDOWN_RATE = 10.0  # heat lost per second while flippers are released
 
 EXCLUDED_FIELDS = {
