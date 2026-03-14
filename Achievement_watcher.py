@@ -1000,7 +1000,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _start_selected_challenge(self):
-        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
+        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
         try:
             has_map = False
             try:
@@ -1008,7 +1008,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
             except Exception:
                 has_map = True
-            if idx == 0:
+            if idx == 3:
+                self._close_challenge_select_overlay()
+            elif idx == 0:
                 if not has_map:
                     return
                 self.watcher.start_timed_challenge()
@@ -1136,13 +1138,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # No NVRAM map – only Heat Challenge is available for this table
             ovw = getattr(self, "_challenge_select", None)
             if ovw and ovw.isVisible():
-                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
+                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
                 if sel == 2:
                     self._close_challenge_select_overlay()
                     try:
                         self.watcher.start_heat_challenge()
                     except Exception:
                         pass
+                elif sel == 3:
+                    self._close_challenge_select_overlay()
                 else:
                     # Snap back to Heat and inform user
                     self._ch_ov_selected_idx = 2
@@ -1179,7 +1183,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         ovw = getattr(self, "_challenge_select", None)
         if ovw and ovw.isVisible():
-            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
+            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
             if sel == 0:
                 self._close_challenge_select_overlay()
                 try:
@@ -1193,6 +1197,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     self.watcher.start_heat_challenge()
                 except Exception:
                     pass
+                return
+            elif sel == 3:
+                self._close_challenge_select_overlay()
                 return
             else:
                 self._open_flip_difficulty_overlay()
@@ -1220,7 +1227,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
-                return  # No NVRAM map – navigation locked to Heat Challenge
+                # No NVRAM map – only allow navigation between Heat (2) and Exit (3)
+                ovw = getattr(self, "_challenge_select", None)
+                if not (ovw and ovw.isVisible()):
+                    return
+                self._ch_ov_selected_idx = 2 if int(self._ch_ov_selected_idx) == 3 else 3
+                try:
+                    ovw.set_selected(self._ch_ov_selected_idx)
+                except Exception:
+                    pass
+                return
         except Exception:
             pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
@@ -1237,7 +1253,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 3
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 4
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:
@@ -1264,7 +1280,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
-                return  # No NVRAM map – navigation locked to Heat Challenge
+                # No NVRAM map – only allow navigation between Heat (2) and Exit (3)
+                ovw = getattr(self, "_challenge_select", None)
+                if not (ovw and ovw.isVisible()):
+                    return
+                self._ch_ov_selected_idx = 3 if int(self._ch_ov_selected_idx) == 2 else 2
+                try:
+                    ovw.set_selected(self._ch_ov_selected_idx)
+                except Exception:
+                    pass
+                return
         except Exception:
             pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
@@ -1281,7 +1306,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 3
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 4
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:

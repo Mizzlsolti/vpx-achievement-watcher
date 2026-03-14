@@ -1944,7 +1944,7 @@ class ChallengeSelectOverlay(QWidget):
     def __init__(self, parent: "MainWindow", selected_idx: int = 0):
         super().__init__(parent)
         self.parent_gui = parent
-        self._selected = int(selected_idx) % 3
+        self._selected = int(selected_idx) % 4
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -1985,7 +1985,7 @@ class ChallengeSelectOverlay(QWidget):
         self._render_and_place()
 
     def set_selected(self, idx: int):
-        self._selected = int(idx) % 3
+        self._selected = int(idx) % 4
         self._render_and_place()
 
     def apply_portrait_from_cfg(self):
@@ -2002,15 +2002,18 @@ class ChallengeSelectOverlay(QWidget):
         text_color = QColor("#FFFFFF")
         hi_color = QColor("#FF7F00")
 
-        if int(getattr(self, "_selected", 0) or 0) % 3 == 0:
+        if int(getattr(self, "_selected", 0) or 0) % 4 == 0:
             title_text = "⌛ Timed Challenge"
             desc_text = "3:00 minutes playing time."
-        elif int(getattr(self, "_selected", 0) or 0) % 3 == 1:
+        elif int(getattr(self, "_selected", 0) or 0) % 4 == 1:
             title_text = "🎯 Flip Challenge"
             desc_text = "Count Left+Right flips until chosen target."
-        else:
+        elif int(getattr(self, "_selected", 0) or 0) % 4 == 2:
             title_text = "🔥 Heat Challenge"
             desc_text = "Keep heat below 100%. Don't spam or hold flippers!"
+        else:
+            title_text = "❌ Exit"
+            desc_text = "Close the challenge menu."
 
         w, h = 520, 200
         pad_lr = 20
@@ -2079,7 +2082,9 @@ class ChallengeSelectOverlay(QWidget):
             p.setPen(QColor("#AAAAAA"))
             p.setFont(QFont(font_family, hint_pt))
             hint_rect = QRect(0, h - bottom_pad - hint_h, w, hint_h)
-            p.drawText(hint_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), "Press Hotkey to start")
+            _is_exit = int(getattr(self, "_selected", 0) or 0) % 4 == 3
+            hint_label = "Press Hotkey to close" if _is_exit else "Press Hotkey to start"
+            p.drawText(hint_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), hint_label)
 
             # Eisblaue pulsierende Pfeile
             amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
