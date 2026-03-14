@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html as _html
 import os
 import json
 import threading
@@ -348,6 +349,31 @@ class CloudStatsMixin:
         else:
             html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Score</th><th>Date</th></tr>")
         
+        vps_base = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
+
+        def _cloud_info_badge(r: dict) -> str:
+            vps_id = (r.get("vps_id") or "").strip()
+            table_name = (r.get("table_name") or "").strip()
+            author = (r.get("author") or "").strip()
+            version = (r.get("version") or "").strip()
+            parts = []
+            if table_name:
+                parts.append(f"Table: {_html.escape(table_name)}")
+            if author:
+                parts.append(f"Author: {_html.escape(author)}")
+            if version:
+                parts.append(f"Version: {_html.escape(version)}")
+            if not parts and not vps_id:
+                return ""
+            tooltip = " | ".join(parts) if parts else _html.escape(vps_id)
+            safe_vps_id = _html.escape(vps_id, quote=True)
+            if vps_id:
+                return (
+                    f" <a href='{vps_base}{safe_vps_id}' title='{tooltip}'"
+                    " style='text-decoration:none;'>ℹ️</a>"
+                )
+            return f" <span title='{tooltip}' style='cursor:help;'>ℹ️</span>"
+
         for i, row in enumerate(data):
             rank = i + 1
             name = row.get("name", "Unknown")
@@ -367,6 +393,7 @@ class CloudStatsMixin:
                 """
                 html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}</td><td>{bar}</td><td>{ts}</td></tr>")
             elif category == "flip":
+                badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
                 if show_diff_col:
                     diff_str = row.get("difficulty", "")
@@ -380,12 +407,13 @@ class CloudStatsMixin:
                             else: diff_str = f"{tf} Flips"
                         else:
                             diff_str = "-"
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}</td><td style='color:#AAAAAA; font-style:italic;'>{diff_str}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td style='color:#AAAAAA; font-style:italic;'>{diff_str}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
                 else:
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
             else:
+                badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
             
         html.append("</table>")
         return "".join(html)
