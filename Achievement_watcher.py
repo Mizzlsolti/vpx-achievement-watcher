@@ -1136,8 +1136,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # No NVRAM map – only Heat Challenge is available for this table
             ovw = getattr(self, "_challenge_select", None)
             if ovw and ovw.isVisible():
-                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
-                if sel == 2:
+                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
+                if sel == 3:
+                    self._close_challenge_select_overlay()
+                elif sel == 2:
                     self._close_challenge_select_overlay()
                     try:
                         self.watcher.start_heat_challenge()
@@ -1179,8 +1181,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         ovw = getattr(self, "_challenge_select", None)
         if ovw and ovw.isVisible():
-            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
-            if sel == 0:
+            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
+            if sel == 3:
+                self._close_challenge_select_overlay()
+                return
+            elif sel == 0:
                 self._close_challenge_select_overlay()
                 try:
                     self.watcher.start_timed_challenge()
@@ -1220,7 +1225,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
-                return  # No NVRAM map – navigation locked to Heat Challenge
+                # No NVRAM map – only allow navigating between Heat (2) and Exit (3)
+                current = int(self._ch_ov_selected_idx) % 4
+                if current == 3:
+                    self._ch_ov_selected_idx = 2
+                    ovw = getattr(self, "_challenge_select", None)
+                    if ovw and ovw.isVisible():
+                        try:
+                            ovw.set_selected(2)
+                        except Exception:
+                            pass
+                return
         except Exception:
             pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
@@ -1237,7 +1252,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 3
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 4
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:
@@ -1264,7 +1279,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
-                return  # No NVRAM map – navigation locked to Heat Challenge
+                # No NVRAM map – only allow navigating between Heat (2) and Exit (3)
+                current = int(self._ch_ov_selected_idx) % 4
+                if current == 2:
+                    self._ch_ov_selected_idx = 3
+                    ovw = getattr(self, "_challenge_select", None)
+                    if ovw and ovw.isVisible():
+                        try:
+                            ovw.set_selected(3)
+                        except Exception:
+                            pass
+                return
         except Exception:
             pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
@@ -1281,7 +1306,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 3
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 4
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:
