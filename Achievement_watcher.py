@@ -1570,10 +1570,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay = QVBoxLayout(grp)
         
         row = QHBoxLayout()
-        row.addWidget(QLabel("Select ROM:"))
+        row.addWidget(QLabel("Select Table:"))
         self.cmb_progress_rom = QComboBox()
         self.cmb_progress_rom.currentIndexChanged.connect(self._on_progress_rom_changed)
         row.addWidget(self.cmb_progress_rom)
+
+        self.lbl_progress_rom_name = QLabel("")
+        self.lbl_progress_rom_name.setStyleSheet("color:#00E5FF; font-weight:bold; margin-left: 10px;")
+        row.addWidget(self.lbl_progress_rom_name)
         
         btn_refresh = QPushButton("🔄 Refresh")
         btn_refresh.setStyleSheet("background:#00E5FF; color:black; font-weight:bold;")
@@ -1610,16 +1614,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         
         valid_roms = sorted([r for r in roms if self.watcher._has_any_map(r)])
         
-        self.cmb_progress_rom.addItem("Global")
+        self.cmb_progress_rom.addItem("Global", "Global")
         
         if valid_roms:
-            self.cmb_progress_rom.addItems(valid_roms)
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            for r in valid_roms:
+                title = romnames.get(r, r)
+                self.cmb_progress_rom.addItem(title, r)
             
         self.cmb_progress_rom.blockSignals(False)
         self._on_progress_rom_changed()
 
     def _on_progress_rom_changed(self):
-        rom = self.cmb_progress_rom.currentText()
+        rom = self.cmb_progress_rom.currentData()
+        if not rom:
+            rom = self.cmb_progress_rom.currentText()
+
+        # Update colored ROM name label next to the dropdown
+        self.lbl_progress_rom_name.setText(rom if (rom and rom != "Global") else "")
+
         if not rom:
             self.progress_view.setHtml("<div style='text-align:center; color:#888;'>(No data available)</div>")
             return
