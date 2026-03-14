@@ -2003,13 +2003,13 @@ class ChallengeSelectOverlay(QWidget):
         hi_color = QColor("#FF7F00")
 
         if int(getattr(self, "_selected", 0) or 0) % 3 == 0:
-            title_text = "Timed Challenge"
+            title_text = "⌛ Timed Challenge"
             desc_text = "3:00 minutes playing time."
         elif int(getattr(self, "_selected", 0) or 0) % 3 == 1:
-            title_text = "Flip Challenge"
+            title_text = "🎯 Flip Challenge"
             desc_text = "Count Left+Right flips until chosen target."
         else:
-            title_text = "Heat Challenge"
+            title_text = "🔥 Heat Challenge"
             desc_text = "Keep heat below 100%. Don't spam or hold flippers!"
 
         w, h = 520, 200
