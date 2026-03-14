@@ -422,6 +422,69 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
             warned.add(key)
         return None
 
+
+def run_vpxtool_get_info(cfg: AppConfig, vpx_path: str) -> dict | None:
+    """Call ``vpxtool info <vpx_path>`` and return a dict with table metadata.
+
+    Returns a dict with keys ``table_name``, ``author``, ``version``, and
+    ``vps_id`` (any of which may be an empty string if not found), or ``None``
+    when the tool cannot be run or returns no useful data.
+    """
+    if not vpx_path or not os.path.isfile(vpx_path):
+        return None
+
+    exe = ensure_vpxtool(cfg)
+    if not exe:
+        return None
+
+    cmd = [exe, "info", vpx_path]
+    try:
+        cp = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            creationflags=0x08000000,
+        )
+        out = (cp.stdout or "").strip()
+        if not out:
+            out = (cp.stderr or "").strip()
+        if cp.returncode != 0 or not out:
+            return None
+
+        def _find(keys: list[str]) -> str:
+            for key in keys:
+                m = re.search(
+                    r"(?i)(?:^|\n)\s*" + re.escape(key) + r"\s*[:\=]\s*(.+)",
+                    out,
+                )
+                if m:
+                    return m.group(1).strip().strip('"').strip("'")
+            return ""
+
+        table_name = _find(["TableName", "table_name", "Name"])
+        author = _find(["AuthorName", "author_name", "Author"])
+        version = _find(["TableVersion", "table_version", "Version"])
+        vps_id = _find(["VPSID", "vps_id", "VPS ID", "VPS_ID"])
+
+        if not any([table_name, author, version, vps_id]):
+            return None
+
+        return {
+            "table_name": table_name,
+            "author": author,
+            "version": version,
+            "vps_id": vps_id,
+        }
+
+    except Exception as e:
+        try:
+            log(cfg, f"[VPXTOOL] info exception: {e}", "WARN")
+        except Exception:
+            pass
+        return None
+
+
 PREFETCH_MODE = "background"
 PREFETCH_LOG_EVERY = 50
 ROLLING_HISTORY_PER_ROM = 10
@@ -1310,7 +1373,7 @@ class Watcher:
         try:
             from_ga = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
             if from_ga:
-                self._ach_record_unlocks("global", self.current_rom, from_ga)
+                self._ach_record_unlocks("global", self.current_rom, from_ga, self._get_current_table_info())
                 try:
                     self._emit_achievement_toasts(from_ga, seconds=5)
                 except Exception:
@@ -1321,7 +1384,7 @@ class Watcher:
         try:
             sess_achs_p1 = self._evaluate_player_session_achievements(1, self.current_rom) or []
             if sess_achs_p1:
-                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1))
+                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1), self._get_current_table_info())
                 try:
                     self._emit_achievement_toasts(sess_achs_p1, seconds=5)
                 except Exception:
@@ -2880,6 +2943,10 @@ class Watcher:
                 "score": int(score)
             }
 
+            tbl_info = self._get_current_table_info()
+            if tbl_info:
+                payload["table_info"] = tbl_info
+
             extra = {}
             if str(kind or "").lower() == "flip":
                 tf = int(ch.get("threshold", 0))
@@ -3534,7 +3601,7 @@ class Watcher:
         try:
             global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
             if global_hits:
-                self._ach_record_unlocks("global", self.current_rom, global_hits)
+                self._ach_record_unlocks("global", self.current_rom, global_hits, self._get_current_table_info())
                 self._emit_achievement_toasts(global_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
@@ -3542,7 +3609,7 @@ class Watcher:
         try:
             session_hits = self._evaluate_player_session_achievements(1, self.current_rom) or []
             if session_hits:
-                self._ach_record_unlocks("session", self.current_rom, list(session_hits))
+                self._ach_record_unlocks("session", self.current_rom, list(session_hits), self._get_current_table_info())
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
@@ -3857,7 +3924,35 @@ class Watcher:
 
             lines.append(f"{label:<30} {value_txt}")
 
-    def _ach_record_unlocks(self, kind: str, rom: str, titles: list):
+    def _get_current_table_info(self) -> dict | None:
+        """Return cached table metadata for the currently loaded VPX file.
+
+        The result is cached per VPX path so that ``vpxtool info`` is called at
+        most once per table during a session.
+        """
+        cache = getattr(self, "_vpx_info_cache", None)
+        if not isinstance(cache, dict):
+            cache = {}
+            self._vpx_info_cache = cache
+
+        rom_cache = getattr(self, "_rom_detect_cache", None)
+        vpx_path = (rom_cache or {}).get("vpx_path") if isinstance(rom_cache, dict) else None
+        if not vpx_path:
+            return None
+
+        try:
+            key = os.path.abspath(vpx_path).lower()
+        except Exception:
+            key = str(vpx_path)
+
+        if key in cache:
+            return cache[key]
+
+        info = run_vpxtool_get_info(self.cfg, vpx_path)
+        cache[key] = info
+        return info
+
+    def _ach_record_unlocks(self, kind: str, rom: str, titles: list, table_info: dict | None = None):
         if not rom or not titles:
             return
         from datetime import datetime, timezone
@@ -3881,6 +3976,8 @@ class Watcher:
                 entry = {"title": title, "ts": now_iso}
                 if t.get("origin"):
                     entry["origin"] = str(t["origin"])
+                if table_info:
+                    entry["table_info"] = table_info
                 lst.append(entry)
                 seen.add(title)
                 added += 1
@@ -3888,7 +3985,10 @@ class Watcher:
                 title = str(t).strip()
                 if not title or title in seen:
                     continue
-                lst.append({"title": title, "ts": now_iso})
+                entry = {"title": title, "ts": now_iso}
+                if table_info:
+                    entry["table_info"] = table_info
+                lst.append(entry)
                 seen.add(title)
                 added += 1
         if added:
@@ -3921,8 +4021,9 @@ class Watcher:
         try:
             session_titles = session_titles or []
             global_titles = global_titles or []
-            self._ach_record_unlocks("session", rom, session_titles)
-            self._ach_record_unlocks("global", rom, global_titles)
+            tbl_info = self._get_current_table_info()
+            self._ach_record_unlocks("session", rom, session_titles, tbl_info)
+            self._ach_record_unlocks("global", rom, global_titles, tbl_info)
             out = []
             for t in session_titles:
                 if isinstance(t, dict):
