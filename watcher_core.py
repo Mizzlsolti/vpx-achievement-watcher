@@ -797,6 +797,10 @@ class Watcher:
             "joy_thread": None,
             "joy_prev_masks": {},
         }
+        self._heat_inputs = {
+            "joy_running": False,
+            "joy_thread": None,
+        }
 
     def start_challenge_input_bindings(self) -> None:
 
@@ -2493,6 +2497,13 @@ class Watcher:
             except Exception:
                 pass
 
+            ini = get_vpx_ini_path_for_current_user()
+            binds = parse_vpx_flipper_bindings(ini or "")
+            vk_left = int(binds.get("vk_left", 0) or 0) or VK_LSHIFT
+            vk_right = int(binds.get("vk_right", 0) or 0) or VK_RSHIFT
+            joy_left = int(binds.get("joy_left", 0) or 0)
+            joy_right = int(binds.get("joy_right", 0) or 0)
+
             ch.clear()
             ch.update({
                 "active": True,
@@ -2506,8 +2517,22 @@ class Watcher:
                 "heat": 0.0,
                 "heat_last_time": time.time(),
                 "heat_prev_pressed": False,
+                "vk_left": vk_left,
+                "vk_right": vk_right,
+                "joy_left": joy_left,
+                "joy_right": joy_right,
+                "joy_pressed": False,
             })
             self.challenge = ch
+
+            try:
+                self._heat_inputs["joy_running"] = True
+                t = threading.Thread(target=self._heat_joy_poll_loop, daemon=True, name="HeatJoyPoll")
+                self._heat_inputs["joy_thread"] = t
+                t.start()
+                log(self.cfg, "[HEAT] Joystick polling started for flipper held-state")
+            except Exception as e:
+                log(self.cfg, f"[HEAT] Joystick thread start failed: {e}", "WARN")
 
             try:
                 self.bridge.challenge_info_show.emit("Heat Challenge – Don't overheat!", 4, "#FF7F00")
@@ -2525,6 +2550,17 @@ class Watcher:
             log(self.cfg, f"[CHALLENGE] heat start failed: {e}", "WARN")
 
     def stop_heat_challenge(self):
+        try:
+            self._heat_inputs["joy_running"] = False
+        except Exception:
+            pass
+        try:
+            t = self._heat_inputs.get("joy_thread")
+            if t and t.is_alive():
+                t.join(timeout=0.5)
+        except Exception:
+            pass
+        self._heat_inputs["joy_thread"] = None
         ch = getattr(self, "challenge", {})
         if ch.get("kind") == "heat":
             ch["active"] = False
@@ -2534,6 +2570,47 @@ class Watcher:
             except Exception:
                 pass
             log(self.cfg, "[CHALLENGE] heat stopped")
+
+    def _heat_joy_poll_loop(self):
+        """Background thread: poll joystick held-state for the Heat Challenge."""
+        try:
+            ch = getattr(self, "challenge", {}) or {}
+            want_left = int(ch.get("joy_left", 0) or 0)
+            want_right = int(ch.get("joy_right", 0) or 0)
+
+            def bit_for(btn: int) -> int:
+                return (1 << (int(btn) - 1)) if int(btn) > 0 else 0
+
+            bit_left = bit_for(want_left)
+            bit_right = bit_for(want_right)
+
+            if not bit_left and not bit_right:
+                return  # no joystick bindings – nothing to poll
+
+            jix = JOYINFOEX()
+            jix.dwSize = ctypes.sizeof(JOYINFOEX)
+            jix.dwFlags = JOY_RETURNALL
+
+            while bool(self._heat_inputs.get("joy_running", False)):
+                held = False
+                for jid in range(16):
+                    try:
+                        if _joyGetPosEx(jid, ctypes.byref(jix)) == JOYERR_NOERROR:
+                            cur = int(jix.dwButtons)
+                            if (bit_left and (cur & bit_left)) or (bit_right and (cur & bit_right)):
+                                held = True
+                                break
+                    except Exception:
+                        continue
+                ch = getattr(self, "challenge", {}) or {}
+                if ch.get("kind") == "heat" and ch.get("active"):
+                    ch["joy_pressed"] = held
+                    self.challenge = ch
+                else:
+                    break
+                time.sleep(0.05)
+        except Exception as e:
+            log(self.cfg, f"[HEAT] joy poll loop failed: {e}", "WARN")
 
     def _clear_challenge_state(self):
         try:
@@ -2550,6 +2627,10 @@ class Watcher:
             pass
         try:
             self._flip_stop_inputs()
+        except Exception:
+            pass
+        try:
+            self._heat_inputs["joy_running"] = False
         except Exception:
             pass
             
@@ -2641,15 +2722,18 @@ class Watcher:
                     delta = min(now_t - last_t, 0.5)
                     ch["heat_last_time"] = now_t
 
+                    vk_l = int(ch.get("vk_left", 0) or 0) or VK_LSHIFT
+                    vk_r = int(ch.get("vk_right", 0) or 0) or VK_RSHIFT
                     try:
                         import ctypes as _ctypes
-                        lshift = bool(_ctypes.windll.user32.GetAsyncKeyState(VK_LSHIFT) & 0x8000)
-                        rshift = bool(_ctypes.windll.user32.GetAsyncKeyState(VK_RSHIFT) & 0x8000)
+                        lshift = bool(_ctypes.windll.user32.GetAsyncKeyState(vk_l) & 0x8000)
+                        rshift = bool(_ctypes.windll.user32.GetAsyncKeyState(vk_r) & 0x8000)
                     except Exception:
                         lshift = False
                         rshift = False
 
-                    pressed = lshift or rshift
+                    joy_held = bool(ch.get("joy_pressed", False))
+                    pressed = lshift or rshift or joy_held
                     prev_pressed = bool(ch.get("heat_prev_pressed", False))
                     heat = float(ch.get("heat", 0.0) or 0.0)
 
@@ -2701,6 +2785,10 @@ class Watcher:
                         ch["completed"] = True
                         self.challenge = ch
 
+                        try:
+                            self._heat_inputs["joy_running"] = False
+                        except Exception:
+                            pass
                         try:
                             self.bridge.heat_bar_hide.emit()
                         except Exception:
@@ -3896,7 +3984,7 @@ class Watcher:
             return
 
         ch = getattr(self, "challenge", {}) or {}
-        is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip")
+        is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")
         ch_aborted = is_challenge and not ch.get("completed", False)
 
         if is_challenge:
@@ -3913,6 +4001,15 @@ class Watcher:
             try:
                 if hasattr(self, "_flip_stop_inputs"):
                     self._flip_stop_inputs()
+            except Exception: pass
+
+            try:
+                self._heat_inputs["joy_running"] = False
+            except Exception: pass
+
+            try:
+                if hasattr(self.bridge, "heat_bar_hide"):
+                    self.bridge.heat_bar_hide.emit()
             except Exception: pass
             
             if ch_aborted:
