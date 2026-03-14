@@ -1987,7 +1987,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         session_map = state.get("session", {}) or {}
         
         def build_columns_html(data_map: dict) -> str:
-            VPS_BASE = "https://virtual-pinball-spreadsheet.web.app/game/"
+            VPS_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
 
             def _info_badge(e: dict) -> str:
                 ti = e.get("table_info") if isinstance(e, dict) else None
@@ -2004,7 +2004,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     parts.append(f"VPS-ID: {ti['vps_id']}")
                 if not parts:
                     return ""
-                tooltip = " | ".join(parts)
+                tooltip = "&#10;".join(parts)
                 vps_id = (ti.get("vps_id") or "").strip()
                 if vps_id:
                     return (
