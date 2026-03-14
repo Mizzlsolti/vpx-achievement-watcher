@@ -577,31 +577,14 @@ class OverlayWindow(QWidget):
         self._current_title = "Highlights" if session_title is None else session_title
         self._render_fixed_columns()
 
-        total_achs = 0
-        unlocked_total = 0
-        pct = 0.0
-        try:
-            if rom_name and rom_name != "Unknown ROM" and self.parent_gui.watcher._has_any_map(rom_name):
-                s_rules = self.parent_gui.watcher._collect_player_rules_for_rom(rom_name)
-                
-                unique_achs = set()
-                for r in s_rules:
-                    if isinstance(r, dict) and r.get("title"):
-                        unique_achs.add(str(r.get("title")).strip())
-                total_achs = len(unique_achs)
-                
-                if total_achs > 0:
-                    state = self.parent_gui.watcher._ach_state_load()
-                    
-                    unlocked_titles = set()
-                    for e in state.get("session", {}).get(rom_name, []):
-                        t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
-                        if t: unlocked_titles.add(t)
-                        
-                    unlocked_total = len(unlocked_titles)
-                    pct = round((unlocked_total / total_achs) * 100, 1)
-        except Exception:
-            pass
+    def _render_fixed_columns(self):
+        self.title.setText(self._current_title or "Highlights")
+        players = list((self._current_combined or {}).get("players") or [])
+        rom_name = str(getattr(self.parent_gui.watcher, "current_rom", None) or "Unknown ROM")
+        limit = self.lines_per_category
+
+        def esc(x) -> str:
+            return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         total_achs = 0
         unlocked_total = 0
@@ -611,7 +594,7 @@ class OverlayWindow(QWidget):
                 g_rules = self.parent_gui.watcher._collect_global_rules_for_rom(rom_name)
                 s_rules = self.parent_gui.watcher._collect_player_rules_for_rom(rom_name)
                 total_achs = len(g_rules) + len(s_rules)
-                
+
                 if total_achs > 0:
                     state = self.parent_gui.watcher._ach_state_load()
                     unlocked_g = len(state.get("global", {}).get(rom_name, []))
@@ -636,20 +619,20 @@ class OverlayWindow(QWidget):
         def block(entry: dict):
             hld = (entry.get("highlights") or {})
             deltas = (entry.get("deltas") or {})
-            
+
             try:
                 score_abs = int(entry.get("score", 0) or 0)
             except Exception:
                 score_abs = 0
 
             lines = []
-            
+
             lines.append(f"<div class='rom-title'>{esc(rom_name)}</div>")
-            
+
             if total_achs > 0:
                 safe_pct = max(0.1, min(100.0, pct))
                 rem_pct = 100.0 - safe_pct
-                
+
                 bar_html = f"""
                 <div style='text-align: center; color: #FFFFFF; font-weight: bold; font-size: 1.15em; margin-bottom: 0.3em;'>
                     {unlocked_total} / {total_achs} ({pct}%)
@@ -672,7 +655,7 @@ class OverlayWindow(QWidget):
                 lines.append("<div style='margin-bottom: 1.8em;'></div>")
 
             lines.append("<table align='center' style='border-collapse: collapse; margin: 0 auto; width: auto;'><tr>")
-            
+
             lines.append("<td valign='top' style='padding-right: 20px; border-right: 1px solid rgba(255, 255, 255, 0.4);'>")
             lines.append("<table class='hltable'>")
             has_high = False
@@ -695,27 +678,27 @@ class OverlayWindow(QWidget):
 
             lines.append("<td valign='top' style='padding-left: 20px; border:none;'>")
             lines.append("<table class='hltable'>")
-            
+
             if not deltas:
                 lines.append("<tr><td colspan='2' style='text-align:center; color:#888; border:none;'>(No actions yet)</td></tr>")
             else:
                 items = sorted(list(deltas.items()), key=lambda x: int(x[1]), reverse=True)
-                
-                max_rows = 13 
+
+                max_rows = 13
                 if len(items) <= max_rows * 2:
                     cols = 2
                 else:
-                    cols = 3 
-                
+                    cols = 3
+
                 max_items = max_rows * cols
                 display_items = items[:max_items]
-                
+
                 header_html = ""
                 for c in range(cols):
                     border = " style='border-left: 2px solid rgba(255,255,255,0.2); padding-left: 1.2em;'" if c > 0 else ""
                     header_html += f"<th{border}>Action</th><th>Count</th>"
                 lines.append(f"<tr>{header_html}</tr>")
-                
+
                 for i in range(0, len(display_items), cols):
                     row_html = ""
                     for c in range(cols):
@@ -727,15 +710,15 @@ class OverlayWindow(QWidget):
                             row_html += f"<td class='left'{border}>{esc(k)}</td><td class='right'>{esc(v_str)}</td>"
                         else:
                             row_html += f"<td class='left'{border}></td><td class='right'></td>"
-                            
+
                     lines.append(f"<tr>{row_html}</tr>")
-                    
+
                 if len(items) > max_items:
                     lines.append(f"<tr><td colspan='{cols * 2}' style='text-align:center; color:#888; font-size:0.9em;'>(+ {len(items)-max_items} more actions)</td></tr>")
-                    
+
             lines.append("</table>")
             lines.append("</td>")
-            
+
             lines.append("</tr></table>")
             return "".join(lines)
 
