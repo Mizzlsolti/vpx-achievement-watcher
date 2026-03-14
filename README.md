@@ -8,6 +8,8 @@ Timed Challenge: Achieve the maximum score in 3 or 5 minutes.
 
 Flip Challenge: How many points can you score with a limited number of pinball finger strokes? Select your difficulty level (e.g., Pro = Only 100 flips!).
 
+Heat Challenge: When the barometer reaches 100%, it's over. The heat rises if you hold down the button or press it too quickly. But it cools down when you let go.
+
 🔔 Feedback: Displays small pop-up notifications (toasts) directly after the  game when you achieve a success and offers optional voice output for challenge events.
 
 💾 Statistics history: Records every round played, the duration of the game, and the points scored in the background. These can be conveniently evaluated in the user interface (GUI).
