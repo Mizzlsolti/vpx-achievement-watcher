@@ -694,13 +694,26 @@ def _raw_save_json(path, obj):
 # ==========================================
 # ANTI-CHEAT SECURITY
 # ==========================================
-ANTI_CHEAT_SALT = "VPX_S3cr3t_H4sh_9921!"
+BASE_SALT = "VpX_W@tcher_2024!"
 
 def _generate_signature(data: dict) -> str:
+    """
+    Generates a hash based on dynamic session values.
+    If the score is altered without adapting the duration/session IDs, the hash becomes invalid.
+    """
     d = dict(data)
     d.pop("_signature", None)
+    
+    # Extract values that should be part of the dynamic salt (fallback to string defaults)
+    score_val = str(d.get("score", "0"))
+    duration_val = str(d.get("duration", "0"))
+    session_val = str(d.get("session_id", "none"))
+    
+    # Create a dynamic salt that changes based on session values
+    dynamic_salt = f"{score_val}_{duration_val}_{session_val}_{BASE_SALT}"
+    
     s = json.dumps(d, sort_keys=True, separators=(',', ':'))
-    return hashlib.sha256((s + ANTI_CHEAT_SALT).encode('utf-8')).hexdigest()
+    return hashlib.sha256((s + dynamic_salt).encode('utf-8')).hexdigest()
 
 def _is_secure_path(path: str) -> bool:
     """Prüft, ob eine Datei durch Anti-Cheat geschützt werden soll."""
