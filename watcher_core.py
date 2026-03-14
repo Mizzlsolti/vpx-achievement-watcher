@@ -338,134 +338,6 @@ VPXTOOL_DIRNAME = "tools"
 VPXTOOL_PATH = os.path.join(APP_DIR, VPXTOOL_DIRNAME, VPXTOOL_EXE)
 VPXTOOL_URL = "https://github.com/francisdb/vpxtool/releases/download/v0.26.0/vpxtool-Windows-x86_64-v0.26.0.zip"
 
-VPS_DB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
-VPS_PAGE_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
-VPS_DB_PATH = os.path.join(APP_DIR, "tools", "vpsdb.json")
-
-_vps_db_in_memory: list | None = None
-_vps_db_lock = threading.Lock()
-
-
-def _load_vps_db(cfg: "AppConfig") -> list:
-    """Return the VPS DB entry list, loading from the tools folder.
-
-    The DB is downloaded during bootstrap into ``tools/vpsdb.json`` and
-    cached in memory for the process lifetime.
-    """
-    global _vps_db_in_memory
-    with _vps_db_lock:
-        if _vps_db_in_memory is not None:
-            return _vps_db_in_memory
-
-        if os.path.isfile(VPS_DB_PATH):
-            try:
-                with open(VPS_DB_PATH, "r", encoding="utf-8") as fh:
-                    data = json.load(fh)
-                if isinstance(data, list) and data:
-                    _vps_db_in_memory = data
-                    return _vps_db_in_memory
-            except Exception as exc:
-                try:
-                    log(cfg, f"[VPS-DB] Failed to parse vpsdb.json: {exc}", "WARN")
-                except Exception:
-                    pass
-        else:
-            try:
-                log(cfg, f"[VPS-DB] {VPS_DB_PATH} not found – run bootstrap to download it.", "WARN")
-            except Exception:
-                pass
-
-        _vps_db_in_memory = []
-        return _vps_db_in_memory
-
-
-def get_vps_table_info(cfg: "AppConfig", rom_name: str, vpx_file_name: str) -> dict | None:
-    """Search the VPS DB for *rom_name* / *vpx_file_name* and return metadata.
-
-    Tries ROM-name matching first (exact, case-insensitive), then falls back
-    to VPX file-name matching.  Returns a dict with keys ``table_name``,
-    ``author``, ``version``, and ``vps_id``, or ``None`` when nothing is found.
-    """
-    try:
-        db = _load_vps_db(cfg)
-        if not db:
-            return None
-
-        rom_lower = (rom_name or "").strip().lower()
-        vpx_lower = (vpx_file_name or "").strip().lower()
-        if vpx_lower.endswith(".vpx"):
-            vpx_lower = vpx_lower[:-4]
-
-        best_entry: dict | None = None
-        best_version = ""
-        best_authors: list = []
-
-        for entry in db:
-            if not isinstance(entry, dict):
-                continue
-
-            rom_match = False
-            if rom_lower:
-                for r in (entry.get("roms") or []):
-                    rn = ""
-                    if isinstance(r, dict):
-                        rn = (r.get("romName") or r.get("id") or "").strip().lower()
-                    else:
-                        rn = str(r).strip().lower()
-                    if rn and rn == rom_lower:
-                        rom_match = True
-                        break
-
-            vpx_match = False
-            matched_version = ""
-            matched_authors: list = []
-            if vpx_lower:
-                for tf in (entry.get("tableFiles") or []):
-                    if not isinstance(tf, dict):
-                        continue
-                    fname = (tf.get("tableFile") or tf.get("gameFileName") or "").strip().lower()
-                    if fname.endswith(".vpx"):
-                        fname = fname[:-4]
-                    if fname and fname == vpx_lower:
-                        vpx_match = True
-                        matched_version = str(tf.get("version") or "").strip()
-                        matched_authors = tf.get("authors") or []
-                        break
-
-            if rom_match or vpx_match:
-                best_entry = entry
-                best_version = matched_version
-                best_authors = matched_authors or (entry.get("authors") or [])
-                if rom_match and vpx_match:
-                    break
-
-        if not best_entry:
-            return None
-
-        table_name = str(best_entry.get("displayTitle") or best_entry.get("name") or "").strip()
-        vps_id = str(best_entry.get("id") or "").strip()
-
-        if isinstance(best_authors, list):
-            author = ", ".join(str(a) for a in best_authors if a)
-        else:
-            author = str(best_authors or "").strip()
-
-        if not any([table_name, author, best_version, vps_id]):
-            return None
-
-        return {
-            "table_name": table_name,
-            "author": author,
-            "version": best_version,
-            "vps_id": vps_id,
-        }
-    except Exception as exc:
-        try:
-            log(cfg, f"[VPS-DB] lookup failed: {exc}", "WARN")
-        except Exception:
-            pass
-        return None
-
 
 def ensure_vpxtool(cfg: AppConfig) -> str | None:
     import zipfile
@@ -549,68 +421,6 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
         if key not in warned:
             log(cfg, f"[VPXTOOL] romname exception: {e}", "WARN")
             warned.add(key)
-        return None
-
-
-def run_vpxtool_get_info(cfg: AppConfig, vpx_path: str) -> dict | None:
-    """Call ``vpxtool info <vpx_path>`` and return a dict with table metadata.
-
-    Returns a dict with keys ``table_name``, ``author``, ``version``, and
-    ``vps_id`` (any of which may be an empty string if not found), or ``None``
-    when the tool cannot be run or returns no useful data.
-    """
-    if not vpx_path or not os.path.isfile(vpx_path):
-        return None
-
-    exe = ensure_vpxtool(cfg)
-    if not exe:
-        return None
-
-    cmd = [exe, "info", vpx_path]
-    try:
-        cp = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=20,
-            creationflags=0x08000000,
-        )
-        out = (cp.stdout or "").strip()
-        if not out:
-            out = (cp.stderr or "").strip()
-        if cp.returncode != 0 or not out:
-            return None
-
-        def _find(keys: list[str]) -> str:
-            for key in keys:
-                m = re.search(
-                    r"(?i)(?:^|\n)\s*" + re.escape(key) + r"\s*[:\=]\s*(.+)",
-                    out,
-                )
-                if m:
-                    return m.group(1).strip().strip('"').strip("'")
-            return ""
-
-        table_name = _find(["TableName", "table_name", "Name"])
-        author = _find(["AuthorName", "author_name", "Author"])
-        version = _find(["TableVersion", "table_version", "Version"])
-        vps_id = _find(["VPSID", "vps_id", "VPS ID", "VPS_ID"])
-
-        if not any([table_name, author, version, vps_id]):
-            return None
-
-        return {
-            "table_name": table_name,
-            "author": author,
-            "version": version,
-            "vps_id": vps_id,
-        }
-
-    except Exception as e:
-        try:
-            log(cfg, f"[VPXTOOL] info exception: {e}", "WARN")
-        except Exception:
-            pass
         return None
 
 
@@ -1502,7 +1312,7 @@ class Watcher:
         try:
             from_ga = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
             if from_ga:
-                self._ach_record_unlocks("global", self.current_rom, from_ga, self._get_current_table_info())
+                self._ach_record_unlocks("global", self.current_rom, from_ga)
                 try:
                     self._emit_achievement_toasts(from_ga, seconds=5)
                 except Exception:
@@ -1513,7 +1323,7 @@ class Watcher:
         try:
             sess_achs_p1 = self._evaluate_player_session_achievements(1, self.current_rom) or []
             if sess_achs_p1:
-                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1), self._get_current_table_info())
+                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1))
                 try:
                     self._emit_achievement_toasts(sess_achs_p1, seconds=5)
                 except Exception:
@@ -1579,7 +1389,6 @@ class Watcher:
 
         ensure_file(f_index(self.cfg), INDEX_URL)
         ensure_file(f_romnames(self.cfg), ROMNAMES_URL)
-        ensure_file(VPS_DB_PATH, VPS_DB_URL)
         try:
             ensure_vpxtool(self.cfg)
         except Exception as e:
@@ -3073,10 +2882,6 @@ class Watcher:
                 "score": int(score)
             }
 
-            tbl_info = self._get_current_table_info()
-            if tbl_info:
-                payload["table_info"] = tbl_info
-
             extra = {}
             if str(kind or "").lower() == "flip":
                 tf = int(ch.get("threshold", 0))
@@ -3097,11 +2902,6 @@ class Watcher:
             hist = secure_load_json(path, {"results": []}) or {"results": []}
             hist.setdefault("results", []).append(payload)
             secure_save_json(path, hist)
-            
-            if tbl_info:
-                for k in ("vps_id", "version", "author", "table_name"):
-                    if tbl_info.get(k):
-                        extra[k] = tbl_info[k]
 
             CloudSync.upload_score(self.cfg, kind, rom, int(score), extra)
             
@@ -3736,7 +3536,7 @@ class Watcher:
         try:
             global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
             if global_hits:
-                self._ach_record_unlocks("global", self.current_rom, global_hits, self._get_current_table_info())
+                self._ach_record_unlocks("global", self.current_rom, global_hits)
                 self._emit_achievement_toasts(global_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
@@ -3744,7 +3544,7 @@ class Watcher:
         try:
             session_hits = self._evaluate_player_session_achievements(1, self.current_rom) or []
             if session_hits:
-                self._ach_record_unlocks("session", self.current_rom, list(session_hits), self._get_current_table_info())
+                self._ach_record_unlocks("session", self.current_rom, list(session_hits))
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
@@ -4059,46 +3859,7 @@ class Watcher:
 
             lines.append(f"{label:<30} {value_txt}")
 
-    def _get_current_table_info(self) -> dict | None:
-        """Return cached table metadata for the currently loaded VPX file.
-
-        The VPS DB is queried first (by ROM name and VPX file name).  If that
-        yields no result, ``run_vpxtool_get_info`` is used as a fallback.
-        Results are cached per VPX path (or ROM when no path is available) so
-        the lookup runs at most once per table within a process lifetime.
-        """
-        cache = getattr(self, "_vpx_info_cache", None)
-        if not isinstance(cache, dict):
-            cache = {}
-            self._vpx_info_cache = cache
-
-        rom_cache = getattr(self, "_rom_detect_cache", None)
-        vpx_path = (rom_cache or {}).get("vpx_path") if isinstance(rom_cache, dict) else None
-        rom = (rom_cache or {}).get("rom") if isinstance(rom_cache, dict) else None
-
-        if not vpx_path and not rom:
-            return None
-
-        # Prefer the normalised absolute VPX path as the cache key so that
-        # different files that share the same ROM still each get their own
-        # vpxtool-based fallback result.  Fall back to the ROM name only when
-        # no path is known.
-        try:
-            key = os.path.abspath(vpx_path).lower() if vpx_path else str(rom or "").lower()
-        except Exception:
-            key = str(vpx_path or rom or "")
-
-        if key in cache:
-            return cache[key]
-
-        vpx_file_name = os.path.basename(vpx_path) if vpx_path else ""
-        info = get_vps_table_info(self.cfg, rom or "", vpx_file_name)
-        if not info and vpx_path:
-            info = run_vpxtool_get_info(self.cfg, vpx_path)
-        cache[key] = info
-        return info
-
-    def _ach_record_unlocks(self, kind: str, rom: str, titles: list, table_info: dict | None = None):
+    def _ach_record_unlocks(self, kind: str, rom: str, titles: list):
         if not rom or not titles:
             return
         from datetime import datetime, timezone
@@ -4122,8 +3883,6 @@ class Watcher:
                 entry = {"title": title, "ts": now_iso}
                 if t.get("origin"):
                     entry["origin"] = str(t["origin"])
-                if table_info:
-                    entry["table_info"] = table_info
                 lst.append(entry)
                 seen.add(title)
                 added += 1
@@ -4132,8 +3891,6 @@ class Watcher:
                 if not title or title in seen:
                     continue
                 entry = {"title": title, "ts": now_iso}
-                if table_info:
-                    entry["table_info"] = table_info
                 lst.append(entry)
                 seen.add(title)
                 added += 1
@@ -4167,9 +3924,8 @@ class Watcher:
         try:
             session_titles = session_titles or []
             global_titles = global_titles or []
-            tbl_info = self._get_current_table_info()
-            self._ach_record_unlocks("session", rom, session_titles, tbl_info)
-            self._ach_record_unlocks("global", rom, global_titles, tbl_info)
+            self._ach_record_unlocks("session", rom, session_titles)
+            self._ach_record_unlocks("global", rom, global_titles)
             out = []
             for t in session_titles:
                 if isinstance(t, dict):
