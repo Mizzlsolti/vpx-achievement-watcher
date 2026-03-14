@@ -125,6 +125,14 @@ DEFAULT_OVERLAY = {
     "ch_ov_rotate_ccw": False,
     "overlay_auto_close": False,
     "automatic_creation": True,
+    "heat_bar_custom": False,
+    "heat_bar_saved": False,
+    "heat_bar_x_landscape": 20,
+    "heat_bar_y_landscape": 100,
+    "heat_bar_x_portrait": 20,
+    "heat_bar_y_portrait": 100,
+    "heat_bar_portrait": False,
+    "heat_bar_rotate_ccw": False,
 }
 DEFAULT_OVERLAY.update({
     "challenge_hotkey_input_source": "keyboard",
@@ -140,6 +148,15 @@ DEFAULT_OVERLAY.update({
 DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
 DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
 CHALLENGES_ENABLED = True
+
+# Windows virtual key codes for flipper buttons used in Heat Challenge
+VK_LSHIFT = 0xA0
+VK_RSHIFT = 0xA1
+
+# Heat Challenge rate constants (units per second unless noted)
+HEAT_HOLD_RATE = 15.0      # heat gained per second while flipper is held
+HEAT_PRESS_BURST = 5.0     # instant heat added on initial flipper press
+HEAT_COOLDOWN_RATE = 10.0  # heat lost per second while flippers are released
 
 EXCLUDED_FIELDS = {
     "Last Game Start", "Last Printout", "Last Replay", "Champion Reset", "Clock Last Set", "Coins Cleared",
@@ -214,6 +231,9 @@ class AppConfig:
                 "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
                 "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
                 
+                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
+                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
+                
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
@@ -264,6 +284,9 @@ class AppConfig:
                 
                 "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
                 "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
+                
+                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
+                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
                 
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
@@ -2449,6 +2472,69 @@ class Watcher:
             self.challenge = ch
             log(self.cfg, "[CHALLENGE] flip stopped")
 
+    def start_heat_challenge(self):
+        try:
+            if not self.game_active or not self.current_rom:
+                log(self.cfg, "[CHALLENGE] heat: ignored (no active game)", "WARN")
+                return
+
+            ch = getattr(self, "challenge", {}) or {}
+            if ch.get("active"):
+                log(self.cfg, "[CHALLENGE] heat: another challenge already active – ignored", "WARN")
+                return
+
+            # Single-player enforced
+            try:
+                if self.snapshot_mode:
+                    self.snap_players_in_game = 1
+                    self.snap_players_locked = True
+                    self.current_player = 1
+                    self._cp_rotate_lock_until = time.time() + 36000.0
+            except Exception:
+                pass
+
+            ch.clear()
+            ch.update({
+                "active": True,
+                "kind": "heat",
+                "rom": self.current_rom,
+                "table": self.current_table,
+                "started_at": time.time(),
+                "end_at": None,
+                "pending_kill_at": None,
+                "suppress_big_overlay_once": True,
+                "heat": 0.0,
+                "heat_last_time": time.time(),
+                "heat_prev_pressed": False,
+            })
+            self.challenge = ch
+
+            try:
+                self.bridge.challenge_info_show.emit("Heat Challenge – Don't overheat!", 4, "#FF7F00")
+                self.bridge.challenge_speak.emit("Heat challenge armed")
+            except Exception:
+                pass
+
+            try:
+                self.bridge.heat_bar_show.emit()
+            except Exception:
+                pass
+
+            log(self.cfg, "[CHALLENGE] heat armed – keep flippers cool!")
+        except Exception as e:
+            log(self.cfg, f"[CHALLENGE] heat start failed: {e}", "WARN")
+
+    def stop_heat_challenge(self):
+        ch = getattr(self, "challenge", {})
+        if ch.get("kind") == "heat":
+            ch["active"] = False
+            self.challenge = ch
+            try:
+                self.bridge.heat_bar_hide.emit()
+            except Exception:
+                pass
+            log(self.cfg, "[CHALLENGE] heat stopped")
+
     def _clear_challenge_state(self):
         try:
             self.bridge.flip_counter_total_hide.emit()
@@ -2456,6 +2542,10 @@ class Watcher:
             pass
         try:
             self.bridge.challenge_timer_stop.emit()
+        except Exception:
+            pass
+        try:
+            self.bridge.heat_bar_hide.emit()
         except Exception:
             pass
         try:
@@ -2490,6 +2580,8 @@ class Watcher:
                     self.stop_timed_challenge()
                 elif kind == "flip":
                     self.stop_flip_challenge()
+                elif kind == "heat":
+                    self.stop_heat_challenge()
                 else:
                     try:
                         self.bridge.challenge_timer_stop.emit()
@@ -2541,6 +2633,83 @@ class Watcher:
                     self.challenge = ch
                     log(self.cfg, "[CHALLENGE] timed finished – Alt+F4 + WM_CLOSE executed")
                     return
+
+            if ch.get("kind") == "heat":
+                try:
+                    now_t = time.time()
+                    last_t = float(ch.get("heat_last_time", now_t) or now_t)
+                    delta = min(now_t - last_t, 0.5)
+                    ch["heat_last_time"] = now_t
+
+                    try:
+                        import ctypes as _ctypes
+                        lshift = bool(_ctypes.windll.user32.GetAsyncKeyState(VK_LSHIFT) & 0x8000)
+                        rshift = bool(_ctypes.windll.user32.GetAsyncKeyState(VK_RSHIFT) & 0x8000)
+                    except Exception:
+                        lshift = False
+                        rshift = False
+
+                    pressed = lshift or rshift
+                    prev_pressed = bool(ch.get("heat_prev_pressed", False))
+                    heat = float(ch.get("heat", 0.0) or 0.0)
+
+                    if pressed:
+                        heat += HEAT_HOLD_RATE * delta
+                        if pressed and not prev_pressed:
+                            heat += HEAT_PRESS_BURST
+                    else:
+                        heat -= HEAT_COOLDOWN_RATE * delta
+
+                    heat = max(0.0, min(100.0, heat))
+                    ch["heat"] = heat
+                    ch["heat_prev_pressed"] = pressed
+                    self.challenge = ch
+
+                    try:
+                        self.bridge.heat_bar_update.emit(int(heat))
+                    except Exception:
+                        pass
+
+                    if heat >= 100.0:
+                        log(self.cfg, "[CHALLENGE] heat reached 100% – killing VPX")
+                        audits_now = audits
+                        try:
+                            audits_now2, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
+                            if audits_now2:
+                                audits_now = audits_now2
+                        except Exception:
+                            pass
+                        if audits_now:
+                            try:
+                                self._last_audits_global = dict(audits_now)
+                            except Exception:
+                                pass
+                            try:
+                                duration_now = int(now - (self.start_time or now))
+                                self.export_overlay_snapshot(audits_now, duration_now, on_demand=True)
+                            except Exception:
+                                pass
+                            ch["prekill_end"] = dict(audits_now)
+
+                        try:
+                            self._kill_vpx_process()
+                        except Exception:
+                            pass
+
+                        ch["active"] = False
+                        ch["pending_kill_at"] = None
+                        ch["completed"] = True
+                        self.challenge = ch
+
+                        try:
+                            self.bridge.heat_bar_hide.emit()
+                        except Exception:
+                            pass
+                        log(self.cfg, "[CHALLENGE] heat finished – VPX killed")
+                        return
+                except Exception as e:
+                    log(self.cfg, f"[CHALLENGE] heat tick failed: {e}", "WARN")
+
         except Exception as e:
             log(self.cfg, f"[CHALLENGE] tick failed: {e}", "WARN")
  
