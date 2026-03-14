@@ -2968,6 +2968,11 @@ class Watcher:
             hist.setdefault("results", []).append(payload)
             secure_save_json(path, hist)
             
+            if tbl_info:
+                for k in ("vps_id", "version", "author", "table_name"):
+                    if tbl_info.get(k):
+                        extra[k] = tbl_info[k]
+
             CloudSync.upload_score(self.cfg, kind, rom, int(score), extra)
             
             ch["result_recorded"] = True
