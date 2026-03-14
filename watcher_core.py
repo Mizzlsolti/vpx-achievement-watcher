@@ -525,8 +525,9 @@ def load_json(path, default=None):
             data["_signature"] = sig
         elif sig == expected_legacy:
             # File is using the old security standard - allow it to load
-            print(f"[SECURITY] Legacy save file detected: {path}. Access granted. Will be upgraded on next save.")
+            print(f"[SECURITY] Legacy save file detected: {path}. Access granted. Upgrading immediately.")
             data["_signature"] = sig
+            save_json(path, data)
         else:
             print(f"\n[SECURITY] TAMPERING DETECTED IN: {path}")
             print("[SECURITY] The file has been blocked and will not be loaded!\n")
