@@ -115,7 +115,7 @@ class CloudStatsMixin:
             </style>
             """
 
-            VPS_BASE = "https://virtual-pinball-spreadsheet.web.app/game/"
+            VPS_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
 
             def _info_badge(ti: dict | None) -> str:
                 if not ti:
@@ -131,7 +131,7 @@ class CloudStatsMixin:
                     parts.append(f"VPS-ID: {ti['vps_id']}")
                 if not parts:
                     return ""
-                tooltip = " | ".join(parts)
+                tooltip = "&#10;".join(parts)
                 vps_id = (ti.get("vps_id") or "").strip()
                 if vps_id:
                     return (
@@ -365,7 +365,7 @@ class CloudStatsMixin:
                 parts.append(f"Version: {_html.escape(version)}")
             if not parts and not vps_id:
                 return ""
-            tooltip = " | ".join(parts) if parts else _html.escape(vps_id)
+            tooltip = "&#10;".join(parts) if parts else _html.escape(vps_id)
             safe_vps_id = _html.escape(vps_id, quote=True)
             if vps_id:
                 return (

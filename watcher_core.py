@@ -338,6 +338,154 @@ VPXTOOL_DIRNAME = "tools"
 VPXTOOL_PATH = os.path.join(APP_DIR, VPXTOOL_DIRNAME, VPXTOOL_EXE)
 VPXTOOL_URL = "https://github.com/francisdb/vpxtool/releases/download/v0.26.0/vpxtool-Windows-x86_64-v0.26.0.zip"
 
+VPS_DB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/vpsdb.json"
+VPS_PAGE_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
+VPS_DB_CACHE_MAX_AGE = 86400  # 24 hours
+
+_vps_db_in_memory: list | None = None
+_vps_db_lock = threading.Lock()
+
+
+def f_vps_db_cache(cfg: "AppConfig") -> str:
+    return os.path.join(cfg.BASE, "vpsdb_cache.json")
+
+
+def _load_vps_db(cfg: "AppConfig") -> list:
+    """Return the VPS DB entry list, loading from cache file or downloading.
+
+    The DB is cached in memory for the process lifetime and on disk for
+    up to ``VPS_DB_CACHE_MAX_AGE`` seconds so it is not re-downloaded every
+    run.
+    """
+    global _vps_db_in_memory
+    with _vps_db_lock:
+        if _vps_db_in_memory is not None:
+            return _vps_db_in_memory
+
+        cache_path = f_vps_db_cache(cfg)
+        if os.path.isfile(cache_path):
+            try:
+                age = time.time() - os.path.getmtime(cache_path)
+                if age < VPS_DB_CACHE_MAX_AGE:
+                    with open(cache_path, "r", encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    if isinstance(data, list) and data:
+                        _vps_db_in_memory = data
+                        return _vps_db_in_memory
+            except Exception:
+                pass
+
+        try:
+            log(cfg, f"[VPS-DB] Downloading VPS database from {VPS_DB_URL}…")
+            data = _fetch_json_url(VPS_DB_URL, timeout=30)
+            if isinstance(data, list) and data:
+                try:
+                    ensure_dir(os.path.dirname(cache_path))
+                    with open(cache_path, "w", encoding="utf-8") as fh:
+                        json.dump(data, fh, ensure_ascii=False)
+                except Exception:
+                    pass
+                _vps_db_in_memory = data
+                log(cfg, f"[VPS-DB] Downloaded {len(data)} entries.")
+                return _vps_db_in_memory
+        except Exception as exc:
+            try:
+                log(cfg, f"[VPS-DB] Download failed: {exc}", "WARN")
+            except Exception:
+                pass
+
+        _vps_db_in_memory = []
+        return _vps_db_in_memory
+
+
+def get_vps_table_info(cfg: "AppConfig", rom_name: str, vpx_file_name: str) -> dict | None:
+    """Search the VPS DB for *rom_name* / *vpx_file_name* and return metadata.
+
+    Tries ROM-name matching first (exact, case-insensitive), then falls back
+    to VPX file-name matching.  Returns a dict with keys ``table_name``,
+    ``author``, ``version``, and ``vps_id``, or ``None`` when nothing is found.
+    """
+    try:
+        db = _load_vps_db(cfg)
+        if not db:
+            return None
+
+        rom_lower = (rom_name or "").strip().lower()
+        vpx_lower = (vpx_file_name or "").strip().lower()
+        if vpx_lower.endswith(".vpx"):
+            vpx_lower = vpx_lower[:-4]
+
+        best_entry: dict | None = None
+        best_version = ""
+        best_authors: list = []
+
+        for entry in db:
+            if not isinstance(entry, dict):
+                continue
+
+            rom_match = False
+            if rom_lower:
+                for r in (entry.get("roms") or []):
+                    rn = ""
+                    if isinstance(r, dict):
+                        rn = (r.get("romName") or r.get("id") or "").strip().lower()
+                    else:
+                        rn = str(r).strip().lower()
+                    if rn and rn == rom_lower:
+                        rom_match = True
+                        break
+
+            vpx_match = False
+            matched_version = ""
+            matched_authors: list = []
+            if vpx_lower:
+                for tf in (entry.get("tableFiles") or []):
+                    if not isinstance(tf, dict):
+                        continue
+                    fname = (tf.get("tableFile") or tf.get("gameFileName") or "").strip().lower()
+                    if fname.endswith(".vpx"):
+                        fname = fname[:-4]
+                    if fname and fname == vpx_lower:
+                        vpx_match = True
+                        matched_version = str(tf.get("version") or "").strip()
+                        matched_authors = tf.get("authors") or []
+                        break
+
+            if rom_match or vpx_match:
+                best_entry = entry
+                best_version = matched_version
+                best_authors = matched_authors or (entry.get("authors") or [])
+                if rom_match and vpx_match:
+                    break
+
+        if not best_entry:
+            return None
+
+        table_name = str(best_entry.get("displayTitle") or best_entry.get("name") or "").strip()
+        vps_id = str(best_entry.get("id") or "").strip()
+
+        if isinstance(best_authors, list):
+            author = ", ".join(str(a) for a in best_authors if a)
+        else:
+            author = str(best_authors or "").strip()
+
+        if not any([table_name, author, best_version, vps_id]):
+            return None
+
+        return {
+            "table_name": table_name,
+            "author": author,
+            "version": best_version,
+            "vps_id": vps_id,
+        }
+    except Exception as exc:
+        try:
+            log(cfg, f"[VPS-DB] lookup failed: {exc}", "WARN")
+        except Exception:
+            pass
+        return None
+
+
 def ensure_vpxtool(cfg: AppConfig) -> str | None:
     import zipfile
     import io
@@ -3932,8 +4080,10 @@ class Watcher:
     def _get_current_table_info(self) -> dict | None:
         """Return cached table metadata for the currently loaded VPX file.
 
-        The result is cached per VPX path so that ``vpxtool info`` is called at
-        most once per table during a session.
+        The VPS DB is queried first (by ROM name and VPX file name).  If that
+        yields no result, ``run_vpxtool_get_info`` is used as a fallback.
+        Results are cached per VPX path (or ROM when no path is available) so
+        the lookup runs at most once per table within a process lifetime.
         """
         cache = getattr(self, "_vpx_info_cache", None)
         if not isinstance(cache, dict):
@@ -3942,18 +4092,27 @@ class Watcher:
 
         rom_cache = getattr(self, "_rom_detect_cache", None)
         vpx_path = (rom_cache or {}).get("vpx_path") if isinstance(rom_cache, dict) else None
-        if not vpx_path:
+        rom = (rom_cache or {}).get("rom") if isinstance(rom_cache, dict) else None
+
+        if not vpx_path and not rom:
             return None
 
+        # Prefer the normalised absolute VPX path as the cache key so that
+        # different files that share the same ROM still each get their own
+        # vpxtool-based fallback result.  Fall back to the ROM name only when
+        # no path is known.
         try:
-            key = os.path.abspath(vpx_path).lower()
+            key = os.path.abspath(vpx_path).lower() if vpx_path else str(rom or "").lower()
         except Exception:
-            key = str(vpx_path)
+            key = str(vpx_path or rom or "")
 
         if key in cache:
             return cache[key]
 
-        info = run_vpxtool_get_info(self.cfg, vpx_path)
+        vpx_file_name = os.path.basename(vpx_path) if vpx_path else ""
+        info = get_vps_table_info(self.cfg, rom or "", vpx_file_name)
+        if not info and vpx_path:
+            info = run_vpxtool_get_info(self.cfg, vpx_path)
         cache[key] = info
         return info
 
