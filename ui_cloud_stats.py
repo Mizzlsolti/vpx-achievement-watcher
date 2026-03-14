@@ -34,6 +34,7 @@ class CloudStatsMixin:
 
             timed_items = []
             flip_items = []
+            heat_items = []
             for fn in os.listdir(hist_dir):
                 if not fn.lower().endswith(".json"):
                     continue
@@ -42,7 +43,7 @@ class CloudStatsMixin:
                 for it in (data.get("results") or []):
                     try:
                         kind = str(it.get("kind", "") or "").lower()
-                        if kind not in ("timed", "flip"):
+                        if kind not in ("timed", "flip", "heat"):
                             continue
                         rom = str(it.get("rom", "") or "")
                         score = int(it.get("score", 0) or 0)
@@ -50,7 +51,7 @@ class CloudStatsMixin:
                         ts = str(it.get("ts", "") or "")
                         
                         diff_str = it.get("difficulty", "")
-                        if not diff_str:
+                        if not diff_str and kind == "flip":
                             tf = int(it.get("target_flips", 0) or 0)
                             if tf > 0:
                                 if tf <= 100: diff_str = "Pro"
@@ -78,17 +79,21 @@ class CloudStatsMixin:
                         
                         if kind == "timed":
                             timed_items.append(item)
-                        else:
+                        elif kind == "flip":
                             flip_items.append(item)
+                        else:
+                            heat_items.append(item)
                     except Exception:
                         continue
 
             timed_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
             flip_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
+            heat_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
 
             LIMIT = 30
             timed_items = timed_items[:LIMIT]
             flip_items = flip_items[:LIMIT]
+            heat_items = heat_items[:LIMIT]
 
             def fmt_score(n: int) -> str:
                 try:
@@ -133,14 +138,16 @@ class CloudStatsMixin:
                 
                 return f"<h4>{title}</h4><table width='100%'>{head}{body}</table>"
 
-            html_left = tbl("Timed", timed_items, False)
-            html_right = tbl("Flip", flip_items, True)
+            html_timed = tbl("Timed", timed_items, False)
+            html_flip = tbl("Flip", flip_items, True)
+            html_heat = tbl("🔥 Heat", heat_items, False)
             
             html = (
                 css +
                 "<table width='100%' style='border:none; margin-top:5px;'><tr>"
-                f"<td valign='top' style='padding-right:20px; width:50%; border:none;'>{html_left}</td>"
-                f"<td valign='top' style='padding-left:20px; width:50%; border:none; border-left:1px solid #555;'>{html_right}</td>"
+                f"<td valign='top' style='padding-right:10px; width:33%; border:none;'>{html_timed}</td>"
+                f"<td valign='top' style='padding:0 10px; width:34%; border:none; border-left:1px solid #555;'>{html_flip}</td>"
+                f"<td valign='top' style='padding-left:10px; width:33%; border:none; border-left:1px solid #555;'>{html_heat}</td>"
                 "</tr></table>"
             )
             self.ch_results_view.setHtml(html)
@@ -197,7 +204,7 @@ class CloudStatsMixin:
         lay_ctrl = QHBoxLayout(grp_controls)
         
         self.cmb_cloud_category = QComboBox()
-        self.cmb_cloud_category.addItems(["Achievement Progress", "Timed Challenge", "Flip Challenge"])        
+        self.cmb_cloud_category.addItems(["Achievement Progress", "Timed Challenge", "Flip Challenge", "Heat Challenge"])        
         self.cmb_cloud_category.currentIndexChanged.connect(self._on_cloud_cat_changed)
         
         self.cmb_cloud_diff = QComboBox()
@@ -233,7 +240,7 @@ class CloudStatsMixin:
 
     def _fetch_cloud_leaderboard(self):
         cat_index = self.cmb_cloud_category.currentIndex()
-        cat_map = {0: "progress", 1: "timed", 2: "flip"}
+        cat_map = {0: "progress", 1: "timed", 2: "flip", 3: "heat"}
         category = cat_map.get(cat_index, "progress")
         rom = self.txt_cloud_rom.text().strip().lower()
         selected_diff = self.cmb_cloud_diff.currentText() if category == "flip" else None

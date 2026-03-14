@@ -63,6 +63,8 @@ from ui_overlay import (
     ChallengeCountdownOverlay,
     ChallengeSelectOverlay,
     FlipDifficultyOverlay,
+    HeatBarometerOverlay,
+    HeatBarPositionPicker,
 )
 
 class Bridge(QObject):
@@ -78,7 +80,10 @@ class Bridge(QObject):
     achievements_updated = pyqtSignal()
     flip_counter_total_show = pyqtSignal(int, int, int)  
     flip_counter_total_update = pyqtSignal(int, int, int)
-    flip_counter_total_hide = pyqtSignal()   
+    flip_counter_total_hide = pyqtSignal()
+    heat_bar_show = pyqtSignal()
+    heat_bar_update = pyqtSignal(int)
+    heat_bar_hide = pyqtSignal()
     
     prefetch_started = pyqtSignal()
     prefetch_progress = pyqtSignal(str)
@@ -136,6 +141,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._build_tab_system()
 
         self.register_flip_counter_handlers()
+        self.register_heat_bar_handlers()
 
         self.timer_stats = QTimer(self)
         self.timer_stats.timeout.connect(self.update_stats)
@@ -214,6 +220,110 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
         self._flip_total_win = None
         self._flip_counter_picker = None
+
+    def register_heat_bar_handlers(self):
+        try:
+            self.bridge.heat_bar_show.connect(self._on_heat_bar_show)
+            self.bridge.heat_bar_update.connect(self._on_heat_bar_update)
+            self.bridge.heat_bar_hide.connect(self._on_heat_bar_hide)
+        except Exception:
+            pass
+        self._heat_bar_win = None
+        self._heat_bar_picker = None
+
+    def _on_heat_bar_show(self):
+        try:
+            if self._heat_bar_win:
+                try:
+                    self._heat_bar_win.close()
+                    self._heat_bar_win.deleteLater()
+                except Exception:
+                    pass
+            self._heat_bar_win = HeatBarometerOverlay(self)
+        except Exception:
+            self._heat_bar_win = None
+
+    def _on_heat_bar_update(self, heat: int):
+        try:
+            if not self._heat_bar_win:
+                self._on_heat_bar_show()
+            else:
+                self._heat_bar_win.set_heat(heat)
+        except Exception:
+            pass
+
+    def _on_heat_bar_hide(self):
+        try:
+            if self._heat_bar_win:
+                self._heat_bar_win.close()
+                self._heat_bar_win.deleteLater()
+        except Exception:
+            pass
+        self._heat_bar_win = None
+
+    def _on_heat_bar_portrait_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["heat_bar_portrait"] = bool(is_checked)
+        self.cfg.save()
+        try:
+            if isinstance(self._heat_bar_picker, HeatBarPositionPicker):
+                self._heat_bar_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+
+    def _on_heat_bar_ccw_toggle(self, state: int):
+        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["heat_bar_rotate_ccw"] = bool(is_ccw)
+        self.cfg.save()
+        try:
+            if isinstance(self._heat_bar_picker, HeatBarPositionPicker):
+                self._heat_bar_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+
+    def _on_heat_bar_place_clicked(self):
+        picker = getattr(self, "_heat_bar_picker", None)
+        if picker:
+            try:
+                x, y = picker.current_top_left()
+            except Exception:
+                g = picker.geometry()
+                x, y = g.x(), g.y()
+
+            ov = self.cfg.OVERLAY or {}
+            portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
+            if portrait:
+                self.cfg.OVERLAY["heat_bar_x_portrait"] = int(x)
+                self.cfg.OVERLAY["heat_bar_y_portrait"] = int(y)
+            else:
+                self.cfg.OVERLAY["heat_bar_x_landscape"] = int(x)
+                self.cfg.OVERLAY["heat_bar_y_landscape"] = int(y)
+            self.cfg.OVERLAY["heat_bar_saved"] = True
+            self.cfg.OVERLAY["heat_bar_custom"] = True
+            self.cfg.save()
+            try:
+                picker.close()
+                picker.deleteLater()
+            except Exception:
+                pass
+            self._heat_bar_picker = None
+            self.btn_heat_bar_place.setText("Place / Save Heat Bar position")
+            return
+        self._heat_bar_picker = HeatBarPositionPicker(self, width_hint=48, height_hint=260)
+        self.btn_heat_bar_place.setText("Save Heat Bar position")
+
+    def _on_heat_bar_test(self):
+        try:
+            if getattr(self, "_heat_bar_test_win", None):
+                try:
+                    self._heat_bar_test_win.close()
+                except Exception:
+                    pass
+            self._heat_bar_test_win = HeatBarometerOverlay(self)
+            self._heat_bar_test_win.set_heat(70)
+            QTimer.singleShot(6000, lambda: (self._heat_bar_test_win.close() if self._heat_bar_test_win else None))
+        except Exception:
+            pass
 
     def _on_flip_total_show(self, total: int, remaining: int, goal: int):
         try:
@@ -890,11 +1000,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _start_selected_challenge(self):
-        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 2
+        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
         try:
+            has_map = False
+            try:
+                current_rom = getattr(self.watcher, "current_rom", None)
+                has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
+            except Exception:
+                has_map = True
             if idx == 0:
+                if not has_map:
+                    return
                 self.watcher.start_timed_challenge()
+            elif idx == 2:
+                self.watcher.start_heat_challenge()
             else:
+                if not has_map:
+                    return
                 self.watcher.start_flip_challenge(500)
         except Exception:
             pass
@@ -1006,20 +1128,41 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
-            if not current_rom or not self.watcher._has_any_map(current_rom):
-                self._close_challenge_select_overlay()
-                self._close_flip_difficulty_overlay()
-                try:
-                    self.bridge.challenge_info_show.emit(
-                        "Challenges disabled: No NVRAM map found.",
-                        3,
-                        "#FF3B30"
-                    )
-                except Exception:
-                    pass
-                return
+            _has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
         except Exception:
-            pass
+            _has_map = True
+
+        if not _has_map:
+            # No NVRAM map – only Heat Challenge is available for this table
+            ovw = getattr(self, "_challenge_select", None)
+            if ovw and ovw.isVisible():
+                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
+                if sel == 2:
+                    self._close_challenge_select_overlay()
+                    try:
+                        self.watcher.start_heat_challenge()
+                    except Exception:
+                        pass
+                else:
+                    # Snap back to Heat and inform user
+                    self._ch_ov_selected_idx = 2
+                    try:
+                        ovw.set_selected(2)
+                    except Exception:
+                        pass
+                    try:
+                        self.bridge.challenge_info_show.emit(
+                            "No NVRAM map – only Heat Challenge available.",
+                            3,
+                            "#FF7F00"
+                        )
+                    except Exception:
+                        pass
+            else:
+                # Open overlay pre-selected at Heat Challenge
+                self._ch_ov_selected_idx = 2
+                self._open_challenge_select_overlay()
+            return
 
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
             try:
@@ -1036,11 +1179,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         ovw = getattr(self, "_challenge_select", None)
         if ovw and ovw.isVisible():
-            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 2
+            sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
             if sel == 0:
                 self._close_challenge_select_overlay()
                 try:
                     self.watcher.start_timed_challenge()
+                except Exception:
+                    pass
+                return
+            elif sel == 2:
+                self._close_challenge_select_overlay()
+                try:
+                    self.watcher.start_heat_challenge()
                 except Exception:
                     pass
                 return
@@ -1067,6 +1217,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             return
+        try:
+            current_rom = getattr(self.watcher, "current_rom", None)
+            if not (current_rom and self.watcher._has_any_map(current_rom)):
+                return  # No NVRAM map – navigation locked to Heat Challenge
+        except Exception:
+            pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
             try:
                 n = len(self._flip_diff_options)
@@ -1081,7 +1237,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 2
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) - 1) % 3
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:
@@ -1105,6 +1261,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             return
+        try:
+            current_rom = getattr(self.watcher, "current_rom", None)
+            if not (current_rom and self.watcher._has_any_map(current_rom)):
+                return  # No NVRAM map – navigation locked to Heat Challenge
+        except Exception:
+            pass
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
             try:
                 n = len(self._flip_diff_options)
@@ -1119,7 +1281,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         src = getattr(self, "_last_ch_event_src", None)
         if self._ch_active_source and src and self._ch_active_source != src:
             self._ch_active_source = src
-        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 2
+        self._ch_ov_selected_idx = (int(self._ch_ov_selected_idx) + 1) % 3
         try:
             ovw.set_selected(self._ch_ov_selected_idx)
         except Exception:
@@ -1336,9 +1498,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_mini_info_test = QPushButton("Test"); self.btn_mini_info_test.clicked.connect(self._on_mini_info_test)
         box_mini_info = create_overlay_box("System Notifications", self.chk_mini_info_portrait, self.chk_mini_info_ccw, self.btn_mini_info_place, self.btn_mini_info_test)
 
+        # 6) Heat Bar
+        self.chk_heat_bar_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_heat_bar_portrait.setChecked(bool(self.cfg.OVERLAY.get("heat_bar_portrait", False))); self.chk_heat_bar_portrait.stateChanged.connect(self._on_heat_bar_portrait_toggle)
+        self.chk_heat_bar_ccw = QCheckBox("Rotate CCW"); self.chk_heat_bar_ccw.setChecked(bool(self.cfg.OVERLAY.get("heat_bar_rotate_ccw", True))); self.chk_heat_bar_ccw.stateChanged.connect(self._on_heat_bar_ccw_toggle)
+        self.btn_heat_bar_place = QPushButton("Place"); self.btn_heat_bar_place.clicked.connect(self._on_heat_bar_place_clicked)
+        self.btn_heat_bar_test = QPushButton("Test"); self.btn_heat_bar_test.clicked.connect(self._on_heat_bar_test)
+        box_heat_bar = create_overlay_box("Heat Bar (Heat Challenge)", self.chk_heat_bar_portrait, self.chk_heat_bar_ccw, self.btn_heat_bar_place, self.btn_heat_bar_test)
+
         lay_pos.addLayout(box_main, 0, 0); lay_pos.addLayout(box_toast, 0, 1)
         lay_pos.addLayout(box_ch_sel, 1, 0); lay_pos.addLayout(box_tc, 1, 1)
-        lay_pos.addLayout(box_mini_info, 2, 0) # Fügt die Box in die 3. Zeile ein
+        lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_heat_bar, 2, 1)
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)

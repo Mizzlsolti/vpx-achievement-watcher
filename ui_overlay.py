@@ -1944,7 +1944,7 @@ class ChallengeSelectOverlay(QWidget):
     def __init__(self, parent: "MainWindow", selected_idx: int = 0):
         super().__init__(parent)
         self.parent_gui = parent
-        self._selected = 0 if int(selected_idx) % 2 == 0 else 1
+        self._selected = int(selected_idx) % 3
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -1985,7 +1985,7 @@ class ChallengeSelectOverlay(QWidget):
         self._render_and_place()
 
     def set_selected(self, idx: int):
-        self._selected = 0 if int(idx) % 2 == 0 else 1
+        self._selected = int(idx) % 3
         self._render_and_place()
 
     def apply_portrait_from_cfg(self):
@@ -2002,12 +2002,15 @@ class ChallengeSelectOverlay(QWidget):
         text_color = QColor("#FFFFFF")
         hi_color = QColor("#FF7F00")
 
-        if int(getattr(self, "_selected", 0) or 0) % 2 == 0:
+        if int(getattr(self, "_selected", 0) or 0) % 3 == 0:
             title_text = "Timed Challenge"
             desc_text = "3:00 minutes playing time."
-        else:
+        elif int(getattr(self, "_selected", 0) or 0) % 3 == 1:
             title_text = "Flip Challenge"
             desc_text = "Count Left+Right flips until chosen target."
+        else:
+            title_text = "Heat Challenge"
+            desc_text = "Keep heat below 100%. Don't spam or hold flippers!"
 
         w, h = 520, 200
         pad_lr = 20
@@ -2326,3 +2329,276 @@ class FlipDifficultyOverlay(QWidget):
             p.drawPixmap(0, 0, self._pix)
             p.end()
 
+
+
+class HeatBarometerOverlay(QWidget):
+    """Vertical heat barometer overlay for Heat Challenge. Fills bottom-to-top,
+    colour transitions from green (0-50%) to orange (50-85%) to red (>85%)."""
+
+    def __init__(self, parent: "MainWindow"):
+        super().__init__(None)
+        self.parent_gui = parent
+        self._heat = 0
+        self.setWindowTitle("Heat Barometer")
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._render_and_place()
+        self.show()
+        self.raise_()
+        try:
+            import win32gui, win32con
+            hwnd = int(self.winId())
+            win32gui.SetWindowPos(
+                hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+            )
+        except Exception:
+            pass
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+        self._render_and_place()
+
+    def _bar_color(self, heat: int) -> QColor:
+        if heat <= 50:
+            # 0-50%: blend from green (0,200,0) toward yellow (255,200,0)
+            r = int(heat * 255 / 50)
+            return QColor(r, 200, 0)
+        elif heat <= 85:
+            # 50-85%: blend from yellow toward deep orange/red
+            frac = (heat - 50) / 35.0
+            r = 255
+            g = int(200 * (1.0 - frac))
+            return QColor(r, g, 0)
+        else:
+            # >85%: solid danger red
+            return QColor(220, 30, 0)
+
+    def _compose_image(self) -> QImage:
+        bar_w = 36
+        bar_h = 220
+        label_h = 28
+        pad = 6
+        w = bar_w + 2 * pad
+        h = bar_h + label_h + 2 * pad
+
+        img = QImage(w, h, QImage.Format.Format_ARGB32)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+            # background
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(0, 0, 0, 220))
+            p.drawRoundedRect(0, 0, w, h, 10, 10)
+
+            # border
+            pen = QPen(QColor("#00E5FF"))
+            pen.setWidth(2)
+            p.setPen(pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(1, 1, w - 2, h - 2, 10, 10)
+
+            # bar background (track)
+            bx = pad
+            by = pad
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(40, 40, 40, 255))
+            p.drawRoundedRect(bx, by, bar_w, bar_h, 6, 6)
+
+            # fill from bottom upward
+            fill_h = int(bar_h * self._heat / 100)
+            if fill_h > 0:
+                fill_y = by + bar_h - fill_h
+                p.setBrush(self._bar_color(self._heat))
+                p.drawRoundedRect(bx, fill_y, bar_w, fill_h, 6, 6)
+
+            # label
+            p.setPen(QColor("#FFFFFF"))
+            p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            label_rect = QRect(0, pad + bar_h, w, label_h)
+            p.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), f"{self._heat}%")
+
+            # pulsing red border when > 85%
+            if self._heat > 85:
+                pulse_pen = QPen(QColor(255, 60, 0, 200))
+                pulse_pen.setWidth(3)
+                p.setPen(pulse_pen)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawRoundedRect(1, 1, w - 2, h - 2, 10, 10)
+        finally:
+            p.end()
+
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
+            if portrait:
+                angle = -90 if bool(ov.get("heat_bar_rotate_ccw", ov.get("portrait_rotate_ccw", True))) else 90
+                img = img.transformed(QTransform().rotate(angle), Qt.TransformationMode.SmoothTransformation)
+        except Exception:
+            pass
+
+        return img
+
+    def _render_and_place(self):
+        img = self._compose_image()
+        W, H = img.width(), img.height()
+        self.setFixedSize(W, H)
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        scr = QApplication.primaryScreen()
+        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
+        use_saved = bool(ov.get("heat_bar_saved", ov.get("heat_bar_custom", False)))
+        if use_saved:
+            if portrait:
+                x = int(ov.get("heat_bar_x_portrait", 20))
+                y = int(ov.get("heat_bar_y_portrait", 100))
+            else:
+                x = int(ov.get("heat_bar_x_landscape", 20))
+                y = int(ov.get("heat_bar_y_landscape", 100))
+        else:
+            x = int(geo.left() + 20)
+            y = int(geo.top() + (geo.height() - H) // 2)
+
+        x = max(geo.left(), min(x, geo.right() - W))
+        y = max(geo.top(),  min(y,  geo.bottom() - H))
+        self.move(x, y)
+        self._pix = QPixmap.fromImage(img)
+        self.update()
+
+    def paintEvent(self, _evt):
+        if hasattr(self, "_pix") and self._pix:
+            p = QPainter(self)
+            p.drawPixmap(0, 0, self._pix)
+            p.end()
+
+
+class HeatBarPositionPicker(QWidget):
+    """Draggable dummy widget to position the HeatBarometerOverlay."""
+
+    def __init__(self, parent: "MainWindow", width_hint: int = 48, height_hint: int = 260):
+        super().__init__(None)
+        self.parent_gui = parent
+        self.setWindowTitle("Place Heat Bar")
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self._base_w = max(36, int(width_hint))
+        self._base_h = max(120, int(height_hint))
+        self._drag_off = QPoint(0, 0)
+        self._portrait = False
+        self._ccw = True
+        self._sync_from_cfg()
+
+        if self._portrait:
+            self._w, self._h = self._base_h, self._base_w
+        else:
+            self._w, self._h = self._base_w, self._base_h
+
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        if self._portrait:
+            x0 = int(ov.get("heat_bar_x_portrait", 20))
+            y0 = int(ov.get("heat_bar_y_portrait", 100))
+        else:
+            x0 = int(ov.get("heat_bar_x_landscape", 20))
+            y0 = int(ov.get("heat_bar_y_landscape", 100))
+
+        geo = self._screen_geo()
+        x = min(max(geo.left(), x0), geo.right() - self._w)
+        y = min(max(geo.top(),  y0), geo.bottom() - self._h)
+        self.setGeometry(x, y, self._w, self._h)
+        self.show()
+        self.raise_()
+
+    def _screen_geo(self) -> QRect:
+        try:
+            screens = QApplication.screens() or []
+            if screens:
+                vgeo = screens[0].geometry()
+                for s in screens[1:]:
+                    vgeo = vgeo.united(s.geometry())
+                return vgeo
+            scr = QApplication.primaryScreen()
+            if scr:
+                return scr.geometry()
+        except Exception:
+            pass
+        return QRect(0, 0, 1280, 720)
+
+    def _sync_from_cfg(self):
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            self._portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
+            self._ccw = bool(ov.get("heat_bar_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
+        except Exception:
+            self._portrait = False
+            self._ccw = True
+
+    def apply_portrait_from_cfg(self):
+        old_portrait = bool(self._portrait)
+        self._sync_from_cfg()
+        if bool(self._portrait) != old_portrait:
+            if self._portrait:
+                self._w, self._h = self._base_h, self._base_w
+            else:
+                self._w, self._h = self._base_w, self._base_h
+            g = self.geometry()
+            x, y = g.x(), g.y()
+            geo = self._screen_geo()
+            x = min(max(geo.left(), x), geo.right() - self._w)
+            y = min(max(geo.top(),  y), geo.bottom() - self._h)
+            self.setGeometry(x, y, self._w, self._h)
+        self.update()
+
+    def paintEvent(self, _evt):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.fillRect(0, 0, self._w, self._h, QColor(0, 0, 0, 200))
+        pen = QPen(QColor("#FF7F00"))
+        pen.setWidth(2)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 8, 8)
+        p.setPen(QColor("#FF7F00"))
+        p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+        msg = "Drag to position.\nClick button again to save"
+        if self._portrait:
+            p.save()
+            angle = -90 if self._ccw else 90
+            center = self.rect().center()
+            p.translate(center)
+            p.rotate(angle)
+            p.translate(-center)
+            p.drawText(self.rect(), int(Qt.AlignmentFlag.AlignCenter), msg)
+            p.restore()
+        else:
+            p.drawText(self.rect(), int(Qt.AlignmentFlag.AlignCenter), msg)
+        p.end()
+
+    def mousePressEvent(self, evt):
+        if evt.button() == Qt.MouseButton.LeftButton:
+            self._drag_off = evt.globalPosition().toPoint() - self.frameGeometry().topLeft()
+
+    def mouseMoveEvent(self, evt):
+        if evt.buttons() & Qt.MouseButton.LeftButton:
+            target = evt.globalPosition().toPoint() - self._drag_off
+            geo = self._screen_geo()
+            x = min(max(geo.left(), target.x()), geo.right() - self._w)
+            y = min(max(geo.top(),  target.y()), geo.bottom() - self._h)
+            self.move(x, y)
+
+    def current_top_left(self) -> tuple[int, int]:
+        g = self.geometry()
+        return int(g.x()), int(g.y())
