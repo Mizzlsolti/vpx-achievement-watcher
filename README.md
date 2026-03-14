@@ -25,9 +25,16 @@ The achievement watcher uses nvram-maps, VPSID and vpxtool for Visual Pinball
 Many thanks 
 
 to tomlogic    https://github.com/tomlogic/pinmame-nvram-maps 
+
 to Team from https://virtualpinballspreadsheet.github.io
+
 and francisdb  https://github.com/francisdb/vpxtool
 
+Team Visual Pinball 
+
+The official Visual Pinball and PinMAME hub.
+
+https://github.com/vpinball
 
 ## Screenshots
 
