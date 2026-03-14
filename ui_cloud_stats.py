@@ -125,16 +125,18 @@ class CloudStatsMixin:
                     body = f"<tr><td colspan='{cols}' align='center' style='color:#888; border:none; padding-top:20px;'>(no results)</td></tr>"
                 else:
                     rows = []
+                    romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
                     for it in items:
                         rom = it.get("rom", "")
                         sc = fmt_score(it.get("score", 0))
                         dur = self._fmt_hms(int(it.get("duration_sec", 0)))
-                        
+                        table_title = _html.escape(romnames.get(rom, ""))
+
                         if is_flip:
                             diff_label = it.get("difficulty", "-")
-                            rows.append(f"<tr><td align='left' class='left'>{rom}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                         else:
-                            rows.append(f"<tr><td align='left' class='left'>{rom}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                     body = "".join(rows)
                 
                 return f"<h4>{title}</h4><table width='100%'>{head}{body}</table>"
@@ -243,12 +245,24 @@ class CloudStatsMixin:
         cat_index = self.cmb_cloud_category.currentIndex()
         cat_map = {0: "progress", 1: "timed", 2: "flip", 3: "heat"}
         category = cat_map.get(cat_index, "progress")
-        rom = self.txt_cloud_rom.text().strip().lower()
+        rom_input = self.txt_cloud_rom.text().strip().lower()
         selected_diff = self.cmb_cloud_diff.currentText() if category == "flip" else None
-        
-        if not rom:
-            self.cloud_view.setHtml("<div style='color:#FF3B30;'>(Please enter a ROM name first)</div>")
+
+        if not rom_input:
+            self.cloud_view.setHtml("<div style='color:#FF3B30;'>(Please enter a ROM or Title first)</div>")
             return
+
+        # Resolve title input to ROM key if the input is not an exact ROM match
+        rom = rom_input
+        try:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            if rom_input not in romnames:
+                for r_key, title in romnames.items():
+                    if rom_input in title.lower():
+                        rom = r_key
+                        break
+        except Exception:
+            pass
             
         if not self.cfg.CLOUD_URL:
             self.cloud_view.setHtml("<div style='color:#FF3B30;'>(No Firebase URL configured in System Tab!)</div>")
@@ -486,6 +500,9 @@ class CloudStatsMixin:
         if not rom:
             rom = "Unknown"
 
+        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        table_title = romnames.get(rom, "")
+
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
         
         if not audits and os.path.exists(summary_path):
@@ -499,6 +516,8 @@ class CloudStatsMixin:
 
         html_lines = ["<div align='center'>"]
         html_lines.append(f"<div class='rom-title'>ROM: {rom}</div>")
+        if table_title:
+            html_lines.append(f"<div style='font-size:1.2em; color:#00E5FF; font-weight:bold; text-align:center; margin-bottom:5px;'>{_html.escape(table_title)}</div>")
         html_lines.append(f"<div class='meta'>All global values</div>")
 
         if not audits:
@@ -570,6 +589,9 @@ class CloudStatsMixin:
         if not rom:
             rom = "Unknown"
 
+        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        table_title = romnames.get(rom, "")
+
         active_deltas = {}
         playtime_str = ""
 
@@ -608,7 +630,9 @@ class CloudStatsMixin:
 
         html_lines = ["<div align='center'>"]
         html_lines.append(f"<div class='rom-title'>ROM: {esc(rom)}</div>")
-        
+        if table_title:
+            html_lines.append(f"<div style='font-size:1.2em; color:#00E5FF; font-weight:bold; text-align:center; margin-bottom:5px;'>{esc(table_title)}</div>")
+
         if playtime_str:
             html_lines.append(f"<div class='meta'>Playtime: {esc(playtime_str)} &nbsp;&nbsp;|&nbsp;&nbsp; Actions from session</div>")
         else:

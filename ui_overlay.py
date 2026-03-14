@@ -449,6 +449,13 @@ class OverlayWindow(QWidget):
         def esc(x) -> str:
             return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+        table_title = ""
+        try:
+            romnames = getattr(self.parent_gui.watcher, "ROMNAMES", {}) or {}
+            table_title = romnames.get(rom_name, "")
+        except Exception:
+            pass
+
         total_achs = 0
         unlocked_total = 0
         pct = 0.0
@@ -491,6 +498,8 @@ class OverlayWindow(QWidget):
             lines = []
 
             lines.append(f"<div class='rom-title'>{esc(rom_name)}</div>")
+            if table_title:
+                lines.append(f"<div style='text-align:center; font-size:1.1em; color:#00E5FF; font-weight:bold; margin-bottom:0.3em;'>{esc(table_title)}</div>")
 
             if total_achs > 0:
                 safe_pct = max(0.1, min(100.0, pct))
