@@ -1987,32 +1987,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         session_map = state.get("session", {}) or {}
         
         def build_columns_html(data_map: dict) -> str:
-            VPS_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
-
-            def _info_badge(e: dict) -> str:
-                ti = e.get("table_info") if isinstance(e, dict) else None
-                if not ti:
-                    return ""
-                parts = []
-                if ti.get("table_name"):
-                    parts.append(f"Table: {ti['table_name']}")
-                if ti.get("author"):
-                    parts.append(f"Author: {ti['author']}")
-                if ti.get("version"):
-                    parts.append(f"Version: {ti['version']}")
-                if ti.get("vps_id"):
-                    parts.append(f"VPS-ID: {ti['vps_id']}")
-                if not parts:
-                    return ""
-                tooltip = "&#10;".join(parts)
-                vps_id = (ti.get("vps_id") or "").strip()
-                if vps_id:
-                    return (
-                        f" <a href='{VPS_BASE}{vps_id}' title='{tooltip}'"
-                        " style='text-decoration:none; color:#00E5FF;'>ℹ️</a>"
-                    )
-                return f" <span title='{tooltip}' style='cursor:help;'>ℹ️</span>"
-
             roms = sorted(data_map.keys(), key=lambda s: str(s).lower())
             if not roms:
                 return "<div>(no data)</div>"
@@ -2025,17 +1999,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         title = str(e.get("title", "")).strip()
                     else:
                         title = str(e).strip()
-                        e = {}
-                        
+
                     title = title.replace(" (Session)", "").replace(" (Global)", "")
-                    
+
                     if title:
-                        items.append((title, _info_badge(e)))
+                        items.append(title)
                 if not items:
                     continue
                 lines = [f"<div style='font-weight:700;margin-bottom:4px;'>{rom}</div>"]
-                for title, badge in items:
-                    lines.append(f"<div style='margin:2px 0;'>{title}{badge}</div>")
+                for title in items:
+                    lines.append(f"<div style='margin:2px 0;'>{title}</div>")
                 cols.append("".join(lines))
             if not cols:
                 return "<div>(no data)</div>"
