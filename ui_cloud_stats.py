@@ -76,7 +76,6 @@ class CloudStatsMixin:
                             "duration_sec": dur_s, 
                             "_dt": dt, 
                             "difficulty": diff_str,
-                            "table_info": it.get("table_info") or None,
                         }
                         
                         if kind == "timed":
@@ -115,31 +114,6 @@ class CloudStatsMixin:
             </style>
             """
 
-            VPS_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
-
-            def _info_badge(ti: dict | None) -> str:
-                if not ti:
-                    return ""
-                parts = []
-                if ti.get("table_name"):
-                    parts.append(f"Table: {ti['table_name']}")
-                if ti.get("author"):
-                    parts.append(f"Author: {ti['author']}")
-                if ti.get("version"):
-                    parts.append(f"Version: {ti['version']}")
-                if ti.get("vps_id"):
-                    parts.append(f"VPS-ID: {ti['vps_id']}")
-                if not parts:
-                    return ""
-                tooltip = "&#10;".join(parts)
-                vps_id = (ti.get("vps_id") or "").strip()
-                if vps_id:
-                    return (
-                        f" <a href='{VPS_BASE}{vps_id}' title='{tooltip}'"
-                        " style='text-decoration:none; color:#00E5FF;'>ℹ️</a>"
-                    )
-                return f" <span title='{tooltip}' style='cursor:help;'>ℹ️</span>"
-
             def tbl(title: str, items: list[dict], is_flip: bool) -> str:
                 if is_flip:
                     head = "<tr><th align='left'>ROM</th><th align='right'>Difficulty</th><th align='right'>Score</th><th align='right'>Duration</th></tr>"
@@ -155,19 +129,18 @@ class CloudStatsMixin:
                         rom = it.get("rom", "")
                         sc = fmt_score(it.get("score", 0))
                         dur = self._fmt_hms(int(it.get("duration_sec", 0)))
-                        badge = _info_badge(it.get("table_info"))
                         
                         if is_flip:
                             diff_label = it.get("difficulty", "-")
-                            rows.append(f"<tr><td align='left' class='left'>{rom}{badge}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left'>{rom}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                         else:
-                            rows.append(f"<tr><td align='left' class='left'>{rom}{badge}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
+                            rows.append(f"<tr><td align='left' class='left'>{rom}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
                     body = "".join(rows)
                 
                 return f"<h4>{title}</h4><table width='100%'>{head}{body}</table>"
 
-            html_timed = tbl("Timed", timed_items, False)
-            html_flip = tbl("Flip", flip_items, True)
+            html_timed = tbl("⏳ Timed", timed_items, False)
+            html_flip = tbl("🎯 Flip", flip_items, True)
             html_heat = tbl("🔥 Heat", heat_items, False)
             
             html = (
