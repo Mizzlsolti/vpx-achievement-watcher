@@ -338,59 +338,40 @@ VPXTOOL_DIRNAME = "tools"
 VPXTOOL_PATH = os.path.join(APP_DIR, VPXTOOL_DIRNAME, VPXTOOL_EXE)
 VPXTOOL_URL = "https://github.com/francisdb/vpxtool/releases/download/v0.26.0/vpxtool-Windows-x86_64-v0.26.0.zip"
 
-VPS_DB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/vpsdb.json"
+VPS_DB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
 VPS_PAGE_BASE = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
-VPS_DB_CACHE_MAX_AGE = 86400  # 24 hours
+VPS_DB_PATH = os.path.join(APP_DIR, "tools", "vpsdb.json")
 
 _vps_db_in_memory: list | None = None
 _vps_db_lock = threading.Lock()
 
 
-def f_vps_db_cache(cfg: "AppConfig") -> str:
-    return os.path.join(cfg.BASE, "vpsdb_cache.json")
-
-
 def _load_vps_db(cfg: "AppConfig") -> list:
-    """Return the VPS DB entry list, loading from cache file or downloading.
+    """Return the VPS DB entry list, loading from the tools folder.
 
-    The DB is cached in memory for the process lifetime and on disk for
-    up to ``VPS_DB_CACHE_MAX_AGE`` seconds so it is not re-downloaded every
-    run.
+    The DB is downloaded during bootstrap into ``tools/vpsdb.json`` and
+    cached in memory for the process lifetime.
     """
     global _vps_db_in_memory
     with _vps_db_lock:
         if _vps_db_in_memory is not None:
             return _vps_db_in_memory
 
-        cache_path = f_vps_db_cache(cfg)
-        if os.path.isfile(cache_path):
+        if os.path.isfile(VPS_DB_PATH):
             try:
-                age = time.time() - os.path.getmtime(cache_path)
-                if age < VPS_DB_CACHE_MAX_AGE:
-                    with open(cache_path, "r", encoding="utf-8") as fh:
-                        data = json.load(fh)
-                    if isinstance(data, list) and data:
-                        _vps_db_in_memory = data
-                        return _vps_db_in_memory
-            except Exception:
-                pass
-
-        try:
-            log(cfg, f"[VPS-DB] Downloading VPS database from {VPS_DB_URL}…")
-            data = _fetch_json_url(VPS_DB_URL, timeout=30)
-            if isinstance(data, list) and data:
+                with open(VPS_DB_PATH, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list) and data:
+                    _vps_db_in_memory = data
+                    return _vps_db_in_memory
+            except Exception as exc:
                 try:
-                    ensure_dir(os.path.dirname(cache_path))
-                    with open(cache_path, "w", encoding="utf-8") as fh:
-                        json.dump(data, fh, ensure_ascii=False)
+                    log(cfg, f"[VPS-DB] Failed to parse vpsdb.json: {exc}", "WARN")
                 except Exception:
                     pass
-                _vps_db_in_memory = data
-                log(cfg, f"[VPS-DB] Downloaded {len(data)} entries.")
-                return _vps_db_in_memory
-        except Exception as exc:
+        else:
             try:
-                log(cfg, f"[VPS-DB] Download failed: {exc}", "WARN")
+                log(cfg, f"[VPS-DB] {VPS_DB_PATH} not found – run bootstrap to download it.", "WARN")
             except Exception:
                 pass
 
@@ -1598,6 +1579,7 @@ class Watcher:
 
         ensure_file(f_index(self.cfg), INDEX_URL)
         ensure_file(f_romnames(self.cfg), ROMNAMES_URL)
+        ensure_file(VPS_DB_PATH, VPS_DB_URL)
         try:
             ensure_vpxtool(self.cfg)
         except Exception as e:
