@@ -1000,7 +1000,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _start_selected_challenge(self):
-        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 3
+        idx = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
         try:
             has_map = False
             try:
@@ -1008,15 +1008,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
             except Exception:
                 has_map = True
+            if not has_map:
+                return
             if idx == 0:
-                if not has_map:
-                    return
                 self.watcher.start_timed_challenge()
             elif idx == 2:
                 self.watcher.start_heat_challenge()
-            else:
-                if not has_map:
-                    return
+            elif idx == 1:
                 self.watcher.start_flip_challenge(500)
         except Exception:
             pass
@@ -1133,37 +1131,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             _has_map = True
 
         if not _has_map:
-            # No NVRAM map – only Heat Challenge is available for this table
-            ovw = getattr(self, "_challenge_select", None)
-            if ovw and ovw.isVisible():
-                sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
-                if sel == 3:
-                    self._close_challenge_select_overlay()
-                elif sel == 2:
-                    self._close_challenge_select_overlay()
-                    try:
-                        self.watcher.start_heat_challenge()
-                    except Exception:
-                        pass
-                else:
-                    # Snap back to Heat and inform user
-                    self._ch_ov_selected_idx = 2
-                    try:
-                        ovw.set_selected(2)
-                    except Exception:
-                        pass
-                    try:
-                        self.bridge.challenge_info_show.emit(
-                            "No NVRAM map – only Heat Challenge available.",
-                            3,
-                            "#FF7F00"
-                        )
-                    except Exception:
-                        pass
-            else:
-                # Open overlay pre-selected at Heat Challenge
-                self._ch_ov_selected_idx = 2
-                self._open_challenge_select_overlay()
+            try:
+                self._close_challenge_select_overlay()
+                self._close_flip_difficulty_overlay()
+            except Exception:
+                pass
+            try:
+                self.bridge.challenge_info_show.emit(
+                    "No NVRAM map available. Challenges require a map for score.",
+                    3,
+                    "#FF3B30"
+                )
+            except Exception:
+                pass
             return
 
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
