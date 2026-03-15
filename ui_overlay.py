@@ -797,7 +797,7 @@ class MiniInfoOverlay(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ov = self.parent_gui.cfg.OVERLAY or {}
         base_pt = int(ov.get("base_body_size", 20))
-        self._body_pt = max(12, base_pt + 3)          
+        self._body_pt = base_pt
         self._font_family = ov.get("font_family", "Segoe UI")
         self._red = "#FF3B30"                          
         self._hint = "#DDDDDD"                         
@@ -908,6 +908,13 @@ class MiniInfoOverlay(QWidget):
             self.hide()
             return
         self._refresh_view()
+
+    def update_font(self):
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        self._body_pt = int(ov.get("base_body_size", 20))
+        self._font_family = str(ov.get("font_family", "Segoe UI"))
+        if self.isVisible():
+            self._refresh_view()
 
     def show_info(self, message: str, seconds: int = 5, center: tuple[int, int] | None = None, color_hex: str | None = None):
         self._base_msg = str(message or "").strip()
@@ -1086,7 +1093,10 @@ class FlipCounterOverlay(QWidget):
         self._remaining = int(remaining)
         self._goal = int(goal)
         self._render_and_place()
-        
+
+    def update_font(self):
+        self._render_and_place()
+
 class FlipCounterPositionPicker(QWidget):
     def __init__(self, parent: "MainWindow", width_hint: int = 380, height_hint: int = 130):
         super().__init__(None)
