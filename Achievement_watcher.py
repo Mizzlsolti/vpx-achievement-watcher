@@ -672,7 +672,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         ("CHALLENGE COMPLETE!<br>Score: 42.069.000", "#00C853"),
         ("TIME'S UP!<br>Score: 42.069.000", "#00C853"),
         (
-            "NVRAM map not found for afm_113b. It will be generated automatically after a full game.",
+            "NVRAM map not found for afm_113b.",
             "#FF3B30",
         ),
         ("Challenge Aborted!", "#FF3B30"),
@@ -856,7 +856,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_overlay_place.setText("Save position")
 
     def _on_mini_info_show(self, rom: str, seconds: int = 10):
-        msg = f"NVRAM map not found for {rom}. It will be generated automatically after a full game."
+        msg = f"NVRAM map not found for {rom}."
 
         def _player_visible() -> bool:
             try:
