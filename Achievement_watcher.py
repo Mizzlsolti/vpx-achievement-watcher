@@ -1455,10 +1455,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.sld_scale.setValue(int(self.cfg.OVERLAY.get("scale_pct", 100)))
         self.sld_scale.valueChanged.connect(self._on_overlay_scale)
         self.lbl_scale = QLabel(f"{self.sld_scale.value()}%")
+        self.btn_scale_reset = QPushButton("100%")
+        self.btn_scale_reset.setToolTip("Reset Overlay Scale to 100%")
+        self.btn_scale_reset.clicked.connect(lambda: self.sld_scale.setValue(100))
 
         lay_style.addWidget(QLabel("Overlay Scale:"), 0, 0)
         lay_style.addWidget(self.sld_scale, 0, 1)
         lay_style.addWidget(self.lbl_scale, 0, 2)
+        lay_style.addWidget(self.btn_scale_reset, 0, 3)
 
         lay_style.addWidget(QLabel("Font Family:"), 1, 0)
         lay_style.addWidget(self.cmb_font_family, 1, 1)
@@ -1697,7 +1701,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No specific achievements defined for this ROM.</div>")
             return
             
-        html = ["<style>table {width:100%; border-collapse:collapse;} td {padding:8px; border-bottom:1px solid #444;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666;}</style>"]
+        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:8px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666;}</style>"]
         
         unlocked_count = 0
         cells = []
@@ -1717,7 +1721,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         html.append(f"<div style='font-size:1.4em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
         html.append(f"<div style='font-size:1.2em; color:#FF7F00; text-align:center; margin-bottom:15px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
         
-        html.append("<table>")
+        html.append("<table align='center' width='100%'>")
         COLUMNS = 4
         for i in range(0, len(cells), COLUMNS):
             html.append("<tr>")
