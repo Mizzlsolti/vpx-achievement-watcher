@@ -196,6 +196,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._ch_flip_diff_idx = 1  
         self._flip_diff_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100)]
         self._flip_diff_select = None
+        self._mini_test_idx = 0
 
         self.watcher.start()
 
@@ -667,11 +668,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._mini_info_picker = MiniInfoPositionPicker(self, width_hint=420, height_hint=100)
         self.btn_mini_info_place.setText("Save position")
 
+    _MINI_TEST_MESSAGES = [
+        ("TEST: System Notification Overlay", "#FF3B30"),
+        ("⚠ WARNING: VPX process not detected – is VPinballX running?", "#FF9500"),
+        (
+            "CHALLENGE COMPLETE!<br>Score: 42.069.000 – timed challenge finished, 3 balls played, multiball bonus applied.",
+            "#00C853",
+        ),
+        ("ℹ INFO: New high-score detected for Medieval Madness – updating leaderboard…", "#00E5FF"),
+    ]
+
     def _on_mini_info_test(self):
         # Ruft das Fenster direkt auf, ohne auf ein offenes Spiel zu warten!
         if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
             self._mini_overlay = MiniInfoOverlay(self)
-        self._mini_overlay.show_info("TEST: System Notification Overlay", seconds=5, color_hex="#FF3B30")
+        msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
+        self._mini_test_idx = (self._mini_test_idx + 1) % len(self._MINI_TEST_MESSAGES)
+        self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
 
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():

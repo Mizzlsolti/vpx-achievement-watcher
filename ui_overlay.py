@@ -826,8 +826,7 @@ class MiniInfoOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        base_pt = int(ov.get("base_body_size", 20))
-        self._body_pt = base_pt
+        self._body_pt = 20
         self._font_family = ov.get("font_family", "Segoe UI")
         self._red = "#FF3B30"                          
         self._hint = "#DDDDDD"                         
@@ -945,7 +944,7 @@ class MiniInfoOverlay(QWidget):
 
     def update_font(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
-        self._body_pt = int(ov.get("base_body_size", 20))
+        self._body_pt = 20
         self._font_family = str(ov.get("font_family", "Segoe UI"))
         if self.isVisible():
             self._refresh_view()
@@ -1037,11 +1036,11 @@ class FlipCounterOverlay(QWidget):
     def _compose_image(self) -> QImage:
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        body_pt = int(ov.get("base_body_size", 20))
-        title_pt = max(body_pt + 2, int(ov.get("base_title_size", int(body_pt * 1.35))))
-        
+        body_pt = 15
+        title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
+
         title_color = QColor("#FF7F00")
-        hi_color = QColor ("#FFFFFF")
+        hi_color = QColor("#FFFFFF")
 
         title = f"Total flips: {int(self._total)}/{int(self._goal)}"
         sub = f"Remaining: {int(max(0, self._remaining))}"
@@ -1923,8 +1922,8 @@ class AchToastWindow(QWidget):
     def _compose_image(self) -> QImage:
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        body_pt = int(ov.get("base_body_size", 20))
-        title_pt = max(body_pt + 2, int(ov.get("base_title_size", int(body_pt * 1.35))))
+        body_pt = 15
+        title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
         
         # Feste Theme-Farben
         title_color = QColor("#FF7F00") # Orange
@@ -2237,7 +2236,7 @@ class ChallengeSelectOverlay(QWidget):
 
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        base_body_pt = int(ov.get("base_body_size", 20))
+        base_body_pt = 20
         ov_scale = int(ov.get("scale_pct", 100)) / 100.0
         scaled_body_pt = max(4, int(round(base_body_pt * ov_scale)))
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
