@@ -262,6 +262,15 @@ class OverlayWindow(QWidget):
         self._nav_arrows_active = False
         self._layout_positions()
         QTimer.singleShot(0, self._register_raw_input)
+        # Page-2 (Achievement Progress) Python-level scroll support
+        self._p2_timer = QTimer(self)
+        self._p2_timer.setInterval(1500)
+        self._p2_timer.timeout.connect(self._p2_tick)
+        self._p2_rows: list = []
+        self._p2_offset: int = 0
+        self._p2_visible: int = 10
+        self._p2_header: str = ""
+        self._p2_css: str = ""
 
     def request_rotation(self, force: bool = False):
         if not self.portrait_mode:
@@ -529,6 +538,8 @@ class OverlayWindow(QWidget):
         self.request_rotation(force=True)
 
     def set_html(self, html: str, session_title: Optional[str] = None):
+        if hasattr(self, "_p2_timer"):
+            self._p2_timer.stop()
         self._current_combined = None
         self._current_title = "Highlights" if session_title is None else session_title
         self.title.setText(self._current_title)
@@ -539,9 +550,70 @@ class OverlayWindow(QWidget):
         self.request_rotation(force=True)
 
     def set_combined(self, combined: dict, session_title: Optional[str] = None):
+        if hasattr(self, "_p2_timer"):
+            self._p2_timer.stop()
         self._current_combined = combined or {}
         self._current_title = "Highlights" if session_title is None else session_title
         self._render_fixed_columns()
+
+    def set_html_scrollable(self, css: str, header_html: str, rows: list,
+                            session_title: Optional[str] = None):
+        """Display a list of table rows with Python QTimer-based scrolling."""
+        if hasattr(self, "_p2_timer"):
+            self._p2_timer.stop()
+        self._current_combined = None
+        self._current_title = session_title or "Achievement Progress"
+        self.title.setText(self._current_title)
+        self._p2_rows = list(rows)
+        self._p2_offset = 0
+        self._p2_header = header_html
+        self._p2_css = css
+        # Estimate how many rows fit in the body area
+        body_pt = getattr(self, "_body_pt", 20)
+        row_h_px = max(16, int(body_pt * 1.8))
+        avail_h = max(80, self.height() - 80)
+        self._p2_visible = max(6, avail_h // row_h_px)
+        self._render_p2()
+        self._layout_positions()
+        self.request_rotation(force=True)
+        if len(self._p2_rows) > self._p2_visible:
+            self._p2_timer.start()
+
+    def _render_p2(self):
+        """Render the current scroll window of achievement rows into the body label."""
+        rows = self._p2_rows
+        offset = self._p2_offset
+        visible = getattr(self, "_p2_visible", 10)
+        chunk = rows[offset:offset + visible]
+        body_pt = getattr(self, "_body_pt", 20)
+        css_base = (f"font-size:{body_pt}pt;"
+                    f"font-family:'{self.font_family}';color:#FFFFFF;")
+        table_html = ("<table width='100%' style='border-collapse:collapse;'>"
+                      + "".join(chunk) + "</table>")
+        full = getattr(self, "_p2_css", "") + getattr(self, "_p2_header", "") + table_html
+        self.body.setText(f"<div style='{css_base}'>{full}</div>")
+
+    def _p2_tick(self):
+        """Advance scroll by one row and re-render; pause at end then loop."""
+        total = len(self._p2_rows)
+        visible = getattr(self, "_p2_visible", 10)
+        if total <= visible:
+            if hasattr(self, "_p2_timer"):
+                self._p2_timer.stop()
+            return
+        max_offset = total - visible
+        self._p2_offset += 1
+        if self._p2_offset > max_offset:
+            # Pause at end for 3 seconds before looping back to the top
+            self._p2_timer.stop()
+            self._p2_offset = 0
+            self._render_p2()
+            self.request_rotation(force=True)
+            QTimer.singleShot(3000, lambda: self._p2_timer.start()
+                              if self._p2_rows else None)
+            return
+        self._render_p2()
+        self.request_rotation(force=True)
 
     def _render_fixed_columns(self):
         self.title.setText(self._current_title or "Highlights")
@@ -584,7 +656,7 @@ class OverlayWindow(QWidget):
           .hltable th { text-align: center; background: rgba(0, 229, 255, 0.15); color: #00E5FF; font-weight: bold; font-size: 1.1em; }
           .hltable td.left { text-align: left; }
           .hltable td.right { text-align: right; font-weight: bold; font-size: 1.15em; color: #FF7F00; }
-          .rom-title { text-align: center; font-size: 1.6em; font-weight: bold; color: #FFFFFF; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.2em; margin-top: 0.4em; }
+          .rom-title { text-align: center; font-size: 1.6em; font-weight: bold; color: #FF7F00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.2em; margin-top: 0.4em; }
           .score-box { text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: #00E5FF; }
         </style>
         """
@@ -659,12 +731,7 @@ class OverlayWindow(QWidget):
                 items = sorted(list(deltas.items()), key=lambda x: int(x[1]), reverse=True)
 
                 max_rows = 13
-                if len(items) <= max_rows * 2:
-                    cols = 2
-                elif len(items) <= max_rows * 3:
-                    cols = 3
-                else:
-                    cols = 4
+                cols = 4
 
                 max_items = max_rows * cols
                 display_items = items[:max_items]

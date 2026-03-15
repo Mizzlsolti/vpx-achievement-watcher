@@ -2386,8 +2386,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     pass
         elif page_idx == 1:
             # Page 2: Local Achievement Progress for last played ROM
-            html = self._overlay_page2_html()
-            self.overlay.set_html(html, "Achievement Progress")
+            css, header_html, rows = self._overlay_page2_html()
+            self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
             try:
@@ -2516,8 +2516,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         return ctx
 
-    def _overlay_page2_html(self) -> str:
-        """Generate HTML for Page 2: Local Achievement Progress of the last played ROM."""
+    def _overlay_page2_html(self) -> tuple:
+        """Return (css, header_html, rows) for Page 2: Achievement Progress.
+
+        ``rows`` is a list of ``<tr>`` HTML strings for use with
+        ``OverlayWindow.set_html_scrollable()``.  The Python-level QTimer scroll
+        in OverlayWindow replaces the old CSS-animation approach (which is not
+        supported by Qt's QLabel RichText renderer).
+        """
         import html as _html_mod
 
         def esc(s):
@@ -2545,22 +2551,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             ".locked{color:#555;}"
             ".hdr{color:#FF7F00;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}"
             ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
-            ".scroll-container{max-height:450px;overflow:hidden;position:relative;margin-top:10px;}"
-            ".scroll-content{animation:scrollUp 25s linear infinite;}"
-            "@keyframes scrollUp{"
-            "0%{transform:translateY(0);}"
-            "10%{transform:translateY(0);}"
-            "100%{transform:translateY(calc(-100% + 450px));}"
-            "}"
             "</style>"
         )
 
         if not rom or not self.watcher._has_any_map(rom):
-            return (
-                css
-                + f"<div class='hdr'>{esc(header)}</div>"
-                + "<div style='text-align:center;color:#888;padding:18px;'>No achievement data for this ROM.</div>"
+            header_html = (
+                f"<div class='hdr'>{esc(header)}</div>"
+                "<div style='text-align:center;color:#888;padding:18px;'>"
+                "No achievement data for this ROM.</div>"
             )
+            return css, header_html, []
 
         try:
             state = self.watcher._ach_state_load()
@@ -2584,13 +2584,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
             unlocked_titles.add(t)
 
-        parts = [css, f"<div class='hdr'>{esc(header)}</div>"]
-
         if not all_rules:
-            parts.append(
-                "<div style='text-align:center;color:#888;padding:18px;'>No specific achievements defined for this ROM.</div>"
+            header_html = (
+                f"<div class='hdr'>{esc(header)}</div>"
+                "<div style='text-align:center;color:#888;padding:18px;'>"
+                "No specific achievements defined for this ROM.</div>"
             )
-            return "".join(parts)
+            return css, header_html, []
 
         unlocked_count = 0
         cells = []
@@ -2604,28 +2604,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 cells.append(f"<td class='locked'>🔒 {esc(clean)}</td>")
 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
-        parts.append(f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+        header_html = (
+            f"<div class='hdr'>{esc(header)}</div>"
+            f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
+        )
 
-        n = len(cells)
-        COLS = 3 if n <= 36 else 4
-
-        rows = (n + COLS - 1) // COLS
-        # Enable auto-scroll only when the list is too tall to fit in the container
-        scroll_class = "scroll-content" if rows > 12 else ""
-
-        parts.append(f"<div class='scroll-container'><div class='{scroll_class}'>")
-        parts.append("<table>")
+        # Always use 4 columns so the table is compact and consistent at any scale
+        COLS = 4
+        rows = []
         for i in range(0, len(cells), COLS):
-            parts.append("<tr>")
+            row = "<tr>"
             for j in range(COLS):
                 if i + j < len(cells):
-                    parts.append(cells[i + j])
+                    row += cells[i + j]
                 else:
-                    parts.append("<td></td>")
-            parts.append("</tr>")
-        parts.append("</table>")
-        parts.append("</div></div>")
-        return "".join(parts)
+                    row += "<td></td>"
+            row += "</tr>"
+            rows.append(row)
+
+        return css, header_html, rows
 
     def _overlay_page3_html(self) -> str:
         """Generate HTML for Page 3: Local Challenge Leaderboard (mirrors the GUI view)."""
