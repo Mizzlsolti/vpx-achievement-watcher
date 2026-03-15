@@ -1807,10 +1807,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.maps_view.setHtml("<div style='color:#888; text-align:center; margin-top:20px;'>(Click 'Load List' to see all supported tables)</div>")
             return
             
-        html = ["<style>table {width:100%; border-collapse:collapse;} th {text-align:left; color:#FF7F00; padding:8px; border-bottom:2px solid #555; background:#111;} td {padding:6px 8px; border-bottom:1px solid #333; color:#DDD; font-weight:bold;}</style>"]
-        html.append(f"<div style='margin-bottom:15px; color:#00E5FF; font-weight:bold;'>The online database currently contains NVRAM maps for {len(self._all_maps_cache)} tables.</div>")
+        html = ["<style>table {border-collapse:collapse;} th {width:25%; text-align:center; color:#FF7F00; padding:8px; border-bottom:2px solid #555; background:#111;} td {width:25%; padding:6px 8px; border-bottom:1px solid #333; color:#DDD; font-weight:bold; text-align:center;}</style>"]
+        html.append(f"<div style='margin-bottom:15px; color:#00E5FF; font-weight:bold; text-align:center;'>The online database currently contains NVRAM maps for {len(self._all_maps_cache)} tables.</div>")
         
-        html.append("<table><tr><th>Table Name</th><th>ROM Identifier</th><th style='border-left: 2px solid #555; padding-left:15px;'>Table Name</th><th>ROM Identifier</th></tr>")
+        html.append("<table align='center' width='100%'><tr><th>Table Name</th><th>ROM Identifier</th><th style='border-left: 2px solid #555;'>Table Name</th><th>ROM Identifier</th></tr>")
         
         filtered_items = []
         for rom, title in self._all_maps_cache:
@@ -1827,9 +1827,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             
             if i + 1 < len(filtered_items):
                 title2, rom2 = filtered_items[i + 1]
-                html.append(f"<td style='border-left: 2px solid #333; padding-left:15px;'>{title2}</td><td style='color:#888;'>{rom2}</td>")
+                html.append(f"<td style='border-left: 2px solid #333;'>{title2}</td><td style='color:#888;'>{rom2}</td>")
             else:
-                html.append("<td style='border-left: 2px solid #333; padding-left:15px;'></td><td></td>")
+                html.append("<td style='border-left: 2px solid #333;'></td><td></td>")
                 
             html.append("</tr>")
                 
