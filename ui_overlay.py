@@ -15,6 +15,68 @@ from PyQt6.QtGui import (
 
 from watcher_core import APP_DIR, register_raw_input_for_window
 
+
+class OverlayNavArrows(QWidget):
+    """Pulsating ice-blue navigation arrows displayed over the main overlay to indicate page cycling."""
+
+    def __init__(self, parent: "OverlayWindow"):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._pulse_t = 0.0
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(50)
+        self._pulse_timer.timeout.connect(self._on_tick)
+        self._pulse_timer.start()
+        self.hide()
+
+    def _on_tick(self):
+        self._pulse_t = (self._pulse_t + 0.08) % 1.0
+        self.update()
+
+    def paintEvent(self, event):
+        from math import sin, pi
+        w, h = self.width(), self.height()
+        if w <= 0 or h <= 0:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        try:
+            amp = 0.5 + 0.5 * sin(2 * pi * self._pulse_t)
+            alpha = 110 + int(120 * amp)
+            scale = 0.9 + 0.2 * amp
+            wobble = 2.0 * sin(2 * pi * self._pulse_t)
+            base_h = 18
+            ah = int(base_h * scale)
+            aw = max(6, int(ah * 0.6))
+            cy = h // 2
+            pad = 16
+            left_cx = pad + int(-wobble)
+            right_cx = w - pad + int(wobble)
+            arrow_color = QColor("#00E5FF")
+            arrow_color.setAlpha(alpha)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(arrow_color)
+            # Left-pointing arrow
+            p.drawPolygon([
+                QPoint(left_cx - aw // 2, cy),
+                QPoint(left_cx + aw // 2, cy - ah // 2),
+                QPoint(left_cx + aw // 2, cy + ah // 2),
+            ])
+            # Right-pointing arrow
+            p.drawPolygon([
+                QPoint(right_cx + aw // 2, cy),
+                QPoint(right_cx - aw // 2, cy - ah // 2),
+                QPoint(right_cx - aw // 2, cy + ah // 2),
+            ])
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+
 class OverlayWindow(QWidget):
     TITLE_OFFSET_X = 0
     TITLE_OFFSET_Y = 0
@@ -45,6 +107,8 @@ class OverlayWindow(QWidget):
             self.body.show()
         except Exception:
             pass
+        if self._nav_arrows_active:
+            self._nav_arrows.raise_()
 
     def _icon_local(self, key: str) -> str:
         use_emojis = not bool(self.parent_gui.cfg.OVERLAY.get("prefer_ascii_icons", False))
@@ -174,6 +238,8 @@ class OverlayWindow(QWidget):
         self.rotated_label.hide()
         self._rot_in_progress = False
         self._font_update_in_progress = False
+        self._nav_arrows = OverlayNavArrows(self)
+        self._nav_arrows_active = False
         self._layout_positions()
         QTimer.singleShot(0, self._register_raw_input)
 
@@ -189,6 +255,16 @@ class OverlayWindow(QWidget):
             finally:
                 self._rotation_pending = False
         QTimer.singleShot(self.ROTATION_DEBOUNCE_MS if not force else 0, _do)
+
+    def set_nav_arrows(self, active: bool):
+        """Show or hide the pulsating page-navigation arrows on the overlay."""
+        self._nav_arrows_active = bool(active)
+        if active:
+            self._nav_arrows.setGeometry(0, 0, self.width(), self.height())
+            self._nav_arrows.show()
+            self._nav_arrows.raise_()
+        else:
+            self._nav_arrows.hide()
 
     def _apply_geometry(self):
         ref = self._ref_screen_geometry()
@@ -367,6 +443,10 @@ class OverlayWindow(QWidget):
             self.rotated_label.setPixmap(QPixmap.fromImage(final_img))
             self.rotated_label.show()
             self.rotated_label.raise_()
+            if self._nav_arrows_active:
+                self._nav_arrows.setGeometry(0, 0, W, H)
+                self._nav_arrows.show()
+                self._nav_arrows.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()
@@ -416,6 +496,9 @@ class OverlayWindow(QWidget):
             self.request_rotation()
         else:
             self._show_live_unrotated()
+        if self._nav_arrows_active:
+            self._nav_arrows.setGeometry(0, 0, self.width(), self.height())
+            self._nav_arrows.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._current_combined = None

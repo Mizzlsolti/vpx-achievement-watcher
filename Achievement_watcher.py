@@ -186,6 +186,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._overlay_busy = False
         self._overlay_last_action = 0.0
         self.overlay = None
+        self._overlay_page = 0  # current page in the 4-page main overlay (0=Main Stats, 1=Achievement Progress, 2=Challenge Leaderboard, 3=Cloud Leaderboard)
 
         self._challenge_select = None
         self._ch_ov_selected_idx = 0
@@ -1193,6 +1194,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._last_ch_nav_ts = now
         except Exception:
             pass
+        # If the main overlay is open, navigate pages instead of the challenge menu
+        try:
+            if self.overlay and self.overlay.isVisible():
+                self._navigate_overlay_page(-1)
+                return
+        except Exception:
+            pass
         if self._challenge_is_active():
             return
         if not self._in_game_now():
@@ -1245,6 +1253,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if (now - float(getattr(self, "_last_ch_nav_ts", 0.0) or 0.0)) < 0.12:
                 return
             self._last_ch_nav_ts = now
+        except Exception:
+            pass
+        # If the main overlay is open, navigate pages instead of the challenge menu
+        try:
+            if self.overlay and self.overlay.isVisible():
+                self._navigate_overlay_page(+1)
+                return
         except Exception:
             pass
         if self._challenge_is_active():
@@ -1547,8 +1562,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
         lay_inputs.addWidget(QLabel("<b>Challenge Action / Start:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge Nav Left:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge Nav Right:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge / Overlay Left:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge / Overlay Right:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
 
         grp_voice = QGroupBox("Voice & Audio")
@@ -1920,12 +1935,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         _set_tip("cmb_ch_hotkey_src", "Input source for the challenge 'Action/Start' button.")
         _set_tip("btn_ch_hotkey_bind", "Assign the hotkey used to start challenges or select options.")
         _set_tip("lbl_ch_hotkey_binding", "Currently assigned hotkey for challenge actions.")
-        _set_tip("cmb_ch_left_src", "Input source for navigating left in challenge menus.")
-        _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left.")
-        _set_tip("lbl_ch_left_binding", "Currently assigned left navigation hotkey.")
-        _set_tip("cmb_ch_right_src", "Input source for navigating right in challenge menus.")
-        _set_tip("btn_ch_right_bind", "Assign the hotkey used to navigate right.")
-        _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey.")
+        _set_tip("cmb_ch_left_src", "Input source for navigating left in Challenge menus AND switching pages in the Main Overlay.")
+        _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left in Challenge menus and the Main Overlay.")
+        _set_tip("lbl_ch_left_binding", "Currently assigned left navigation hotkey (used to navigate Challenge menus AND to switch pages in the Main Overlay).")
+        _set_tip("cmb_ch_right_src", "Input source for navigating right in Challenge menus AND switching pages in the Main Overlay.")
+        _set_tip("btn_ch_right_bind", "Assign the hotkey used to navigate right in Challenge menus and the Main Overlay.")
+        _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey (used to navigate Challenge menus AND to switch pages in the Main Overlay).")
         _set_tip("sld_ch_volume", "Adjust the volume of the AI voice announcements.")
         _set_tip("chk_ch_voice_mute", "Completely disable spoken voice announcements during challenges.")
         
@@ -2165,6 +2180,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _refresh_overlay_live(self):
         if not bool(self.cfg.OVERLAY.get("live_updates", False)):
             return
+        # Only refresh page 0 (Main Stats); other pages have static content
+        if getattr(self, "_overlay_page", 0) != 0:
+            return
         try:
             if self.watcher and (self.watcher.game_active or self.watcher._vp_player_visible()):
                 try:
@@ -2195,7 +2213,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             
-            # Neu bauen und rendern der einzigen Seite!
             self._prepare_overlay_sections()
             secs = self._overlay_cycle.get("sections", [])
             if not secs:
@@ -2295,20 +2312,413 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay.set_combined(combined, session_title=title or "Active Player Highlights")
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
+            try:
+                self.overlay.set_nav_arrows(True)
+            except Exception:
+                pass
             return
         if kind == "html":
             html = payload.get("html", "") or "<div>-</div>"
             self.overlay.set_html(html, session_title=title)
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
+            try:
+                self.overlay.set_nav_arrows(True)
+            except Exception:
+                pass
             return
         combined = {"players": [payload]}
         title2 = f"Highlights – {payload.get('title','')}".strip()
         self.overlay.set_combined(combined, session_title=title2)
         self.overlay.show(); self.overlay.raise_()
         self._start_overlay_auto_close_timer()
+        try:
+            self.overlay.set_nav_arrows(True)
+        except Exception:
+            pass
 
-    def _cycle_overlay_button(self): 
+    # ------------------------------------------------------------------
+    # Overlay page navigation (4 pages cycled via challenge_left/right)
+    # ------------------------------------------------------------------
+
+    def _navigate_overlay_page(self, direction: int):
+        """Cycle to the next/previous overlay page (endless loop, 4 pages)."""
+        self._overlay_page = (int(getattr(self, "_overlay_page", 0)) + direction) % 4
+        try:
+            self._show_overlay_page(self._overlay_page)
+        except Exception as e:
+            try:
+                from watcher_core import log
+                log(self.cfg, f"[OVERLAY] page navigation failed: {e}", "WARN")
+            except Exception:
+                pass
+
+    def _show_overlay_page(self, page_idx: int):
+        """Show one of the 4 overlay pages."""
+        self._ensure_overlay()
+        if page_idx == 0:
+            # Page 1: Main Stats (existing combined-players view)
+            secs = self._overlay_cycle.get("sections", [])
+            if not secs:
+                self._prepare_overlay_sections()
+                secs = self._overlay_cycle.get("sections", [])
+            if secs:
+                self._show_overlay_section(secs[0])
+            else:
+                self.overlay.set_html(
+                    "<div style='text-align:center; color:#888; padding:20px;'>(No session data available)</div>",
+                    "Session Overview",
+                )
+                self.overlay.show(); self.overlay.raise_()
+                self._start_overlay_auto_close_timer()
+                try:
+                    self.overlay.set_nav_arrows(True)
+                except Exception:
+                    pass
+        elif page_idx == 1:
+            # Page 2: Local Achievement Progress for last played ROM
+            html = self._overlay_page2_html()
+            self.overlay.set_html(html, "Achievement Progress")
+            self.overlay.show(); self.overlay.raise_()
+            self._start_overlay_auto_close_timer()
+            try:
+                self.overlay.set_nav_arrows(True)
+            except Exception:
+                pass
+        elif page_idx == 2:
+            # Page 3: Local Challenge Leaderboard (1:1 mirror of GUI)
+            html = self._overlay_page3_html()
+            self.overlay.set_html(html, "Challenge Leaderboard")
+            self.overlay.show(); self.overlay.raise_()
+            self._start_overlay_auto_close_timer()
+            try:
+                self.overlay.set_nav_arrows(True)
+            except Exception:
+                pass
+        elif page_idx == 3:
+            # Page 4: Cloud Leaderboard (dynamic)
+            self._overlay_page4_show()
+
+    def _get_last_played_rom(self) -> str:
+        """Return the ROM key of the last played session (non-challenge or challenge)."""
+        import json as _json
+        try:
+            summary_path = os.path.join(
+                self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
+            )
+            if os.path.isfile(summary_path):
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    data = _json.load(f)
+                rom = str(data.get("rom", "") or "")
+                if rom:
+                    return rom
+        except Exception:
+            pass
+        try:
+            rom = (
+                getattr(self.watcher, "current_rom", None)
+                or getattr(self.watcher, "_last_logged_rom", None)
+            )
+            if rom:
+                return str(rom)
+        except Exception:
+            pass
+        return ""
+
+    def _get_last_session_context(self) -> dict:
+        """Determine what was last played: non-challenge session or a challenge, and return metadata."""
+        import json as _json
+        from datetime import datetime
+        from watcher_core import secure_load_json
+
+        ctx = {"rom": "", "table_name": "", "is_challenge": False, "kind": "", "difficulty": ""}
+
+        # Last non-challenge session from summary
+        summary_path = os.path.join(
+            self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
+        )
+        last_normal_ts = None
+        normal_rom = ""
+        normal_table = ""
+        try:
+            if os.path.isfile(summary_path):
+                last_normal_ts = os.path.getmtime(summary_path)
+                with open(summary_path, "r", encoding="utf-8") as f:
+                    data = _json.load(f)
+                normal_rom = str(data.get("rom", "") or "")
+                normal_table = str(data.get("table", "") or "")
+        except Exception:
+            pass
+
+        # Last challenge session from challenge history files
+        last_challenge_ts = None
+        challenge_rom = ""
+        challenge_kind = ""
+        challenge_difficulty = ""
+        hist_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+        try:
+            if os.path.isdir(hist_dir):
+                latest_item = None
+                latest_dt = None
+                for fn in os.listdir(hist_dir):
+                    if not fn.lower().endswith(".json"):
+                        continue
+                    fpath = os.path.join(hist_dir, fn)
+                    data = secure_load_json(fpath, {"results": []}) or {"results": []}
+                    for it in (data.get("results") or []):
+                        try:
+                            ts = str(it.get("ts", "") or "")
+                            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                            if dt.tzinfo is not None:
+                                dt = dt.astimezone().replace(tzinfo=None)
+                            if latest_dt is None or dt > latest_dt:
+                                latest_dt = dt
+                                latest_item = it
+                        except Exception:
+                            continue
+                if latest_item and latest_dt:
+                    last_challenge_ts = latest_dt.timestamp()
+                    challenge_rom = str(latest_item.get("rom", "") or "")
+                    challenge_kind = str(latest_item.get("kind", "") or "").lower()
+                    challenge_difficulty = str(latest_item.get("difficulty", "") or "")
+        except Exception:
+            pass
+
+        # Pick the more recent context
+        if last_challenge_ts is not None and last_normal_ts is not None:
+            if last_challenge_ts >= last_normal_ts:
+                ctx.update({"rom": challenge_rom, "is_challenge": True,
+                            "kind": challenge_kind, "difficulty": challenge_difficulty})
+            else:
+                ctx.update({"rom": normal_rom, "table_name": normal_table})
+        elif last_challenge_ts is not None:
+            ctx.update({"rom": challenge_rom, "is_challenge": True,
+                        "kind": challenge_kind, "difficulty": challenge_difficulty})
+        elif last_normal_ts is not None:
+            ctx.update({"rom": normal_rom, "table_name": normal_table})
+
+        # Resolve table name from ROMNAMES if not already set
+        if ctx["rom"] and not ctx["table_name"]:
+            try:
+                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+                ctx["table_name"] = romnames.get(ctx["rom"], "")
+            except Exception:
+                pass
+
+        return ctx
+
+    def _overlay_page2_html(self) -> str:
+        """Generate HTML for Page 2: Local Achievement Progress of the last played ROM."""
+        import html as _html_mod
+
+        def esc(s):
+            return _html_mod.escape(str(s))
+
+        rom = self._get_last_played_rom()
+        table_name = ""
+        if rom:
+            try:
+                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+                table_name = romnames.get(rom, "")
+            except Exception:
+                pass
+
+        if rom:
+            header = f"Last Played: {table_name} ({rom})" if table_name else f"Last Played: {rom}"
+        else:
+            header = "No recent play data available"
+
+        css = (
+            "<style>"
+            "table{width:100%;border-collapse:collapse;}"
+            "td{padding:5px 6px;border-bottom:1px solid #333;}"
+            ".unlocked{color:#00E5FF;font-weight:bold;}"
+            ".locked{color:#555;}"
+            ".hdr{color:#FF7F00;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}"
+            ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
+            "</style>"
+        )
+
+        if not rom or not self.watcher._has_any_map(rom):
+            return (
+                css
+                + f"<div class='hdr'>{esc(header)}</div>"
+                + "<div style='text-align:center;color:#888;padding:18px;'>No achievement data for this ROM.</div>"
+            )
+
+        try:
+            state = self.watcher._ach_state_load()
+        except Exception:
+            state = {"global": {}, "session": {}}
+
+        all_rules = []
+        unlocked_titles = set()
+        try:
+            s_rules = self.watcher._collect_player_rules_for_rom(rom)
+            seen = set()
+            for r in s_rules:
+                if isinstance(r, dict) and r.get("title"):
+                    t = str(r["title"]).strip()
+                    if t not in seen:
+                        seen.add(t)
+                        all_rules.append(r)
+        except Exception:
+            pass
+        for e in state.get("session", {}).get(rom, []):
+            t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+            unlocked_titles.add(t)
+
+        parts = [css, f"<div class='hdr'>{esc(header)}</div>"]
+
+        if not all_rules:
+            parts.append(
+                "<div style='text-align:center;color:#888;padding:18px;'>No specific achievements defined for this ROM.</div>"
+            )
+            return "".join(parts)
+
+        unlocked_count = 0
+        cells = []
+        for r in all_rules:
+            title = str(r.get("title", "Unknown")).strip()
+            clean = title.replace(" (Session)", "").replace(" (Global)", "")
+            if title in unlocked_titles or clean in unlocked_titles:
+                unlocked_count += 1
+                cells.append(f"<td class='unlocked'>✅ {esc(clean)}</td>")
+            else:
+                cells.append(f"<td class='locked'>🔒 {esc(clean)}</td>")
+
+        pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
+        parts.append(f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+        parts.append("<table>")
+        COLS = 3
+        for i in range(0, len(cells), COLS):
+            parts.append("<tr>")
+            for j in range(COLS):
+                if i + j < len(cells):
+                    parts.append(cells[i + j])
+                else:
+                    parts.append("<td></td>")
+            parts.append("</tr>")
+        parts.append("</table>")
+        return "".join(parts)
+
+    def _overlay_page3_html(self) -> str:
+        """Generate HTML for Page 3: Local Challenge Leaderboard (mirrors the GUI view)."""
+        try:
+            return self._build_challenges_results_html()
+        except Exception:
+            return "<div style='color:#FF3B30;text-align:center;'>(Error loading challenge leaderboard)</div>"
+
+    def _overlay_page4_show(self):
+        """Show Page 4: Cloud Leaderboard. Fetches data in the background."""
+        import html as _html_mod
+        import threading
+
+        self._ensure_overlay()
+        ctx = self._get_last_session_context()
+
+        # Build dynamic header
+        is_challenge = ctx.get("is_challenge", False)
+        kind = ctx.get("kind", "")
+        difficulty = ctx.get("difficulty", "")
+        table_name = ctx.get("table_name", "")
+        rom = ctx.get("rom", "")
+
+        kind_labels = {"timed": "Timed Challenge", "flip": "Flip Challenge", "heat": "Heat Challenge"}
+        if is_challenge:
+            ch_label = kind_labels.get(kind, "Challenge")
+            header_title = f"{ch_label} – {difficulty}" if difficulty else ch_label
+        else:
+            header_title = table_name if table_name else (rom.upper() if rom else "Cloud Leaderboard")
+
+        cloud_sync_msg = ""
+        if not self.cfg.CLOUD_ENABLED:
+            cloud_sync_msg = (
+                "<div style='color:#FF7F00;font-weight:bold;font-size:1.05em;"
+                "text-align:center;padding:8px 12px;border:1px solid #FF7F00;"
+                "border-radius:6px;margin-bottom:10px;'>"
+                "If you want to participate, enable cloud sync."
+                "</div>"
+            )
+
+        header_html = (
+            f"<div style='color:#FF7F00;font-size:1.15em;font-weight:bold;"
+            f"text-align:center;padding:6px 0;margin-bottom:4px;'>"
+            f"{_html_mod.escape(header_title)}</div>"
+            + cloud_sync_msg
+        )
+
+        if self.cfg.CLOUD_ENABLED and rom:
+            loading_html = header_html + (
+                "<div style='color:#888;text-align:center;padding:16px;'>Fetching cloud data…</div>"
+            )
+        else:
+            loading_html = header_html + (
+                "<div style='color:#888;text-align:center;padding:16px;'>(No ROM data available)</div>"
+                if not rom else ""
+            )
+
+        self.overlay.set_html(loading_html, "Cloud Leaderboard")
+        self.overlay.show(); self.overlay.raise_()
+        self._start_overlay_auto_close_timer()
+        try:
+            self.overlay.set_nav_arrows(True)
+        except Exception:
+            pass
+
+        if not (self.cfg.CLOUD_ENABLED and rom):
+            return
+
+        # Fetch cloud data in background
+        from watcher_core import CloudSync
+
+        def _do_fetch():
+            try:
+                if is_challenge:
+                    cat = kind if kind in ("timed", "flip", "heat") else "timed"
+                    data = CloudSync.fetch_data(self.cfg, f"scores/{cat}/{rom}")
+                    if data:
+                        if cat == "flip" and difficulty and difficulty != "All Difficulties":
+                            data = [
+                                r for r in data
+                                if str(r.get("difficulty", "")).strip().lower() == difficulty.lower()
+                            ]
+                        data.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
+                    selected_diff = difficulty if (is_challenge and kind == "flip") else None
+                    cat_for_html = cat
+                else:
+                    data = CloudSync.fetch_data(self.cfg, f"progress/{rom}")
+                    if data:
+                        data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
+                    selected_diff = None
+                    cat_for_html = "progress"
+
+                cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff)
+                final_html = header_html + cloud_body
+
+                def _update():
+                    try:
+                        if (
+                            getattr(self, "_overlay_page", -1) == 3
+                            and self.overlay
+                            and self.overlay.isVisible()
+                        ):
+                            self.overlay.set_html(final_html, "Cloud Leaderboard")
+                            try:
+                                self.overlay.set_nav_arrows(True)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, _update)
+            except Exception:
+                pass
+
+        threading.Thread(target=_do_fetch, daemon=True).start()
+
+    def _cycle_overlay_button(self):
 
         try:
             if self.watcher and self.watcher.game_active:
@@ -2332,6 +2742,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             ov = getattr(self, "overlay", None)
             if not ov or not ov.isVisible():
+                # Open overlay on page 0 (Main Stats)
+                self._overlay_page = 0
                 self._prepare_overlay_sections()
                 secs = self._overlay_cycle.get("sections", [])
                 if not secs:
@@ -2340,25 +2752,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._overlay_cycle["idx"] = 0
                 self._show_overlay_section(secs[0])
             else:
-                secs = self._overlay_cycle.get("sections", [])
-                if not secs:
-                    self._prepare_overlay_sections()
-                    secs = self._overlay_cycle.get("sections", [])
-                    if not secs:
-                        self._hide_overlay()
-                        self._overlay_cycle = {"sections": [], "idx": -1}
-                        return
-                    self._overlay_cycle["idx"] = 0
-                    self._show_overlay_section(secs[0])
-                    return
-                idx = int(self._overlay_cycle.get("idx", -1))
-                idx = 0 if idx < 0 else idx + 1
-                if idx >= len(secs):
-                    self._hide_overlay()
-                    self._overlay_cycle = {"sections": [], "idx": -1}
-                else:
-                    self._overlay_cycle["idx"] = idx
-                    self._show_overlay_section(secs[idx])
+                # Overlay already visible – toggle it off
+                self._hide_overlay()
         finally:
             import time as _time
             self._overlay_last_action = _time.monotonic()
@@ -2510,7 +2905,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay_auto_close_timer.stop()
         except Exception:
             pass
-
+        try:
+            if self.overlay:
+                self.overlay.set_nav_arrows(False)
+        except Exception:
+            pass
         if self.overlay and self.overlay.isVisible():
             self.overlay.hide()
             
