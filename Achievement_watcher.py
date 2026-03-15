@@ -2279,28 +2279,35 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
 
-            if not active_deltas:
-                try:
-                    import json
-                    summary_path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json")
-                    if os.path.isfile(summary_path):
-                        with open(summary_path, "r", encoding="utf-8") as f:
-                            data = json.load(f)
+            summary_rom = ""
+            try:
+                import json
+                summary_path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json")
+                if os.path.isfile(summary_path):
+                    with open(summary_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        summary_rom = data.get("rom", "")
+                        if not active_deltas:
                             saved_deltas = data.get("players", [])[0].get("deltas", {})
                             for k, v in saved_deltas.items():
                                 if int(v) > 0:
                                     active_deltas[k] = int(v)
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
             for p in combined_players:
                 p["deltas"] = active_deltas
 
+            resolved_rom = (
+                getattr(self.watcher, "current_rom", "")
+                or next(iter(combined_players), {}).get("rom", "")
+                or summary_rom
+            )
             sections.append({
                 "kind": "combined_players",
                 "players": combined_players,
                 "title": "Session Overview",
-                "rom_name": getattr(self.watcher, "current_rom", "") or combined_players[0].get("rom", ""),
+                "rom_name": resolved_rom,
             })
             
         self._overlay_cycle = {"sections": sections, "idx": -1}
