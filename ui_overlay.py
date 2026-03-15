@@ -568,11 +568,20 @@ class OverlayWindow(QWidget):
         self._p2_offset = 0
         self._p2_header = header_html
         self._p2_css = css
-        # Estimate how many rows fit in the body area
+        # Estimate how many rows fit in the body area.
+        # In portrait mode the widget is taller than wide (e.g. 334×594 on 1080p),
+        # but the content is rendered in the rotated orientation: the widget's
+        # *width* (the short side) maps to the available content height.
         body_pt = getattr(self, "_body_pt", 20)
         row_h_px = max(16, int(body_pt * 1.8))
-        avail_h = max(80, self.height() - 80)
-        self._p2_visible = max(6, avail_h // row_h_px)
+        if getattr(self, "portrait_mode", False):
+            content_dim = self.width()
+        else:
+            content_dim = self.height()
+        avail_h = max(80, content_dim - 80)
+        # Subtract 2 row-heights to account for the header section
+        # (ROM title div + progress bar div) that occupies the top of the body.
+        self._p2_visible = max(3, avail_h // row_h_px - 2)
         self._render_p2()
         self._layout_positions()
         self.request_rotation(force=True)
