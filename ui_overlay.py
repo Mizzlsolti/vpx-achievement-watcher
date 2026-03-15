@@ -730,7 +730,7 @@ class OverlayWindow(QWidget):
             else:
                 lines.append("<div style='margin-bottom: 1.8em;'></div>")
 
-            lines.append("<table align='center' style='border-collapse: collapse; margin: 0 auto; width: auto;'><tr>")
+            lines.append("<table align='center' style='border-collapse: collapse; margin: 0 auto; width: 100%;'><tr>")
 
             lines.append("<td valign='top' style='padding-right: 20px; border-right: 1px solid rgba(255, 255, 255, 0.4);'>")
             lines.append("<table class='hltable'>")
@@ -2137,7 +2137,7 @@ class ChallengeCountdownOverlay(QWidget):
     def _compose_image(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        base_body_pt = int(ov.get("base_body_size", 20))
+        base_body_pt = 20  # hardlocked – timer base size is always 20
         ov_scale = int(ov.get("scale_pct", 100)) / 100.0
         scaled_pt = max(4, int(round(base_body_pt * ov_scale)))
         factor = scaled_pt / 20.0
