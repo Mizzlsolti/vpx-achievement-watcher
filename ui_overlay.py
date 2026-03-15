@@ -221,6 +221,8 @@ class OverlayWindow(QWidget):
         self._base_hint_size = int(ov.get("base_hint_size", 16))
         self._body_pt = self._base_body_size
         self._current_combined = None
+        self._current_html = None
+        self._p2_rows = None
         self._current_title = None
         self._rotation_pending = False
         self._apply_geometry()
@@ -484,6 +486,22 @@ class OverlayWindow(QWidget):
         finally:
             self._rot_in_progress = False
 
+    def _refresh_current_content(self):
+        """Re-render the currently displayed page using the current font settings.
+        Handles all four page types: fixed-columns (page 0), scrollable rows (page 1),
+        and plain HTML pages (pages 2/3)."""
+        if self._current_combined:
+            self._render_fixed_columns()
+        elif self._current_html is not None:
+            self.set_html(self._current_html, self._current_title)
+        elif self._p2_rows is not None:
+            self._render_p2()
+            self._layout_positions()
+            self.request_rotation(force=True)
+        else:
+            self._layout_positions()
+            self.request_rotation(force=True)
+
     def apply_font_from_cfg(self, ov: dict):
         if getattr(self, "_font_update_in_progress", False):
             return
@@ -496,11 +514,7 @@ class OverlayWindow(QWidget):
             self._apply_scale(self.scale_pct)
             def _finish():
                 try:
-                    if self._current_combined:
-                        self._render_fixed_columns()
-                    else:
-                        self._layout_positions()
-                        self.request_rotation(force=True)
+                    self._refresh_current_content()
                 finally:
                     self._font_update_in_progress = False
             QTimer.singleShot(0, _finish)
@@ -531,6 +545,8 @@ class OverlayWindow(QWidget):
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._current_combined = None
+        self._current_html = None
+        self._p2_rows = None
         self._current_title = session_title or "Highlights"
         self.title.setText(self._current_title)
         self.body.setText("<div>Loading highlights …</div>")
@@ -541,6 +557,8 @@ class OverlayWindow(QWidget):
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None
+        self._current_html = html
+        self._p2_rows = None
         self._current_title = "Highlights" if session_title is None else session_title
         self.title.setText(self._current_title)
         body_pt = getattr(self, "_body_pt", 20)
@@ -553,6 +571,8 @@ class OverlayWindow(QWidget):
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = combined or {}
+        self._current_html = None
+        self._p2_rows = None
         self._current_title = "Highlights" if session_title is None else session_title
         self._render_fixed_columns()
 
@@ -562,6 +582,7 @@ class OverlayWindow(QWidget):
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None
+        self._current_html = None
         self._current_title = session_title or "Achievement Progress"
         self.title.setText(self._current_title)
         self._p2_rows = list(rows)
@@ -837,9 +858,13 @@ class MiniInfoOverlay(QWidget):
             return 640, 360
 
     def _compose_html(self) -> str:
+        pt = getattr(self, "_body_pt", 20)
+        fam = str(getattr(self, "_font_family", "Segoe UI")).replace("'", "").replace('"', "").replace(";", "").replace("<", "").replace(">", "")
         return (
+            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";'>"
             f"<span style='color:{self._red};'>{self._base_msg}</span>"
             f"<br><span style='color:{self._hint};'>closing in {self._remaining}…</span>"
+            f"</div>"
         )
 
     def _render_message_image(self, html: str) -> QImage:

@@ -3097,8 +3097,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay.scale_pct = int(val)
             self.overlay._apply_scale(int(val))
             self.overlay._apply_geometry()
-            self.overlay._layout_positions()
-            self.overlay.request_rotation(force=True)
+            self.overlay._refresh_current_content()
         try:
             if hasattr(self, "_overlay_picker") and isinstance(self._overlay_picker, OverlayPositionPicker):
                 self._overlay_picker.apply_portrait_from_cfg()
@@ -3446,8 +3445,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if self.overlay:
             self.overlay.apply_font_from_cfg(self.cfg.OVERLAY)
             self.overlay._apply_geometry()
-            self.overlay._layout_positions()
-            self.overlay.request_rotation(force=True)
         self._update_secondary_overlay_fonts()
 
     def _update_secondary_overlay_fonts(self):
