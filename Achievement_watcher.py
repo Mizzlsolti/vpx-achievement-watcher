@@ -1451,14 +1451,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.sld_scale.valueChanged.connect(self._on_overlay_scale)
         self.lbl_scale = QLabel(f"{self.sld_scale.value()}%")
 
-        lay_style.addWidget(QLabel("Font Family:"), 0, 0)
-        lay_style.addWidget(self.cmb_font_family, 0, 1)
-        lay_style.addWidget(QLabel("Base Size:"), 0, 2)
-        lay_style.addWidget(self.spn_font_size, 0, 3)
-        
-        lay_style.addWidget(QLabel("Overlay Scale:"), 1, 0)
-        lay_style.addWidget(self.sld_scale, 1, 1)
-        lay_style.addWidget(self.lbl_scale, 1, 2)
+        lay_style.addWidget(QLabel("Overlay Scale:"), 0, 0)
+        lay_style.addWidget(self.sld_scale, 0, 1)
+        lay_style.addWidget(self.lbl_scale, 0, 2)
+
+        lay_style.addWidget(QLabel("Font Family:"), 1, 0)
+        lay_style.addWidget(self.cmb_font_family, 1, 1)
+        lay_style.addWidget(QLabel("Base Size:"), 1, 2)
+        lay_style.addWidget(self.spn_font_size, 1, 3)
 
         layout.addWidget(grp_style)
 
