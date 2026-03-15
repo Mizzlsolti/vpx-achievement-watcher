@@ -3191,7 +3191,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "2.2"
+        CURRENT_VERSION = "2.3.1"
         
         def _task():
             try:
