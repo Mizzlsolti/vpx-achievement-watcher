@@ -2591,8 +2591,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
         parts.append(f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+
+        n = len(cells)
+        if n <= 36:
+            COLS = 3
+        elif n <= 60:
+            COLS = 4
+            parts.append("<style>td{font-size:0.9em;padding:3px 4px;}</style>")
+        else:
+            COLS = 5
+            parts.append("<style>td{font-size:0.75em;padding:2px 3px;}</style>")
+
         parts.append("<table>")
-        COLS = 4
         for i in range(0, len(cells), COLS):
             parts.append("<tr>")
             for j in range(COLS):
