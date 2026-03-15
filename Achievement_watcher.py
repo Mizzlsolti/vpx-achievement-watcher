@@ -669,13 +669,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_mini_info_place.setText("Save position")
 
     _MINI_TEST_MESSAGES = [
-        ("TEST: System Notification Overlay", "#FF3B30"),
-        ("⚠ WARNING: VPX process not detected – is VPinballX running?", "#FF9500"),
+        ("CHALLENGE COMPLETE!<br>Score: 42.069.000", "#00C853"),
+        ("TIME'S UP!<br>Score: 42.069.000", "#00C853"),
         (
-            "CHALLENGE COMPLETE!<br>Score: 42.069.000 – timed challenge finished, 3 balls played, multiball bonus applied.",
-            "#00C853",
+            "NVRAM map not found for afm_113b. It will be generated automatically after a full game.",
+            "#FF3B30",
         ),
-        ("ℹ INFO: New high-score detected for Medieval Madness – updating leaderboard…", "#00E5FF"),
+        ("Challenge Aborted!", "#FF3B30"),
+        ("Challenge can only be started in-game.", "#FF3B30"),
     ]
 
     def _on_mini_info_test(self):
