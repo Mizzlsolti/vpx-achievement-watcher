@@ -600,9 +600,8 @@ class OverlayWindow(QWidget):
 
             lines = []
 
-            lines.append(f"<div class='rom-title'>{esc(rom_name)}</div>")
-            if table_title:
-                lines.append(f"<div style='text-align:center; font-size:1.1em; color:#00E5FF; font-weight:bold; margin-bottom:0.3em;'>{esc(table_title)}</div>")
+            display_title = table_title or rom_name or "Unknown ROM"
+            lines.append(f"<div class='rom-title'>{esc(display_title)}</div>")
 
             if total_achs > 0:
                 safe_pct = max(0.1, min(100.0, pct))
