@@ -3103,6 +3103,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._overlay_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_secondary_overlay_fonts()
 
     def _on_toggle_source_changed(self, src: str):
         self.cfg.OVERLAY["toggle_input_source"] = src
@@ -3454,6 +3455,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         flip = getattr(self, "_flip_total_win", None)
         if flip is not None:
             flip.update_font()
+        for attr in ("_challenge_select", "_flip_diff_select", "_challenge_timer"):
+            win = getattr(self, attr, None)
+            if win is not None and win.isVisible():
+                win.update_font()
 
     def _install_global_keyboard_hook(self):
         try:
