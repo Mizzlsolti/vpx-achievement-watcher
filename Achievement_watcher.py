@@ -2259,6 +2259,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "highlights": p.get("highlights", {}),
                     "playtime_sec": p.get("playtime_sec", 0),
                     "score": int(p.get("score", 0) or 0),
+                    "rom": p.get("rom", ""),
                 })
         
         active_ids = [e for e in combined_players if 1 <= int(e.get("id", 0)) <= 4]
@@ -2298,7 +2299,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             sections.append({
                 "kind": "combined_players",
                 "players": combined_players,
-                "title": "Session Overview"
+                "title": "Session Overview",
+                "rom_name": getattr(self.watcher, "current_rom", "") or combined_players[0].get("rom", ""),
             })
             
         self._overlay_cycle = {"sections": sections, "idx": -1}
@@ -2308,7 +2310,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         kind = str(payload.get("kind", "")).lower()
         title = str(payload.get("title", "") or "").strip()
         if kind == "combined_players":
-            combined = {"players": payload.get("players", [])}
+            combined = {"players": payload.get("players", []), "rom_name": payload.get("rom_name", "")}
             self.overlay.set_combined(combined, session_title=title or "Active Player Highlights")
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
@@ -2714,7 +2716,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(0, _update)
             except Exception:
-                pass
+                def _show_error():
+                    try:
+                        if (
+                            getattr(self, "_overlay_page", -1) == 3
+                            and self.overlay
+                            and self.overlay.isVisible()
+                        ):
+                            self.overlay.set_html(
+                                header_html + "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to load cloud data.</div>",
+                                "Cloud Leaderboard"
+                            )
+                    except Exception:
+                        pass
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, _show_error)
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
@@ -3590,7 +3606,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "3.4"
+        CURRENT_VERSION = "2.3"
         
         def _task():
             try:
