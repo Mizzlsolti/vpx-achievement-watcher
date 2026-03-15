@@ -3435,6 +3435,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.save()
         if self.overlay:
             self.overlay.apply_font_from_cfg(self.cfg.OVERLAY)
+        self._update_secondary_overlay_fonts()
 
     def _on_font_size_changed(self, val: int):
         body = int(val)
@@ -3447,6 +3448,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay._apply_geometry()
             self.overlay._layout_positions()
             self.overlay.request_rotation(force=True)
+        self._update_secondary_overlay_fonts()
+
+    def _update_secondary_overlay_fonts(self):
+        mini = getattr(self, "_mini_overlay", None)
+        if mini is not None:
+            mini.update_font()
+        flip = getattr(self, "_flip_total_win", None)
+        if flip is not None:
+            flip.update_font()
 
     def _install_global_keyboard_hook(self):
         try:
