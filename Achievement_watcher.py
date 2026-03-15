@@ -114,7 +114,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.mini_info_show.connect(self._on_mini_info_show)
         self.bridge.ach_toast_show.connect(self._on_ach_toast_show)
         self._ach_toast_mgr = AchToastManager(self)
-        self.bridge.achievements_updated.connect(self.update_achievements_tab)
         self.bridge.challenge_info_show.connect(self._on_challenge_info_show)
         self.bridge.challenge_timer_start.connect(self._on_challenge_timer_start)
         self.bridge.challenge_timer_stop.connect(self._on_challenge_timer_stop)
@@ -200,15 +199,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.watcher.start()
 
         self._apply_theme()
-        self._check_for_updates() 
+        self._check_for_updates()
         self._init_tooltips_main()
         self._init_overlay_tooltips()
-
-        try:
-            self.update_achievements_tab()
-            self._init_achievements_timer()
-        except Exception:
-            pass
 
         self._refresh_input_bindings()
 
@@ -2009,59 +2002,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _init_settings_tooltips(self):
         pass
      
-    def update_achievements_tab(self):
-        state = secure_load_json(f_achievements_state(self.cfg), {}) or {}
-        global_map = state.get("global", {}) or {}
-        session_map = state.get("session", {}) or {}
-        
-        def build_columns_html(data_map: dict) -> str:
-            roms = sorted(data_map.keys(), key=lambda s: str(s).lower())
-            if not roms:
-                return "<div>(no data)</div>"
-            cols = []
-            for rom in roms:
-                entries = data_map.get(rom, []) or []
-                items = []
-                for e in entries:
-                    if isinstance(e, dict):
-                        title = str(e.get("title", "")).strip()
-                    else:
-                        title = str(e).strip()
-
-                    title = title.replace(" (Session)", "").replace(" (Global)", "")
-
-                    if title:
-                        items.append(title)
-                if not items:
-                    continue
-                lines = [f"<div style='font-weight:700;margin-bottom:4px;'>{rom}</div>"]
-                for title in items:
-                    lines.append(f"<div style='margin:2px 0;'>{title}</div>")
-                cols.append("".join(lines))
-            if not cols:
-                return "<div>(no data)</div>"
-            html = "<table width='100%'><tr>" + "".join(
-                f"<td valign='top' style='padding:0 14px;'>{c}</td>" for c in cols
-            ) + "</tr></table>"
-            return html
-            
-        try:
-            html_g = build_columns_html(global_map)
-            self.ach_view_global.setHtml(html_g)
-        except Exception:
-            pass
-
-        try:
-            html_pl = build_columns_html(session_map)
-            self.ach_view_pl.setHtml(html_pl)
-        except Exception:
-            pass 
-        try:
-            if hasattr(self, "cmb_progress_rom"):
-                self._on_progress_rom_changed()
-        except Exception:
-            pass
-
     def _on_ach_toast_custom_toggled(self, state: int):
         use = (Qt.CheckState(state) == Qt.CheckState.Checked)
         self.cfg.OVERLAY["ach_toast_custom"] = bool(use)
@@ -2069,15 +2009,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.cfg.OVERLAY["ach_toast_saved"] = False
         self.cfg.save()
 
-    def _init_achievements_timer(self):
-        try:
-            self.timer_achievements = QTimer(self)
-            self.timer_achievements.setInterval(5000)  # 5 seconds
-            self.timer_achievements.timeout.connect(self.update_achievements_tab)
-            self.timer_achievements.start()
-        except Exception:
-            pass 
- 
     def _get_icon(self) -> QIcon:
         try:
             p = resource_path("watcher.ico")
