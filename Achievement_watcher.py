@@ -188,6 +188,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._overlay_page = 0  # current page in the 4-page main overlay (0=Main Stats, 1=Achievement Progress, 2=Challenge Leaderboard, 3=Cloud Leaderboard)
 
         self._challenge_select = None
+        self._challenge_select_test = None
         self._ch_ov_selected_idx = 0
         self._ch_active_source = None
         self._last_ch_event_src = None
@@ -980,16 +981,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             
     def _on_ch_ov_test(self):
         try:
-            if getattr(self, "_challenge_select", None):
+            if getattr(self, "_challenge_select_test", None):
                 try:
-                    self._challenge_select.close()
-                    self._challenge_select.deleteLater()
+                    self._challenge_select_test.close()
+                    self._challenge_select_test.deleteLater()
                 except Exception:
                     pass
-            self._challenge_select = ChallengeSelectOverlay(self, selected_idx=int(self._ch_ov_selected_idx))
-            self._challenge_select.show()
-            self._challenge_select.raise_()
-            QTimer.singleShot(5000, self._close_challenge_select_overlay)
+            self._challenge_select_test = ChallengeSelectOverlay(self, selected_idx=int(self._ch_ov_selected_idx))
+            self._challenge_select_test.show()
+            self._challenge_select_test.raise_()
+
+            def _close_test():
+                try:
+                    w = getattr(self, "_challenge_select_test", None)
+                    if w:
+                        w.close()
+                        w.deleteLater()
+                except Exception:
+                    pass
+                self._challenge_select_test = None
+
+            QTimer.singleShot(5000, _close_test)
         except Exception:
             pass
 
@@ -3387,7 +3399,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             flip = getattr(self, attr, None)
             if flip is not None:
                 flip.update_font()
-        for attr in ("_challenge_select", "_flip_diff_select", "_challenge_timer"):
+        for attr in ("_challenge_select", "_challenge_select_test", "_flip_diff_select", "_challenge_timer"):
             win = getattr(self, attr, None)
             if win is not None and win.isVisible():
                 win.update_font()

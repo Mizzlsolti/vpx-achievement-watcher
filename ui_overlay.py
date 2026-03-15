@@ -681,8 +681,8 @@ class OverlayWindow(QWidget):
 
         style = """
         <style>
-          table.hltable { border-collapse: collapse; margin: 0 auto; width: auto; font-size: 1.1em; }
-          .hltable th, .hltable td { padding: 0.35em 1.2em; border-bottom: 1px solid rgba(255,255,255,0.15); white-space: nowrap; color: #E0E0E0; }
+          table.hltable { border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }
+          .hltable th, .hltable td { padding: 0.25em 0.55em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }
           .hltable th { text-align: center; background: rgba(0, 229, 255, 0.15); color: #00E5FF; font-weight: bold; font-size: 1.1em; }
           .hltable td.left { text-align: left; }
           .hltable td.right { text-align: right; font-weight: bold; font-size: 1.15em; color: #FF7F00; }
@@ -760,15 +760,15 @@ class OverlayWindow(QWidget):
             else:
                 items = sorted(list(deltas.items()), key=lambda x: int(x[1]), reverse=True)
 
-                max_rows = 13
-                cols = 4
+                max_rows = 20
+                cols = 2
 
                 max_items = max_rows * cols
                 display_items = items[:max_items]
 
                 header_html = ""
                 for c in range(cols):
-                    border = " style='border-left: 2px solid rgba(255,255,255,0.2); padding-left: 1.2em;'" if c > 0 else ""
+                    border = " style='border-left: 2px solid rgba(255,255,255,0.2); padding-left: 0.55em;'" if c > 0 else ""
                     header_html += f"<th{border}>Action</th><th>Count</th>"
                 lines.append(f"<tr>{header_html}</tr>")
 
@@ -776,7 +776,7 @@ class OverlayWindow(QWidget):
                     row_html = ""
                     for c in range(cols):
                         idx = i + c
-                        border = " style='border-left: 2px solid rgba(255,255,255,0.2); padding-left: 1.2em;'" if c > 0 else ""
+                        border = " style='border-left: 2px solid rgba(255,255,255,0.2); padding-left: 0.55em;'" if c > 0 else ""
                         if idx < len(display_items):
                             k, v = display_items[idx]
                             v_str = f"+{v:,}".replace(",", ".")
@@ -826,7 +826,7 @@ class MiniInfoOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        base_pt = int(ov.get("mini_body_size", 15))
+        base_pt = int(ov.get("base_body_size", 20))
         self._body_pt = base_pt
         self._font_family = ov.get("font_family", "Segoe UI")
         self._red = "#FF3B30"                          
@@ -945,7 +945,7 @@ class MiniInfoOverlay(QWidget):
 
     def update_font(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
-        self._body_pt = int(ov.get("mini_body_size", 15))
+        self._body_pt = int(ov.get("base_body_size", 20))
         self._font_family = str(ov.get("font_family", "Segoe UI"))
         if self.isVisible():
             self._refresh_view()
@@ -1129,7 +1129,8 @@ class FlipCounterOverlay(QWidget):
         self._render_and_place()
 
     def update_font(self):
-        self._render_and_place()
+        if self.isVisible():
+            self._render_and_place()
 
 class FlipCounterPositionPicker(QWidget):
     def __init__(self, parent: "MainWindow", width_hint: int = 380, height_hint: int = 130):
