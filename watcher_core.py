@@ -3501,6 +3501,7 @@ class Watcher:
 
         payload = {
             "player": 1,
+            "rom": self.current_rom,
             "playtime_sec": play_sec,
             "score": score_abs,
             "highlights": highlights,
