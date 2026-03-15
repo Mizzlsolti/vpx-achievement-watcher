@@ -307,7 +307,7 @@ class CloudStatsMixin:
     def _generate_cloud_html(self, data: list, category: str, rom: str, selected_diff: str = None) -> str:
         css = """
         <style>
-          table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+          table { border-collapse: collapse; width: 80%; margin: 10px auto; }
           th, td { padding: 10px; border-bottom: 1px solid #444; color: #FFF; text-align: center; vertical-align: middle; }
           th { background: #1A1A1A; color: #00E5FF; font-weight: bold; }
           td.rank { font-weight: bold; color: #FF7F00; font-size: 1.2em; width: 50px; }
