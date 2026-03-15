@@ -167,17 +167,7 @@ class CloudStatsMixin:
     def _build_tab_stats(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        
         self.stats_tabs = QTabWidget()
-        
-        ach_tab = QWidget()
-        ach_layout = QHBoxLayout(ach_tab)
-        self.ach_view_global = QTextBrowser()
-        self.ach_view_pl = QTextBrowser()
-        box_g = QVBoxLayout(); box_g.addWidget(QLabel("<b>🌍 Global NVRAM Unlocks</b>")); box_g.addWidget(self.ach_view_global)
-        box_s = QVBoxLayout(); box_s.addWidget(QLabel("<b>👤 Player Session Unlocks</b>")); box_s.addWidget(self.ach_view_pl)
-        ach_layout.addLayout(box_g); ach_layout.addLayout(box_s)
-        self.stats_tabs.addTab(ach_tab, "🏆 Achievements")
 
         self.stats_views = {}
         self.stats_views["global"] = QTextBrowser()
