@@ -2592,7 +2592,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
         parts.append(f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
         parts.append("<table>")
-        COLS = 3
+        COLS = 4
         for i in range(0, len(cells), COLS):
             parts.append("<tr>")
             for j in range(COLS):
@@ -2715,8 +2715,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                 from PyQt6.QtCore import QTimer
                 QTimer.singleShot(0, _update)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[CLOUD OVERLAY] fetch failed: {e}")
+                error_html = header_html + (
+                    "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to load cloud data.</div>"
+                )
+
+                def _show_error():
+                    try:
+                        if (
+                            getattr(self, "_overlay_page", -1) == 3
+                            and self.overlay
+                            and self.overlay.isVisible()
+                        ):
+                            self.overlay.set_html(error_html, "Cloud Leaderboard")
+                            try:
+                                self.overlay.set_nav_arrows(True)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, _show_error)
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
@@ -3592,7 +3613,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "2.4"
+        CURRENT_VERSION = "2.3"
         
         def _task():
             try:
