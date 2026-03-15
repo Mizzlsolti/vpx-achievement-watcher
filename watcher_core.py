@@ -92,7 +92,7 @@ DEFAULT_OVERLAY = {
     "toggle_joy_button": 2,
     "font_family": "Segoe UI",
     "base_title_size": 15, 
-    "base_body_size": 12,
+    "base_body_size": 20,
     "base_hint_size": 16,
     "use_xy": False,
     "pos_x": 100,
