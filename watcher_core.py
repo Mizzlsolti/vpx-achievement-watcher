@@ -2915,7 +2915,11 @@ class Watcher:
                 pass
             try:
                 score_txt = f"{int(score):,d}".replace(",", ".")
-                self.bridge.challenge_info_show.emit(f"Score: {score_txt}", 8, "#FFFFFF")
+                if str(kind or "").lower() == "timed":
+                    title = "TIME'S UP!"
+                else:
+                    title = "CHALLENGE COMPLETE!"
+                self.bridge.challenge_info_show.emit(f"{title}<br>Score: {score_txt}", 8, "#FFFFFF")
             except Exception:
                 pass
 
