@@ -2685,6 +2685,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         from watcher_core import CloudSync
 
         def _do_fetch():
+            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             try:
                 if is_challenge:
                     cat = kind if kind in ("timed", "flip", "heat") else "timed"
@@ -2705,49 +2706,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     selected_diff = None
                     cat_for_html = "progress"
 
-                cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff)
-                final_html = header_html + cloud_body
+                if not data:
+                    final_html = header_html + (
+                        "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
+                    )
+                else:
+                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff)
+                    final_html = header_html + cloud_body
 
-                def _update():
-                    try:
-                        if (
-                            getattr(self, "_overlay_page", -1) == 3
-                            and self.overlay
-                            and self.overlay.isVisible()
-                        ):
-                            self.overlay.set_html(final_html, "Cloud Leaderboard")
-                            try:
-                                self.overlay.set_nav_arrows(True)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                from PyQt6.QtCore import QTimer
-                QTimer.singleShot(0, _update)
+                QMetaObject.invokeMethod(
+                    self, "_overlay_set_cloud_html",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, final_html)
+                )
             except Exception as e:
                 print(f"[CLOUD OVERLAY] fetch failed: {e}")
                 error_html = header_html + (
-                    "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to load cloud data.</div>"
+                    "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
                 )
-
-                def _show_error():
-                    try:
-                        if (
-                            getattr(self, "_overlay_page", -1) == 3
-                            and self.overlay
-                            and self.overlay.isVisible()
-                        ):
-                            self.overlay.set_html(error_html, "Cloud Leaderboard")
-                            try:
-                                self.overlay.set_nav_arrows(True)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                from PyQt6.QtCore import QTimer
-                QTimer.singleShot(0, _show_error)
+                QMetaObject.invokeMethod(
+                    self, "_overlay_set_cloud_html",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, error_html)
+                )
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
@@ -3633,7 +3614,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 
                 url = f"{self.cfg.CLOUD_URL.rstrip('/')}/app_info.json"
                 
-                req = urllib.request.Request(url)
+                req = urllib.request.Request(url, headers={"User-Agent": "AchievementWatcher/2.0"})
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
@@ -3658,6 +3639,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 print(f"[UPDATE CHECK] failed: {e}")
                 
         threading.Thread(target=_task, daemon=True).start()
+
+    @pyqtSlot(str)
+    def _overlay_set_cloud_html(self, html: str):
+        """Thread-safe slot to update the cloud leaderboard overlay HTML."""
+        try:
+            if (
+                getattr(self, "_overlay_page", -1) == 3
+                and self.overlay
+                and self.overlay.isVisible()
+            ):
+                self.overlay.set_html(html, "Cloud Leaderboard")
+                try:
+                    self.overlay.set_nav_arrows(True)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     @pyqtSlot(str)
     def _show_update_warning(self, msg: str):
