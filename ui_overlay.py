@@ -37,10 +37,22 @@ class OverlayNavArrows(QWidget):
 
     def paintEvent(self, event):
         from math import sin, pi
-        w, h = self.width(), self.height()
-        if w <= 0 or h <= 0:
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
             return
-        p = QPainter(self)
+
+        parent = self.parent()
+        portrait = getattr(parent, "portrait_mode", False)
+        ccw = getattr(parent, "rotate_ccw", True)
+
+        if portrait:
+            draw_w, draw_h = H, W
+        else:
+            draw_w, draw_h = W, H
+
+        img = QImage(draw_w, draw_h, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         try:
             amp = 0.5 + 0.5 * sin(2 * pi * self._pulse_t)
@@ -50,10 +62,10 @@ class OverlayNavArrows(QWidget):
             base_h = 18
             ah = int(base_h * scale)
             aw = max(6, int(ah * 0.6))
-            cy = h // 2
+            cy = draw_h // 2
             pad = 16
             left_cx = pad + int(-wobble)
-            right_cx = w - pad + int(wobble)
+            right_cx = draw_w - pad + int(wobble)
             arrow_color = QColor("#00E5FF")
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
@@ -75,6 +87,14 @@ class OverlayNavArrows(QWidget):
                 p.end()
             except Exception:
                 pass
+
+        if portrait:
+            angle = -90 if ccw else 90
+            img = img.transformed(QTransform().rotate(angle), Qt.TransformationMode.SmoothTransformation)
+
+        p_main = QPainter(self)
+        p_main.drawImage(0, 0, img)
+        p_main.end()
 
 
 class OverlayWindow(QWidget):
@@ -526,7 +546,7 @@ class OverlayWindow(QWidget):
     def _render_fixed_columns(self):
         self.title.setText(self._current_title or "Highlights")
         players = list((self._current_combined or {}).get("players") or [])
-        rom_name = str(getattr(self.parent_gui.watcher, "current_rom", None) or "Unknown ROM")
+        rom_name = str((self._current_combined or {}).get("rom_name") or getattr(self.parent_gui.watcher, "current_rom", None) or "Unknown ROM")
         limit = self.lines_per_category
 
         def esc(x) -> str:
@@ -642,8 +662,10 @@ class OverlayWindow(QWidget):
                 max_rows = 13
                 if len(items) <= max_rows * 2:
                     cols = 2
-                else:
+                elif len(items) <= max_rows * 3:
                     cols = 3
+                else:
+                    cols = 4
 
                 max_items = max_rows * cols
                 display_items = items[:max_items]
@@ -864,6 +886,7 @@ def read_active_players(base_dir: str):
             "score": int(data.get("score", 0) or 0),
             "title": data.get("title", "Player 1"),
             "player": 1,
+            "rom": data.get("rom", ""),
         }]
     except Exception:
         return []

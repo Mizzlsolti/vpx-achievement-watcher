@@ -2259,6 +2259,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "highlights": p.get("highlights", {}),
                     "playtime_sec": p.get("playtime_sec", 0),
                     "score": int(p.get("score", 0) or 0),
+                    "rom": p.get("rom", ""),
                 })
         
         active_ids = [e for e in combined_players if 1 <= int(e.get("id", 0)) <= 4]
@@ -2298,7 +2299,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             sections.append({
                 "kind": "combined_players",
                 "players": combined_players,
-                "title": "Session Overview"
+                "title": "Session Overview",
+                "rom_name": getattr(self.watcher, "current_rom", "") or combined_players[0].get("rom", ""),
             })
             
         self._overlay_cycle = {"sections": sections, "idx": -1}
@@ -3590,7 +3592,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "3.4"
+        CURRENT_VERSION = "2.4"
         
         def _task():
             try:
@@ -3622,7 +3624,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         msg = f"An important update is available!\n\nCurrent version: {CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
                         QMetaObject.invokeMethod(self, "_show_update_warning", Qt.ConnectionType.QueuedConnection, Q_ARG(str, msg))
             except Exception as e:
-                pass 
+                print(f"[UPDATE CHECK] failed: {e}")
                 
         threading.Thread(target=_task, daemon=True).start()
 
