@@ -826,7 +826,7 @@ class MiniInfoOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        base_pt = int(ov.get("base_body_size", 20))
+        base_pt = int(ov.get("mini_body_size", 15))
         self._body_pt = base_pt
         self._font_family = ov.get("font_family", "Segoe UI")
         self._red = "#FF3B30"                          
@@ -945,7 +945,7 @@ class MiniInfoOverlay(QWidget):
 
     def update_font(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
-        self._body_pt = int(ov.get("base_body_size", 20))
+        self._body_pt = int(ov.get("mini_body_size", 15))
         self._font_family = str(ov.get("font_family", "Segoe UI"))
         if self.isVisible():
             self._refresh_view()
@@ -2135,7 +2135,15 @@ class ChallengeCountdownOverlay(QWidget):
         self.update()
 
     def _compose_image(self):
-        w, h = 400, 120
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        font_family = str(ov.get("font_family", "Segoe UI"))
+        base_body_pt = int(ov.get("base_body_size", 20))
+        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
+        scaled_pt = max(4, int(round(base_body_pt * ov_scale)))
+        factor = scaled_pt / 20.0
+        w = max(200, int(round(400 * factor)))
+        h = max(60, int(round(120 * factor)))
+        timer_font_pt = max(20, int(round(48 * factor)))
         img = QImage(w, h, QImage.Format.Format_ARGB32)
         img.fill(Qt.GlobalColor.transparent)
         p = QPainter(img)
@@ -2145,12 +2153,11 @@ class ChallengeCountdownOverlay(QWidget):
         p.fillRect(0, 0, w, h, QColor(0, 0, 0, 255))
         mins, secs = divmod(self._left, 60)
         txt = f"{mins:02d}:{secs:02d}"
-        font = QFont("Segoe UI", 48, QFont.Weight.Bold)
+        font = QFont(font_family, timer_font_pt, QFont.Weight.Bold)
         p.setFont(font)
         p.drawText(QRect(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, txt)
         p.end()
         try:
-            ov = self.parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("ch_timer_portrait", ov.get("portrait_mode", True)))
             if portrait:
                 angle = -90 if bool(ov.get("ch_timer_rotate_ccw", ov.get("portrait_rotate_ccw", True))) else 90
@@ -2158,6 +2165,10 @@ class ChallengeCountdownOverlay(QWidget):
         except Exception:
             pass
         return img
+
+    def update_font(self):
+        if self.isVisible():
+            self._render_and_place()
 
     def paintEvent(self, _evt):
         if hasattr(self, "_pix"):
@@ -2216,14 +2227,20 @@ class ChallengeSelectOverlay(QWidget):
     def apply_portrait_from_cfg(self):
         self._render_and_place()
 
+    def update_font(self):
+        if self.isVisible():
+            self._render_and_place()
+
     def _compose_image(self) -> QImage:
         from math import sin, pi
 
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         base_body_pt = int(ov.get("base_body_size", 20))
-        hint_pt = int(ov.get("base_hint_size", max(12, base_body_pt * 0.8)))
-        
+        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
+        scaled_body_pt = max(4, int(round(base_body_pt * ov_scale)))
+        hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
+
         text_color = QColor("#FFFFFF")
         hi_color = QColor("#FF7F00")
 
@@ -2240,11 +2257,13 @@ class ChallengeSelectOverlay(QWidget):
             title_text = "❌ Exit"
             desc_text = "Close the challenge menu."
 
-        w, h = 520, 200
-        pad_lr = 20
-        top_pad = 24
-        bottom_pad = 18
-        hint_gap = 10
+        factor = scaled_body_pt / 20.0
+        w = max(280, int(round(520 * factor)))
+        h = max(110, int(round(200 * factor)))
+        pad_lr = max(10, int(round(20 * factor)))
+        top_pad = max(12, int(round(24 * factor)))
+        bottom_pad = max(9, int(round(18 * factor)))
+        hint_gap = max(5, int(round(10 * factor)))
         avail_w = w - 2 * pad_lr
 
         img = QImage(w, h, QImage.Format.Format_ARGB32)
@@ -2262,8 +2281,8 @@ class ChallengeSelectOverlay(QWidget):
             p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRoundedRect(1, 1, w - 2, h - 2, radius, radius)
 
-            title_pt = base_body_pt + 6
-            desc_pt = max(10, base_body_pt)
+            title_pt = scaled_body_pt + 6
+            desc_pt = max(10, scaled_body_pt)
             min_title = 12
             min_desc = 10
 
@@ -2316,14 +2335,14 @@ class ChallengeSelectOverlay(QWidget):
             # Eisblaue pulsierende Pfeile
             amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
             alpha = 110 + int(120 * amp)
-            scale = 0.9 + 0.2 * amp
+            anim_scale = 0.9 + 0.2 * amp
             wobble = 2.0 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
-            base_h = 18
-            ah = int(base_h * scale)
-            aw = max(8, int(ah * 0.6))
+            base_arr_h = max(10, int(round(18 * factor)))
+            ah = int(base_arr_h * anim_scale)
+            aw = max(6, int(ah * 0.6))
             cy = title_rect.center().y()
-            left_cx = pad_lr + 24 + int(-wobble)
-            right_cx = w - pad_lr - 24 + int(wobble)
+            left_cx = pad_lr + max(12, int(round(24 * factor))) + int(-wobble)
+            right_cx = w - pad_lr - max(12, int(round(24 * factor))) + int(wobble)
             
             arrow_color = QColor("#00E5FF")
             arrow_color.setAlpha(alpha)
@@ -2441,20 +2460,30 @@ class FlipDifficultyOverlay(QWidget):
     def apply_portrait_from_cfg(self):
         self._render_and_place()
 
+    def update_font(self):
+        if self.isVisible():
+            self._render_and_place()
+
     def _compose_image(self) -> QImage:
         from math import sin, pi
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         base_body_pt = int(ov.get("base_body_size", 20))
-        hint_pt = int(ov.get("base_hint_size", max(12, base_body_pt * 0.8)))
+        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
+        scaled_body_pt = max(4, int(round(base_body_pt * ov_scale)))
+        hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
         text_color = QColor("#FFFFFF")
         hi_color = QColor("#FF7F00")
 
-        w, h = 560, 240
-        pad_lr = 24
-        top_pad = 26
-        bottom_pad = 18
-        gap_title_desc = 8
+        factor = scaled_body_pt / 20.0
+        w = max(300, int(round(560 * factor)))
+        h = max(130, int(round(240 * factor)))
+        pad_lr = max(12, int(round(24 * factor)))
+        top_pad = max(13, int(round(26 * factor)))
+        bottom_pad = max(9, int(round(18 * factor)))
+        gap_title_desc = max(4, int(round(8 * factor)))
+        spacing = max(8, int(round(15 * factor)))
+        hint_line_h = max(10, int(round(18 * factor)))
         avail_w = w - 2 * pad_lr
 
         img = QImage(w, h, QImage.Format.Format_ARGB32)
@@ -2472,19 +2501,20 @@ class FlipDifficultyOverlay(QWidget):
             p.drawRoundedRect(1, 1, w - 2, h - 2, radius, radius)
 
             title = "Flip Challenge – Choose difficulty"
+            title_font_pt = scaled_body_pt + 6
             p.setPen(hi_color)
-            p.setFont(QFont(font_family, base_body_pt + 6, QFont.Weight.Bold))
-            fm_t = QFontMetrics(QFont(font_family, base_body_pt + 6, QFont.Weight.Bold))
+            p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
+            fm_t = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
             t_h = fm_t.height()
             p.drawText(QRect(pad_lr, top_pad, avail_w, t_h),
                        int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), title)
 
             y0 = top_pad + t_h + gap_title_desc
             n = max(1, len(self._options))
-            spacing = 15
             total_spacing = spacing * (n - 1)
-            box_w = max(80, int((avail_w - total_spacing) / n))
-            box_h = 100
+            box_w = max(60, int((avail_w - total_spacing) / n))
+            box_h = max(50, int(round(100 * factor)))
+            inner_pad = max(5, int(round(10 * factor)))
 
             def draw_option(ix: int, name: str, flips: int, selected: bool):
                 x = pad_lr + ix * (box_w + spacing)
@@ -2501,15 +2531,18 @@ class FlipDifficultyOverlay(QWidget):
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRoundedRect(rect, 10, 10)
 
+                name_pt = scaled_body_pt + (2 if selected else 0)
                 p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
-                p.setFont(QFont(font_family, base_body_pt + (2 if selected else 0), QFont.Weight.Bold))
-                fm_n = QFontMetrics(QFont(font_family, base_body_pt + (2 if selected else 0), QFont.Weight.Bold))
+                p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
+                fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
                 name_h = fm_n.height()
-                p.drawText(QRect(x, y0 + 10, box_w, name_h),
+                p.drawText(QRect(x, y0 + inner_pad, box_w, name_h),
                            int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
                 
-                p.setFont(QFont(font_family, base_body_pt))
-                p.drawText(QRect(x, y0 + 10 + name_h + 6, box_w, base_body_pt + 8),
+                flips_pt = scaled_body_pt
+                p.setFont(QFont(font_family, flips_pt))
+                fm_f = QFontMetrics(QFont(font_family, flips_pt))
+                p.drawText(QRect(x, y0 + inner_pad + name_h + max(4, int(round(6 * factor))), box_w, fm_f.height()),
                            int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), f"{int(flips)} flips")
 
             for i, (nm, fl) in enumerate(self._options):
@@ -2517,7 +2550,7 @@ class FlipDifficultyOverlay(QWidget):
 
             p.setPen(QColor("#AAAAAA"))
             p.setFont(QFont(font_family, hint_pt))
-            p.drawText(QRect(0, h - bottom_pad - 18, w, 18),
+            p.drawText(QRect(0, h - bottom_pad - hint_line_h, w, hint_line_h),
                        int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter),
                        "Select with Left/Right, press Hotkey to start")
         finally:
