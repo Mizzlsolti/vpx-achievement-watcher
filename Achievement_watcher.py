@@ -2540,11 +2540,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         css = (
             "<style>"
             "table{width:100%;border-collapse:collapse;}"
-            "td{padding:5px 6px;border-bottom:1px solid #333;}"
+            "td{font-size:0.9em;padding:4px 6px;border-bottom:1px solid #333;}"
             ".unlocked{color:#00E5FF;font-weight:bold;}"
             ".locked{color:#555;}"
             ".hdr{color:#FF7F00;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}"
             ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
+            ".scroll-container{max-height:450px;overflow:hidden;position:relative;margin-top:10px;}"
+            ".scroll-content{animation:scrollUp 25s linear infinite;}"
+            "@keyframes scrollUp{"
+            "0%{transform:translateY(0);}"
+            "10%{transform:translateY(0);}"
+            "100%{transform:translateY(calc(-100% + 450px));}"
+            "}"
             "</style>"
         )
 
@@ -2600,15 +2607,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         parts.append(f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
 
         n = len(cells)
-        if n <= 36:
-            COLS = 3
-        elif n <= 60:
-            COLS = 4
-            parts.append("<style>td{font-size:0.9em;padding:3px 4px;}</style>")
-        else:
-            COLS = 5
-            parts.append("<style>td{font-size:0.75em;padding:2px 3px;}</style>")
+        COLS = 3 if n <= 36 else 4
 
+        rows = (n + COLS - 1) // COLS
+        # Enable auto-scroll only when the list is too tall to fit in the container
+        scroll_class = "scroll-content" if rows > 12 else ""
+
+        parts.append(f"<div class='scroll-container'><div class='{scroll_class}'>")
         parts.append("<table>")
         for i in range(0, len(cells), COLS):
             parts.append("<tr>")
@@ -2619,6 +2624,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     parts.append("<td></td>")
             parts.append("</tr>")
         parts.append("</table>")
+        parts.append("</div></div>")
         return "".join(parts)
 
     def _overlay_page3_html(self) -> str:
