@@ -186,7 +186,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._overlay_busy = False
         self._overlay_last_action = 0.0
         self.overlay = None
-        self._overlay_page = 0  # current page in the 4-page main overlay (0=stats, 1=progress, 2=challenges, 3=cloud)
+        self._overlay_page = 0  # current page in the 4-page main overlay (0=Main Stats, 1=Achievement Progress, 2=Challenge Leaderboard, 3=Cloud Leaderboard)
 
         self._challenge_select = None
         self._ch_ov_selected_idx = 0

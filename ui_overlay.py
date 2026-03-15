@@ -59,13 +59,13 @@ class OverlayNavArrows(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
             # Left-pointing arrow
-            p.drawPolygon(*[
+            p.drawPolygon([
                 QPoint(left_cx - aw // 2, cy),
                 QPoint(left_cx + aw // 2, cy - ah // 2),
                 QPoint(left_cx + aw // 2, cy + ah // 2),
             ])
             # Right-pointing arrow
-            p.drawPolygon(*[
+            p.drawPolygon([
                 QPoint(right_cx + aw // 2, cy),
                 QPoint(right_cx - aw // 2, cy - ah // 2),
                 QPoint(right_cx - aw // 2, cy + ah // 2),

@@ -120,7 +120,7 @@ class CloudStatsMixin:
         </style>
         """
 
-        def tbl(title: str, items: list, is_flip: bool) -> str:
+        def tbl(title: str, items: list[dict], is_flip: bool) -> str:
             if is_flip:
                 head = "<tr><th align='left'>ROM</th><th align='right'>Difficulty</th><th align='right'>Score</th><th align='right'>Duration</th></tr>"
             else:
