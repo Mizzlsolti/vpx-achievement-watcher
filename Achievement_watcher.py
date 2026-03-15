@@ -2310,7 +2310,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         kind = str(payload.get("kind", "")).lower()
         title = str(payload.get("title", "") or "").strip()
         if kind == "combined_players":
-            combined = {"players": payload.get("players", [])}
+            combined = {"players": payload.get("players", []), "rom_name": payload.get("rom_name", "")}
             self.overlay.set_combined(combined, session_title=title or "Active Player Highlights")
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
