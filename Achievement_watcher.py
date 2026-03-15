@@ -3383,9 +3383,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         mini = getattr(self, "_mini_overlay", None)
         if mini is not None:
             mini.update_font()
-        flip = getattr(self, "_flip_total_win", None)
-        if flip is not None:
-            flip.update_font()
+        for attr in ("_flip_total_win", "_flip_total_test_win"):
+            flip = getattr(self, attr, None)
+            if flip is not None:
+                flip.update_font()
         for attr in ("_challenge_select", "_flip_diff_select", "_challenge_timer"):
             win = getattr(self, attr, None)
             if win is not None and win.isVisible():
