@@ -2708,13 +2708,22 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
-        from PyQt6.QtCore import QTimer
+        from PyQt6.QtCore import QObject, pyqtSignal
         import urllib.request
         import json
         import base64
         import html as _html_mod
+        import threading
+        import ssl
 
         self._ensure_overlay()
+
+        # Recommended PyQt6 pattern for cross-thread UI updates
+        class VpcWorkerSignals(QObject):
+            update_ui = pyqtSignal(str, str)
+
+        signals = VpcWorkerSignals()
+        signals.update_ui.connect(self.overlay.set_html)
 
         # Zeige Ladebildschirm an
         loading_html = (
@@ -2734,12 +2743,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _fetch_vpc_challenge():
             try:
+                # SSL workaround for Windows systems with missing/outdated CA certificates
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
                 # 1. Challenge-Daten (Text/Infos) über die GET API abrufen
                 req_api = urllib.request.Request(
                     "https://virtualpinballchat.com/vpc/api/v1/currentWeek?channelName=competition-corner",
                     headers={'User-Agent': 'VPX-Achievement-Watcher'}
                 )
-                with urllib.request.urlopen(req_api, timeout=10) as response:
+                with urllib.request.urlopen(req_api, timeout=10, context=ctx) as response:
                     api_data = json.loads(response.read().decode('utf-8'))
 
                 if isinstance(api_data, list) and len(api_data) > 0:
@@ -2771,7 +2785,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     method='POST'
                 )
 
-                with urllib.request.urlopen(req_img, timeout=15) as img_response:
+                with urllib.request.urlopen(req_img, timeout=15, context=ctx) as img_response:
                     img_data = img_response.read()
 
                 b64_img = base64.b64encode(img_data).decode('utf-8')
@@ -2794,8 +2808,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"</div>"
                 )
 
-                # NEU: Sicherer Weg, um UI im Main-Thread zu aktualisieren!
-                QTimer.singleShot(0, lambda: self.overlay.set_html(final_html, "VPC Weekly"))
+                # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
+                signals.update_ui.emit(final_html, "VPC Weekly")
 
             except Exception as e:
                 import traceback
@@ -2804,10 +2818,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"<div style='color:#FF5555;text-align:center;padding:16px;'>"
                     f"Error loading VPC Challenge:<br><span style='font-size:0.8em;'>{str(e)}</span></div>"
                 )
-                # NEU: Sicherer Weg im Fehlerfall
-                QTimer.singleShot(0, lambda: self.overlay.set_html(error_html, "VPC Weekly"))
+                signals.update_ui.emit(error_html, "VPC Weekly")
 
-        import threading
         threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
 
     def _cycle_overlay_button(self):
