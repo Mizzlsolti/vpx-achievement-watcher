@@ -2709,26 +2709,49 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_h):
         import html as _html_mod
 
-        # Wir benutzen wieder width='95%' (oder ähnlich), damit es sich automatisch anpasst.
-        # So verhindern wir, dass das Bild über den rechten Rand ragt!
-        
+        # Da das Fenster im Portrait-Modus gedreht ist, berechnen wir die Breite 
+        # sicher anhand der übergebenen Fenstergröße (overlay_h).
+        # 0.85 bedeutet 85% der Breite. Wenn es kleiner/weiter weg vom Rand soll, 
+        # mach z.B. 0.75 draus.
+        img_width = int(overlay_h * 0.85)
+
+        # Wir nutzen align='center' direkt in den divs. Das ist 100% kompatibel mit Qt.
         dynamic_header = (
-            # Wir packen alles in ein übergeordnetes DIV, um das Padding für den kompletten Inhalt zu steuern.
-            f"<div style='padding: 10px;'>"
-            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
+            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top:10px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
+            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom:15px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Keine Tabelle mehr! Einfach ein DIV, das den Inhalt zentriert.
-        # margin: 0 auto; sorgt dafür, dass das Bild im Div zentriert bleibt.
+        # Ein einfaches div mit align='center' hält das Bild absolut mittig.
         table_html = (
-            f"<div style='text-align:center; margin-top: 15px;'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='95%' style='border-radius:8px; margin: 0 auto;' />"
+            f"<div align='center'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
             f"</div>"
-            f"</div>" # Ende des umschließenden divs
         )
+
+        return f"{dynamic_header}{table_html}"
+
+    def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
+        import html as _html_mod
+
+        # Im Landscape nehmen wir 75% der verfügbaren Breite
+        img_width = int(overlay_w * 0.75)
+
+        dynamic_header = (
+            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top:10px;'>"
+            f"VPC Weekly Challenge</div>"
+            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom:15px;'>"
+            f"{week_text}{_html_mod.escape(table_name)}</div>"
+        )
+
+        table_html = (
+            f"<div align='center'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
+            f"</div>"
+        )
+
+        return f"{dynamic_header}{table_html}"
 
         return f"{dynamic_header}{table_html}"
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
