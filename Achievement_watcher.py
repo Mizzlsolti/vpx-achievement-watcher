@@ -2735,43 +2735,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
         import html as _html_mod
 
-        # BILD-BREITE ANPASSEN:
-        # Hier steuerst du, wie groß das Bild gerendert wird.
-        # Im Landscape nutzt das Bild jetzt z.B. 80% der Fensterbreite.
-        img_width = int(overlay_w * 0.80)
-        
-        # SCHRAUBEN ZUM VERSCHIEBEN DES GESAMTEN BLOCKS:
-        # positive Zahl = nach rechts / unten
-        # negative Zahl = nach links / oben
-        schiebe_nach_rechts = -2000    # z.B. 50 für nach rechts, -50 für nach links
-        schiebe_nach_unten  = -2000    # z.B. 20 für nach unten, -20 für nach oben
-
-        # Hier wird die Verschiebung auf ALLES angewendet (Header + Bild)
-        verschiebe_style = f"position: relative; left: {schiebe_nach_rechts}px; top: {schiebe_nach_unten}px;"
-
-        dynamic_header = (
-            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
-            f"VPC Weekly Challenge</div>"
-            f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
-            f"{week_text}{_html_mod.escape(table_name)}</div>"
-        )
-
-        table_html = (
-            # Alles in ein großes DIV gepackt, das durch "verschiebe_style" bewegt wird
-            f"<div style='{verschiebe_style}'>"
-            f"{dynamic_header}"
-            # Das Bild selbst wird hart in der Mitte des neuen Blocks zentriert
-            f"<div align='center'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
-            f"</div>"
-            f"</div>"
-        )
-
-        return table_html
-        
-    def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
-        import html as _html_mod
-
         dynamic_header = (
             f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
             f"VPC Weekly Challenge</div>"
@@ -2788,6 +2751,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         )
 
         return f"{dynamic_header}{table_html}"
+
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
         from PyQt6.QtCore import QObject, pyqtSignal
