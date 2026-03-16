@@ -2845,9 +2845,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 if is_portrait:
                     # Portrait: eigener API-Aufruf mit layout="portrait"
                     portrait_payload = json.dumps({
-                        "channelName": "competition-corner",
-                        "layout": "portrait",
-                        "numRows": 20
+                        "layout": "portrait"
                     }).encode('utf-8')
 
                     req_img_portrait = urllib.request.Request(
@@ -2870,9 +2868,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 else:
                     # Landscape: eigener API-Aufruf mit layout="landscape"
                     landscape_payload = json.dumps({
-                        "channelName": "competition-corner",
-                        "layout": "landscape",
-                        "numRows": 20
+                        "layout": "landscape"
                     }).encode('utf-8')
 
                     req_img_landscape = urllib.request.Request(
