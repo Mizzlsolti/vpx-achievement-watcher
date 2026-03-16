@@ -2760,7 +2760,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """
         import html as _html_mod
 
-        multiplier = 1.38
+        multiplier = 0.70
         img_width = int(overlay_w * multiplier)
 
         dynamic_header = (
