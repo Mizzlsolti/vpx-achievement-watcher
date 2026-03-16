@@ -493,12 +493,22 @@ class OverlayWindow(QWidget):
 
     def _refresh_current_content(self):
         """Re-render the currently displayed page using the current font settings.
-        Handles all four page types: fixed-columns (page 0), scrollable rows (page 1),
-        and plain HTML pages (pages 2/3)."""
+        Handles all page types: fixed-columns (page 0), scrollable rows (page 1),
+        plain HTML pages (pages 2/3), and fullsize pages (page 5 VPC leaderboard)."""
         if self._current_combined:
             self._render_fixed_columns()
         elif self._current_html is not None:
-            self.set_html(self._current_html, self._current_title)
+            if getattr(self, '_fullsize_mode', False):
+                # In fullsize mode (e.g. VPC page 5), never call set_html() as that
+                # resets _fullsize_mode. Prefer delegating to parent's _refresh_vpc_page5()
+                # so image pixel dimensions are recalculated for the current overlay size.
+                parent = getattr(self, 'parent_gui', None)
+                if parent is not None and getattr(parent, '_vpc_page5_data', None):
+                    parent._refresh_vpc_page5()
+                else:
+                    self.set_html_fullsize(self._current_html, self._current_title)
+            else:
+                self.set_html(self._current_html, self._current_title)
         elif self._p2_rows is not None:
             self._render_p2()
             self._layout_positions()
