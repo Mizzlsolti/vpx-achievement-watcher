@@ -20,13 +20,17 @@ Heat Challenge: When the barometer reaches 100%, it's over. The heat rises if yo
 
 🛡️ Fair play & anti-cheat To keep the leaderboards fair, local saves and scores are protected by hash signatures. 
 
-The achievement watcher uses nvram-maps and vpxtool for Visual Pinball
+VPC Weekly Challene view. Discords Weekly Challenge on Overlay (Only view)
+
+The achievement watcher uses nvram-maps, vpc-data and vpxtool for Visual Pinball
 
 Many thanks 
 
 to tomlogic    https://github.com/tomlogic/pinmame-nvram-maps 
 
-and francisdb      https://github.com/francisdb/vpxtool
+francisdb      https://github.com/francisdb/vpxtool
+
+emb417 https://github.com/emb417/vpc-data
 
 Team Visual Pinball 
 
