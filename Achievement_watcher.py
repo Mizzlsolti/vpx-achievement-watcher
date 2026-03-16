@@ -2707,24 +2707,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         threading.Thread(target=_do_fetch, daemon=True).start()
 
     def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_h):
-        """Build the full overlay HTML for Page 5 in Portrait mode.
-
-        Uses overlay_h as the base dimension with a 0.70 multiplier and
-        centres the image vertically inside the overlay.
-
-        Args:
-            b64_img (str): Base-64-encoded PNG image data.
-            week_text (str): Formatted week prefix, e.g. "Week 42 - " or "".
-            table_name (str): Name of the pinball table for this week's challenge.
-            overlay_h (int): Height of the overlay window in pixels.
-
-        Returns:
-            str: HTML string ready to be passed to overlay.set_html().
-        """
         import html as _html_mod
-
-        multiplier = 0.70
-        img_width = int(overlay_h * multiplier)
 
         dynamic_header = (
             f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
@@ -2733,35 +2716,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Portrait: centre image vertically in the overlay
+        # Portrait: Bildbreite auf z.B. 95% setzen, damit es sich automatisch anpasst
         table_html = (
             f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
             f"<tr><td align='center' valign='middle'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+            f"<img src='data:image/png;base64,{b64_img}' width='95%' style='border-radius:8px;' />"
             f"</td></tr></table>"
         )
 
         return f"{dynamic_header}{table_html}"
 
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
-        """Build the full overlay HTML for Page 5 in Landscape mode.
-
-        Uses overlay_w as the base dimension with a 1.38 multiplier and
-        anchors the image to the top so it is not clipped at the bottom.
-
-        Args:
-            b64_img (str): Base-64-encoded PNG image data.
-            week_text (str): Formatted week prefix, e.g. "Week 42 - " or "".
-            table_name (str): Name of the pinball table for this week's challenge.
-            overlay_w (int): Width of the overlay window in pixels.
-
-        Returns:
-            str: HTML string ready to be passed to overlay.set_html().
-        """
         import html as _html_mod
-
-        multiplier = 0.70
-        img_width = int(overlay_w * multiplier)
 
         dynamic_header = (
             f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
@@ -2770,16 +2736,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Landscape: anchor image to the top so it is not clipped at the bottom
+        # Landscape: Bildbreite auf z.B. 80% setzen, damit es sich automatisch anpasst
         table_html = (
             f"<table width='100%' style='border:none; margin:0; padding:0;'>"
             f"<tr><td align='center' valign='top' style='padding-top:10px;'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+            f"<img src='data:image/png;base64,{b64_img}' width='80%' style='border-radius:8px;' />"
             f"</td></tr></table>"
         )
 
         return f"{dynamic_header}{table_html}"
-
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
         from PyQt6.QtCore import QObject, pyqtSignal
