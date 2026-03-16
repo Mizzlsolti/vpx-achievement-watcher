@@ -2800,15 +2800,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                # Die Tabelle hält das Layout stabil. 
-                # Im Landscape (quer) muss die Breite stark reduziert werden (55%), 
-                # damit das Bild nicht aus dem unteren Bildschirmrand rutscht!
-                img_width = "90%" if is_portrait else "55%" 
+                # Fetch window dimensions to calculate base_size properly like in PR #72
+                # Ensure we have a valid width to work with
+                overlay_w = self.overlay.width() if self.overlay else 1920
+                overlay_h = self.overlay.height() if self.overlay else 1080
 
+                # In portrait mode, the logical width is the physical height of the screen
+                base_size = overlay_h if is_portrait else overlay_w
+
+                # Calculate pixel width based on orientation
+                # Landscape uses a much smaller multiplier so the image height doesn't clip the bottom
+                multiplier = 0.95 if is_portrait else 0.55
+                img_width = int(base_size * multiplier)
+
+                # Keep the table structure from PR #72 which kept the text properly aligned
                 final_html = (
                     f"{dynamic_header}"
                     f"<table width='100%' style='border:none; margin:0; padding:0;'>"
-                    f"<tr><td align='center' valign='top'>"
+                    f"<tr><td align='center' valign='middle'>"
                     f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
                     f"</td></tr></table>"
                 )
