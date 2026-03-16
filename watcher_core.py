@@ -91,9 +91,9 @@ DEFAULT_OVERLAY = {
     "toggle_vk": 120,
     "toggle_joy_button": 2,
     "font_family": "Segoe UI",
-    "base_title_size": 15, 
-    "base_body_size": 20,
-    "base_hint_size": 16,
+    "base_title_size": 17,
+    "base_body_size": 12,
+    "base_hint_size": 10,
     "use_xy": False,
     "pos_x": 100,
     "pos_y": 100,
@@ -212,7 +212,8 @@ class AppConfig:
             allowed_keys = [
                 "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
                 "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved", 
+                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+                "base_body_size", "base_title_size", "base_hint_size",
                 
                 "toggle_input_source", "toggle_vk", "toggle_joy_button",
                 "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
@@ -266,7 +267,8 @@ class AppConfig:
             allowed_keys = [
                 "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
                 "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved", 
+                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+                "base_body_size", "base_title_size", "base_hint_size",
                 
                 "toggle_input_source", "toggle_vk", "toggle_joy_button",
                 "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
