@@ -2800,24 +2800,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                # Fetch window dimensions to calculate base_size properly like in PR #72
-                # Ensure we have a valid width to work with
-                overlay_w = self.overlay.width() if self.overlay else 1920
-                overlay_h = self.overlay.height() if self.overlay else 1080
-
-                # In portrait mode, the logical width is the physical height of the screen
-                base_size = overlay_h if is_portrait else overlay_w
-
-                # Calculate pixel width based on orientation
-                # Landscape uses a much smaller multiplier so the image height doesn't clip the bottom
-                multiplier = 0.70 if is_portrait else 1.38
-                img_width = int(base_size * multiplier)
+                # Use percentages so the image scales dynamically when the overlay is resized.
+                # Portrait: 70% was confirmed as perfect by the user.
+                # Landscape: 75% — adjust this value up/down to taste.
+                img_width = "70%" if is_portrait else "75%"
 
                 # Keep the table structure from PR #72 which kept the text properly aligned
                 final_html = (
                     f"{dynamic_header}"
                     f"<table width='100%' style='border:none; margin:0; padding:0;'>"
-                    f"<tr><td align='center' valign='middle'>"
+                    f"<tr><td align='center' valign='top'>"
                     f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
                     f"</td></tr></table>"
                 )
