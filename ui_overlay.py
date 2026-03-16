@@ -409,7 +409,8 @@ class OverlayWindow(QWidget):
             self.rotated_label.hide()
             self.container.show()
             self.text_container.show()
-            self.title.show()
+            if not getattr(self, '_fullsize_mode', False):
+                self.title.show()
             self.body.show()
             return
         if getattr(self, "_rot_in_progress", False):
