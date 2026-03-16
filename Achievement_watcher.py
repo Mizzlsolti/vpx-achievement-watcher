@@ -2837,43 +2837,59 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 table_name = week_data.get("tableName", week_data.get("table", "Unknown Table"))
                 week_number = week_data.get("weekNumber", "")
 
-                # 2. Ausrichtung erkennen (Portrait oder Landscape)
-                is_portrait = getattr(self.cfg, 'PORTRAIT_MODE', False)
-                vpc_layout = "portrait" if is_portrait else "landscape"
-
-                # 3. Offizielles Bild über die POST API generieren lassen
-                payload = json.dumps({
-                    "channelName": "competition-corner",
-                    "layout": vpc_layout,
-                    "numRows": 20
-                }).encode('utf-8')
-
-                req_img = urllib.request.Request(
-                    "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
-                    data=payload,
-                    headers={
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'VPX-Achievement-Watcher'
-                    },
-                    method='POST'
-                )
-
-                with urllib.request.urlopen(req_img, timeout=15, context=ctx) as img_response:
-                    img_data = img_response.read()
-
-                b64_img = base64.b64encode(img_data).decode('utf-8')
-
-                # 4. HTML für das Overlay zusammenbauen
                 week_text = f"Week {week_number} - " if week_number else ""
 
-                # Fetch window dimensions to calculate pixel width
-                overlay_w = self.overlay.width() if self.overlay else 1920
-                overlay_h = self.overlay.height() if self.overlay else 1080
+                # 2. Ausrichtung erkennen (Portrait oder Landscape) – komplett getrennte Pfade
+                is_portrait = getattr(self.cfg, 'PORTRAIT_MODE', False)
 
-                # Delegate to the independent portrait/landscape helper methods
                 if is_portrait:
+                    # Portrait: eigener API-Aufruf mit layout="portrait"
+                    portrait_payload = json.dumps({
+                        "channelName": "competition-corner",
+                        "layout": "portrait",
+                        "numRows": 20
+                    }).encode('utf-8')
+
+                    req_img_portrait = urllib.request.Request(
+                        "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
+                        data=portrait_payload,
+                        headers={
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'VPX-Achievement-Watcher'
+                        },
+                        method='POST'
+                    )
+
+                    with urllib.request.urlopen(req_img_portrait, timeout=15, context=ctx) as img_response:
+                        img_data = img_response.read()
+
+                    b64_img = base64.b64encode(img_data).decode('utf-8')
+                    overlay_h = self.overlay.height() if self.overlay else 1080
                     final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_h)
+
                 else:
+                    # Landscape: eigener API-Aufruf mit layout="landscape"
+                    landscape_payload = json.dumps({
+                        "channelName": "competition-corner",
+                        "layout": "landscape",
+                        "numRows": 20
+                    }).encode('utf-8')
+
+                    req_img_landscape = urllib.request.Request(
+                        "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
+                        data=landscape_payload,
+                        headers={
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'VPX-Achievement-Watcher'
+                        },
+                        method='POST'
+                    )
+
+                    with urllib.request.urlopen(req_img_landscape, timeout=15, context=ctx) as img_response:
+                        img_data = img_response.read()
+
+                    b64_img = base64.b64encode(img_data).decode('utf-8')
+                    overlay_w = self.overlay.width() if self.overlay else 1920
                     final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w)
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
