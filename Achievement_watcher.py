@@ -2743,7 +2743,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         # SCHRAUBEN ZUM VERSCHIEBEN DES GESAMTEN BLOCKS:
         # positive Zahl = nach rechts / unten
         # negative Zahl = nach links / oben
-        schiebe_nach_rechts = 0    # z.B. 50 für nach rechts, -50 für nach links
+        schiebe_nach_rechts = -200    # z.B. 50 für nach rechts, -50 für nach links
         schiebe_nach_unten  = 0    # z.B. 20 für nach unten, -20 für nach oben
 
         # Hier wird die Verschiebung auf ALLES angewendet (Header + Bild)
