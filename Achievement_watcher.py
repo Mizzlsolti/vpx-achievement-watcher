@@ -2800,19 +2800,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                # Use percentages so the image scales dynamically when the overlay is resized.
-                # Portrait: 70% was confirmed as perfect by the user.
-                # Landscape: 75% — adjust this value up/down to taste.
-                img_width = "70%" if is_portrait else "75%"
+                # Independent positioning and size for portrait and landscape
+                if is_portrait:
+                    img_width = "70%"
+                    # Portrait: centre image vertically in the overlay
+                    table_html = (
+                        f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
+                        f"<tr><td align='center' valign='middle'>"
+                        f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+                        f"</td></tr></table>"
+                    )
+                else:
+                    # Landscape: anchor image to the top so it is not clipped at the bottom
+                    img_width = "75%"
+                    table_html = (
+                        f"<table width='100%' style='border:none; margin:0; padding:0;'>"
+                        f"<tr><td align='center' valign='top' style='padding-top:10px;'>"
+                        f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+                        f"</td></tr></table>"
+                    )
 
-                # Keep the table structure from PR #72 which kept the text properly aligned
-                final_html = (
-                    f"{dynamic_header}"
-                    f"<table width='100%' style='border:none; margin:0; padding:0;'>"
-                    f"<tr><td align='center' valign='top'>"
-                    f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
-                    f"</td></tr></table>"
-                )
+                final_html = f"{dynamic_header}{table_html}"
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
                 signals.update_ui.emit(final_html, "VPC Weekly")
