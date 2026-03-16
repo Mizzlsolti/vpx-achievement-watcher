@@ -2810,7 +2810,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                 # Calculate pixel width based on orientation
                 # Landscape uses a much smaller multiplier so the image height doesn't clip the bottom
-                multiplier = 0.95 if is_portrait else 1.50
+                multiplier = 0.95 if is_portrait else 1.40
                 img_width = int(base_size * multiplier)
 
                 # Keep the table structure from PR #72 which kept the text properly aligned
