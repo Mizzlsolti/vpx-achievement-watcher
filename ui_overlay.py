@@ -216,9 +216,9 @@ class OverlayWindow(QWidget):
         self.lines_per_category = int(ov.get("lines_per_category", 5))
         
         self.font_family = ov.get("font_family", "Segoe UI")
-        self._base_title_size = int(ov.get("base_title_size", 36))
-        self._base_body_size = int(ov.get("base_body_size", 20))
-        self._base_hint_size = int(ov.get("base_hint_size", 16))
+        self._base_title_size = int(ov.get("base_title_size", 17))
+        self._base_body_size = int(ov.get("base_body_size", 12))
+        self._base_hint_size = int(ov.get("base_hint_size", 10))
         self._body_pt = self._base_body_size
         self._current_combined = None
         self._current_html = None
