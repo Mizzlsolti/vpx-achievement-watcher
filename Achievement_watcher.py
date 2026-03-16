@@ -2800,12 +2800,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                img_width = "95%" if is_portrait else "100%"
+                img_width = "95%" if is_portrait else "95%" # Leave a little margin on landscape too
                 final_html = (
                     f"{dynamic_header}"
-                    f"<div style='text-align:center; display:flex; align-items:center; justify-content:center;'>"
-                    f"<img src='data:image/png;base64,{b64_img}' style='max-width:{img_width}; border-radius:8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.8);' />"
-                    f"</div>"
+                    f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
+                    f"<tr><td align='center' valign='middle'>"
+                    f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+                    f"</td></tr></table>"
                 )
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
