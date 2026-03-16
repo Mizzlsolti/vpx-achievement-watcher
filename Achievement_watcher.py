@@ -2739,33 +2739,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
         import html as _html_mod
 
-        # WICHTIG: Der body-Container in ui_overlay.py ist nur 90% der Fensterbreite!
-        # Und oben sitzt der Overlay-Title (ca. pad=24 + title_height + 10).
-        # Wir müssen mit der BODY-Größe rechnen, nicht mit der Fenstergröße!
-        body_w = int(overlay_w * 0.9)
+        # Reserve ~50px for the header text lines (title + week/table name).
+        # Use the full overlay dimensions directly — Qt renders the image area
+        # relative to the overlay window, so no body-inset correction is needed here.
+        avail_w = overlay_w
+        avail_h = overlay_h - 50
 
-        # Der body startet ca. 60px unter dem Fensteroberkante (title + padding)
-        # und hat unten nochmal 24px padding
-        body_h = overlay_h - 60 - 24
-
-        # Platz für unsere eigenen Header-Textzeilen im body (ca. 50px)
-        text_space = 50
-        avail_w = body_w - 10          # kleiner Sicherheitsrand
-        avail_h = body_h - text_space  # Platz nach Abzug des Textes
-
-        # Das Bild hat Seitenverhältnis 16:9
+        # The API returns 1920x1080 landscape images (16:9 aspect ratio).
         aspect = 16.0 / 9.0
 
-        # Breite so, dass die Höhe noch reinpasst
-        w_from_width = avail_w
-        h_from_width = int(w_from_width / aspect)
+        # Fit image within available bounds while preserving aspect ratio.
+        img_w = avail_w
+        img_h = int(img_w / aspect)
 
-        if h_from_width <= avail_h:
-            img_w = w_from_width
-        else:
-            img_w = int(avail_h * aspect)
+        if img_h > avail_h:
+            img_h = avail_h
+            img_w = int(img_h * aspect)
 
         img_w = max(100, img_w)
+        img_h = max(56, img_h)
 
         dynamic_header = (
             f"<div align='center' style='color:#00E5FF;font-size:1.3em;font-weight:bold;margin-top:2px;'>"
@@ -2774,11 +2766,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Feste Pixel-Breite + align='center' im div = Qt zentriert es IMMER perfekt
+        # Use <table> centering — the only reliable method in Qt's RichText engine.
+        # Fixed pixel width/height prevent Qt from misaligning percentage-based images.
         table_html = (
-            f"<div align='center'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' />"
-            f"</div>"
+            f"<table width='100%'><tr><td align='center' valign='top'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
+            f"</td></tr></table>"
         )
 
         return f"{dynamic_header}{table_html}"
