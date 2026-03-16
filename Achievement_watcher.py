@@ -2327,6 +2327,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Show one of the 5 overlay pages."""
         self._ensure_overlay()
         if page_idx == 0:
+            self._vpc_page5_data = None
             # Page 1: Main Stats (existing combined-players view)
             secs = self._overlay_cycle.get("sections", [])
             if not secs:
@@ -2346,6 +2347,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 except Exception:
                     pass
         elif page_idx == 1:
+            self._vpc_page5_data = None
             # Page 2: Local Achievement Progress for last played ROM
             css, header_html, rows = self._overlay_page2_html()
             self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
@@ -2356,6 +2358,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
         elif page_idx == 2:
+            self._vpc_page5_data = None
             # Page 3: Local Challenge Leaderboard (1:1 mirror of GUI)
             html = self._overlay_page3_html()
             self.overlay.set_html(html, "Challenge Leaderboard")
@@ -2366,6 +2369,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
         elif page_idx == 3:
+            self._vpc_page5_data = None
             # Page 4: Cloud Leaderboard (dynamic)
             self._overlay_page4_show()
         elif page_idx == 4:
@@ -2732,25 +2736,72 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         return f"{dynamic_header}{table_html}"
 
-    def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
+    def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
         import html as _html_mod
 
+        # WICHTIG: Der body-Container in ui_overlay.py ist nur 90% der Fensterbreite!
+        # Und oben sitzt der Overlay-Title (ca. pad=24 + title_height + 10).
+        # Wir müssen mit der BODY-Größe rechnen, nicht mit der Fenstergröße!
+        body_w = int(overlay_w * 0.9)
+
+        # Der body startet ca. 60px unter dem Fensteroberkante (title + padding)
+        # und hat unten nochmal 24px padding
+        body_h = overlay_h - 60 - 24
+
+        # Platz für unsere eigenen Header-Textzeilen im body (ca. 50px)
+        text_space = 50
+        avail_w = body_w - 10          # kleiner Sicherheitsrand
+        avail_h = body_h - text_space  # Platz nach Abzug des Textes
+
+        # Das Bild hat Seitenverhältnis 16:9
+        aspect = 16.0 / 9.0
+
+        # Breite so, dass die Höhe noch reinpasst
+        w_from_width = avail_w
+        h_from_width = int(w_from_width / aspect)
+
+        if h_from_width <= avail_h:
+            img_w = w_from_width
+        else:
+            img_w = int(avail_h * aspect)
+
+        img_w = max(100, img_w)
+
         dynamic_header = (
-            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
+            f"<div align='center' style='color:#00E5FF;font-size:1.3em;font-weight:bold;margin-top:2px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
+            f"<div align='center' style='color:#FF7F00;font-size:1.1em;font-weight:bold;margin-bottom:5px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Landscape: Bildbreite auf z.B. 80% setzen, damit es sich automatisch anpasst
+        # Feste Pixel-Breite + align='center' im div = Qt zentriert es IMMER perfekt
         table_html = (
-            f"<table width='100%' style='border:none; margin:0; padding:0;'>"
-            f"<tr><td align='center' valign='top' style='padding-top:10px;'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='80%' style='border-radius:8px;' />"
-            f"</td></tr></table>"
+            f"<div align='center'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' />"
+            f"</div>"
         )
 
         return f"{dynamic_header}{table_html}"
+
+    def _refresh_vpc_page5(self):
+        """Recalculate and redisplay the VPC image for the current overlay size."""
+        data = getattr(self, '_vpc_page5_data', None)
+        if not data:
+            return
+        b64_img = data['b64_img']
+        week_text = data['week_text']
+        table_name = data['table_name']
+        is_portrait = data['is_portrait']
+
+        if is_portrait:
+            overlay_h = self.overlay.height() if self.overlay else 1080
+            final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_h)
+        else:
+            overlay_w = self.overlay.width() if self.overlay else 1920
+            overlay_h = self.overlay.height() if self.overlay else 1080
+            final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
+
+        self.overlay.set_html(final_html, "VPC Weekly")
 
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
@@ -2830,7 +2881,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         method='POST'
                     )
 
-                    with urllib.request.urlopen(req_img_portrait, timeout=15, context=ctx) as img_response:
+                    with urllib.request.urlopen(req_img_portrait, timeout=45, context=ctx) as img_response:
                         img_data = img_response.read()
 
                     b64_img = base64.b64encode(img_data).decode('utf-8')
@@ -2853,12 +2904,36 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         method='POST'
                     )
 
-                    with urllib.request.urlopen(req_img_landscape, timeout=15, context=ctx) as img_response:
+                    with urllib.request.urlopen(req_img_landscape, timeout=45, context=ctx) as img_response:
                         img_data = img_response.read()
 
                     b64_img = base64.b64encode(img_data).decode('utf-8')
                     overlay_w = self.overlay.width() if self.overlay else 1920
-                    final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w)
+                    overlay_h = self.overlay.height() if self.overlay else 1080
+                    final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
+
+                # Cache raw data so the slider can recalculate the image
+                self._vpc_page5_data = {
+                    'b64_img': b64_img,
+                    'week_text': week_text,
+                    'table_name': table_name,
+                    'is_portrait': is_portrait,
+                }
+
+                # Slider hook: When overlay scale changes, recalculate the image
+                try:
+                    self.overlay.resizeEvent_original  # check if already hooked
+                except AttributeError:
+                    _orig = self.overlay.resizeEvent
+                    self.overlay.resizeEvent_original = _orig
+                    _self = self  # Reference to Achievement_watcher instance
+
+                    def _hooked_resize(event, _orig=_orig, _aw=_self):
+                        _orig(event)
+                        if getattr(_aw, '_vpc_page5_data', None):
+                            _aw._refresh_vpc_page5()
+
+                    self.overlay.resizeEvent = _hooked_resize
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
                 signals.update_ui.emit(final_html, "VPC Weekly")
