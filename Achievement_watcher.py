@@ -2733,35 +2733,41 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         return f"{dynamic_header}{table_html}"
 
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
-        """Build the full overlay HTML for Page 5 in Landscape mode."""
         import html as _html_mod
 
-        # 1. BILDGRÖSSE BERECHNEN
-        # overlay_w ist die volle Breite des Overlay-Fensters.
-        # multiplier = 0.90 bedeutet, das Bild nimmt 90% der Fensterbreite ein.
-        # Verkleinere diesen Wert (z.B. auf 0.70), wenn das Bild kleiner werden soll.
-        multiplier = 0.90
-        img_width = int(overlay_w * multiplier)
+        # BILD-BREITE ANPASSEN:
+        # Hier steuerst du, wie groß das Bild gerendert wird.
+        # Im Landscape nutzt das Bild jetzt z.B. 80% der Fensterbreite.
+        img_width = int(overlay_w * 0.80)
+        
+        # SCHRAUBEN ZUM VERSCHIEBEN DES GESAMTEN BLOCKS:
+        # positive Zahl = nach rechts / unten
+        # negative Zahl = nach links / oben
+        schiebe_nach_rechts = 0    # z.B. 50 für nach rechts, -50 für nach links
+        schiebe_nach_unten  = 0    # z.B. 20 für nach unten, -20 für nach oben
 
-        # 2. HEADER
-        # Wir zentrieren den Text hart mit dem alten HTML align="center" Attribut.
-        # margin-top drückt den Titel etwas nach unten, weg vom Rand.
+        # Hier wird die Verschiebung auf ALLES angewendet (Header + Bild)
+        verschiebe_style = f"position: relative; left: {schiebe_nach_rechts}px; top: {schiebe_nach_unten}px;"
+
         dynamic_header = (
-            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top: 10px;'>"
+            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom: 20px;'>"
+            f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # 3. BILD (ZENTRIERT)
-        # Auch hier: Ein einfaches div mit align="center" ist die sicherste Methode in PyQt.
         table_html = (
+            # Alles in ein großes DIV gepackt, das durch "verschiebe_style" bewegt wird
+            f"<div style='{verschiebe_style}'>"
+            f"{dynamic_header}"
+            # Das Bild selbst wird hart in der Mitte des neuen Blocks zentriert
             f"<div align='center'>"
             f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
             f"</div>"
+            f"</div>"
         )
 
-        return f"{dynamic_header}{table_html}"
+        return table_html
         
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
         import html as _html_mod
