@@ -2800,9 +2800,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
+                # Fetch window dimensions to calculate pixel width
+                overlay_w = self.overlay.width() if self.overlay else 1920
+                overlay_h = self.overlay.height() if self.overlay else 1080
+
                 # Independent positioning and size for portrait and landscape
                 if is_portrait:
-                    img_width = "70%"
+                    # In portrait mode, the logical width is the physical height of the screen
+                    base_size = overlay_h
+                    multiplier = 0.70  # Adjust this if needed
+                    img_width = int(base_size * multiplier)
+
                     # Portrait: centre image vertically in the overlay
                     table_html = (
                         f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
@@ -2811,8 +2819,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         f"</td></tr></table>"
                     )
                 else:
+                    # In landscape mode, use the normal width
+                    base_size = overlay_w
+                    multiplier = 1.38  # Adjust this if needed
+                    img_width = int(base_size * multiplier)
+
                     # Landscape: anchor image to the top so it is not clipped at the bottom
-                    img_width = "75%"
                     table_html = (
                         f"<table width='100%' style='border:none; margin:0; padding:0;'>"
                         f"<tr><td align='center' valign='top' style='padding-top:10px;'>"
