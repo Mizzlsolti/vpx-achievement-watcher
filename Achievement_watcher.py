@@ -2709,28 +2709,37 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_h):
         import html as _html_mod
 
-        dynamic_header = (
-            # 1. Schraube: text-align='left' statt 'center' schiebt den Text ganz nach links.
-            # 2. Schraube: padding-top ändern (z.B. 0px oder negativ margin-top), um ihn weiter hoch zu schieben.
-            # 3. Schraube: margin-left (oder padding-left), um ihn von links einzurücken.
-            f"<div style='color:#00E5FF; font-size:1.2em; font-weight:bold; text-align:left; padding-top:0px; margin-left:20px;'>"
-            f"VPC Weekly Challenge</div>"
-            
-            # Hier das Gleiche für den Tisch-Namen
-            f"<div style='color:#FF7F00; font-size:1.0em; font-weight:bold; text-align:left; margin-bottom:8px; margin-left:20px;'>"
-            f"{week_text}{_html_mod.escape(table_name)}</div>"
+        multiplier = 0.70
+        img_width = int(overlay_h * multiplier)
+
+        # Wie in Seite 4 packen wir unser CSS in einen Style-Block!
+        css = """
+        <style>
+          .vpc-container { width: 100%; text-align: center; }
+          .vpc-header { color: #00E5FF; font-size: 1.2em; font-weight: bold; margin-bottom: 2px; }
+          .vpc-table { color: #FF7F00; font-size: 1.0em; font-weight: bold; margin-bottom: 10px; }
+          .vpc-img-wrapper { text-align: center; width: 100%; }
+        </style>
+        """
+
+        header_html = (
+            f"<div class='vpc-container'>"
+            f"<div class='vpc-header'>VPC Weekly Challenge</div>"
+            f"<div class='vpc-table'>{week_text}{_html_mod.escape(table_name)}</div>"
+            f"</div>"
         )
 
+        # Die Tabelle als reines Werkzeug zum Platzieren des Bildes
+        # align='center' in der Tabelle zentriert die Tabelle selbst im overlay
         table_html = (
-            f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
-            f"<tr><td align='center' valign='top'>"
-            # Hier sind die Schrauben: 
-
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' "
-            f"style='border-radius:8px; margin-top:-20px; margin-left:-30px;' />"
-            f"</td></tr></table>"
+            f"<table align='center' width='100%' style='border:none; margin-top:5px;'>"
+            f"<tr><td align='center'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
+            f"</td></tr>"
+            f"</table>"
         )
-        return f"{dynamic_header}{table_html}"
+
+        return f"{css}{header_html}{table_html}"
 
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
         import html as _html_mod
