@@ -2800,11 +2800,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
+                # Die Tabelle hält das Layout stabil. 
+                # Im Landscape (quer) muss die Breite stark reduziert werden (55%), 
+                # damit das Bild nicht aus dem unteren Bildschirmrand rutscht!
+                img_width = "90%" if is_portrait else "55%" 
+
                 final_html = (
                     f"{dynamic_header}"
-                    f"<div style='text-align: center; width: 100%;'>"
-                    f"<img src='data:image/png;base64,{b64_img}' width='95%' />"
-                    f"</div>"
+                    f"<table width='100%' style='border:none; margin:0; padding:0;'>"
+                    f"<tr><td align='center' valign='top'>"
+                    f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
+                    f"</td></tr></table>"
                 )
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
