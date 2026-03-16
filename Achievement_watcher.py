@@ -2800,14 +2800,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                # Breite im Landscape-Modus verkleinern, damit die Höhe ins Bild passt!
-                img_width = "95%" if is_portrait else "65%" 
+                # Wir MÜSSEN die Tabelle behalten, sonst bricht die PyQt-Rotation das Layout.
+                # Wir machen das Bild aber schmaler (80% / 65%), damit die Höhe nicht unten rausragt!
+                img_width = "80%" if is_portrait else "65%" 
                 
                 final_html = (
                     f"{dynamic_header}"
-                    f"<div align='center' style='margin-top:10px;'>"
+                    f"<table width='100%' style='border:none; margin:0; padding:0;'>"
+                    f"<tr><td align='center' valign='top'>"
                     f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
-                    f"</div>"
+                    f"</td></tr></table>"
                 )
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
