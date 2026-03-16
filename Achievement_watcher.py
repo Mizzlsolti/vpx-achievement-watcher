@@ -2708,7 +2708,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
-        from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+        from PyQt6.QtCore import QTimer
         import urllib.request
         import json
         import base64
@@ -2790,15 +2790,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 final_html = (
                     f"{dynamic_header}"
                     f"<div style='text-align:center; display:flex; align-items:center; justify-content:center;'>"
-                    f"<img src='data:image/png;base64,{b64_img}' style='max-width:{img_width}; border-radius:8px;' />"
+                    f"<img src='data:image/png;base64,{b64_img}' style='max-width:{img_width}; border-radius:8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.8);' />"
                     f"</div>"
                 )
 
-                QMetaObject.invokeMethod(
-                    self.overlay, "set_html", Qt.ConnectionType.QueuedConnection,
-                    Q_ARG(str, final_html),
-                    Q_ARG(str, "VPC Weekly")
-                )
+                # NEU: Sicherer Weg, um UI im Main-Thread zu aktualisieren!
+                QTimer.singleShot(0, lambda: self.overlay.set_html(final_html, "VPC Weekly"))
 
             except Exception as e:
                 import traceback
@@ -2807,11 +2804,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"<div style='color:#FF5555;text-align:center;padding:16px;'>"
                     f"Error loading VPC Challenge:<br><span style='font-size:0.8em;'>{str(e)}</span></div>"
                 )
-                QMetaObject.invokeMethod(
-                    self.overlay, "set_html", Qt.ConnectionType.QueuedConnection,
-                    Q_ARG(str, error_html),
-                    Q_ARG(str, "VPC Weekly")
-                )
+                # NEU: Sicherer Weg im Fehlerfall
+                QTimer.singleShot(0, lambda: self.overlay.set_html(error_html, "VPC Weekly"))
 
         import threading
         threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
