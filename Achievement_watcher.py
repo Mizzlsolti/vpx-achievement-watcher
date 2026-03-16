@@ -2800,17 +2800,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                # Die Tabelle zwingt PyQt6 dazu, das Layout auch bei Rotation zusammenzuhalten.
-                # Wir reduzieren die Breite drastisch (besonders im Landscape),
-                # damit die proportionale Höhe nicht aus dem Bildschirm rutscht.
-                img_width = "85%" if is_portrait else "55%"
-
                 final_html = (
                     f"{dynamic_header}"
-                    f"<table width='100%' style='border:none; margin:0; padding:0;'>"
-                    f"<tr><td align='center' valign='top'>"
-                    f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
-                    f"</td></tr></table>"
+                    f"<div style='text-align: center; width: 100%;'>"
+                    f"<img src='data:image/png;base64,{b64_img}' width='95%' />"
+                    f"</div>"
                 )
 
                 # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
