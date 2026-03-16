@@ -2312,8 +2312,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _navigate_overlay_page(self, direction: int):
-        """Cycle to the next/previous overlay page (endless loop, 4 pages)."""
-        self._overlay_page = (int(getattr(self, "_overlay_page", 0)) + direction) % 4
+        """Cycle to the next/previous overlay page (endless loop, 5 pages)."""
+        self._overlay_page = (int(getattr(self, "_overlay_page", 0)) + direction) % 5
         try:
             self._show_overlay_page(self._overlay_page)
         except Exception as e:
@@ -2324,7 +2324,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 pass
 
     def _show_overlay_page(self, page_idx: int):
-        """Show one of the 4 overlay pages."""
+        """Show one of the 5 overlay pages."""
         self._ensure_overlay()
         if page_idx == 0:
             # Page 1: Main Stats (existing combined-players view)
@@ -2368,6 +2368,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         elif page_idx == 3:
             # Page 4: Cloud Leaderboard (dynamic)
             self._overlay_page4_show()
+        elif page_idx == 4:
+            # Page 5: VPC Weekly Challenge Leaderboard
+            self._overlay_page5_show()
 
     def _get_last_played_rom(self) -> str:
         """Return the ROM key of the last played session (non-challenge or challenge)."""
@@ -2702,6 +2705,116 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 )
 
         threading.Thread(target=_do_fetch, daemon=True).start()
+
+    def _overlay_page5_show(self):
+        """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
+        from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+        import urllib.request
+        import json
+        import base64
+        import html as _html_mod
+
+        self._ensure_overlay()
+
+        # Zeige Ladebildschirm an
+        loading_html = (
+            f"<div style='color:#00E5FF;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
+            f"VPC Weekly Challenge</div>"
+            f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
+        )
+        self.overlay.set_html(loading_html, "VPC Weekly")
+        self.overlay.show()
+        self.overlay.raise_()
+        self._start_overlay_auto_close_timer()
+
+        try:
+            self.overlay.set_nav_arrows(True)
+        except Exception:
+            pass
+
+        def _fetch_vpc_challenge():
+            try:
+                # 1. Challenge-Daten (Text/Infos) über die GET API abrufen
+                req_api = urllib.request.Request(
+                    "https://virtualpinballchat.com/vpc/api/v1/currentWeek?channelName=competition-corner",
+                    headers={'User-Agent': 'VPX-Achievement-Watcher'}
+                )
+                with urllib.request.urlopen(req_api, timeout=10) as response:
+                    api_data = json.loads(response.read().decode('utf-8'))
+
+                if isinstance(api_data, list) and len(api_data) > 0:
+                    week_data = api_data[0]
+                else:
+                    week_data = api_data
+
+                table_name = week_data.get("tableName", week_data.get("table", "Unknown Table"))
+                week_number = week_data.get("weekNumber", "")
+
+                # 2. Ausrichtung erkennen (Portrait oder Landscape)
+                is_portrait = getattr(self.cfg, 'PORTRAIT_MODE', False)
+                vpc_layout = "portrait" if is_portrait else "landscape"
+
+                # 3. Offizielles Bild über die POST API generieren lassen
+                payload = json.dumps({
+                    "channelName": "competition-corner",
+                    "layout": vpc_layout,
+                    "numRows": 20
+                }).encode('utf-8')
+
+                req_img = urllib.request.Request(
+                    "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
+                    data=payload,
+                    headers={
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'VPX-Achievement-Watcher'
+                    },
+                    method='POST'
+                )
+
+                with urllib.request.urlopen(req_img, timeout=15) as img_response:
+                    img_data = img_response.read()
+
+                b64_img = base64.b64encode(img_data).decode('utf-8')
+
+                # 4. HTML für das Overlay zusammenbauen
+                week_text = f"Week {week_number} - " if week_number else ""
+
+                dynamic_header = (
+                    f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
+                    f"VPC Weekly Challenge</div>"
+                    f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
+                    f"{week_text}{_html_mod.escape(table_name)}</div>"
+                )
+
+                img_width = "95%" if is_portrait else "100%"
+                final_html = (
+                    f"{dynamic_header}"
+                    f"<div style='text-align:center; display:flex; align-items:center; justify-content:center;'>"
+                    f"<img src='data:image/png;base64,{b64_img}' style='max-width:{img_width}; border-radius:8px;' />"
+                    f"</div>"
+                )
+
+                QMetaObject.invokeMethod(
+                    self.overlay, "set_html", Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, final_html),
+                    Q_ARG(str, "VPC Weekly")
+                )
+
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                error_html = (
+                    f"<div style='color:#FF5555;text-align:center;padding:16px;'>"
+                    f"Error loading VPC Challenge:<br><span style='font-size:0.8em;'>{str(e)}</span></div>"
+                )
+                QMetaObject.invokeMethod(
+                    self.overlay, "set_html", Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, error_html),
+                    Q_ARG(str, "VPC Weekly")
+                )
+
+        import threading
+        threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
 
     def _cycle_overlay_button(self):
 
