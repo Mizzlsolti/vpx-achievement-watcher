@@ -2800,11 +2800,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"{week_text}{_html_mod.escape(table_name)}</div>"
                 )
 
-                img_width = "95%"
+                # Breite im Landscape-Modus verkleinern, damit die Höhe ins Bild passt!
+                img_width = "95%" if is_portrait else "65%" 
+                
                 final_html = (
                     f"{dynamic_header}"
-                    f"<div style='text-align:center;'>"
-                    f"<img src='data:image/png;base64,{b64_img}' style='max-width:95%; border-radius:8px;' />"
+                    f"<div align='center' style='margin-top:10px;'>"
+                    f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
                     f"</div>"
                 )
 
@@ -3707,7 +3709,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "2.3"
+        CURRENT_VERSION = "2.4"
         
         def _task():
             try:
