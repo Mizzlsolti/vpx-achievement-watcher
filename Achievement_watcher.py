@@ -2711,11 +2711,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         threading.Thread(target=_do_fetch, daemon=True).start()
 
     def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_w, overlay_h):
-        import html as _html_mod
-
-        # Reserve 35px for the header text lines; fit image in remaining space.
+        # Use full overlay dimensions — image already contains all branding/week info.
         avail_w = overlay_w
-        avail_h = overlay_h - 35
+        avail_h = overlay_h
 
         # The API returns 640x752 portrait images (aspect ratio 640/752).
         aspect = 640.0 / 752.0
@@ -2731,30 +2729,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         img_w = max(100, img_w)
         img_h = max(int(100 / aspect), img_h)
 
-        dynamic_header = (
-            f"<div align='center' style='color:#00E5FF;font-size:1.2em;font-weight:bold;margin-top:2px;'>"
-            f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00;font-size:1.0em;font-weight:bold;margin-bottom:3px;'>"
-            f"{week_text}{_html_mod.escape(table_name)}</div>"
-        )
-
         # Use <table> centering — the only reliable method in Qt's RichText engine.
-        table_html = (
-            f"<table width='100%'><tr><td align='center' valign='top'>"
+        return (
+            f"<table width='100%' height='100%'><tr><td align='center' valign='middle'>"
             f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
             f"</td></tr></table>"
         )
 
-        return f"{dynamic_header}{table_html}"
-
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
-        import html as _html_mod
-
-        # Reserve ~35px for the header text lines (title + week/table name).
-        # Use the full overlay dimensions directly — Qt renders the image area
-        # relative to the overlay window, so no body-inset correction is needed here.
+        # Use full overlay dimensions — image already contains all branding/week info.
         avail_w = overlay_w
-        avail_h = overlay_h - 35
+        avail_h = overlay_h
 
         # The API returns 1920x1080 landscape images (16:9 aspect ratio).
         aspect = 16.0 / 9.0
@@ -2770,22 +2755,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         img_w = max(100, img_w)
         img_h = max(56, img_h)
 
-        dynamic_header = (
-            f"<div align='center' style='color:#00E5FF;font-size:1.3em;font-weight:bold;margin-top:2px;'>"
-            f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00;font-size:1.1em;font-weight:bold;margin-bottom:3px;'>"
-            f"{week_text}{_html_mod.escape(table_name)}</div>"
-        )
-
         # Use <table> centering — the only reliable method in Qt's RichText engine.
         # Fixed pixel width/height prevent Qt from misaligning percentage-based images.
-        table_html = (
-            f"<table width='100%'><tr><td align='center' valign='top'>"
+        return (
+            f"<table width='100%' height='100%'><tr><td align='center' valign='middle'>"
             f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
             f"</td></tr></table>"
         )
-
-        return f"{dynamic_header}{table_html}"
 
     def _refresh_vpc_page5(self):
         """Recalculate and redisplay the VPC image for the current overlay size."""
@@ -3310,7 +3286,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay.scale_pct = int(val)
             self.overlay._apply_scale(int(val))
             self.overlay._apply_geometry()
-            self.overlay._refresh_current_content()
+            if getattr(self, '_vpc_page5_data', None):
+                # VPC page 5 is active — recalculate image dimensions for new overlay size
+                self._refresh_vpc_page5()
+            else:
+                self.overlay._refresh_current_content()
         try:
             if hasattr(self, "_overlay_picker") and isinstance(self._overlay_picker, OverlayPositionPicker):
                 self._overlay_picker.apply_portrait_from_cfg()
