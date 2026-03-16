@@ -2710,28 +2710,39 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
-    def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_h):
+    def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_w, overlay_h):
         import html as _html_mod
 
-        # Da das Fenster im Portrait-Modus gedreht ist, berechnen wir die Breite 
-        # sicher anhand der übergebenen Fenstergröße (overlay_h).
-        # 0.85 bedeutet 85% der Breite. Wenn es kleiner/weiter weg vom Rand soll, 
-        # mach z.B. 0.75 draus.
-        img_width = int(overlay_h * 0.85)
+        # Reserve 35px for the header text lines; fit image in remaining space.
+        avail_w = overlay_w
+        avail_h = overlay_h - 35
 
-        # Wir nutzen align='center' direkt in den divs. Das ist 100% kompatibel mit Qt.
+        # The API returns 640x752 portrait images (aspect ratio 640/752).
+        aspect = 640.0 / 752.0
+
+        # Fit image within available bounds while preserving aspect ratio.
+        img_w = avail_w
+        img_h = int(img_w / aspect)
+
+        if img_h > avail_h:
+            img_h = avail_h
+            img_w = int(img_h * aspect)
+
+        img_w = max(100, img_w)
+        img_h = max(int(100 / aspect), img_h)
+
         dynamic_header = (
-            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top:10px;'>"
+            f"<div align='center' style='color:#00E5FF;font-size:1.2em;font-weight:bold;margin-top:2px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom:15px;'>"
+            f"<div align='center' style='color:#FF7F00;font-size:1.0em;font-weight:bold;margin-bottom:3px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Ein einfaches div mit align='center' hält das Bild absolut mittig.
+        # Use <table> centering — the only reliable method in Qt's RichText engine.
         table_html = (
-            f"<div align='center'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
-            f"</div>"
+            f"<table width='100%'><tr><td align='center' valign='top'>"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
+            f"</td></tr></table>"
         )
 
         return f"{dynamic_header}{table_html}"
@@ -2739,11 +2750,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
         import html as _html_mod
 
-        # Reserve ~50px for the header text lines (title + week/table name).
+        # Reserve ~35px for the header text lines (title + week/table name).
         # Use the full overlay dimensions directly — Qt renders the image area
         # relative to the overlay window, so no body-inset correction is needed here.
         avail_w = overlay_w
-        avail_h = overlay_h - 50
+        avail_h = overlay_h - 35
 
         # The API returns 1920x1080 landscape images (16:9 aspect ratio).
         aspect = 16.0 / 9.0
@@ -2762,7 +2773,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         dynamic_header = (
             f"<div align='center' style='color:#00E5FF;font-size:1.3em;font-weight:bold;margin-top:2px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00;font-size:1.1em;font-weight:bold;margin-bottom:5px;'>"
+            f"<div align='center' style='color:#FF7F00;font-size:1.1em;font-weight:bold;margin-bottom:3px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
@@ -2787,8 +2798,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         is_portrait = data['is_portrait']
 
         if is_portrait:
-            overlay_h = self.overlay.height() if self.overlay else 1080
-            final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_h)
+            overlay_w = self.overlay.width() if self.overlay else 1080
+            overlay_h = self.overlay.height() if self.overlay else 1920
+            final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_w, overlay_h)
         else:
             overlay_w = self.overlay.width() if self.overlay else 1920
             overlay_h = self.overlay.height() if self.overlay else 1080
@@ -2878,8 +2890,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         img_data = img_response.read()
 
                     b64_img = base64.b64encode(img_data).decode('utf-8')
-                    overlay_h = self.overlay.height() if self.overlay else 1080
-                    final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_h)
+                    overlay_w = self.overlay.width() if self.overlay else 1080
+                    overlay_h = self.overlay.height() if self.overlay else 1920
+                    final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_w, overlay_h)
 
                 else:
                     # Landscape: eigener API-Aufruf mit layout="landscape"
