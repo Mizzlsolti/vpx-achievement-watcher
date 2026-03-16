@@ -2710,7 +2710,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         import html as _html_mod
 
         dynamic_header = (
-            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:center;padding-top:4px;'>"
+            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:left;padding-top:4px;'>"
             f"VPC Weekly Challenge</div>"
             f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
