@@ -2716,14 +2716,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
-        # Portrait: Bildbreite auf z.B. 95% setzen, damit es sich automatisch anpasst
         table_html = (
             f"<table width='100%' height='100%' style='border:none; margin:0; padding:0;'>"
-            f"<tr><td align='center' valign='middle'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='95%' style='border-radius:8px;' />"
+            f"<tr><td align='center' valign='top'>"
+            # Hier sind die Schrauben: 
+
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' "
+            f"style='border-radius:8px; margin-top:-20px; margin-left:-30px;' />"
             f"</td></tr></table>"
         )
-
         return f"{dynamic_header}{table_html}"
 
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
