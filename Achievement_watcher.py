@@ -2774,9 +2774,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         is_portrait = data['is_portrait']
 
         if is_portrait:
-            overlay_w = self.overlay.width() if self.overlay else 1080
-            overlay_h = self.overlay.height() if self.overlay else 1920
-            final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_w, overlay_h)
+            # Portrait overlay renders content in a landscape pre-canvas (H×W).
+            # Use pre-canvas dimensions so the image fills it edge-to-edge.
+            pre_w = self.overlay.height() if self.overlay else 1920
+            pre_h = self.overlay.width() if self.overlay else 1080
+            final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
         else:
             overlay_w = self.overlay.width() if self.overlay else 1920
             overlay_h = self.overlay.height() if self.overlay else 1080
@@ -2844,17 +2846,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 week_text = f"Week {week_number} - " if week_number else ""
 
                 # 2. Ausrichtung erkennen (Portrait oder Landscape) – komplett getrennte Pfade
-                is_portrait = getattr(self.cfg, 'PORTRAIT_MODE', False)
+                is_portrait = getattr(self.overlay, 'portrait_mode', False) if self.overlay else False
 
                 if is_portrait:
-                    # Portrait: eigener API-Aufruf mit layout="portrait"
-                    portrait_payload = json.dumps({
-                        "layout": "portrait"
+                    # Portrait overlay: content is rendered in a landscape pre-canvas
+                    # (H×W = overlay height × overlay width) before being rotated 90°.
+                    # Request the landscape VPC image so it fills the pre-canvas perfectly.
+                    vpc_payload = json.dumps({
+                        "layout": "landscape"
                     }).encode('utf-8')
 
-                    req_img_portrait = urllib.request.Request(
+                    req_img = urllib.request.Request(
                         "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
-                        data=portrait_payload,
+                        data=vpc_payload,
                         headers={
                             'Content-Type': 'application/json',
                             'User-Agent': 'VPX-Achievement-Watcher'
@@ -2862,13 +2866,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         method='POST'
                     )
 
-                    with urllib.request.urlopen(req_img_portrait, timeout=45, context=ctx) as img_response:
+                    with urllib.request.urlopen(req_img, timeout=45, context=ctx) as img_response:
                         img_data = img_response.read()
 
                     b64_img = base64.b64encode(img_data).decode('utf-8')
-                    overlay_w = self.overlay.width() if self.overlay else 1080
-                    overlay_h = self.overlay.height() if self.overlay else 1920
-                    final_html = self._generate_vpc_html_portrait(b64_img, week_text, table_name, overlay_w, overlay_h)
+                    # Use pre-canvas dimensions (H×W) so the image fills the canvas edge-to-edge.
+                    pre_w = self.overlay.height() if self.overlay else 1920
+                    pre_h = self.overlay.width() if self.overlay else 1080
+                    final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
 
                 else:
                     # Landscape: eigener API-Aufruf mit layout="landscape"
