@@ -2710,9 +2710,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         import html as _html_mod
 
         dynamic_header = (
-            f"<div style='color:#00E5FF;font-size:1.2em;font-weight:bold;text-align:left;padding-top:4px;'>"
+            # 1. Schraube: text-align='left' statt 'center' schiebt den Text ganz nach links.
+            # 2. Schraube: padding-top ändern (z.B. 0px oder negativ margin-top), um ihn weiter hoch zu schieben.
+            # 3. Schraube: margin-left (oder padding-left), um ihn von links einzurücken.
+            f"<div style='color:#00E5FF; font-size:1.2em; font-weight:bold; text-align:left; padding-top:0px; margin-left:20px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div style='color:#FF7F00;font-size:1.0em;font-weight:bold;text-align:center;margin-bottom:8px;'>"
+            
+            # Hier das Gleiche für den Tisch-Namen
+            f"<div style='color:#FF7F00; font-size:1.0em; font-weight:bold; text-align:left; margin-bottom:8px; margin-left:20px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
