@@ -347,6 +347,10 @@ class OverlayWindow(QWidget):
     def _layout_positions_for(self, w: int, h: int, portrait_pre_render: bool = False):
         if hasattr(self, "text_container"):
             self.text_container.setGeometry(0, 0, w, h)
+        if getattr(self, '_fullsize_mode', False):
+            self.title.hide()
+            self.body.setGeometry(0, 0, w, h)
+            return
         pad = 24
         try:
             self.title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -544,6 +548,7 @@ class OverlayWindow(QWidget):
             self._nav_arrows.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
+        self._fullsize_mode = False
         self._current_combined = None
         self._current_html = None
         self._p2_rows = None
@@ -554,6 +559,7 @@ class OverlayWindow(QWidget):
         self.request_rotation(force=True)
 
     def set_html(self, html: str, session_title: Optional[str] = None):
+        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None
@@ -567,7 +573,29 @@ class OverlayWindow(QWidget):
         self._layout_positions()
         self.request_rotation(force=True)
 
+    def set_html_fullsize(self, html: str, session_title: Optional[str] = None):
+        """Like set_html() but expands body to the full window — no title bar, no insets.
+
+        Use this for pages that display a full-window image (e.g. Page 5 VPC leaderboard).
+        Switching to any other page via set_html/set_combined/etc. automatically restores
+        the normal title + body layout.
+        """
+        if hasattr(self, "_p2_timer"):
+            self._p2_timer.stop()
+        self._fullsize_mode = True
+        self._current_combined = None
+        self._current_html = html
+        self._p2_rows = None
+        self._current_title = "Highlights" if session_title is None else session_title
+        self.title.hide()
+        body_pt = getattr(self, "_body_pt", 20)
+        css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+        self.body.setText(f"<div style='{css}'>{html}</div>")
+        self.body.setGeometry(0, 0, self.width(), self.height())
+        self.request_rotation(force=True)
+
     def set_combined(self, combined: dict, session_title: Optional[str] = None):
+        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = combined or {}
@@ -579,6 +607,7 @@ class OverlayWindow(QWidget):
     def set_html_scrollable(self, css: str, header_html: str, rows: list,
                             session_title: Optional[str] = None):
         """Display a list of table rows with Python QTimer-based scrolling."""
+        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None

@@ -2794,7 +2794,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             overlay_h = self.overlay.height() if self.overlay else 1080
             final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
 
-        self.overlay.set_html(final_html, "VPC Weekly")
+        self.overlay.set_html_fullsize(final_html, "VPC Weekly")
 
     def _overlay_page5_show(self):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
@@ -2812,7 +2812,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             update_ui = pyqtSignal(str, str)
 
         signals = VpcWorkerSignals()
-        signals.update_ui.connect(self.overlay.set_html)
+        signals.update_ui.connect(self.overlay.set_html_fullsize)
 
         # Zeige Ladebildschirm an
         loading_html = (
@@ -2820,7 +2820,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"VPC Weekly Challenge</div>"
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
-        self.overlay.set_html(loading_html, "VPC Weekly")
+        self.overlay.set_html_fullsize(loading_html, "VPC Weekly")
         self.overlay.show()
         self.overlay.raise_()
         self._start_overlay_auto_close_timer()
