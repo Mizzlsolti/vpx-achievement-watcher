@@ -123,7 +123,8 @@ class OverlayWindow(QWidget):
         try:
             self.container.show()
             self.text_container.show()
-            self.title.show()
+            if not getattr(self, '_fullsize_mode', False):
+                self.title.show()
             self.body.show()
         except Exception:
             pass
@@ -439,7 +440,7 @@ class OverlayWindow(QWidget):
             old_title_vis = self.title.isVisible()
             old_body_vis = self.body.isVisible()
             self.text_container.setGeometry(0, 0, pre_w, pre_h)
-            self.title.setVisible(True)
+            self.title.setVisible(not getattr(self, '_fullsize_mode', False))
             self.body.setVisible(True)
             self._layout_positions_for(pre_w, pre_h, portrait_pre_render=False)
             QApplication.processEvents()
