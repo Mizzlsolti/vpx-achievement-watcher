@@ -2733,27 +2733,36 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         return f"{dynamic_header}{table_html}"
 
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
+        """Build the full overlay HTML for Page 5 in Landscape mode."""
         import html as _html_mod
 
-        # Im Landscape nehmen wir 75% der verfügbaren Breite
-        img_width = int(overlay_w * 0.75)
+        # 1. BILDGRÖSSE BERECHNEN
+        # overlay_w ist die volle Breite des Overlay-Fensters.
+        # multiplier = 0.90 bedeutet, das Bild nimmt 90% der Fensterbreite ein.
+        # Verkleinere diesen Wert (z.B. auf 0.70), wenn das Bild kleiner werden soll.
+        multiplier = 0.90
+        img_width = int(overlay_w * multiplier)
 
+        # 2. HEADER
+        # Wir zentrieren den Text hart mit dem alten HTML align="center" Attribut.
+        # margin-top drückt den Titel etwas nach unten, weg vom Rand.
         dynamic_header = (
-            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top:10px;'>"
+            f"<div align='center' style='color:#00E5FF; font-size:1.2em; font-weight:bold; margin-top: 10px;'>"
             f"VPC Weekly Challenge</div>"
-            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom:15px;'>"
+            f"<div align='center' style='color:#FF7F00; font-size:1.0em; font-weight:bold; margin-bottom: 20px;'>"
             f"{week_text}{_html_mod.escape(table_name)}</div>"
         )
 
+        # 3. BILD (ZENTRIERT)
+        # Auch hier: Ein einfaches div mit align="center" ist die sicherste Methode in PyQt.
         table_html = (
             f"<div align='center'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' />"
+            f"<img src='data:image/png;base64,{b64_img}' width='{img_width}' style='border-radius:8px;' />"
             f"</div>"
         )
 
         return f"{dynamic_header}{table_html}"
-
-        return f"{dynamic_header}{table_html}"
+        
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w):
         import html as _html_mod
 
