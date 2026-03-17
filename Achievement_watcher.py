@@ -1749,6 +1749,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             
         global_tally = state.get("global_tally", {}) if rom == "Global" else {}
 
+        # Pre-compute live NVRAM totals for nvram_tally so that the progress
+        # bars reflect actual NVRAM data even without a recent session evaluation.
+        _live_nvram_cache: dict = {}  # field -> live total across all played ROMs
+        _live_nvram_audits: dict = {}  # rom -> audits (shared across field lookups)
+        _roms_played_for_live: list = list(state.get("roms_played") or []) if rom == "Global" else []
+
+        def _live_nvram_total(field: str) -> int:
+            if not _roms_played_for_live:
+                return 0
+            if field not in _live_nvram_cache:
+                try:
+                    val = self.watcher._sum_field_across_all_roms(
+                        field, _roms_played_for_live, _live_nvram_audits
+                    )
+                except Exception:
+                    val = 0
+                _live_nvram_cache[field] = val
+            return _live_nvram_cache[field]
+
         html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666; font-size:0.85em;} .tally-bar {background:#333; border-radius:4px; height:6px; margin:2px auto; max-width:120px;} .tally-fill {background:#FF7F00; height:6px; border-radius:4px;}</style>"]
         
         unlocked_count = 0
@@ -1780,7 +1799,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     elif rtype_display in ("nvram_tally", "challenge_count"):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
-                        progress = int(tally.get("progress", 0))
+                        cached_progress = int(tally.get("progress", 0))
+                        # Also read live NVRAM totals so that progress bars are
+                        # accurate even when no session has been evaluated yet.
+                        field = cond.get("field") or ""
+                        live_progress = _live_nvram_total(field) if field else 0
+                        progress = max(cached_progress, live_progress)
                         pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
                         cells.append(
                             f"<td class='locked'>🔒 {clean_title}<br>"

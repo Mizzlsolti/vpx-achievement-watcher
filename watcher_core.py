@@ -4529,18 +4529,21 @@ class Watcher:
     # Each entry maps a canonical name to a list of keyword-tuples; ALL keywords in a tuple must be
     # present (case-insensitive) in an NVRAM field name for it to match.
     _NVRAM_TALLY_PATTERNS: dict[str, list[tuple[str, ...]]] = {
-        "Ball Saves":       [("ball save",)],
+        "Ball Saves":       [("ball save",), ("ball saver",)],
         "Ramps Made":       [("ramp",)],
-        "Jackpots":         [("jackpot",)],
-        "Total Multiballs": [("multiball",)],
+        # "jckpot" covers abbreviated spellings like "TROPICAL JCKPOTS"
+        "Jackpots":         [("jackpot",), ("jckpot",)],
+        "Total Multiballs": [("multiball",), ("multi-ball",)],
         "Loops":            [("loop",)],
         "Spinner":          [("spinner",)],
-        "Drop Targets":     [("drop target",), ("target",)],
+        # "drop target" is the primary match; "drops" catches "DROPS MADE" / "DROPS COMPLETED"
+        # The bare "target" fallback is intentionally removed to avoid false positives.
+        "Drop Targets":     [("drop target",), ("drops",)],
         "Orbits":           [("orbit",)],
         "Combos":           [("combo",)],
         "Extra Balls":      [("extra ball",)],
-        "Games Started":    [("games started",)],
-        "Balls Played":     [("balls played",), ("ball count",)],
+        "Games Started":    [("games started",), ("games played",)],
+        "Balls Played":     [("balls played",), ("ball count",), ("total balls",)],
         "Modes Started":    [("mode", "start")],
         "Modes Completed":  [("mode", "complete")],
     }
