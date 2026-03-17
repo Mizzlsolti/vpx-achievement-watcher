@@ -35,7 +35,7 @@ class CloudStatsMixin:
 
     def _build_challenges_results_html(self) -> str:
         """Build and return the challenge leaderboard HTML (used by both the GUI and the overlay)."""
-        hist_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+        hist_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
         if not os.path.isdir(hist_dir):
             return "<div style='color:#888; text-align:center; margin-top:20px;'>(no results yet)</div>"
 
@@ -423,19 +423,6 @@ class CloudStatsMixin:
     # ==========================================
 
     def update_stats(self):
-        stats_dir = os.path.join(self.cfg.BASE, "session_stats")
-        content = ""
-        if os.path.isdir(stats_dir):
-            try:
-                txt_files = [os.path.join(stats_dir, fn) for fn in os.listdir(stats_dir)
-                             if fn.lower().endswith(".txt")]
-                if txt_files:
-                    latest = max(txt_files, key=lambda p: os.path.getmtime(p))
-                    with open(latest, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read()
-            except Exception:
-                pass
-
         def _set_html_preserve_scroll(browser, html):
             try:
                 sb = browser.verticalScrollBar()
@@ -465,7 +452,7 @@ class CloudStatsMixin:
 
         try:
             if 1 in self.stats_views:
-                html_p1 = self._gui_stats_player1_html(content)
+                html_p1 = self._gui_stats_player1_html()
                 _set_html_preserve_scroll(self.stats_views[1], html_p1)
         except Exception:
             pass
@@ -490,18 +477,6 @@ class CloudStatsMixin:
 
         summary_path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json")
         
-        if not rom:
-            p = self._read_latest_session_txt_path()
-            if p and os.path.isfile(p):
-                try:
-                    with open(p, "r", encoding="utf-8", errors="replace") as f:
-                        for line in f:
-                            if line.lower().startswith("rom:"):
-                                rom = line.split(":", 1)[1].strip()
-                                break
-                except Exception:
-                    pass
-
         if not rom and os.path.exists(summary_path):
             try:
                 with open(summary_path, "r", encoding="utf-8") as f:
@@ -563,7 +538,7 @@ class CloudStatsMixin:
         html_lines.append("</div>")
         return style + "".join(html_lines)
 
-    def _gui_stats_player1_html(self, content: str = "") -> str:
+    def _gui_stats_player1_html(self) -> str:
         def esc(x) -> str:
             return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -584,12 +559,7 @@ class CloudStatsMixin:
             rom = str(getattr(self.watcher, "current_rom", "") or "").strip()
         except Exception:
             pass
-        if not rom and content:
-            for line in content.splitlines():
-                if line.lower().startswith("rom:"):
-                    rom = line.split(":", 1)[1].strip()
-                    break
-                    
+
         summary_path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json")
         if not rom and os.path.exists(summary_path):
             try:
@@ -754,35 +724,10 @@ class CloudStatsMixin:
         return html
 
     def _read_latest_session_txt(self) -> str:
-        stats_dir = os.path.join(self.cfg.BASE, "session_stats")
-        if not os.path.isdir(stats_dir):
-            return ""
-        try:
-            txt_files = [os.path.join(stats_dir, fn) for fn in os.listdir(stats_dir)
-                         if fn.lower().endswith(".txt")]
-            if not txt_files:
-                return ""
-            latest = max(txt_files, key=lambda p: os.path.getmtime(p))
-            with open(latest, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
-        except Exception:
-            return ""
+        return ""
 
     def _read_latest_session_txt_path(self) -> str:
-        stats_dir = os.path.join(self.cfg.BASE, "session_stats")
-        if not os.path.isdir(stats_dir):
-            return ""
-        try:
-            txt_files = [
-                os.path.join(stats_dir, fn)
-                for fn in os.listdir(stats_dir)
-                if fn.lower().endswith(".txt")
-            ]
-            if not txt_files:
-                return ""
-            return max(txt_files, key=lambda p: os.path.getmtime(p))
-        except Exception:
-            return ""
+        return ""
 
     def _read_raw_nvram_for_current_or_last_rom(self) -> tuple[str, bytes]:
         rom = ""
@@ -790,18 +735,6 @@ class CloudStatsMixin:
             rom = str(getattr(self.watcher, "current_rom", "") or "").strip()
         except Exception:
             rom = ""
-
-        if not rom:
-            p = self._read_latest_session_txt_path()
-            if p and os.path.isfile(p):
-                try:
-                    with open(p, "r", encoding="utf-8", errors="replace") as f:
-                        for line in f:
-                            if line.lower().startswith("rom:"):
-                                rom = line.split(":", 1)[1].strip()
-                                break
-                except Exception:
-                    pass
 
         if not rom:
             return "", b""
@@ -829,18 +762,6 @@ class CloudStatsMixin:
             rom = str(getattr(self.watcher, "current_rom", "") or "").strip()
         except Exception:
             pass
-
-        if not rom:
-            p = self._read_latest_session_txt_path()
-            if p and os.path.isfile(p):
-                try:
-                    with open(p, "r", encoding="utf-8", errors="replace") as f:
-                        for line in f:
-                            if line.lower().startswith("rom:"):
-                                rom = line.split(":", 1)[1].strip()
-                                break
-                except Exception:
-                    pass
 
         if not rom:
             return style + "<div align='center'>(Global Snapshot: ROM unknown)</div>"
