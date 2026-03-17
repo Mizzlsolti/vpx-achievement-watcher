@@ -1715,7 +1715,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No specific achievements defined for this ROM.</div>")
             return
             
-        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:8px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666;}</style>"]
+        global_tally = state.get("global_tally", {}) if rom == "Global" else {}
+
+        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:8px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666;} .tally-bar {background:#333; border-radius:4px; height:10px; margin:4px auto; max-width:120px;} .tally-fill {background:#FF7F00; height:10px; border-radius:4px;}</style>"]
         
         unlocked_count = 0
         cells = []
@@ -1727,7 +1729,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 unlocked_count += 1
                 cells.append(f"<td class='unlocked'>✅ {clean_title}</td>")
             else:
-                cells.append(f"<td class='locked'>🔒 {clean_title}</td>")
+                cond = r.get("condition", {}) or {}
+                if rom == "Global" and str(cond.get("type", "")).lower() == "nvram_tally":
+                    need = int(cond.get("min", 1))
+                    tally = global_tally.get(title, {})
+                    progress = int(tally.get("progress", 0))
+                    pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
+                    cells.append(
+                        f"<td class='locked'>🔒 {clean_title}<br>"
+                        f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                        f"<span style='font-size:0.85em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                    )
+                else:
+                    cells.append(f"<td class='locked'>🔒 {clean_title}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         

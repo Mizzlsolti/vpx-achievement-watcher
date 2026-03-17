@@ -1124,7 +1124,7 @@ class Watcher:
                 rules.append({
                     "title": title,
                     "scope": "global",
-                    "condition": {"type": "nvram_overall", "field": fld, "min": int(m)}
+                    "condition": {"type": "nvram_tally", "field": fld, "min": int(m)}
                 })
             ci += 1
         return rules[:total_target]        
@@ -3612,6 +3612,43 @@ class Watcher:
                     if int(duration_sec or 0) >= min_s and title not in seen_aw:
                         awarded.append(title); seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
+                elif rtype == "nvram_tally":
+                    field = cond.get("field")
+                    if not field or is_excluded_field(field):
+                        continue
+                    need = int(cond.get("min", 1))
+
+                    state = self._ach_state_load()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+
+                    delta = int(deltas_ci.get(field, 0) or 0)
+                    if delta <= 0:
+                        tally = state.get("global_tally", {}).get(title, {})
+                        current_progress = int(tally.get("progress", 0))
+                        if current_progress >= need and title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
+                        continue
+
+                    tally_bucket = state.setdefault("global_tally", {})
+                    tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
+
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    tally["entries"].append({"rom": rom, "delta": delta, "ts": now_iso})
+                    tally["progress"] += delta
+                    self._ach_state_save(state)
+
+                    if tally["progress"] >= need and title not in seen_aw:
+                        awarded.append(title)
+                        seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
             except Exception:
                 continue
         return awarded, all_titles, awarded_meta
@@ -3873,7 +3910,8 @@ class Watcher:
         now_iso = datetime.now(timezone.utc).isoformat()
         state = self._ach_state_load()
         bucket = state.setdefault(kind, {})
-        lst = bucket.setdefault(rom, [])
+        storage_key = "__global__" if kind == "global" else rom
+        lst = bucket.setdefault(storage_key, [])
 
         def _entry_title(e):
             try:
