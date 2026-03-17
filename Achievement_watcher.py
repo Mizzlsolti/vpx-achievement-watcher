@@ -1746,7 +1746,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             
         global_tally = state.get("global_tally", {}) if rom == "Global" else {}
 
-        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:8px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666;} .tally-bar {background:#333; border-radius:4px; height:10px; margin:4px auto; max-width:120px;} .tally-fill {background:#FF7F00; height:10px; border-radius:4px;}</style>"]
+        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666; font-size:0.85em;} .tally-bar {background:#333; border-radius:4px; height:6px; margin:2px auto; max-width:120px;} .tally-fill {background:#FF7F00; height:6px; border-radius:4px;}</style>"]
         
         unlocked_count = 0
         cells = []
@@ -1760,27 +1760,46 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
-                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count"):
-                    if rtype_display in ("nvram_tally", "challenge_count"):
+                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count", "session_time"):
+                    if rtype_display == "session_time":
+                        need = int(cond.get("min_seconds", cond.get("min", 1)))
+                        tally = global_tally.get(title, {})
+                        progress = int(tally.get("progress", 0))
+                        progress_min = round(progress / 60, 1)
+                        need_min = round(need / 60, 1)
+                        label = f"{progress_min}/{need_min} min"
+                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
+                        cells.append(
+                            f"<td class='locked'>🔒 {clean_title}<br>"
+                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{label}</span></td>"
+                        )
+                    elif rtype_display in ("nvram_tally", "challenge_count"):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
                         progress = int(tally.get("progress", 0))
+                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
+                        cells.append(
+                            f"<td class='locked'>🔒 {clean_title}<br>"
+                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                        )
                     else:
                         progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
-                    pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
-                    cells.append(
-                        f"<td class='locked'>🔒 {clean_title}<br>"
-                        f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
-                        f"<span style='font-size:0.85em;color:#FF7F00;'>{progress}/{need}</span></td>"
-                    )
+                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
+                        cells.append(
+                            f"<td class='locked'>🔒 {clean_title}<br>"
+                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                        )
                 else:
                     cells.append(f"<td class='locked'>🔒 {clean_title}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
         rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
-        html.append(f"<div style='font-size:1.4em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
-        html.append(f"<div style='font-size:1.2em; color:#FF7F00; text-align:center; margin-bottom:15px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+        html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
+        html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
         
         html.append("<table align='center' width='100%'>")
         COLUMNS = 4
