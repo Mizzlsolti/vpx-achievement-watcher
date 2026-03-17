@@ -4263,7 +4263,8 @@ class Watcher:
 
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
         """Scan TABLES_DIR for .vpx files and return ROM names matching the given manufacturer.
-        If manufacturer is '__any__', return all ROMs found regardless of manufacturer."""
+        Only includes ROMs that have an available NVRAM map (consistent with roms_played tracking).
+        If manufacturer is '__any__', return all map-having ROMs found regardless of manufacturer."""
         result = set()
         tables_dir = getattr(self.cfg, "TABLES_DIR", None)
         if not tables_dir or not os.path.isdir(tables_dir):
@@ -4278,6 +4279,11 @@ class Watcher:
                 except Exception:
                     rom = None
                 if not rom:
+                    continue
+                # Only include ROMs that have an NVRAM map — consistent with roms_played tracking
+                # (roms_played is only updated when _has_any_map() is True)
+                if not self._has_any_map(rom):
+                    log(self.cfg, f"[SCAN] Skipping {rom} (no NVRAM map)", "INFO")
                     continue
                 if manufacturer == "__any__":
                     result.add(rom)
