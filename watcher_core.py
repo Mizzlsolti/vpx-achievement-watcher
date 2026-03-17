@@ -4404,7 +4404,7 @@ class Watcher:
     # then just the leading alphabetic characters.
     MANUFACTURER_MAP: dict[str, str] = {
         # Bally
-        "afm": "Bally", "tom": "Bally", "mm": "Bally", "mb": "Bally", "cv": "Bally",
+        "afm": "Bally", "tom": "Bally", "mm": "Bally", "cv": "Bally",
         "cp": "Bally", "cftbl": "Bally", "pz": "Bally", "fh": "Bally", "bbb": "Bally",
         "trucksp": "Bally", "theatre": "Bally", "scared": "Bally", "eatpm": "Bally",
         "centaur": "Bally", "paragon": "Bally", "eightball": "Bally", "medusa": "Bally",
@@ -4426,7 +4426,7 @@ class Watcher:
         "corv": "Williams", "dh": "Williams", "i500": "Williams", "jb": "Williams",
         "jm": "Williams", "ngg": "Williams", "pop": "Williams", "sc": "Williams",
         "sf2": "Williams", "tod": "Williams", "totan": "Williams", "wd": "Williams",
-        "congo": "Williams", "dracula": "Williams",
+        "congo": "Williams", "dracula": "Williams", "mb": "Williams",
         "nbaf": "Williams", "cactjack": "Williams", "strik": "Williams",
         # Stern (modern)
         "godzilla": "Stern", "deadpool": "Stern", "got": "Stern", "munsters": "Stern",
