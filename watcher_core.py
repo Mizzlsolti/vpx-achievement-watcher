@@ -4399,14 +4399,99 @@ class Watcher:
         p = f_achievements_state(self.cfg)
         secure_save_json(p, state)
 
+    # Maps known ROM prefixes to their manufacturer names.
+    # Prefix matching is used: exact ROM name, then progressively shorter underscore-split segments,
+    # then just the leading alphabetic characters.
+    MANUFACTURER_MAP: dict[str, str] = {
+        # Bally
+        "afm": "Bally", "tom": "Bally", "mm": "Bally", "mb": "Bally", "cv": "Bally",
+        "cp": "Bally", "cftbl": "Bally", "pz": "Bally", "fh": "Bally", "bbb": "Bally",
+        "trucksp": "Bally", "theatre": "Bally", "scared": "Bally", "eatpm": "Bally",
+        "centaur": "Bally", "paragon": "Bally", "eightball": "Bally", "medusa": "Bally",
+        "xenon": "Bally", "vector": "Bally", "embryon": "Bally", "speakesy": "Bally",
+        "hotdoggin": "Bally", "mystic": "Bally", "fireball": "Bally", "frontier": "Bally",
+        "harlem": "Bally", "ngndshkr": "Bally", "goldball": "Bally", "grandslm": "Bally",
+        "kosteel": "Bally", "xsandos": "Bally", "blackblt": "Bally", "cybrnaut": "Bally",
+        "beatclck": "Bally", "atlantis": "Bally", "spy_hunter": "Bally",
+        "flashgdn": "Bally", "smman": "Bally",
+        # Williams
+        "ts": "Williams", "t2": "Williams", "ij": "Williams", "wcs": "Williams",
+        "dw": "Williams", "br": "Williams", "rs": "Williams", "ft": "Williams",
+        "gi": "Williams", "hurr": "Williams", "dm": "Williams",
+        "tz": "Williams", "ww": "Williams", "taf": "Williams", "nf": "Williams",
+        "bop": "Williams", "whirl": "Williams", "rollr": "Williams",
+        "ss": "Williams", "taxi": "Williams", "pool": "Williams", "diner": "Williams",
+        "jy": "Williams", "poto": "Williams", "esha": "Williams", "fire": "Williams",
+        "sttng": "Williams", "jd": "Williams", "afv": "Williams", "cc": "Williams",
+        "corv": "Williams", "dh": "Williams", "i500": "Williams", "jb": "Williams",
+        "jm": "Williams", "ngg": "Williams", "pop": "Williams", "sc": "Williams",
+        "sf2": "Williams", "tod": "Williams", "totan": "Williams", "wd": "Williams",
+        "congo": "Williams", "dracula": "Williams",
+        "nbaf": "Williams", "cactjack": "Williams", "strik": "Williams",
+        # Stern (modern)
+        "godzilla": "Stern", "deadpool": "Stern", "got": "Stern", "munsters": "Stern",
+        "aerosmith": "Stern", "lotr": "Stern", "sopranos": "Stern", "simpsons": "Stern",
+        "metallica": "Stern", "twd": "Stern", "mustang": "Stern", "starwars": "Stern",
+        "ghostbusters": "Stern", "batman66": "Stern", "kiss": "Stern", "wpt": "Stern",
+        "elvis": "Stern", "ironman": "Stern", "xmen": "Stern", "transformers": "Stern",
+        "avatar": "Stern", "tron": "Stern", "acdc": "Stern", "spider": "Stern",
+        "avengers": "Stern", "nbafastbreak": "Stern",
+        # Data East
+        "lw3": "Data East", "tftc": "Data East", "hook": "Data East", "btmn": "Data East",
+        "rab": "Data East", "gnr": "Data East", "stwr": "Data East", "tmnt": "Data East",
+        "trek": "Data East", "simp": "Data East", "wwfr": "Data East", "mn_180": "Data East",
+        "rctycn": "Data East", "aar": "Data East",
+        # Gottlieb / Premier
+        "cue": "Gottlieb", "teed": "Gottlieb", "sprbrk": "Gottlieb", "gladiatr": "Gottlieb",
+        "shaq": "Gottlieb", "freddy": "Gottlieb", "wipe": "Gottlieb", "sfight2": "Gottlieb",
+        "silvslug": "Gottlieb", "waterwld": "Gottlieb",
+        # Sega
+        "baywatch": "Sega", "mav": "Sega", "frankenstein": "Sega", "id4": "Sega",
+        "twister": "Sega", "apollo": "Sega", "gw": "Sega", "jpark": "Sega",
+        "swtril": "Sega", "spacejam": "Sega", "viprsega": "Sega", "ctcheese": "Sega",
+        "goldeneye": "Sega", "xfiles": "Sega", "starship": "Sega", "harley": "Sega",
+        "godzilla_sega": "Sega", "lostspc": "Sega",
+        # Capcom
+        "kp": "Capcom", "bbb_capcom": "Capcom", "pm": "Capcom", "flip": "Capcom",
+        "bsv": "Capcom", "kingspin": "Capcom",
+    }
+
     def _get_manufacturer_from_rom(self, rom: str) -> str | None:
-        """Return the manufacturer string from ROMNAMES for a given ROM, e.g. 'Bally'."""
+        """Return the manufacturer for a given ROM name, e.g. 'Bally' for 'afm_113b'.
+
+        Lookup order:
+        1. MANUFACTURER_MAP — exact match on the lowercased ROM name.
+        2. MANUFACTURER_MAP — progressively shorter underscore-delimited prefixes
+           (e.g. 'afm_113b' → tries 'afm_113b', then 'afm').
+        3. MANUFACTURER_MAP — leading alphabetic characters only
+           (e.g. 'afm113' → 'afm').
+        4. ROMNAMES regex fallback (legacy behaviour, skips bare version strings).
+        """
+        rom_lower = rom.lower()
+        # 1. Exact match
+        if rom_lower in self.MANUFACTURER_MAP:
+            return self.MANUFACTURER_MAP[rom_lower]
+        # 2. Progressively shorter underscore-split prefixes
+        parts = rom_lower.split("_")
+        for i in range(len(parts) - 1, 0, -1):
+            prefix = "_".join(parts[:i])
+            if prefix in self.MANUFACTURER_MAP:
+                return self.MANUFACTURER_MAP[prefix]
+        # 3. Leading alphabetic characters (strips trailing digits / underscores)
+        base_m = re.match(r'^([a-z]+)(?=\d|_|$)', rom_lower)
+        if base_m and base_m.group(1) in self.MANUFACTURER_MAP:
+            return self.MANUFACTURER_MAP[base_m.group(1)]
+        # 4. Fallback: parse ROMNAMES entry (e.g. "Table Name (Manufacturer)")
         name = self.ROMNAMES.get(rom) if hasattr(self, "ROMNAMES") else None
         if not name:
             return None
         m = re.search(r'\(([^)]+)\)$', str(name).strip())
         if m:
-            return m.group(1)
+            val = m.group(1)
+            # Ignore version strings like "1.13b / S1.1" — manufacturer names never start with a digit
+            if re.match(r'^\d', val):
+                return None
+            return val
         return None
 
     # Keyword patterns for fuzzy matching of canonical global field names to ROM-specific NVRAM labels.
