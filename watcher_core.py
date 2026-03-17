@@ -3898,7 +3898,21 @@ class Watcher:
                         awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "session_time":
                     min_s = int(cond.get("min_seconds", cond.get("min", 0)))
-                    if int(duration_sec or 0) >= min_s and title not in seen_aw:
+                    state = self._ach_state_load()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+                    tally_bucket = state.setdefault("global_tally", {})
+                    tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    tally["entries"].append({"rom": rom, "delta": int(duration_sec or 0), "ts": now_iso})
+                    tally["progress"] += int(duration_sec or 0)
+                    self._ach_state_save(state)
+                    if tally["progress"] >= min_s and title not in seen_aw:
                         awarded.append(title); seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
