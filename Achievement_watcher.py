@@ -1768,59 +1768,91 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 _live_nvram_cache[field] = val
             return _live_nvram_cache[field]
 
-        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666; font-size:0.85em;} .tally-bar {background:#333; border-radius:4px; height:6px; margin:2px auto; max-width:120px;} .tally-fill {background:#FF7F00; height:6px; border-radius:4px;}</style>"]
-        
+        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666; font-size:0.85em;}</style>"]
+
+        def _tooltip_for_rule(rule, unlocked=False):
+            cond = rule.get("condition", {}) or {}
+            rtype = str(cond.get("type", "")).lower()
+            prefix = "✅ Unlocked! " if unlocked else ""
+            if rtype == "session_time":
+                seconds = cond.get("min_seconds", cond.get("min", 0))
+                mins = round(int(seconds) / 60)
+                return f"{prefix}Accumulate {mins} minutes of total play time across all sessions"
+            elif rtype == "nvram_tally":
+                field = cond.get("field", "")
+                need = int(cond.get("min", 1))
+                return f"{prefix}Reach {need} total {field} across all played tables"
+            elif rtype == "rom_count":
+                mfr = cond.get("manufacturer", "")
+                if mfr == "__any__":
+                    min_brands = cond.get("min_brands")
+                    if min_brands:
+                        return f"{prefix}Play tables from {int(min_brands)} different manufacturers"
+                    else:
+                        return f"{prefix}Play {int(cond.get('min', 1))} different tables"
+                return f"{prefix}Play {int(cond.get('min', 1))} different {mfr} tables"
+            elif rtype == "rom_complete_set":
+                mfr = cond.get("manufacturer", "")
+                if mfr == "__any__":
+                    return f"{prefix}Play every installed table"
+                return f"{prefix}Play every installed {mfr} table"
+            elif rtype == "rom_multi_brand":
+                mfrs = cond.get("manufacturers", [])
+                return f"{prefix}Play at least one table from each: {', '.join(mfrs)}"
+            elif rtype == "challenge_count":
+                ct = cond.get("challenge_type", "")
+                need = int(cond.get("min", 1))
+                return f"{prefix}Complete {need} {ct} challenge{'s' if need != 1 else ''}"
+            return prefix + "Achievement"
+
         unlocked_count = 0
         cells = []
         for r in all_rules:
             title = str(r.get("title", "Unknown")).strip()
             clean_title = title.replace(" (Session)", "").replace(" (Global)", "")
-            
+
             if title in unlocked_titles or clean_title in unlocked_titles:
                 unlocked_count += 1
-                cells.append(f"<td class='unlocked'>✅ {clean_title}</td>")
+                tooltip = _tooltip_for_rule(r, unlocked=True).replace("'", "&#39;")
+                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}</td>")
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
+                tooltip = _tooltip_for_rule(r, unlocked=False).replace("'", "&#39;")
                 if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count", "session_time"):
                     if rtype_display == "session_time":
                         need = int(cond.get("min_seconds", cond.get("min", 1)))
                         tally = global_tally.get(title, {})
                         progress = int(tally.get("progress", 0))
+                        # Add live session time if a game is currently active (display only)
+                        if self.watcher.game_active and self.watcher.start_time:
+                            progress += int(time.time() - self.watcher.start_time)
                         progress_min = round(progress / 60, 1)
                         need_min = round(need / 60, 1)
                         label = f"{progress_min}/{need_min} min"
-                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
                         cells.append(
-                            f"<td class='locked'>🔒 {clean_title}<br>"
-                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
                             f"<span style='font-size:0.75em;color:#FF7F00;'>{label}</span></td>"
                         )
                     elif rtype_display in ("nvram_tally", "challenge_count"):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
                         cached_progress = int(tally.get("progress", 0))
-                        # Also read live NVRAM totals so that progress bars are
-                        # accurate even when no session has been evaluated yet.
                         field = cond.get("field") or ""
                         live_progress = _live_nvram_total(field) if field else 0
                         progress = max(cached_progress, live_progress)
-                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
                         cells.append(
-                            f"<td class='locked'>🔒 {clean_title}<br>"
-                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
                             f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
                         )
                     else:
                         progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
-                        pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
                         cells.append(
-                            f"<td class='locked'>🔒 {clean_title}<br>"
-                            f"<div class='tally-bar'><div class='tally-fill' style='width:{pct_fill}%;'></div></div>"
+                            f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
                             f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
                         )
                 else:
-                    cells.append(f"<td class='locked'>🔒 {clean_title}</td>")
+                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         

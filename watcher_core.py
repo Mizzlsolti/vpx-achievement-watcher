@@ -1295,8 +1295,8 @@ class Watcher:
 
         candidate_fields = [
             "Games Started", "Balls Played", "Ramps Made", "Jackpots",
-            "Total Multiballs", "Loops", "Spinner", "Drop Targets",
-            "Orbits", "Combos", "Extra Balls", "Ball Saves",
+            "Total Multiballs", "Loops",
+            "Combos", "Extra Balls", "Ball Saves",
             "Modes Started", "Modes Completed"
         ]
 
@@ -4321,7 +4321,17 @@ class Watcher:
                 data = load_json(path, {}) or {}
                 cur = data.get("rules") or []
                 if isinstance(cur, list) and len(cur) >= 95:
-                    return
+                    # Force regeneration if any removed categories are still present
+                    REMOVED_FIELDS = {"Drop Targets", "Spinner", "Orbits"}
+                    has_removed = any(
+                        cond.get("field") in REMOVED_FIELDS
+                        for r in cur
+                        if isinstance(r, dict)
+                        for cond in [r.get("condition", {})]
+                        if isinstance(cond, dict) and cond.get("type") == "nvram_tally"
+                    )
+                    if not has_removed:
+                        return
             except Exception:
                 pass
         try:
@@ -4535,11 +4545,6 @@ class Watcher:
         "Jackpots":         [("jackpot",), ("jckpot",)],
         "Total Multiballs": [("multiball",), ("multi-ball",)],
         "Loops":            [("loop",)],
-        "Spinner":          [("spinner",)],
-        # "drop target" is the primary match; "drops" catches "DROPS MADE" / "DROPS COMPLETED"
-        # The bare "target" fallback is intentionally removed to avoid false positives.
-        "Drop Targets":     [("drop target",), ("drops",)],
-        "Orbits":           [("orbit",)],
         "Combos":           [("combo",)],
         "Extra Balls":      [("extra ball",)],
         "Games Started":    [("games started",), ("games played",)],
