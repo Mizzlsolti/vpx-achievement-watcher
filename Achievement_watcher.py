@@ -2259,6 +2259,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.cfg.TABLES_DIR = d
             self.tables_label.setText(f"TABLES (optional): {d}")
             self.cfg.save()
+            if hasattr(self, "watcher") and self.watcher and hasattr(self.watcher, "_installed_roms_scan_done"):
+                self.watcher._installed_roms_scan_done = False
+                self.watcher._installed_roms_scan_cache = {}
 
     def _refresh_overlay_live(self):
         if not bool(self.cfg.OVERLAY.get("live_updates", False)):
@@ -3953,6 +3956,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.status_label.setText(f"🟢 {msg}")
         self.status_label.setStyleSheet("font-size: 11pt; color: #00B050; padding: 10px;")
         QTimer.singleShot(10000, self._reset_status_label)
+        # Kick off background ROM scan so the cache is warm before the first session ends
+        try:
+            if self.watcher:
+                def _bg_prescan():
+                    try:
+                        self.watcher._scan_installed_roms_by_manufacturer("__any__")
+                    except Exception as e:
+                        log(self.cfg, f"[SCAN] Background pre-scan error: {e}", "WARN")
+                threading.Thread(target=_bg_prescan, daemon=True).start()
+        except Exception:
+            pass
 
     def _reset_status_label(self):
         self.status_label.setText("🟢 Watcher: RUNNING...")

@@ -838,7 +838,10 @@ class Watcher:
         self._field_layout_cache: Dict[str, Dict[str, Any]] = {}
         self.current_segment_provisional_diff: Dict[str, int] = {}
         self.include_current_segment_in_overlay = True
-        self._control_fields_cache: Dict[str, List[dict]] = {}  
+        self._control_fields_cache: Dict[str, List[dict]] = {}
+
+        self._installed_roms_scan_cache: dict = {}   # manufacturer -> set of ROM names; '__all_with_map__' -> all ROMs with maps
+        self._installed_roms_scan_done: bool = False
         
         self.snapshot_mode = True
         self.snap_initialized = False
@@ -4377,34 +4380,52 @@ class Watcher:
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
         """Scan TABLES_DIR for .vpx files and return ROM names matching the given manufacturer.
         Only includes ROMs that have an available NVRAM map (consistent with roms_played tracking).
-        If manufacturer is '__any__', return all map-having ROMs found regardless of manufacturer."""
-        result = set()
+        If manufacturer is '__any__', return all map-having ROMs found regardless of manufacturer.
+        Results are cached after the first scan to avoid repeated blocking filesystem walks."""
+        # Return from cache if available
+        if self._installed_roms_scan_done:
+            if manufacturer == "__any__":
+                return set(self._installed_roms_scan_cache.get("__all_with_map__", set()))
+            return set(self._installed_roms_scan_cache.get(manufacturer, set()))
+
+        # First call: do the full scan ONCE and cache ALL results
+        result_all: set = set()  # all ROMs with maps
+        result_by_mfr: dict = {}
         tables_dir = getattr(self.cfg, "TABLES_DIR", None)
-        if not tables_dir or not os.path.isdir(tables_dir):
-            return result
-        for root, _dirs, files in os.walk(tables_dir):
-            for fname in files:
-                if not fname.lower().endswith(".vpx"):
-                    continue
-                vpx_path = os.path.join(root, fname)
-                try:
-                    rom = run_vpxtool_get_rom(self.cfg, vpx_path)
-                except Exception:
-                    rom = None
-                if not rom:
-                    continue
-                # Only include ROMs that have an NVRAM map — consistent with roms_played tracking
-                # (roms_played is only updated when _has_any_map() is True)
-                if not self._has_any_map(rom):
-                    log(self.cfg, f"[SCAN] Skipping {rom} (no NVRAM map)", "INFO")
-                    continue
-                if manufacturer == "__any__":
-                    result.add(rom)
-                else:
+        if tables_dir and os.path.isdir(tables_dir):
+            skipped = 0
+            vpxtool_warn = 0
+            for root, _dirs, files in os.walk(tables_dir):
+                for fname in files:
+                    if not fname.lower().endswith(".vpx"):
+                        continue
+                    vpx_path = os.path.join(root, fname)
+                    try:
+                        rom = run_vpxtool_get_rom(self.cfg, vpx_path)
+                    except Exception:
+                        rom = None
+                    if not rom:
+                        vpxtool_warn += 1
+                        continue
+                    # Only include ROMs that have an NVRAM map — consistent with roms_played tracking
+                    # (roms_played is only updated when _has_any_map() is True)
+                    if not self._has_any_map(rom):
+                        skipped += 1
+                        continue
+                    result_all.add(rom)
                     mfr = self._get_manufacturer_from_rom(rom)
-                    if mfr == manufacturer:
-                        result.add(rom)
-        return result
+                    if mfr:
+                        result_by_mfr.setdefault(mfr, set()).add(rom)
+            if skipped > 0 or vpxtool_warn > 0:
+                log(self.cfg, f"[SCAN] Table scan complete: {len(result_all)} ROMs with maps, {skipped} skipped (no map), {vpxtool_warn} vpxtool warnings", "INFO")
+
+        self._installed_roms_scan_cache = dict(result_by_mfr)
+        self._installed_roms_scan_cache["__all_with_map__"] = result_all
+        self._installed_roms_scan_done = True
+
+        if manufacturer == "__any__":
+            return set(result_all)
+        return set(result_by_mfr.get(manufacturer, set()))
 
     def _append_nvram_dump_block(self, lines: list[str], audits: dict):
         if not isinstance(audits, dict) or not audits:
