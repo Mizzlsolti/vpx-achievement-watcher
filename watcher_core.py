@@ -3775,6 +3775,9 @@ class Watcher:
                 self._ach_state_save(rom_state)
                 mfr = self._get_manufacturer_from_rom(self.current_rom)
                 log(self.cfg, f"[GLOBAL_ACH] roms_played updated: {self.current_rom} (manufacturer: {mfr})")
+            else:
+                mfr = self._get_manufacturer_from_rom(self.current_rom)
+                log(self.cfg, f"[GLOBAL_ACH] roms_played already contains: {self.current_rom} (manufacturer: {mfr}, total: {len(roms_played)})")
         except Exception as e:
             log(self.cfg, f"[ACH] roms_played update failed: {e}", "WARN")
 
@@ -3960,7 +3963,7 @@ class Watcher:
                     if title in already_global:
                         continue
 
-                    delta = int(deltas_ci.get(field, 0) or 0)
+                    delta = self._fuzzy_sum_deltas(deltas_ci, field)
                     if delta <= 0:
                         tally = state.get("global_tally", {}).get(title, {})
                         current_progress = int(tally.get("progress", 0))
@@ -4010,6 +4013,8 @@ class Watcher:
                         played_for_mfr = {r for r in roms_played if _mfr_for(r) == manufacturer}
                         progress = len(played_for_mfr)
                         need = int(cond.get("min", 1))
+                        if progress < need:
+                            log(self.cfg, f"[GLOBAL_ACH] rom_count '{title}': {progress}/{need} ({manufacturer}) – played={list(played_for_mfr)}, roms_played={roms_played}")
                     # Update tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": progress}
                     _rom_state_dirty = True
@@ -4403,6 +4408,53 @@ class Watcher:
         if m:
             return m.group(1)
         return None
+
+    # Keyword patterns for fuzzy matching of canonical global field names to ROM-specific NVRAM labels.
+    # Each entry maps a canonical name to a list of keyword-tuples; ALL keywords in a tuple must be
+    # present (case-insensitive) in an NVRAM field name for it to match.
+    _NVRAM_TALLY_PATTERNS: dict[str, list[tuple[str, ...]]] = {
+        "Ball Saves":       [("ball save",)],
+        "Ramps Made":       [("ramp",)],
+        "Jackpots":         [("jackpot",)],
+        "Total Multiballs": [("multiball",)],
+        "Loops":            [("loop",)],
+        "Spinner":          [("spinner",)],
+        "Drop Targets":     [("drop target",), ("target",)],
+        "Orbits":           [("orbit",)],
+        "Combos":           [("combo",)],
+        "Extra Balls":      [("extra ball",)],
+        "Games Started":    [("games started",)],
+        "Balls Played":     [("balls played",), ("ball count",)],
+        "Modes Started":    [("mode", "start")],
+        "Modes Completed":  [("mode", "complete")],
+    }
+
+    def _fuzzy_sum_deltas(self, deltas_ci: dict, canonical_field: str) -> int:
+        """Return the sum of all deltas from fields in deltas_ci that match canonical_field.
+
+        First tries an exact key lookup (current behaviour).  If that yields 0, falls back to
+        keyword-based fuzzy matching so that ROM-specific labels like "Ball Saver Cnt" are
+        matched by the canonical name "Ball Saves".
+        """
+        exact = int(deltas_ci.get(canonical_field, 0) or 0)
+        if exact > 0:
+            return exact
+
+        patterns = self._NVRAM_TALLY_PATTERNS.get(canonical_field)
+        if not patterns:
+            return 0
+
+        total = 0
+        counted: set[str] = set()
+        for k, v in deltas_ci.items():
+            kl = k.lower()
+            for kws in patterns:
+                if all(kw in kl for kw in kws):
+                    if k not in counted:
+                        total += int(v or 0)
+                        counted.add(k)
+                    break
+        return total
 
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
         """Scan TABLES_DIR for .vpx files and return ROM names matching the given manufacturer.
