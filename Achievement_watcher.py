@@ -1760,8 +1760,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
-                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand"):
-                    if rtype_display == "nvram_tally":
+                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count"):
+                    if rtype_display in ("nvram_tally", "challenge_count"):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
                         progress = int(tally.get("progress", 0))

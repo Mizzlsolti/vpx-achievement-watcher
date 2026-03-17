@@ -1099,7 +1099,7 @@ class Watcher:
         rules: list[dict] = []
         seen: set[str] = set()
         for mins in [10, 15, 20, 30, 35, 45, 60]:
-            title = self._unique_title(f"Global – {mins} Minutes", seen)
+            title = self._unique_title(f"Global – Play {mins} Minutes", seen)
             rules.append({
                 "title": title,
                 "scope": "global",
@@ -1120,7 +1120,7 @@ class Watcher:
             for m in self._overall_milestones_for_field(fld):
                 if len(rules) >= total_target:
                     break
-                title = self._unique_title(f"Global – {fld} {m}", seen)
+                title = self._unique_title(f"Global – {fld}: {m} Total", seen)
                 rules.append({
                     "title": title,
                     "scope": "global",
@@ -1200,6 +1200,38 @@ class Watcher:
                     "scope": "global",
                     "condition": cond,
                 })
+
+        # --- Challenge-based global achievements ---
+        CHALLENGE_ACHIEVEMENTS = [
+            # Timed challenges
+            {"title": "Complete Your First Timed Challenge",  "challenge_type": "timed", "min": 1},
+            {"title": "Complete 5 Timed Challenges",          "challenge_type": "timed", "min": 5},
+            {"title": "Complete 10 Timed Challenges",         "challenge_type": "timed", "min": 10},
+            {"title": "Complete 25 Timed Challenges",         "challenge_type": "timed", "min": 25},
+            {"title": "Complete 50 Timed Challenges",         "challenge_type": "timed", "min": 50},
+            # Flip challenges
+            {"title": "Complete Your First Flip Challenge",   "challenge_type": "flip",  "min": 1},
+            {"title": "Complete 5 Flip Challenges",           "challenge_type": "flip",  "min": 5},
+            {"title": "Complete 10 Flip Challenges",          "challenge_type": "flip",  "min": 10},
+            {"title": "Complete 25 Flip Challenges",          "challenge_type": "flip",  "min": 25},
+            {"title": "Complete 50 Flip Challenges",          "challenge_type": "flip",  "min": 50},
+            # Heat challenges
+            {"title": "Complete Your First Heat Challenge",   "challenge_type": "heat",  "min": 1},
+            {"title": "Complete 5 Heat Challenges",           "challenge_type": "heat",  "min": 5},
+            {"title": "Complete 10 Heat Challenges",          "challenge_type": "heat",  "min": 10},
+            {"title": "Complete 25 Heat Challenges",          "challenge_type": "heat",  "min": 25},
+            {"title": "Complete 50 Heat Challenges",          "challenge_type": "heat",  "min": 50},
+        ]
+        for ach in CHALLENGE_ACHIEVEMENTS:
+            rules.append({
+                "title": ach["title"],
+                "scope": "global",
+                "condition": {
+                    "type": "challenge_count",
+                    "challenge_type": ach["challenge_type"],
+                    "min": ach["min"],
+                },
+            })
 
         return rules        
             
@@ -1336,7 +1368,7 @@ class Watcher:
 
         for mins in session_time_minutes:
             secs = int(mins * 60)
-            title = self._unique_title(f"{rom} – {mins} Minutes (Session)", seen_titles)
+            title = self._unique_title(f"{rom} – Play {mins} Minutes", seen_titles)
             rules.append({
                 "title": title,
                 "condition": {"type": "session_time", "min_seconds": secs},
@@ -1361,7 +1393,7 @@ class Watcher:
                 cnt = used_session_per_field.get(fld, 0)
                 if cnt >= max_session_uses_per_field:
                     break
-                title = self._unique_title(f"{rom} – {fld} {int(m)} (Session)", seen_titles)
+                title = self._unique_title(f"{rom} – {fld}: {int(m)}", seen_titles)
                 rules.append({
                     "title": title,
                     "condition": {"type": "nvram_delta", "field": fld, "min": int(m)},
@@ -2979,6 +3011,12 @@ class Watcher:
             hist.setdefault("results", []).append(payload)
             secure_save_json(path, hist)
 
+            # Re-evaluate challenge_count achievements immediately after recording
+            try:
+                self._evaluate_challenge_count_achievements()
+            except Exception:
+                pass
+
             CloudSync.upload_score(self.cfg, kind, rom, int(score), extra)
             
             ch["result_recorded"] = True
@@ -3889,6 +3927,27 @@ class Watcher:
                         awarded_meta.append({"title": title, "origin": origin})
                         log(self.cfg, f"[GLOBAL_ACH] rom_multi_brand triggered: '{title}' ({progress}/{need} brands played)")
 
+                elif rtype == "challenge_count":
+                    state = _rom_state()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+                    challenge_type = str(cond.get("challenge_type") or "").lower()
+                    need = int(cond.get("min", 1))
+                    count = self._count_completed_challenges(challenge_type)
+                    # Update tally for progress display (batched save at end)
+                    state.setdefault("global_tally", {})[title] = {"progress": count}
+                    _rom_state_dirty = True
+                    if count >= need and title not in seen_aw:
+                        awarded.append(title)
+                        seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
+                        log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
+
             except Exception:
                 continue
 
@@ -3901,6 +3960,70 @@ class Watcher:
 
         return awarded, all_titles, awarded_meta
         
+    def _count_completed_challenges(self, challenge_type: str) -> int:
+        """Count completed challenges of a given type from the challenge history folder."""
+        count = 0
+        history_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+        if not os.path.isdir(history_dir):
+            return 0
+        try:
+            for fname in os.listdir(history_dir):
+                if not fname.endswith(".json"):
+                    continue
+                fpath = os.path.join(history_dir, fname)
+                try:
+                    hist = secure_load_json(fpath, {}) or {}
+                    for entry in (hist.get("results") or []):
+                        if str(entry.get("kind") or "").lower() == challenge_type:
+                            count += 1
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return count
+
+    def _evaluate_challenge_count_achievements(self):
+        """Evaluate challenge_count global achievements and award any newly reached ones."""
+        try:
+            gp = f_global_ach(self.cfg)
+            if not os.path.exists(gp):
+                return
+            data = load_json(gp, {}) or {}
+            rules = [r for r in (data.get("rules") or []) if isinstance(r, dict)]
+            state = self._ach_state_load()
+            already_global = {
+                str(e.get("title", "")).strip()
+                for entries in state.get("global", {}).values()
+                for e in entries
+            }
+            awarded_meta = []
+            for rule in rules:
+                cond = (rule.get("condition") or {}) if isinstance(rule, dict) else {}
+                if str(cond.get("type") or "").lower() != "challenge_count":
+                    continue
+                title = (rule.get("title") or "").strip()
+                if not title or title in already_global:
+                    continue
+                challenge_type = str(cond.get("challenge_type") or "").lower()
+                need = int(cond.get("min", 1))
+                count = self._count_completed_challenges(challenge_type)
+                # Update tally for progress display
+                state.setdefault("global_tally", {})[title] = {"progress": count}
+                if count >= need:
+                    awarded_meta.append({"title": title, "origin": "global_achievements"})
+                    log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
+            if awarded_meta:
+                self._ach_record_unlocks("global", self.current_rom or "__challenge__", awarded_meta)
+                self._ach_state_save(state)
+                try:
+                    self._emit_achievement_toasts(awarded_meta, seconds=5)
+                except Exception:
+                    pass
+            else:
+                self._ach_state_save(state)
+        except Exception as e:
+            log(self.cfg, f"[GLOBAL_ACH] challenge_count eval failed: {e}", "WARN")
+
     def _collect_global_rules_for_rom(self, rom: str) -> list[dict]:
         rules_out = []
         seen_titles = set()
@@ -3977,7 +4100,7 @@ class Watcher:
             try:
                 data = load_json(path, {}) or {}
                 cur = data.get("rules") or []
-                if isinstance(cur, list) and len(cur) >= 70:
+                if isinstance(cur, list) and len(cur) >= 95:
                     return
             except Exception:
                 pass
