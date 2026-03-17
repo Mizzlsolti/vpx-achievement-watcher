@@ -1257,35 +1257,31 @@ class Watcher:
     def _overall_milestones_for_field(self, field_label: str) -> list[int]:
         f = (field_label or "").lower()
         if "games started" in f:
-            return [50, 100, 250, 500]
+            return [50, 100, 250, 500, 1000, 2000, 3000, 5000, 7500, 10000, 15000, 20000, 25000, 30000, 50000]
         if "balls played" in f:
-            return [100, 250, 500]
+            return [100, 250, 500, 1000, 2500, 5000, 10000, 15000, 25000, 50000, 75000, 100000]
         if "extra ball" in f:
-            return [10, 20, 30]
+            return [10, 20, 30, 50, 100, 250, 500, 1000, 2500, 5000]
         if "ball save" in f:
-            return [20, 50, 100]
+            return [20, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
         if "jackpot" in f:
-            return [25, 50, 100, 150]
+            return [25, 50, 100, 150, 300, 500, 1000, 2500, 5000, 10000]
         if "multiball" in f:
-            return [10, 25, 50]
+            return [10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
         if "ramp" in f:
-            return [100, 200, 300, 500]
+            return [100, 200, 300, 500, 1000, 2500, 5000, 10000, 25000, 50000]
         if "loop" in f or "orbit" in f:
-            return [100, 200, 500]
-        if "spinner" in f:
-            return [100, 200, 500]
-        if "target" in f:
-            return [200, 400, 800]
+            return [100, 200, 500, 1000, 2500, 5000, 10000, 25000]
         if "modes completed" in f or ("mode" in f and "complete" in f):
-            return [10, 25, 50]
+            return [10, 25, 50, 100, 250, 500, 1000, 2500]
         if "modes started" in f or ("mode" in f and "start" in f):
-            return [25, 50, 100]
-        return [50, 100, 250, 500]     
+            return [25, 50, 100, 250, 500, 1000, 2500, 5000]
+        return [50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000]
 
     def _generate_default_global_rules(self) -> list[dict]:
         rules: list[dict] = []
         seen: set[str] = set()
-        for mins in [10, 15, 20, 30, 35, 45, 60]:
+        for mins in [10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000]:
             title = self._unique_title(f"Global – Play {mins} Minutes", seen)
             rules.append({
                 "title": title,
@@ -1300,7 +1296,7 @@ class Watcher:
             "Modes Started", "Modes Completed"
         ]
 
-        total_target = 50
+        total_target = 150
         ci = 0
         while len(rules) < total_target and candidate_fields:
             fld = candidate_fields[ci % len(candidate_fields)]
@@ -1436,7 +1432,7 @@ class Watcher:
         if fields_meta:
             for f in fields_meta:
                 sec = str(f.get("section", "")).lower()
-                if "feature" in sec or "histogram" in sec or "champion" in sec or "mode" in sec:
+                if "feature" in sec or "champion" in sec or "mode" in sec:
                     lbl = str(f.get("label") or f.get("name") or "")
                     if lbl and lbl in audits:
                         priority_fields.append(lbl)
@@ -1494,7 +1490,7 @@ class Watcher:
             return 15
 
         def pick_session_milestones(lbl: str) -> list[int]:
-            if lbl in priority_set and ("score" in lbl.lower() or "histogram" in lbl.lower() or "champion" in lbl.lower()):
+            if lbl in priority_set and ("score" in lbl.lower() or "champion" in lbl.lower()):
                 return [1]
             mils = self._session_milestones_for_field(lbl) or []
             cap = session_cap_for(lbl)
@@ -4320,7 +4316,7 @@ class Watcher:
             try:
                 data = load_json(path, {}) or {}
                 cur = data.get("rules") or []
-                if isinstance(cur, list) and len(cur) >= 95:
+                if isinstance(cur, list) and len(cur) >= 155:
                     # Force regeneration if any removed categories are still present
                     REMOVED_FIELDS = {"Drop Targets", "Spinner", "Orbits"}
                     has_removed = any(
