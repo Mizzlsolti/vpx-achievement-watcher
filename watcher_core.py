@@ -3707,17 +3707,23 @@ class Watcher:
             except Exception:
                 continue
 
-        out, seen_field = [], set()
+        best_per_field = {}
+        non_field_titles = []
+
         for title in awarded:
-            parts = title.split("–")
+            parts = title.split("–", 1)
             if len(parts) > 1:
-                field_name = parts[-1].strip().split(" ")[0]
-            else:
-                field_name = title
-            if field_name in seen_field:
-                continue
-            seen_field.add(field_name)
-            out.append(title)
+                right = parts[1].strip()
+                m = re.match(r'^(.+?):\s*(\d+)$', right)
+                if m:
+                    field_name = m.group(1).strip()
+                    tier_value = int(m.group(2))
+                    if field_name not in best_per_field or tier_value > best_per_field[field_name][0]:
+                        best_per_field[field_name] = (tier_value, title)
+                    continue
+            non_field_titles.append(title)
+
+        out = non_field_titles + [t for _, t in sorted(best_per_field.values())]
         return out
 
     def _augment_player_events_with_flags(self, score_abs: int, end_audits: dict, events: dict) -> dict:
