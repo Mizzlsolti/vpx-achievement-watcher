@@ -2178,10 +2178,7 @@ class ChallengeCountdownOverlay(QWidget):
     def _compose_image(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        base_body_pt = 20  # hardlocked – timer base size is always 20
-        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
-        scaled_pt = max(4, int(round(base_body_pt * ov_scale)))
-        factor = scaled_pt / 20.0
+        factor = 1.0  # Challenge timer is always fixed size (100%)
         w = max(200, int(round(400 * factor)))
         h = max(60, int(round(120 * factor)))
         timer_font_pt = max(20, int(round(48 * factor)))
@@ -2278,8 +2275,7 @@ class ChallengeSelectOverlay(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         base_body_pt = 20
-        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
-        scaled_body_pt = max(4, int(round(base_body_pt * ov_scale)))
+        scaled_body_pt = 20  # Challenge select is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
 
         text_color = QColor("#FFFFFF")
@@ -2509,9 +2505,8 @@ class FlipDifficultyOverlay(QWidget):
         from math import sin, pi
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        base_body_pt = int(ov.get("base_body_size", 20))
-        ov_scale = int(ov.get("scale_pct", 100)) / 100.0
-        scaled_body_pt = max(4, int(round(base_body_pt * ov_scale)))
+        base_body_pt = 20
+        scaled_body_pt = 20  # Flip difficulty overlay is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
         text_color = QColor("#FFFFFF")
         hi_color = QColor("#FF7F00")
