@@ -1663,6 +1663,35 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cmb_progress_rom.blockSignals(False)
         self._on_progress_rom_changed()
 
+    def _get_manufacturer_progress_for_display(self, cond: dict, global_tally: dict, title: str) -> tuple:
+        """Return (progress, need) for display in the progress bar for manufacturer-based conditions.
+        Reads roms_played from global_tally cache stored by _evaluate_achievements."""
+        rtype = str(cond.get("type") or "").lower()
+        tally = global_tally.get(title, {})
+        progress = int(tally.get("progress", 0))
+        if rtype == "rom_count":
+            manufacturer = cond.get("manufacturer", "")
+            if manufacturer == "__any__":
+                min_brands = cond.get("min_brands")
+                if min_brands is not None:
+                    return progress, int(min_brands)
+                else:
+                    return progress, int(cond.get("min", 1))
+            else:
+                return progress, int(cond.get("min", 1))
+        elif rtype == "rom_complete_set":
+            installed_count = int(tally.get("installed_count", 0))
+            if installed_count > 0:
+                return progress, installed_count
+            # installed_count not yet cached (no session evaluated); show progress/progress
+            # to avoid division-by-zero, use max(progress, 1) as the denominator
+            return progress, max(progress, 1)
+        elif rtype == "rom_multi_brand":
+            manufacturers = cond.get("manufacturers") or []
+            installed_count = int(tally.get("installed_count", len(manufacturers)))
+            return progress, installed_count
+        return 0, 1
+
     def _on_progress_rom_changed(self):
         rom = self.cmb_progress_rom.currentData()
         if not rom:
@@ -1730,10 +1759,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 cells.append(f"<td class='unlocked'>✅ {clean_title}</td>")
             else:
                 cond = r.get("condition", {}) or {}
-                if rom == "Global" and str(cond.get("type", "")).lower() == "nvram_tally":
-                    need = int(cond.get("min", 1))
-                    tally = global_tally.get(title, {})
-                    progress = int(tally.get("progress", 0))
+                rtype_display = str(cond.get("type", "")).lower()
+                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand"):
+                    if rtype_display == "nvram_tally":
+                        need = int(cond.get("min", 1))
+                        tally = global_tally.get(title, {})
+                        progress = int(tally.get("progress", 0))
+                    else:
+                        progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
                     pct_fill = min(100, round(progress / need * 100)) if need > 0 else 0
                     cells.append(
                         f"<td class='locked'>🔒 {clean_title}<br>"

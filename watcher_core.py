@@ -1127,7 +1127,81 @@ class Watcher:
                     "condition": {"type": "nvram_tally", "field": fld, "min": int(m)}
                 })
             ci += 1
-        return rules[:total_target]        
+
+        # --- Manufacturer-based global achievements ---
+        MANUFACTURER_ACHIEVEMENTS = [
+            # Rookie: play 3 different tables of a manufacturer
+            {"title": "Bally Rookie",      "type": "rom_count", "manufacturer": "Bally",     "min": 3},
+            {"title": "Williams Rookie",   "type": "rom_count", "manufacturer": "Williams",  "min": 3},
+            {"title": "Stern Rookie",      "type": "rom_count", "manufacturer": "Stern",     "min": 3},
+            {"title": "Data East Rookie",  "type": "rom_count", "manufacturer": "Data East", "min": 3},
+            {"title": "Gottlieb Rookie",   "type": "rom_count", "manufacturer": "Gottlieb",  "min": 3},
+            {"title": "Sega Rookie",       "type": "rom_count", "manufacturer": "Sega",      "min": 3},
+            {"title": "Capcom Rookie",     "type": "rom_count", "manufacturer": "Capcom",    "min": 3},
+            # Veteran: play 5 different tables of a manufacturer
+            {"title": "Bally Veteran",     "type": "rom_count", "manufacturer": "Bally",     "min": 5},
+            {"title": "Williams Veteran",  "type": "rom_count", "manufacturer": "Williams",  "min": 5},
+            {"title": "Stern Veteran",     "type": "rom_count", "manufacturer": "Stern",     "min": 5},
+            {"title": "Data East Veteran", "type": "rom_count", "manufacturer": "Data East", "min": 5},
+            {"title": "Gottlieb Veteran",  "type": "rom_count", "manufacturer": "Gottlieb",  "min": 5},
+            # Master: play all installed tables of a manufacturer
+            {"title": "Bally Master",      "type": "rom_complete_set", "manufacturer": "Bally"},
+            {"title": "Williams Master",   "type": "rom_complete_set", "manufacturer": "Williams"},
+            {"title": "Stern Master",      "type": "rom_complete_set", "manufacturer": "Stern"},
+            {"title": "Data East Master",  "type": "rom_complete_set", "manufacturer": "Data East"},
+            {"title": "Gottlieb Master",   "type": "rom_complete_set", "manufacturer": "Gottlieb"},
+            {"title": "Sega Master",       "type": "rom_complete_set", "manufacturer": "Sega"},
+            {"title": "Capcom Master",     "type": "rom_complete_set", "manufacturer": "Capcom"},
+            # Cross-brand
+            {"title": "Brand Explorer",    "type": "rom_count", "manufacturer": "__any__",   "min_brands": 3},
+            {"title": "Brand Connoisseur", "type": "rom_count", "manufacturer": "__any__",   "min_brands": 5},
+            {"title": "Brand Master",      "type": "rom_count", "manufacturer": "__any__",   "min_brands": 7},
+            # Combo / Era
+            {"title": "Golden Age",        "type": "rom_multi_brand", "manufacturers": ["Bally", "Williams", "Gottlieb"]},
+            {"title": "Modern Era",        "type": "rom_multi_brand", "manufacturers": ["Stern", "Data East", "Sega"]},
+            # Collector milestones (any manufacturer)
+            {"title": "Table Tourist",     "type": "rom_count", "manufacturer": "__any__",   "min": 10},
+            {"title": "Table Explorer",    "type": "rom_count", "manufacturer": "__any__",   "min": 20},
+            {"title": "Complete Collector", "type": "rom_complete_set", "manufacturer": "__any__"},
+            # Extra
+            {"title": "Midway Rookie",     "type": "rom_count", "manufacturer": "Midway",    "min": 3},
+            {"title": "Midway Master",     "type": "rom_complete_set", "manufacturer": "Midway"},
+            {"title": "Premier Rookie",    "type": "rom_count", "manufacturer": "Premier",   "min": 3},
+        ]
+        for ach in MANUFACTURER_ACHIEVEMENTS:
+            t = ach["title"]
+            atype = ach["type"]
+            if atype == "rom_multi_brand":
+                rules.append({
+                    "title": t,
+                    "scope": "global",
+                    "condition": {
+                        "type": "rom_multi_brand",
+                        "manufacturers": ach["manufacturers"],
+                    },
+                })
+            elif atype == "rom_complete_set":
+                rules.append({
+                    "title": t,
+                    "scope": "global",
+                    "condition": {
+                        "type": "rom_complete_set",
+                        "manufacturer": ach["manufacturer"],
+                    },
+                })
+            else:
+                cond: dict = {"type": "rom_count", "manufacturer": ach["manufacturer"]}
+                if "min" in ach:
+                    cond["min"] = ach["min"]
+                if "min_brands" in ach:
+                    cond["min_brands"] = ach["min_brands"]
+                rules.append({
+                    "title": t,
+                    "scope": "global",
+                    "condition": cond,
+                })
+
+        return rules        
             
     def _ensure_rom_specific(self, rom: str, audits: dict):
         if not rom or not audits:
@@ -3531,7 +3605,20 @@ class Watcher:
         if not self.current_rom or not self._has_any_map(self.current_rom):
             log(self.cfg, f"[ACH] Evaluation skipped: No NVRAM map found for '{self.current_rom}'")
             return
-            
+
+        # Track roms_played in achievements_state (Anti-Cheat protected)
+        try:
+            rom_state = self._ach_state_load()
+            roms_played = list(rom_state.get("roms_played") or [])
+            if self.current_rom not in roms_played:
+                roms_played.append(self.current_rom)
+                rom_state["roms_played"] = roms_played
+                self._ach_state_save(rom_state)
+                mfr = self._get_manufacturer_from_rom(self.current_rom)
+                log(self.cfg, f"[GLOBAL_ACH] roms_played updated: {self.current_rom} (manufacturer: {mfr})")
+        except Exception as e:
+            log(self.cfg, f"[ACH] roms_played update failed: {e}", "WARN")
+
         try:
             _awarded, _all_global, awarded_meta = self._evaluate_achievements(
                 self.current_rom, self.start_audits, end_audits, duration_sec
@@ -3575,6 +3662,71 @@ class Watcher:
         all_titles = []
         seen_all = set()
         seen_aw = set()
+
+        # Pre-load state for rom_count / rom_complete_set / rom_multi_brand evaluation
+        _rom_state_cache: dict | None = None
+        _installed_roms_cache: dict = {}  # manufacturer -> set of ROM names
+        _mfr_cache: dict = {}  # rom -> manufacturer (cached to avoid repeated regex)
+
+        def _rom_state() -> dict:
+            nonlocal _rom_state_cache
+            if _rom_state_cache is None:
+                _rom_state_cache = self._ach_state_load()
+            return _rom_state_cache
+
+        def _installed_roms(manufacturer: str) -> set:
+            if manufacturer not in _installed_roms_cache:
+                _installed_roms_cache[manufacturer] = self._scan_installed_roms_by_manufacturer(manufacturer)
+            return _installed_roms_cache[manufacturer]
+
+        def _mfr_for(r: str) -> str | None:
+            if r not in _mfr_cache:
+                _mfr_cache[r] = self._get_manufacturer_from_rom(r)
+            return _mfr_cache[r]
+
+        # Check for rom_complete_set revocations before evaluating rules
+        try:
+            state_pre = _rom_state()
+            already_global = {
+                str(e.get("title", "")).strip()
+                for entries in state_pre.get("global", {}).values()
+                for e in entries
+            }
+            roms_played_pre = set(state_pre.get("roms_played") or [])
+            revoked = False
+            for rule in global_rules:
+                cond_pre = (rule.get("condition") or {}) if isinstance(rule, dict) else {}
+                if str(cond_pre.get("type") or "").lower() != "rom_complete_set":
+                    continue
+                t_pre = (rule.get("title") or "Achievement").strip()
+                if t_pre not in already_global:
+                    continue
+                mfr_pre = cond_pre.get("manufacturer", "")
+                installed_pre = _installed_roms(mfr_pre)
+                if not installed_pre:
+                    continue
+                new_tables = installed_pre - roms_played_pre
+                if new_tables:
+                    # Revoke: remove from global unlocks and reset tally
+                    for r_key, entries in list(state_pre.get("global", {}).items()):
+                        state_pre["global"][r_key] = [
+                            e for e in entries
+                            if str(e.get("title", "")).strip() != t_pre
+                        ]
+                    tally_bucket = state_pre.setdefault("global_tally", {})
+                    if t_pre in tally_bucket:
+                        del tally_bucket[t_pre]
+                    revoked = True
+                    log(self.cfg, f"[GLOBAL_ACH] rom_complete_set revoked for '{t_pre}': {len(new_tables)} new table(s) found ({', '.join(sorted(new_tables))})")
+            if revoked:
+                self._ach_state_save(state_pre)
+                _rom_state_cache = state_pre
+        except Exception:
+            pass
+
+        # Track whether the rom_state was modified by new-type rules so we save once at end
+        _rom_state_dirty = False
+
         for rule in global_rules:
             title = (rule.get("title") or "Achievement").strip()
             if title not in seen_all:
@@ -3649,8 +3801,104 @@ class Watcher:
                         awarded.append(title)
                         seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
+
+                elif rtype == "rom_count":
+                    state = _rom_state()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+                    roms_played = list(state.get("roms_played") or [])
+                    manufacturer = cond.get("manufacturer", "")
+                    if manufacturer == "__any__":
+                        min_brands = cond.get("min_brands")
+                        if min_brands is not None:
+                            # Count distinct brands represented in roms_played
+                            brands = {_mfr_for(r) for r in roms_played}
+                            brands.discard(None)
+                            progress = len(brands)
+                            need = int(min_brands)
+                        else:
+                            # Count total distinct ROMs
+                            progress = len(set(roms_played))
+                            need = int(cond.get("min", 1))
+                    else:
+                        played_for_mfr = {r for r in roms_played if _mfr_for(r) == manufacturer}
+                        progress = len(played_for_mfr)
+                        need = int(cond.get("min", 1))
+                    # Update tally for progress display (batched save at end)
+                    state.setdefault("global_tally", {})[title] = {"progress": progress}
+                    _rom_state_dirty = True
+                    if progress >= need and title not in seen_aw:
+                        awarded.append(title)
+                        seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
+                        log(self.cfg, f"[GLOBAL_ACH] rom_count triggered: '{title}' ({progress}/{need} tables played)")
+
+                elif rtype == "rom_complete_set":
+                    state = _rom_state()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+                    manufacturer = cond.get("manufacturer", "")
+                    roms_played = set(state.get("roms_played") or [])
+                    installed = _installed_roms(manufacturer)
+                    if not installed:
+                        continue
+                    installed_count = len(installed)
+                    played_count = len(installed & roms_played)
+                    # Store installed_count in global_tally for progress display (batched save at end)
+                    state.setdefault("global_tally", {})[title] = {"progress": played_count, "installed_count": installed_count}
+                    _rom_state_dirty = True
+                    if played_count >= installed_count and title not in seen_aw:
+                        awarded.append(title)
+                        seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
+                        log(self.cfg, f"[GLOBAL_ACH] rom_complete_set triggered: '{title}' ({played_count}/{installed_count} tables played)")
+
+                elif rtype == "rom_multi_brand":
+                    state = _rom_state()
+                    already_global = {
+                        str(e.get("title", "")).strip()
+                        for entries in state.get("global", {}).values()
+                        for e in entries
+                    }
+                    if title in already_global:
+                        continue
+                    manufacturers = cond.get("manufacturers") or []
+                    roms_played = list(state.get("roms_played") or [])
+                    # Pre-compute set of manufacturers represented in roms_played
+                    played_brands = {_mfr_for(r) for r in roms_played}
+                    played_brands.discard(None)
+                    brands_with_roms = {mfr for mfr in manufacturers if mfr in played_brands}
+                    progress = len(brands_with_roms)
+                    need = len(manufacturers)
+                    # Update tally for progress display (batched save at end)
+                    state.setdefault("global_tally", {})[title] = {"progress": progress, "installed_count": need}
+                    _rom_state_dirty = True
+                    if progress >= need and title not in seen_aw:
+                        awarded.append(title)
+                        seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
+                        log(self.cfg, f"[GLOBAL_ACH] rom_multi_brand triggered: '{title}' ({progress}/{need} brands played)")
+
             except Exception:
                 continue
+
+        # Batch-save the rom_state if any new-type rules updated it
+        if _rom_state_dirty and _rom_state_cache is not None:
+            try:
+                self._ach_state_save(_rom_state_cache)
+            except Exception:
+                pass
+
         return awarded, all_titles, awarded_meta
         
     def _collect_global_rules_for_rom(self, rom: str) -> list[dict]:
@@ -3729,7 +3977,7 @@ class Watcher:
             try:
                 data = load_json(path, {}) or {}
                 cur = data.get("rules") or []
-                if isinstance(cur, list) and len(cur) >= 40:
+                if isinstance(cur, list) and len(cur) >= 70:
                     return
             except Exception:
                 pass
@@ -3879,6 +4127,42 @@ class Watcher:
     def _ach_state_save(self, state: dict):
         p = f_achievements_state(self.cfg)
         secure_save_json(p, state)
+
+    def _get_manufacturer_from_rom(self, rom: str) -> str | None:
+        """Return the manufacturer string from ROMNAMES for a given ROM, e.g. 'Bally'."""
+        name = self.ROMNAMES.get(rom) if hasattr(self, "ROMNAMES") else None
+        if not name:
+            return None
+        m = re.search(r'\(([^)]+)\)$', str(name).strip())
+        if m:
+            return m.group(1)
+        return None
+
+    def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
+        """Scan TABLES_DIR for .vpx files and return ROM names matching the given manufacturer.
+        If manufacturer is '__any__', return all ROMs found regardless of manufacturer."""
+        result = set()
+        tables_dir = getattr(self.cfg, "TABLES_DIR", None)
+        if not tables_dir or not os.path.isdir(tables_dir):
+            return result
+        for root, _dirs, files in os.walk(tables_dir):
+            for fname in files:
+                if not fname.lower().endswith(".vpx"):
+                    continue
+                vpx_path = os.path.join(root, fname)
+                try:
+                    rom = run_vpxtool_get_rom(self.cfg, vpx_path)
+                except Exception:
+                    rom = None
+                if not rom:
+                    continue
+                if manufacturer == "__any__":
+                    result.add(rom)
+                else:
+                    mfr = self._get_manufacturer_from_rom(rom)
+                    if mfr == manufacturer:
+                        result.add(rom)
+        return result
 
     def _append_nvram_dump_block(self, lines: list[str], audits: dict):
         if not isinstance(audits, dict) or not audits:
