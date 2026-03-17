@@ -367,7 +367,7 @@ def ensure_vpxtool(cfg: AppConfig) -> str | None:
         log(cfg, f"[VPXTOOL] download failed: {e}", "ERROR")
         return None
 
-def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
+def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = False) -> str | None:
 
     if not vpx_path or not os.path.isfile(vpx_path):
         return None
@@ -396,7 +396,8 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
 
         if cp.returncode != 0:
             if key not in warned:
-                log(cfg, f"[VPXTOOL] romname failed rc={cp.returncode}: {out}", "WARN")
+                if not suppress_warn:
+                    log(cfg, f"[VPXTOOL] romname failed rc={cp.returncode}: {out}", "WARN")
                 warned.add(key)
             return None
 
@@ -415,13 +416,15 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str) -> str | None:
             return m.group(1)
 
         if key not in warned:
-            log(cfg, f"[VPXTOOL] romname returned no parsable output: {out}", "WARN")
+            if not suppress_warn:
+                log(cfg, f"[VPXTOOL] romname returned no parsable output: {out}", "WARN")
             warned.add(key)
         return None
 
     except Exception as e:
         if key not in warned:
-            log(cfg, f"[VPXTOOL] romname exception: {e}", "WARN")
+            if not suppress_warn:
+                log(cfg, f"[VPXTOOL] romname exception: {e}", "WARN")
             warned.add(key)
         return None
 
@@ -620,10 +623,28 @@ def sanitize_filename(s):
 import urllib.request
 
 class CloudSync:
+    _upload_skip_warned: bool = False
+    _upload_skip_warned_lock = threading.Lock()
+
+    @staticmethod
+    def _warn_missing_player_name(cfg: AppConfig) -> bool:
+        """Returns True if player name is missing/default and upload should be skipped.
+        Logs a once-only warning on the first occurrence."""
+        pname = cfg.OVERLAY.get("player_name", "Player").strip()
+        if not pname or pname.lower() == "player":
+            with CloudSync._upload_skip_warned_lock:
+                if not CloudSync._upload_skip_warned:
+                    log(cfg, "[CLOUD] Upload skipped: Please set a player name (not 'Player') in System tab to enable cloud uploads.", "WARN")
+                    CloudSync._upload_skip_warned = True
+            return True
+        return False
+
     @staticmethod
     def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0 or not pname or pname.lower() == "player":
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
             return
         
         url = cfg.CLOUD_URL.strip().rstrip('/')
@@ -668,7 +689,9 @@ class CloudSync:
     @staticmethod
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0 or not pname or pname.lower() == "player":
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
             return
             
         url = cfg.CLOUD_URL.strip().rstrip('/')
@@ -769,6 +792,10 @@ class CloudSync:
             return
         pname = player_name.strip() if player_name else cfg.OVERLAY.get("player_name", "Player").strip()
         if not pname or pname.lower() == "player":
+            with CloudSync._upload_skip_warned_lock:
+                if not CloudSync._upload_skip_warned:
+                    log(cfg, "[CLOUD] Upload skipped: Please set a player name (not 'Player') in System tab to enable cloud uploads.", "WARN")
+                    CloudSync._upload_skip_warned = True
             return
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
@@ -4401,7 +4428,7 @@ class Watcher:
                         continue
                     vpx_path = os.path.join(root, fname)
                     try:
-                        rom = run_vpxtool_get_rom(self.cfg, vpx_path)
+                        rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True)
                     except Exception:
                         rom = None
                     if not rom:
