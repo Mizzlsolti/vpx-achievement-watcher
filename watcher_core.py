@@ -3910,6 +3910,7 @@ class Watcher:
         _rom_state_cache: dict | None = None
         _installed_roms_cache: dict = {}  # manufacturer -> set of ROM names
         _mfr_cache: dict = {}  # rom -> manufacturer (cached to avoid repeated regex)
+        _rom_audits_cache: dict = {}  # rom -> audits dict (for nvram_tally cross-ROM reads)
 
         def _rom_state() -> dict:
             nonlocal _rom_state_cache
@@ -4037,7 +4038,8 @@ class Watcher:
                         continue
 
                     delta = self._fuzzy_sum_deltas(deltas_ci, field)
-                    abs_val = int(self._nv_get_int_ci(end_audits, field, 0))
+                    roms_played = list(state.get("roms_played") or [])
+                    abs_val = self._sum_field_across_all_roms(field, roms_played, _rom_audits_cache)
 
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
@@ -4568,6 +4570,56 @@ class Watcher:
                         total += int(v or 0)
                         counted.add(k)
                     break
+        return total
+
+    def _fuzzy_sum_field(self, audits: dict, canonical_field: str) -> int:
+        """Return the sum of all values in *audits* that fuzzy-match *canonical_field*.
+
+        Uses the same _NVRAM_TALLY_PATTERNS as _fuzzy_sum_deltas so that
+        ROM-specific labels like "MAIN M.B. JACKPOTS" are matched by "Jackpots".
+        Falls back to exact case-insensitive lookup when no pattern entry exists.
+        """
+        patterns = self._NVRAM_TALLY_PATTERNS.get(canonical_field)
+        if not patterns:
+            return int(self._nv_get_int_ci(audits, canonical_field, 0))
+
+        total = 0
+        counted: set[str] = set()
+        for k, v in audits.items():
+            kl = k.lower()
+            for kws in patterns:
+                if all(kw in kl for kw in kws):
+                    if k not in counted:
+                        try:
+                            total += int(v or 0)
+                        except (ValueError, TypeError):
+                            pass
+                        counted.add(k)
+                    break
+        return total
+
+    def _sum_field_across_all_roms(self, field: str, roms_played: list,
+                                    _audits_cache: dict | None = None) -> int:
+        """Sum *field* across all played ROMs using fuzzy NVRAM label matching.
+
+        *roms_played* is the list of ROM names from the achievements state.
+        *_audits_cache* is an optional dict keyed by ROM name that is populated on
+        first use so repeated calls during one evaluation pass avoid re-reading files.
+        """
+        total = 0
+        for r in roms_played:
+            try:
+                if _audits_cache is not None:
+                    if r not in _audits_cache:
+                        audits, _, _ = self.read_nvram_audits_with_autofix(r)
+                        _audits_cache[r] = audits
+                    audits = _audits_cache[r]
+                else:
+                    audits, _, _ = self.read_nvram_audits_with_autofix(r)
+                if audits:
+                    total += self._fuzzy_sum_field(audits, field)
+            except Exception:
+                continue
         return total
 
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
