@@ -4031,24 +4031,21 @@ class Watcher:
                         continue
 
                     delta = self._fuzzy_sum_deltas(deltas_ci, field)
-                    if delta <= 0:
-                        tally = state.get("global_tally", {}).get(title, {})
-                        current_progress = int(tally.get("progress", 0))
-                        if current_progress >= need and title not in seen_aw:
-                            awarded.append(title)
-                            seen_aw.add(title)
-                            awarded_meta.append({"title": title, "origin": origin})
-                        continue
+                    abs_val = int(self._nv_get_int_ci(end_audits, field, 0))
 
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
 
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    tally["entries"].append({"rom": rom, "delta": delta, "ts": now_iso})
-                    tally["progress"] += delta
+                    if delta > 0:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        tally["entries"].append({"rom": rom, "delta": delta, "ts": now_iso})
+                        tally["progress"] += delta
+
+                    effective_progress = max(int(tally["progress"]), abs_val)
+                    tally["progress"] = effective_progress
                     self._ach_state_save(state)
 
-                    if tally["progress"] >= need and title not in seen_aw:
+                    if effective_progress >= need and title not in seen_aw:
                         awarded.append(title)
                         seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
