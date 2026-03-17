@@ -4,6 +4,7 @@ from __future__ import annotations
 import random
 import subprocess
 import hashlib
+import shutil
 import os, sys, time, json, re, glob, threading, uuid
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
@@ -319,18 +320,83 @@ class AppConfig:
         except Exception as e:
             print(f"CRITICAL ERROR: Could not save config.json -> {e}")
 
-def p_maps(cfg):         return os.path.join(cfg.BASE, "NVRAM_Maps")
+def p_maps(cfg):         return os.path.join(cfg.BASE, "tools", "NVRAM_Maps")
 def p_local_maps(cfg):   return os.path.join(p_maps(cfg), "maps")
 def p_session(cfg):      return os.path.join(cfg.BASE, "session_stats")
 def p_highlights(cfg):   return os.path.join(p_session(cfg), "Highlights")
-def p_rom_spec(cfg):     return os.path.join(cfg.BASE, "rom_specific_achievements")
-def p_custom(cfg):       return os.path.join(cfg.BASE, "custom_achievements")
-def f_global_ach(cfg):   return os.path.join(cfg.BASE, "global_achievements.json")
+def p_achievements(cfg): return os.path.join(cfg.BASE, "Achievements")
+def p_rom_spec(cfg):     return os.path.join(p_achievements(cfg), "rom_specific_achievements")
+def p_custom(cfg):       return os.path.join(p_achievements(cfg), "custom_achievements")
+def f_global_ach(cfg):   return os.path.join(p_achievements(cfg), "global_achievements.json")
 def f_achievements_state(cfg: "AppConfig") -> str:
-    return os.path.join(cfg.BASE, "achievements_state.json")
+    return os.path.join(p_achievements(cfg), "achievements_state.json")
 def f_log(cfg):          return os.path.join(cfg.BASE, "watcher.log")
 def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
 def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
+
+
+def _migrate_runtime_dirs(cfg):
+    """One-time migration from old flat structure to new grouped structure."""
+
+    # NVRAM_Maps: root → tools/NVRAM_Maps
+    old_maps = os.path.join(cfg.BASE, "NVRAM_Maps")
+    new_maps = p_maps(cfg)
+    if os.path.isdir(old_maps) and not os.path.isdir(new_maps):
+        ensure_dir(os.path.dirname(new_maps))
+        shutil.move(old_maps, new_maps)
+
+    # achievements_state.json: root → Achievements/
+    old_state = os.path.join(cfg.BASE, "achievements_state.json")
+    new_state = f_achievements_state(cfg)
+    if os.path.isfile(old_state) and not os.path.isfile(new_state):
+        ensure_dir(os.path.dirname(new_state))
+        shutil.move(old_state, new_state)
+
+    # global_achievements.json: root → Achievements/
+    old_global = os.path.join(cfg.BASE, "global_achievements.json")
+    new_global = f_global_ach(cfg)
+    if os.path.isfile(old_global) and not os.path.isfile(new_global):
+        ensure_dir(os.path.dirname(new_global))
+        shutil.move(old_global, new_global)
+
+    # rom_specific_achievements: root → Achievements/
+    old_rom_spec = os.path.join(cfg.BASE, "rom_specific_achievements")
+    new_rom_spec = p_rom_spec(cfg)
+    if os.path.isdir(old_rom_spec) and not os.path.isdir(new_rom_spec):
+        ensure_dir(os.path.dirname(new_rom_spec))
+        shutil.move(old_rom_spec, new_rom_spec)
+
+    # custom_achievements: root → Achievements/
+    old_custom = os.path.join(cfg.BASE, "custom_achievements")
+    new_custom = p_custom(cfg)
+    if os.path.isdir(old_custom) and not os.path.isdir(new_custom):
+        ensure_dir(os.path.dirname(new_custom))
+        shutil.move(old_custom, new_custom)
+
+    # challenges: root → session_stats/challenges
+    old_challenges = os.path.join(cfg.BASE, "challenges")
+    new_challenges = os.path.join(p_session(cfg), "challenges")
+    if os.path.isdir(old_challenges) and not os.path.isdir(new_challenges):
+        ensure_dir(os.path.dirname(new_challenges))
+        shutil.move(old_challenges, new_challenges)
+
+    # Clean up old .txt session dumps
+    if os.path.isdir(p_session(cfg)):
+        for fn in os.listdir(p_session(cfg)):
+            if fn.lower().endswith(".txt"):
+                try:
+                    os.remove(os.path.join(p_session(cfg), fn))
+                except Exception:
+                    pass
+
+    # Clean up old .session.json history files in Highlights
+    if os.path.isdir(p_highlights(cfg)):
+        for fn in os.listdir(p_highlights(cfg)):
+            if fn.lower().endswith(".session.json"):
+                try:
+                    os.remove(os.path.join(p_highlights(cfg), fn))
+                except Exception:
+                    pass
 
 GITHUB_BASE = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/475fa3619134f5aa732ccd80244e1613e7e6e9a1"
 INDEX_URL = f"{GITHUB_BASE}/index.json"
@@ -1599,6 +1665,7 @@ class Watcher:
             p_local_maps(self.cfg),
             p_session(self.cfg),
             p_highlights(self.cfg),
+            p_achievements(self.cfg),
             p_rom_spec(self.cfg),
             p_custom(self.cfg),
         ]:
@@ -3125,7 +3192,7 @@ class Watcher:
                 payload["difficulty"] = diff_name
                 extra = {"target_flips": tf, "difficulty": diff_name}
 
-            out_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+            out_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
             ensure_dir(out_dir)
             path = os.path.join(out_dir, f"{sanitize_filename(rom)}.json")
             hist = secure_load_json(path, {"results": []}) or {"results": []}
@@ -4111,7 +4178,7 @@ class Watcher:
     def _count_completed_challenges(self, challenge_type: str) -> int:
         """Count completed challenges of a given type from the challenge history folder."""
         count = 0
-        history_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+        history_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
         if not os.path.isdir(history_dir):
             return 0
         try:
@@ -4308,40 +4375,6 @@ class Watcher:
             save_json(path, payload)
             log(self.cfg, "Custom placeholder created")
 
-    def _rolling_txt_limit(self, rom: Optional[str]):
-        if not rom:
-            return
-        patterns = [
-            os.path.join(p_session(self.cfg), f"{sanitize_filename(rom)}__*.txt"),
-            os.path.join(p_session(self.cfg), f"*_{sanitize_filename(rom)}_*.txt")
-        ]
-        files = []
-        for pat in patterns:
-            files.extend(glob.glob(pat))
-        files = sorted(files, key=lambda x: os.path.getmtime(x))
-        while len(files) > ROLLING_HISTORY_PER_ROM:
-            old = files.pop(0)
-            try:
-                os.remove(old)
-                log(self.cfg, f"Session limit reached – removed oldest: {old}")
-            except Exception as e:
-                log(self.cfg, f"Could not remove old session: {e}", "WARN")
-
-    def _highlights_history_limit(self, keep: int = 10):
-        try:
-            ensure_dir(p_highlights(self.cfg))
-            combined = glob.glob(os.path.join(p_highlights(self.cfg), "*.session.json"))
-            latest_path = os.path.join(p_highlights(self.cfg), "session_latest.json")
-            cand = [p for p in combined if os.path.abspath(p) != os.path.abspath(latest_path)]
-            cand.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-            for pth in cand[keep:]:
-                try:
-                    os.remove(pth)
-                except Exception as e:
-                    log(self.cfg, f"[HIGHLIGHTS] Could not remove {pth}: {e}", "WARN")
-        except Exception as e:
-            log(self.cfg, f"[HIGHLIGHTS] History enforcement failed: {e}", "WARN")
-
     def _export_summary(self, end_audits: dict, duration_sec: int):
         from datetime import timezone
         summary_path = os.path.join(p_highlights(self.cfg), self.SUMMARY_FILENAME)
@@ -4379,13 +4412,6 @@ class Watcher:
             }
 
             save_json(summary_path, payload)
-
-            try:
-                ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                hist_path = os.path.join(p_highlights(self.cfg), f"{ts}.session.json")
-                save_json(hist_path, payload)
-            except Exception as e:
-                log(self.cfg, f"[SUMMARY] write historical session failed: {e}", "WARN")
 
         except Exception as e:
             log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
@@ -5077,6 +5103,10 @@ class Watcher:
     def start(self):
         if getattr(self, "thread", None) and self.thread.is_alive():
             return
+        try:
+            _migrate_runtime_dirs(self.cfg)
+        except Exception as e:
+            log(self.cfg, f"[MIGRATE] failed: {e}", "WARN")
         try:
             self.bootstrap()
         except Exception as e:

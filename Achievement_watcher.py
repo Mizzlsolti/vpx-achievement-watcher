@@ -961,8 +961,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             ensure_dir(self.cfg.BASE)
             for sub in [
-                "NVRAM_Maps", "NVRAM_Maps/maps", "session_stats",
-                "rom_specific_achievements", "custom_achievements",
+                os.path.join("tools", "NVRAM_Maps"),
+                os.path.join("tools", "NVRAM_Maps", "maps"),
+                "session_stats",
+                os.path.join("Achievements", "rom_specific_achievements"),
+                os.path.join("Achievements", "custom_achievements"),
             ]:
                 ensure_dir(os.path.join(self.cfg.BASE, sub))
             try:
@@ -1077,7 +1080,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.save()
     
     def _ch_results_path(self, rom: str) -> str:
-        return os.path.join(self.cfg.BASE, "challenges", "history", f"{sanitize_filename(rom)}.json")
+        return os.path.join(self.cfg.BASE, "session_stats", "challenges", "history", f"{sanitize_filename(rom)}.json")
 
     def keyPressEvent(self, event):
         super().keyPressEvent(event)
@@ -1376,7 +1379,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _prefetch_maps_now(self):
         try:
             self.watcher.start_prefetch_background()
-            maps_dir = os.path.join(self.cfg.BASE, "NVRAM_Maps", "maps")
+            maps_dir = os.path.join(self.cfg.BASE, "tools", "NVRAM_Maps", "maps")
             QMessageBox.information(
                 self, "Prefetch",
                 f"Prefetch started. Missing maps are being cached in the background at:\n"
@@ -2557,7 +2560,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         challenge_rom = ""
         challenge_kind = ""
         challenge_difficulty = ""
-        hist_dir = os.path.join(self.cfg.BASE, "challenges", "history")
+        hist_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
         try:
             if os.path.isdir(hist_dir):
                 latest_item = None
@@ -4053,10 +4056,10 @@ def main():
         if wiz.exec() != QDialog.DialogCode.Accepted:
             sys.exit(0)
     for sub in [
-        "NVRAM_Maps/maps",
-        "session_stats/Highlights",
-        "rom_specific_achievements",
-        "custom_achievements",
+        os.path.join("tools", "NVRAM_Maps", "maps"),
+        os.path.join("session_stats", "Highlights"),
+        os.path.join("Achievements", "rom_specific_achievements"),
+        os.path.join("Achievements", "custom_achievements"),
     ]:
         ensure_dir(os.path.join(cfg.BASE, sub))
     bridge = Bridge()
