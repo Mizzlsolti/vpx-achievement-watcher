@@ -1939,6 +1939,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
         lay_maint.addWidget(self.btn_repair)
         lay_maint.addWidget(self.btn_prefetch)
+
+        self.btn_restore_cloud = QPushButton("☁️ Restore from Cloud")
+        self.btn_restore_cloud.setToolTip(
+            "Downloads your full achievement progress from the cloud using your Player ID. "
+            "Use this to restore your achievements on a new PC. "
+            "Warning: This will overwrite your local achievement data."
+        )
+        self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
+        lay_maint.addWidget(self.btn_restore_cloud)
         
         lbl_id_warning = QLabel(
             "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
@@ -1967,6 +1977,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 return
         self.cfg.CLOUD_ENABLED = self.chk_cloud_enabled.isChecked()
         self.cfg.save()
+        if getattr(self, "btn_restore_cloud", None):
+            self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
         
     def _save_player_name(self, name):
         self.cfg.OVERLAY["player_name"] = name.strip()
@@ -1982,6 +1994,50 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _save_player_id(self, player_id):
         self.cfg.OVERLAY["player_id"] = player_id.strip()
         self.cfg.save()
+
+    def _restore_achievements_from_cloud(self):
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            self._msgbox_topmost("warn", "Restore from Cloud", "Cloud sync is not enabled.")
+            return
+
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            self._msgbox_topmost("warn", "Restore from Cloud", "Please set a valid Player ID first.")
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Restore from Cloud",
+            "This will overwrite your local achievement data with the cloud version. Are you sure?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            data = CloudSync.fetch_node(self.cfg, f"players/{pid}/achievements")
+        except Exception as e:
+            self._msgbox_topmost("warn", "Restore from Cloud", f"Failed to fetch data from cloud:\n{e}")
+            return
+
+        if not data or not isinstance(data, dict):
+            self._msgbox_topmost("warn", "Restore from Cloud", "No achievement data found in the cloud for your Player ID.")
+            return
+
+        try:
+            # Reconstruct the local state structure from the cloud payload
+            state = {
+                "global": {"__global__": data.get("global", [])},
+                "session": data.get("session", {}),
+                "roms_played": data.get("roms_played", []),
+            }
+            self.watcher._ach_state_save(state)
+        except Exception as e:
+            self._msgbox_topmost("warn", "Restore from Cloud", f"Failed to save restored data locally:\n{e}")
+            return
+
+        self._msgbox_topmost("info", "Restore from Cloud", "Achievement data successfully restored from the cloud!")
 
     def _init_tooltips_main(self):
         def _set_tip(attr: str, tip: str):
@@ -2712,9 +2768,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         def _do_fetch():
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             try:
+                player_ids = CloudSync.fetch_player_ids(self.cfg)
+                data = []
                 if is_challenge:
                     cat = kind if kind in ("timed", "flip", "heat") else "timed"
-                    data = CloudSync.fetch_data(self.cfg, f"scores/{cat}/{rom}")
+                    for pid in player_ids:
+                        try:
+                            if cat == "flip":
+                                flip_node = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/flip")
+                                if flip_node and isinstance(flip_node, dict):
+                                    for rom_key, entry in flip_node.items():
+                                        if rom_key == rom or rom_key.startswith(f"{rom}_"):
+                                            if entry and isinstance(entry, dict):
+                                                data.append(entry)
+                            else:
+                                entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/{cat}/{rom}")
+                                if entry and isinstance(entry, dict):
+                                    data.append(entry)
+                        except Exception:
+                            pass
                     if data:
                         if cat == "flip" and difficulty and difficulty != "All Difficulties":
                             data = [
@@ -2725,7 +2797,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     selected_diff = difficulty if (is_challenge and kind == "flip") else None
                     cat_for_html = cat
                 else:
-                    data = CloudSync.fetch_data(self.cfg, f"progress/{rom}")
+                    for pid in player_ids:
+                        try:
+                            entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/progress/{rom}")
+                            if entry and isinstance(entry, dict):
+                                data.append(entry)
+                        except Exception:
+                            pass
                     if data:
                         data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
                     selected_diff = None

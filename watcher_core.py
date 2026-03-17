@@ -629,17 +629,17 @@ class CloudSync:
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
         
-        pid_key = f"p_{pid}"
+        rom_key = rom
         if extra_data:
             if category == "flip" and "target_flips" in extra_data:
-                pid_key = f"p_{pid}_f{extra_data['target_flips']}"
+                rom_key = f"{rom}_f{extra_data['target_flips']}"
             elif category == "time" and "target_time" in extra_data:
-                pid_key = f"p_{pid}_t{extra_data['target_time']}"
+                rom_key = f"{rom}_t{extra_data['target_time']}"
             elif "difficulty" in extra_data:
                 clean_diff = str(extra_data["difficulty"]).replace(" ", "")
-                pid_key = f"p_{pid}_{clean_diff}"
+                rom_key = f"{rom}_{clean_diff}"
         
-        endpoint = f"{url}/scores/{category}/{rom}/{pid_key}.json"
+        endpoint = f"{url}/players/{pid}/scores/{category}/{rom_key}.json"
         
         def _task():
             try:
@@ -672,8 +672,8 @@ class CloudSync:
             return
             
         url = cfg.CLOUD_URL.strip().rstrip('/')
-        pid = cfg.OVERLAY.get("player_id", "unknown")
-        endpoint = f"{url}/progress/{rom}/{pid}.json"
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+        endpoint = f"{url}/players/{pid}/progress/{rom}.json"
         
         def _task():
             percentage = round((unlocked / total) * 100, 1)
@@ -716,6 +716,97 @@ class CloudSync:
         except Exception as e:
             log(cfg, f"[CLOUD] Fetch error for {endpoint}: {e}", "ERROR")
             return []
+
+    @staticmethod
+    def fetch_player_ids(cfg: AppConfig) -> list:
+        """Return the list of all player IDs stored under /players/ using a shallow fetch."""
+        if not cfg.CLOUD_URL:
+            return []
+        url = cfg.CLOUD_URL.strip().rstrip('/')
+        endpoint = f"{url}/players.json?shallow=true"
+        try:
+            import urllib.request
+            import ssl
+            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            if isinstance(data, dict):
+                return list(data.keys())
+            return []
+        except Exception as e:
+            log(cfg, f"[CLOUD] fetch_player_ids error: {e}", "ERROR")
+            return []
+
+    @staticmethod
+    def fetch_node(cfg: AppConfig, node_path: str):
+        """Fetch a single Firebase node and return the raw parsed object (dict, list, or None)."""
+        if not cfg.CLOUD_URL or not node_path:
+            return None
+        url = cfg.CLOUD_URL.strip().rstrip('/')
+        endpoint = f"{url}/{node_path}.json"
+        try:
+            import urllib.request
+            import ssl
+            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception as e:
+            log(cfg, f"[CLOUD] fetch_node error for {endpoint}: {e}", "ERROR")
+            return None
+
+    @staticmethod
+    def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):
+        """Upload the full achievements state (global + session + roms_played) to Firebase
+        under /players/{pid}/achievements.json. Called automatically after each session
+        and each achievement unlock when cloud sync is enabled."""
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        pname = player_name.strip() if player_name else cfg.OVERLAY.get("player_name", "Player").strip()
+        if not pname or pname.lower() == "player":
+            return
+        url = cfg.CLOUD_URL.strip().rstrip('/')
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+        endpoint = f"{url}/players/{pid}/achievements.json"
+
+        def _task():
+            global_entries = []
+            try:
+                global_entries = list(state.get("global", {}).get("__global__", []) or [])
+            except Exception:
+                pass
+            session_entries = {}
+            try:
+                session_entries = dict(state.get("session", {}) or {})
+            except Exception:
+                pass
+            roms_played = []
+            try:
+                roms_played = list(state.get("roms_played", []) or [])
+            except Exception:
+                pass
+            payload = {
+                "name": pname,
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "global": global_entries,
+                "session": session_entries,
+                "roms_played": roms_played,
+            }
+            put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
+            put_req.add_header('Content-Type', 'application/json')
+            try:
+                with urllib.request.urlopen(put_req, timeout=10) as resp:
+                    log(cfg, f"[CLOUD] Uploaded full achievements for player {pid}")
+            except Exception as e:
+                log(cfg, f"[CLOUD] upload_full_achievements failed: {e}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
 
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
@@ -3681,6 +3772,14 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
 
+        try:
+            if self.cfg.CLOUD_ENABLED:
+                state = self._ach_state_load()
+                player_name = self.cfg.OVERLAY.get("player_name", "Player")
+                CloudSync.upload_full_achievements(self.cfg, state, player_name)
+        except Exception as e:
+            log(self.cfg, f"[ACH] full achievements upload failed: {e}", "WARN")
+
     def _evaluate_achievements(self, rom: str, start_audits: dict, end_audits: dict, duration_sec: int) -> tuple[list[str], list[str], list[dict]]:
         global_rules = self._collect_global_rules_for_rom(rom)
 
@@ -4357,6 +4456,12 @@ class Watcher:
             try:
                 if getattr(self, "bridge", None) and hasattr(self.bridge, "achievements_updated"):
                     self.bridge.achievements_updated.emit()
+            except Exception:
+                pass
+            try:
+                if self.cfg.CLOUD_ENABLED:
+                    player_name = self.cfg.OVERLAY.get("player_name", "Player")
+                    CloudSync.upload_full_achievements(self.cfg, state, player_name)
             except Exception:
                 pass
   

@@ -264,13 +264,33 @@ class CloudStatsMixin:
         self.cloud_view.setHtml("<div style='color:#00E5FF;'>Fetching data from cloud...</div>")
         
         def _bg_fetch():
-            if category == "progress":
-                data = CloudSync.fetch_data(self.cfg, f"progress/{rom}")
-                if data:
+            player_ids = CloudSync.fetch_player_ids(self.cfg)
+            data = []
+            for pid in player_ids:
+                try:
+                    if category == "progress":
+                        entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/progress/{rom}")
+                        if entry and isinstance(entry, dict):
+                            data.append(entry)
+                    elif category == "flip":
+                        # Fetch all flip ROM keys for this player and filter by the requested ROM prefix
+                        flip_node = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/flip")
+                        if flip_node and isinstance(flip_node, dict):
+                            for rom_key, entry in flip_node.items():
+                                if rom_key == rom or rom_key.startswith(f"{rom}_"):
+                                    if entry and isinstance(entry, dict):
+                                        data.append(entry)
+                    else:
+                        entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/{category}/{rom}")
+                        if entry and isinstance(entry, dict):
+                            data.append(entry)
+                except Exception:
+                    pass
+
+            if data:
+                if category == "progress":
                     data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
-            else:
-                data = CloudSync.fetch_data(self.cfg, f"scores/{category}/{rom}")
-                if data:
+                else:
                     if category == "flip" and selected_diff != "All Difficulties":
                         filtered_data = []
                         for row in data:
