@@ -88,12 +88,12 @@ class SetupWizardDialog(QDialog):
         try:
             ensure_dir(self.cfg.BASE)
             for sub in [
-                "NVRAM_Maps",
-                "NVRAM_Maps/maps",
+                os.path.join("tools", "NVRAM_Maps"),
+                os.path.join("tools", "NVRAM_Maps", "maps"),
                 "session_stats",
-                "session_stats/Highlights",
-                "rom_specific_achievements",
-                "custom_achievements",
+                os.path.join("session_stats", "Highlights"),
+                os.path.join("Achievements", "rom_specific_achievements"),
+                os.path.join("Achievements", "custom_achievements"),
             ]:
                 ensure_dir(os.path.join(self.cfg.BASE, sub))
         except Exception:
