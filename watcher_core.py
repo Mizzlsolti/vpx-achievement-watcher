@@ -4117,19 +4117,37 @@ class Watcher:
                         awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "session_time":
                     min_s = int(cond.get("min_seconds", cond.get("min", 0)))
+                    need_min = min_s / 60  # convert threshold to minutes
+
                     state = self._ach_state_load()
                     already_global = {
                         str(e.get("title", "")).strip()
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
+                    if title in already_global:
+                        continue
+
+                    # 1) NVRAM-based: sum "MINUTES ON" across all played ROMs (already in minutes)
+                    roms_played = list(state.get("roms_played") or [])
+                    abs_minutes = self._sum_field_across_all_roms("MINUTES ON", roms_played, _rom_audits_cache)
+
+                    # 2) Incremental tally (stored in minutes)
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
-                    now_iso = datetime.now(timezone.utc).isoformat()
-                    tally["entries"].append({"rom": rom, "delta": int(duration_sec or 0), "ts": now_iso})
-                    tally["progress"] += int(duration_sec or 0)
+                    delta_min = round((duration_sec or 0) / 60, 2)
+                    if delta_min > 0:
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        tally["entries"].append({"rom": rom, "delta": delta_min, "ts": now_iso})
+                        tally["progress"] += delta_min
+
+                    # Effective = max(NVRAM absolute, accumulated tally) — both in minutes
+                    effective = max(float(tally["progress"]), float(abs_minutes))
+                    tally["progress"] = effective
+
                     self._ach_state_save(state)
-                    if tally["progress"] >= min_s and title not in seen_aw and title not in already_global:
+
+                    if effective >= need_min and title not in seen_aw:
                         awarded.append(title); seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
@@ -4678,6 +4696,9 @@ class Watcher:
         "Extra Balls":      [("extra ball",)],
         "Games Started":    [("games started",), ("games played",)],
         "Balls Played":     [("balls played",), ("ball count",), ("total balls",)],
+        # "MINUTES ON" is the standard WPC/Williams NVRAM field for cumulative play time in minutes.
+        # "minute" covers abbreviated variants like "MINUTES ON" or "Minutes On".
+        "MINUTES ON":       [("minutes on",), ("minute",)],
     }
 
     def _fuzzy_sum_deltas(self, deltas_ci: dict, canonical_field: str) -> int:
