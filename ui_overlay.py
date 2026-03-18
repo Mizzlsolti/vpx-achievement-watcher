@@ -28,8 +28,16 @@ class OverlayNavArrows(QWidget):
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_tick)
-        self._pulse_timer.start()
         self.hide()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._pulse_timer.isActive():
+            self._pulse_timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._pulse_timer.stop()
 
     def _on_tick(self):
         self._pulse_t = (self._pulse_t + 0.08) % 1.0
