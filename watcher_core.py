@@ -82,6 +82,46 @@ from input_hook import (
 
 APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+
+TABLE_EMOJI_KEYWORDS: dict[str, str] = {
+    "mars":        "🛸",  "alien":      "👽",  "space":     "🚀",
+    "monster":     "👹",  "dracula":    "🧛",  "vampire":   "🧛",
+    "castle":      "🏰",  "medieval":   "⚔️",  "knight":    "🗡️",
+    "magic":       "🎩",  "wizard":     "🧙",  "sorcerer":  "🧙",
+    "circus":      "🎪",  "carnival":   "🎪",  "funhouse":  "🤡",
+    "pirate":      "🏴‍☠️", "treasure":   "💰",  "gold":      "💰",
+    "jungle":      "🌴",  "safari":     "🦁",  "gorilla":   "🦍",
+    "race":        "🏎️",  "speed":      "💨",  "motor":     "🏍️",
+    "fish":        "🐟",  "shark":      "🦈",  "ocean":     "🌊",
+    "rock":        "🎸",  "band":       "🎸",  "music":     "🎵",
+    "star":        "⭐",  "galaxy":     "🌌",  "twilight":  "🌀",
+    "fire":        "🔥",  "phoenix":    "🔥",  "dragon":    "🐉",
+    "indiana":     "🤠",  "adventure":  "🗺️",  "tomb":      "⚰️",
+    "robot":       "🤖",  "terminator": "🤖",  "machine":   "⚙️",
+    "family":      "👨‍👩‍👧‍👦", "addams":    "🫰",  "munster":   "👻",
+    "ghost":       "👻",  "scared":     "💀",  "horror":    "🎃",
+    "world cup":   "⚽",  "football":   "🏈",  "basket":    "🏀",
+    "cactus":      "🌵",  "western":    "🤠",  "canyon":    "🏜️",
+    "elvis":       "🕺",  "party":      "🎉",  "wedding":   "💍",
+    "police":      "🚔",  "detective":  "🔍",  "spy":       "🕵️",
+    "road":        "🛣️",  "truck":      "🚛",  "taxi":      "🚕",
+    "junk":        "♻️",  "wreck":      "💥",
+    "cat":         "🐱",  "panther":    "🐆",
+    "whirlwind":   "🌪️",  "storm":      "⛈️",  "tornado":   "🌪️",
+}
+
+MANUFACTURER_EMOJI: dict[str, str] = {
+    "Williams":  "🟡",
+    "Bally":     "🔴",
+    "Stern":     "🟠",
+    "Data East": "🔵",
+    "Gottlieb":  "🟢",
+    "Sega":      "🔷",
+    "Capcom":    "🟣",
+    "Premier":   "⬜",
+    "Midway":    "🟤",
+}
+
 DEFAULT_OVERLAY = {
     "scale_pct": 50,
     "background": "auto",
@@ -1005,6 +1045,7 @@ class Watcher:
 
         self._installed_roms_scan_cache: dict = {}   # manufacturer -> set of ROM names; '__all_with_map__' -> all ROMs with maps
         self._installed_roms_scan_done: bool = False
+        self._rom_emoji_cache: dict = {}  # rom -> emoji string
         
         self.snapshot_mode = True
         self.snap_initialized = False
@@ -4604,6 +4645,25 @@ class Watcher:
             return val
         return None
 
+    def _resolve_emoji_for_rom(self, rom: str) -> str:
+        """Automatically resolve a fitting emoji for a ROM based on table name keywords."""
+        romnames = getattr(self, "ROMNAMES", {}) or {}
+        table_name = romnames.get(rom, "").lower()
+
+        # 1. Keyword match on table name (longest keywords first to prefer specific matches)
+        for keyword, emoji in sorted(TABLE_EMOJI_KEYWORDS.items(),
+                                     key=lambda x: len(x[0]), reverse=True):
+            if keyword in table_name:
+                return emoji
+
+        # 2. Manufacturer fallback
+        mfr = self._get_manufacturer_from_rom(rom)
+        if mfr and mfr in MANUFACTURER_EMOJI:
+            return MANUFACTURER_EMOJI[mfr]
+
+        # 3. Generic pinball fallback
+        return "🎯"
+
     # Keyword patterns for fuzzy matching of canonical global field names to ROM-specific NVRAM labels.
     # Each entry maps a canonical name to a list of keyword-tuples; ALL keywords in a tuple must be
     # present (case-insensitive) in an NVRAM field name for it to match.
@@ -4736,6 +4796,7 @@ class Watcher:
                     mfr = self._get_manufacturer_from_rom(rom)
                     if mfr:
                         result_by_mfr.setdefault(mfr, set()).add(rom)
+                    self._rom_emoji_cache[rom] = self._resolve_emoji_for_rom(rom)
             if skipped > 0 or vpxtool_warn > 0:
                 log(self.cfg, f"[SCAN] Table scan complete: {len(result_all)} ROMs with maps, {skipped} skipped (no map), {vpxtool_warn} vpxtool warnings", "INFO")
 

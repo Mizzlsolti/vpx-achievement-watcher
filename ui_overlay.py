@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import json
+import sys
 
 from typing import Optional
 
@@ -1952,6 +1953,41 @@ class AchToastWindow(QWidget):
         super().closeEvent(e)
 
     def _icon_pixmap(self, size: int = 40) -> QPixmap:
+        emoji = ""
+        try:
+            if self._rom == "__levelup__":
+                emoji = "⬆️"
+            else:
+                watcher = getattr(self.parent_gui, "watcher", None)
+                if watcher:
+                    cache = getattr(watcher, "_rom_emoji_cache", {})
+                    emoji = cache.get(self._rom, "")
+                    if not emoji and hasattr(watcher, "_resolve_emoji_for_rom"):
+                        emoji = watcher._resolve_emoji_for_rom(self._rom)
+        except Exception:
+            emoji = ""
+
+        if emoji:
+            pm = QPixmap(size, size)
+            pm.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pm)
+            try:
+                p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                if sys.platform == "win32":
+                    font_name = "Segoe UI Emoji"
+                elif sys.platform == "darwin":
+                    font_name = "Apple Color Emoji"
+                else:
+                    font_name = "Noto Color Emoji"
+                font = QFont(font_name, int(size * 0.75))
+                p.setFont(font)
+                p.drawText(QRect(0, 0, size, size),
+                           Qt.AlignmentFlag.AlignCenter, emoji)
+            finally:
+                p.end()
+            return pm
+
+        # Fallback: original gold/white circles
         pm = QPixmap(size, size)
         pm.fill(Qt.GlobalColor.transparent)
         p = QPainter(pm)
