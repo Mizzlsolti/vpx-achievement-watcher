@@ -2526,7 +2526,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return any(h.get(cat) for cat in ("Power", "Precision", "Fun"))
 
         sections = []
-        players_raw = read_active_players(self.cfg.BASE)
+
+        # Prefer the in-memory snapshot cache (avoids a disk read race where the
+        # file hasn't been flushed yet but the overlay signal has already arrived).
+        players_raw = []
+        try:
+            cached = getattr(self.watcher, "_overlay_snapshot_cache", None)
+            if cached and isinstance(cached, dict):
+                players_raw = [{
+                    "id": 1,
+                    "highlights": cached.get("highlights", {}),
+                    "playtime_sec": int(cached.get("playtime_sec", 0) or 0),
+                    "score": int(cached.get("score", 0) or 0),
+                    "title": "Player 1",
+                    "player": 1,
+                    "rom": cached.get("rom", ""),
+                }]
+        except Exception:
+            pass
+
+        if not players_raw:
+            players_raw = read_active_players(self.cfg.BASE)
+
         combined_players = []
         if players_raw:
             for p in players_raw:
