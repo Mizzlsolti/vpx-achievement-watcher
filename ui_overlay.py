@@ -2091,8 +2091,8 @@ class AchToastWindow(QWidget):
                 pass
 
             if table_name:
-                # Strip trailing version number, e.g. "Cactus Canyon (1.3)" → "Cactus Canyon"
-                table_name = re.sub(r'\s*\([\d.]+\)\s*$', '', table_name).strip()
+                # Strip everything from the first " (" onwards, e.g. "AC/DC Limited Edition (V1.5)" → "AC/DC Limited Edition"
+                table_name = table_name.split(" (")[0].strip()
 
             line2 = table_name if table_name else rom
 
