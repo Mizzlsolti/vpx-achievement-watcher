@@ -240,6 +240,13 @@ class OverlayEffectsWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        low_perf = False
+        try:
+            low_perf = bool(self.parent().parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+        except Exception:
+            pass
+        if low_perf:
+            return
         if not self._particles:
             self._init_particles()
         if not self._tick_timer.isActive():
@@ -267,6 +274,13 @@ class OverlayEffectsWidget(QWidget):
     def paintEvent(self, event):
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
+            return
+        low_perf = False
+        try:
+            low_perf = bool(self.parent().parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+        except Exception:
+            pass
+        if low_perf:
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -351,9 +365,11 @@ class OverlayWindow(QWidget):
             QTimer.singleShot(0, self._show_live_unrotated)
         # Start effects overlay (glow border + floating particles)
         if hasattr(self, '_effects_widget'):
-            self._effects_widget.setGeometry(0, 0, self.width(), self.height())
-            self._effects_widget.show()
-            self._effects_widget.raise_()
+            low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            if not low_perf:
+                self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+                self._effects_widget.show()
+                self._effects_widget.raise_()
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -717,8 +733,10 @@ class OverlayWindow(QWidget):
                 self._nav_arrows.raise_()
             # Keep effects widget (glow + particles) on top
             if hasattr(self, '_effects_widget') and self._effects_widget.isVisible():
-                self._effects_widget.setGeometry(0, 0, W, H)
-                self._effects_widget.raise_()
+                low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+                if not low_perf:
+                    self._effects_widget.setGeometry(0, 0, W, H)
+                    self._effects_widget.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()
@@ -794,8 +812,10 @@ class OverlayWindow(QWidget):
             self._nav_arrows.setGeometry(0, 0, self.width(), self.height())
             self._nav_arrows.raise_()
         if hasattr(self, '_effects_widget') and self._effects_widget.isVisible():
-            self._effects_widget.setGeometry(0, 0, self.width(), self.height())
-            self._effects_widget.raise_()
+            low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            if not low_perf:
+                self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+                self._effects_widget.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._fullsize_mode = False
@@ -962,11 +982,15 @@ class OverlayWindow(QWidget):
         new_pct_target = pct if total_achs > 0 else 0.0
         if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
             self._progress_pct_target = new_pct_target
-            if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
-                # Fresh start: jump to 0 for a fill animation
-                self._progress_pct_current = 0.0
-            if hasattr(self, '_progress_bar_timer'):
-                self._progress_bar_timer.start()
+            low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            if low_perf:
+                self._progress_pct_current = self._progress_pct_target
+            else:
+                if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
+                    # Fresh start: jump to 0 for a fill animation
+                    self._progress_pct_current = 0.0
+                if hasattr(self, '_progress_bar_timer'):
+                    self._progress_bar_timer.start()
 
         style = """
         <style>
@@ -995,7 +1019,10 @@ class OverlayWindow(QWidget):
                 self._score_target = score_abs
                 if getattr(self, '_score_display', 0) == 0:
                     self._score_display = 0
-                if hasattr(self, '_score_spin_timer'):
+                low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+                if low_perf:
+                    self._score_display = self._score_target
+                elif hasattr(self, '_score_spin_timer'):
                     self._score_spin_timer.start()
 
             lines = []
@@ -1196,6 +1223,11 @@ class OverlayWindow(QWidget):
         captures the current display, runs the callback to update content, then animates
         between old and new snapshots.
         """
+        low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+        if low_perf:
+            new_content_callback()
+            return
+
         old_img = self._snapshot_current()
         if old_img is None or old_img.isNull():
             new_content_callback()
@@ -3719,7 +3751,7 @@ class ChallengeStartCountdown(QWidget):
         self._step_elapsed = 0.0
 
         self._timer = QTimer(self)
-        self._timer.setInterval(16)
+        self._timer.setInterval(50 if self._low_perf else 16)
         self._timer.timeout.connect(self._tick)
 
         _start_topmost_timer(self)
@@ -3735,7 +3767,7 @@ class ChallengeStartCountdown(QWidget):
             self.finished.emit()
             self.close()
             return
-        self._step_elapsed += 16.0
+        self._step_elapsed += float(self._timer.interval())
         _, _, duration, _ = self._steps[self._step_idx]
         if self._step_elapsed >= duration:
             self._step_elapsed = 0.0
