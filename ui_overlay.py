@@ -428,9 +428,9 @@ class OverlayWindow(QWidget):
         if self.bg_url:
             css = ("QWidget#overlay_bg {"
                    f"border-image: url('{self.bg_url}') 0 0 0 0 stretch stretch;"
-                   "background:rgba(8,12,22,230);border:2px solid #00E5FF;border-radius:18px;}")
+                   "background:rgba(8,12,22,245);border:2px solid #00E5FF;border-radius:18px;}")
         else:
-            css = ("QWidget#overlay_bg {background:rgba(8,12,22,230);"
+            css = ("QWidget#overlay_bg {background:rgba(8,12,22,245);"
                    "border:2px solid #00E5FF;border-radius:18px;}")
         self.container.setStyleSheet(css)
         self.text_container = QWidget(self)
@@ -648,9 +648,9 @@ class OverlayWindow(QWidget):
                     bg_img = scaled.copy(cx, cy, min(W, sw - cx), min(H, sh - cy)).toImage().convertToFormat(
                         QImage.Format.Format_ARGB32_Premultiplied)
                 else:
-                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 230))
+                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 245))
             else:
-                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 230))
+                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 245))
             pre_w, pre_h = H, W
             old_geom = self.text_container.geometry()
             old_title_vis = self.title.isVisible()
@@ -1288,7 +1288,7 @@ class MiniInfoOverlay(QWidget):
         self._font_family = ov.get("font_family", "Segoe UI")
         self._red = "#FF3B30"                          
         self._hint = "#DDDDDD"                         
-        self._bg_color = QColor(8, 12, 22, 230)
+        self._bg_color = QColor(8, 12, 22, 245)
         self._radius = 16
         self._pad_w = 28
         self._pad_h = 22
@@ -1526,7 +1526,7 @@ class FlipCounterOverlay(QWidget):
         p = QPainter(img)
         try:
             p.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing, True)
-            bg = QColor(8, 12, 22, 235)
+            bg = QColor(8, 12, 22, 245)
             radius = 16
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(bg)
@@ -1674,7 +1674,7 @@ class FlipCounterPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -1791,7 +1791,7 @@ class TimerPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -1908,7 +1908,7 @@ class ToastPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -2023,7 +2023,7 @@ class ChallengeOVPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -2141,7 +2141,7 @@ class MiniInfoPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -2263,7 +2263,7 @@ class OverlayPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
@@ -2570,7 +2570,7 @@ class AchToastWindow(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         
-        bg = QColor(8, 12, 22, 210)
+        bg = QColor(8, 12, 22, 245)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(bg)
         radius = 16
@@ -2916,7 +2916,7 @@ class ChallengeCountdownOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(8, 12, 22, 235))
+        p.setBrush(QColor(8, 12, 22, 245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
         _draw_glow_border(p, 0, 0, w, h, radius=16)
         p.setPen(Qt.GlobalColor.white)
@@ -3042,7 +3042,7 @@ class ChallengeSelectOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 235))
+            p.setBrush(QColor(8, 12, 22, 245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
 
@@ -3260,7 +3260,7 @@ class FlipDifficultyOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 235))
+            p.setBrush(QColor(8, 12, 22, 245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
             _draw_glow_border(p, 0, 0, w, h, radius=radius)
@@ -3427,7 +3427,7 @@ class HeatBarometerOverlay(QWidget):
 
             # background
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 220))
+            p.setBrush(QColor(8, 12, 22, 245))
             p.drawRoundedRect(0, 0, w, h, 10, 10)
 
             # border with glow
@@ -3592,7 +3592,7 @@ class HeatBarPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 200))
+        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
         pen = QPen(QColor("#FF7F00"))
         pen.setWidth(2)
         p.setPen(pen)
