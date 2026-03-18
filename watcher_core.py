@@ -545,11 +545,7 @@ def _raw_save_json(path, obj):
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(obj, f, indent=2, ensure_ascii=False)
-            try:
-                f.flush()
-                os.fsync(f.fileno())
-            except Exception:
-                pass
+            f.flush()
         try:
             os.replace(tmp, path)
         except Exception:
@@ -2396,6 +2392,10 @@ class Watcher:
     def _vp_player_visible(self) -> bool:
         if not win32gui:
             return False
+        now = time.time()
+        cache = getattr(self, "_vp_visible_cache", None)
+        if cache and (now - cache[0]) < 1.0:
+            return cache[1]
         visible = {"flag": False}
         def _cb(hwnd, _):
             try:
@@ -2411,7 +2411,9 @@ class Watcher:
             win32gui.EnumWindows(_cb, None)
         except Exception:
             return False
-        return bool(visible["flag"])
+        result = bool(visible["flag"])
+        self._vp_visible_cache = (now, result)
+        return result
 
     def _get_vp_player_rect(self) -> tuple[int, int, int, int] | None:
         if not win32gui:
@@ -5139,6 +5141,14 @@ class Watcher:
     
     def _thread_main(self):
         log(self.cfg, ">>> watcher thread running")
+        # Lower thread priority so VPX always gets CPU scheduler priority
+        try:
+            THREAD_PRIORITY_BELOW_NORMAL = -1
+            handle = ctypes.windll.kernel32.GetCurrentThread()
+            ctypes.windll.kernel32.SetThreadPriority(handle, THREAD_PRIORITY_BELOW_NORMAL)
+            log(self.cfg, "[WATCHER] thread priority set to BELOW_NORMAL")
+        except Exception as e:
+            log(self.cfg, f"[WATCHER] could not set thread priority: {e}", "WARN")
         active_rom = None
         if not hasattr(self, "_last_live_export_ts"):
             self._last_live_export_ts = 0.0
@@ -5238,7 +5248,11 @@ class Watcher:
                         active_rom = None
                         self._missing_table_ticks = 0
 
-            time.sleep(0.5)
+            # Sleep longer while game is active to reduce CPU/IO pressure on VPX
+            if active_rom is not None:
+                time.sleep(1.0)
+            else:
+                time.sleep(0.5)
 
     def start(self):
         if getattr(self, "thread", None) and self.thread.is_alive():
