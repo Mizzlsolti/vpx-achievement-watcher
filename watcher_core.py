@@ -960,6 +960,32 @@ class CloudSync:
             return None
 
     @staticmethod
+    def fetch_parallel(cfg: AppConfig, node_paths: list, max_workers: int = 10) -> dict:
+        """Fetch multiple Firebase nodes in parallel using ThreadPoolExecutor.
+
+        Returns a dict mapping each node_path to its fetched data (or None on error).
+        Turns N sequential requests into ~1 round-trip of parallel requests.
+        """
+        import concurrent.futures
+        if not node_paths:
+            return {}
+        results = {}
+
+        def _fetch_one(node_path):
+            return node_path, CloudSync.fetch_node(cfg, node_path)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(node_paths))) as executor:
+            futures = {executor.submit(_fetch_one, path): path for path in node_paths}
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    path, data = future.result()
+                    results[path] = data
+                except Exception as e:
+                    path = futures.get(future, "unknown")
+                    log(cfg, f"[CLOUD] fetch_parallel error for {path}: {e}", "ERROR")
+        return results
+
+    @staticmethod
     def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):
         """Upload the full achievements state (global + session + roms_played) to Firebase
         under /players/{pid}/achievements.json. Called automatically after each session
