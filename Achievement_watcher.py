@@ -1882,34 +1882,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
                 tooltip = _tooltip_for_rule(r, unlocked=False).replace("'", "&#39;")
-                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count", "session_time"):
-                    if rtype_display == "session_time":
-                        need = int(cond.get("min_seconds", cond.get("min", 1)))
-                        need_min = need / 60  # convert threshold to minutes
-
-                        tally = global_tally.get(title, {})
-                        cached_progress = float(tally.get("progress", 0))
-                        # Progress is stored in seconds; convert to minutes unless already marked as minutes.
-                        if tally.get("unit") != "minutes":
-                            cached_progress = cached_progress / 60
-
-                        # NVRAM-based: "MINUTES ON" summed across all ROMs (already in minutes)
-                        live_minutes = _live_nvram_total("MINUTES ON") if _roms_played_for_live else 0
-
-                        progress_min = max(cached_progress, float(live_minutes))
-
-                        # Add live session time if a game is currently active (convert seconds → minutes)
-                        if self.watcher.game_active and self.watcher.start_time:
-                            progress_min += (time.time() - self.watcher.start_time) / 60
-
-                        progress_min_display = round(progress_min, 1)
-                        need_min_display = round(need_min, 1)
-                        label = f"{progress_min_display}/{need_min_display} min"
-                        cells.append(
-                            f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{label}</span></td>"
-                        )
-                    elif rtype_display in ("nvram_tally", "challenge_count"):
+                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count"):
+                    if rtype_display in ("nvram_tally", "challenge_count"):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
                         cached_progress = int(tally.get("progress", 0))
