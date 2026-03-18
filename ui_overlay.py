@@ -1118,7 +1118,11 @@ class OverlayWindow(QWidget):
         if self._score_display == self._score_target:
             self._score_spin_timer.stop()
             return
-        step = max(1, abs(self._score_target - self._score_display) // 20)
+        diff = abs(self._score_target - self._score_display)
+        # Cap animation to ~15 ticks (~750ms at 50ms interval) regardless of score magnitude.
+        # Also enforce a minimum step of 1% of the target so huge values don't stall at the end.
+        MAX_TICKS = 15
+        step = max(1, diff // MAX_TICKS, abs(self._score_target) // 100)
         if self._score_display < self._score_target:
             self._score_display = min(self._score_target, self._score_display + step)
         else:
