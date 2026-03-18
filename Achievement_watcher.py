@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextEdit, QTextBrowser, QSystemTrayIcon, QMenu, QFileDialog, QMessageBox, QTabWidget,
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
-    QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout
+    QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot)
@@ -41,6 +41,7 @@ from watcher_core import (
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, vk_to_name_en,
+    compute_player_level, LEVEL_TABLE,
 )
 
 from ui_dialogs import SetupWizardDialog
@@ -87,7 +88,8 @@ class Bridge(QObject):
     
     prefetch_started = pyqtSignal()
     prefetch_progress = pyqtSignal(str)
-    prefetch_finished = pyqtSignal(str)                     
+    prefetch_finished = pyqtSignal(str)
+    level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
 
 class MainWindow(QMainWindow, CloudStatsMixin):
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
@@ -123,6 +125,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.prefetch_started.connect(self._on_prefetch_started)
         self.bridge.prefetch_progress.connect(self._on_prefetch_progress)
         self.bridge.prefetch_finished.connect(self._on_prefetch_finished)
+        self.bridge.level_up_show.connect(self._on_level_up)
+        self.bridge.achievements_updated.connect(self._refresh_level_display)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -1422,6 +1426,48 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_status.addWidget(self.status_label)
         layout.addWidget(grp_status)
 
+        grp_level = QGroupBox("👑 Player Level")
+        lay_level = QVBoxLayout(grp_level)
+
+        self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
+        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
+        self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
+
+        self.bar_level = QProgressBar()
+        self.bar_level.setRange(0, 100)
+        self.bar_level.setValue(0)
+        self.bar_level.setTextVisible(False)
+        self.bar_level.setFixedHeight(18)
+        self.bar_level.setStyleSheet(
+            "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
+            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
+        )
+
+        row_level_info = QHBoxLayout()
+        self.lbl_level_count = QLabel("0 Achievements unlocked")
+        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
+        self.lbl_level_next = QLabel("")
+        self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
+        self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
+        row_level_info.addWidget(self.lbl_level_count)
+        row_level_info.addStretch(1)
+        row_level_info.addWidget(self.lbl_level_next)
+
+        lay_level.addWidget(self.lbl_level_icon_name)
+        lay_level.addWidget(self.bar_level)
+        lay_level.addLayout(row_level_info)
+
+        grp_level_table = QGroupBox("Level Table")
+        lay_level_table = QVBoxLayout(grp_level_table)
+        lv_browser = QTextBrowser()
+        lv_browser.setMaximumHeight(260)
+        lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
+        lay_level_table.addWidget(lv_browser)
+        self.lv_table_browser = lv_browser
+
+        lay_level.addWidget(grp_level_table)
+        layout.addWidget(grp_level)
+
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
@@ -1447,6 +1493,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         layout.addStretch(1)
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
+        QTimer.singleShot(1500, self._refresh_level_display)
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
@@ -2756,9 +2803,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 cells.append(f"<td class='locked'>🔒 {esc(clean)}</td>")
 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
+        try:
+            _state_for_lv = self.watcher._ach_state_load()
+            _lv = compute_player_level(_state_for_lv)
+            level_badge = f"{_lv['icon']} {_lv['label']} • Level {_lv['level']} • {_lv['total']} Achievements"
+        except Exception:
+            level_badge = ""
         header_html = (
             f"<div class='hdr'>{esc(header)}</div>"
-            f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
+            + (f"<div style='color:#FF7F00;font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
+            + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
         )
 
         # Always use 4 columns so the table is compact and consistent at any scale
@@ -3319,6 +3373,48 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _on_ach_toast_show(self, title: str, rom: str, seconds: int = 5):
         try:
             self._ach_toast_mgr.enqueue(title, rom, max(1, int(seconds)))
+        except Exception:
+            pass
+
+    def _on_level_up(self, level_name: str, level_number: int):
+        try:
+            toast_title = f"⬆️ LEVEL UP!  {level_name}"
+            self._ach_toast_mgr.enqueue_level_up(toast_title, level_number, seconds=6)
+        except Exception:
+            pass
+        try:
+            self._refresh_level_display()
+        except Exception:
+            pass
+
+    def _refresh_level_display(self):
+        try:
+            state = self.watcher._ach_state_load()
+            lv = compute_player_level(state)
+            self.lbl_level_icon_name.setText(f"{lv['icon']}  <b>{lv['label']}</b>   Level {lv['level']}")
+            if lv["max_level"]:
+                self.lbl_level_next.setText("🌟 Max Level reached!")
+                self.bar_level.setValue(100)
+            else:
+                self.lbl_level_next.setText(
+                    f"Next: {LEVEL_TABLE[lv['level']][2]}  (Level {lv['level']+1}) — {lv['next_at'] - lv['total']} more Achievements"
+                )
+                self.bar_level.setValue(int(lv["progress_pct"]))
+            self.lbl_level_count.setText(f"{lv['total']} Achievements unlocked")
+            rows_html = ""
+            for threshold, lvl, name in LEVEL_TABLE:
+                cls = ' class="current"' if lvl == lv["level"] else ""
+                marker = " ◀" if lvl == lv["level"] else ""
+                rows_html += f"<tr{cls}><td>{lvl}</td><td>{name}{marker}</td><td>{threshold}</td></tr>"
+            self.lv_table_browser.setHtml(
+                "<style>table{border-collapse:collapse;width:100%}"
+                "th{color:#FF7F00;font-weight:bold;padding:4px 8px;border-bottom:2px solid #555;background:#111;text-align:left}"
+                "td{padding:3px 8px;border-bottom:1px solid #2a2a2a;color:#CCC}"
+                ".current td{color:#00E5FF;font-weight:bold;background:#152015}"
+                "</style>"
+                "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
+                + rows_html + "</table>"
+            )
         except Exception:
             pass
 

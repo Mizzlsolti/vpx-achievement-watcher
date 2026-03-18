@@ -686,6 +686,77 @@ def sanitize_filename(s):
     s = re.sub(r"[^\w\-. ]+", "_", str(s))
     return s.strip().replace(" ", "_")
 
+LEVEL_TABLE = [
+    (0,    1,  "🪙 Rookie"),
+    (10,   2,  "🥉 Apprentice"),
+    (25,   3,  "🥈 Veteran"),
+    (50,   4,  "🥇 Expert"),
+    (100,  5,  "🏆 Master"),
+    (200,  6,  "💎 Grand Master"),
+    (400,  7,  "👑 Pinball Legend"),
+    (750,  8,  "🔥 Pinball God"),
+    (1200, 9,  "⚡ Multiball King"),
+    (2000, 10, "🌟 VPX Elite"),
+]
+
+def compute_player_level(state: dict) -> dict:
+    """
+    Compute the player level from the achievements state.
+    Counts all unique unlocked achievement titles across global + all session ROMs (deduped).
+    Returns dict with keys: level (int), name (str), icon (str), label (str), total (int),
+    next_at (int), progress_pct (float), prev_at (int), max_level (bool)
+    """
+    seen = set()
+    # global
+    for entries in (state.get("global") or {}).values():
+        for e in (entries or []):
+            t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+            if t:
+                seen.add(t)
+    # session (all ROMs)
+    for entries in (state.get("session") or {}).values():
+        for e in (entries or []):
+            t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+            if t:
+                seen.add(t)
+    total = len(seen)
+
+    current_level = 1
+    current_name = LEVEL_TABLE[0][2]
+    prev_at = 0
+    next_at = LEVEL_TABLE[1][0] if len(LEVEL_TABLE) > 1 else total + 1
+
+    for threshold, lvl, name in LEVEL_TABLE:
+        if total >= threshold:
+            current_level = lvl
+            current_name = name
+            prev_at = threshold
+        else:
+            next_at = threshold
+            break
+    else:
+        next_at = prev_at  # max level reached
+
+    icon = current_name.split(" ")[0]  # the emoji
+    label = " ".join(current_name.split(" ")[1:])  # the name without emoji
+
+    if next_at > prev_at:
+        progress_pct = round((total - prev_at) / (next_at - prev_at) * 100, 1)
+    else:
+        progress_pct = 100.0  # max level
+
+    return {
+        "level": current_level,
+        "name": current_name,
+        "icon": icon,
+        "label": label,
+        "total": total,
+        "next_at": next_at,
+        "prev_at": prev_at,
+        "progress_pct": progress_pct,
+        "max_level": current_level == LEVEL_TABLE[-1][1],
+    }
+
 import urllib.request
 
 class CloudSync:
@@ -883,12 +954,15 @@ class CloudSync:
                 roms_played = list(state.get("roms_played", []) or [])
             except Exception:
                 pass
+            lv = compute_player_level(state)
             payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "global": global_entries,
                 "session": session_entries,
                 "roms_played": roms_played,
+                "player_level": lv["level"],
+                "player_level_name": lv["name"],
             }
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
@@ -4705,6 +4779,7 @@ class Watcher:
         from datetime import datetime, timezone
         now_iso = datetime.now(timezone.utc).isoformat()
         state = self._ach_state_load()
+        old_level_info = compute_player_level(state)
         bucket = state.setdefault(kind, {})
         storage_key = "__global__" if kind == "global" else rom
         lst = bucket.setdefault(storage_key, [])
@@ -4737,6 +4812,12 @@ class Watcher:
                 added += 1
         if added:
             self._ach_state_save(state)
+            new_level_info = compute_player_level(state)
+            if new_level_info["level"] > old_level_info["level"]:
+                try:
+                    self.bridge.level_up_show.emit(new_level_info["name"], new_level_info["level"])
+                except Exception:
+                    pass
             try:
                 if getattr(self, "bridge", None) and hasattr(self.bridge, "achievements_updated"):
                     self.bridge.achievements_updated.emit()

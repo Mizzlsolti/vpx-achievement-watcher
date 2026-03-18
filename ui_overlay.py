@@ -1965,15 +1965,26 @@ class AchToastWindow(QWidget):
         font_family = str(ov.get("font_family", "Segoe UI"))
         body_pt = 15
         title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
-        
+
+        is_level_up = (self._rom == "__levelup__")
+        if is_level_up:
+            border_color = QColor("#00E5FF")
+            line1 = "⬆️  LEVEL UP!"
+            line2 = self._title.replace("⬆️ LEVEL UP!  ", "").strip()
+        else:
+            border_color = QColor("#555555")
+            line1 = self._title or "Achievement unlocked"
+            line2 = self._rom or ""
+
         # Feste Theme-Farben
         title_color = QColor("#FF7F00") # Orange
         text_color = QColor("#FFFFFF")  # Weiß
-        
-        title = self._title or "Achievement unlocked"
-        sub = self._rom or ""
+        levelup_color = QColor("#00E5FF")  # Cyan for level-up line1
+
+        title = line1
+        sub = line2
         f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
-        f_body = QFont(font_family, body_pt)
+        f_body = QFont(font_family, body_pt, QFont.Weight.Bold if is_level_up else QFont.Weight.Normal)
         fm_title = QFontMetrics(f_title)
         fm_body = QFontMetrics(f_body)
         icon_sz = max(28, int(body_pt * 2.0))
@@ -2002,8 +2013,7 @@ class AchToastWindow(QWidget):
         radius = 16
         p.drawRoundedRect(0, 0, W, H, radius, radius)
         
-        # Eisblauer Rahmen
-        pen = QPen(QColor("#00E5FF"))
+        pen = QPen(border_color)
         pen.setWidth(2)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
@@ -2015,12 +2025,12 @@ class AchToastWindow(QWidget):
         x_text = pad + icon_sz + gap
         text_top = int((H - text_h) / 2)
         
-        p.setPen(title_color)
+        p.setPen(levelup_color if is_level_up else title_color)
         p.setFont(f_title)
         p.drawText(QRect(x_text, text_top, W - x_text - pad, fm_title.height()),
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
         if sub:
-            p.setPen(text_color)
+            p.setPen(title_color if is_level_up else text_color)
             p.setFont(f_body)
             p.drawText(QRect(x_text, text_top + fm_title.height() + vgap,
                              W - x_text - pad, fm_body.height()),
@@ -2085,6 +2095,12 @@ class AchToastManager(QObject):
     def enqueue(self, title: str, rom: str, seconds: int = 5):
         """Fügt einen Toast in die Warteschlange ein."""
         self._queue.append((title, rom, seconds))
+        if not self._active:
+            self._show_next()
+
+    def enqueue_level_up(self, title: str, level_number: int, seconds: int = 6):
+        """Enqueue a special level-up toast."""
+        self._queue.append((title, "__levelup__", seconds))
         if not self._active:
             self._show_next()
 
