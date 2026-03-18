@@ -3286,6 +3286,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         try:
             if self.watcher and self.watcher.game_active:
+                # Wenn eine Challenge aktiv ist oder gestartet wird → nichts tun
+                ch = getattr(self.watcher, "challenge", {}) or {}
+                if ch.get("active") or ch.get("suppress_big_overlay_once"):
+                    return
                 try:
                     if self.overlay and self.overlay.isVisible():
                         self.overlay.hide()
@@ -3575,6 +3579,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if getattr(self, "_challenge_select", None) and self._challenge_select.isVisible():
                 return
             if getattr(self, "_flip_diff_select", None) and self._flip_diff_select.isVisible():
+                return
+        except Exception:
+            pass
+
+        # Während Challenge keine Overlay-Toggle erlauben
+        try:
+            ch = getattr(self.watcher, "challenge", {}) or {}
+            if ch.get("active") or ch.get("suppress_big_overlay_once"):
                 return
         except Exception:
             pass

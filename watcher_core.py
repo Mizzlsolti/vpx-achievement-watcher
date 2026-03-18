@@ -1059,6 +1059,7 @@ class Watcher:
         self.bootstrap_phase = False
         
         self._flip_init_state()
+        self._toasted_titles: set = set()
 
     def _map_fields_for_rom(self, rom: str) -> list[str]:
         out = []
@@ -4927,19 +4928,22 @@ class Watcher:
   
     def _emit_achievement_toasts(self, titles, seconds: int = 5):
         try:
+            already_shown = getattr(self, "_toasted_titles", set())
             for t in titles or []:
                 if isinstance(t, dict):
                     title = str(t.get("title", "")).strip()
                 else:
                     title = str(t).strip()
-                    
+
                 title = title.replace(" (Session)", "").replace(" (Global)", "")
-                
-                if title:
+
+                if title and title not in already_shown:
+                    already_shown.add(title)
                     try:
                         self.bridge.ach_toast_show.emit(title, self.current_rom or "", int(seconds))
                     except Exception:
                         pass
+            self._toasted_titles = already_shown
         except Exception:
             pass  
   
@@ -4981,6 +4985,7 @@ class Watcher:
         self.start_time = time.time()
         self.game_active = True
         self.players.clear()
+        self._toasted_titles = set()
 
         self.start_audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
 
