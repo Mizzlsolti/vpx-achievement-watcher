@@ -1363,7 +1363,6 @@ class Watcher:
             "Games Started", "Balls Played", "Ramps Made", "Jackpots",
             "Total Multiballs", "Loops",
             "Combos", "Extra Balls", "Ball Saves",
-            "Modes Started", "Modes Completed"
         ]
 
         total_target = 150
@@ -4083,15 +4082,13 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
                     now_iso = datetime.now(timezone.utc).isoformat()
                     tally["entries"].append({"rom": rom, "delta": int(duration_sec or 0), "ts": now_iso})
                     tally["progress"] += int(duration_sec or 0)
                     self._ach_state_save(state)
-                    if tally["progress"] >= min_s and title not in seen_aw:
+                    if tally["progress"] >= min_s and title not in seen_aw and title not in already_global:
                         awarded.append(title); seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
@@ -4394,7 +4391,7 @@ class Watcher:
                 cur = data.get("rules") or []
                 if isinstance(cur, list) and len(cur) >= 155:
                     # Force regeneration if any removed categories are still present
-                    REMOVED_FIELDS = {"Drop Targets", "Spinner", "Orbits"}
+                    REMOVED_FIELDS = {"Drop Targets", "Spinner", "Orbits", "Modes Started", "Modes Completed"}
                     has_removed = any(
                         cond.get("field") in REMOVED_FIELDS
                         for r in cur
@@ -4621,8 +4618,6 @@ class Watcher:
         "Extra Balls":      [("extra ball",)],
         "Games Started":    [("games started",), ("games played",)],
         "Balls Played":     [("balls played",), ("ball count",), ("total balls",)],
-        "Modes Started":    [("mode", "start")],
-        "Modes Completed":  [("mode", "complete")],
     }
 
     def _fuzzy_sum_deltas(self, deltas_ci: dict, canonical_field: str) -> int:

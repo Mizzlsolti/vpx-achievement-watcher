@@ -1871,6 +1871,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         need = int(cond.get("min_seconds", cond.get("min", 1)))
                         tally = global_tally.get(title, {})
                         progress = int(tally.get("progress", 0))
+                        if progress == 0 and _roms_played_for_live:
+                            progress = _live_nvram_total("MINUTES ON") * 60
                         # Add live session time if a game is currently active (display only)
                         if self.watcher.game_active and self.watcher.start_time:
                             progress += int(time.time() - self.watcher.start_time)
