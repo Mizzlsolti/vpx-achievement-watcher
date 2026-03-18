@@ -10,7 +10,7 @@ import random
 from typing import Optional
 
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect, QObject, QPoint
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect, QObject, QPoint, QEventLoop
 from PyQt6.QtGui import (
     QColor, QFont, QFontMetrics, QTransform, QPixmap,
     QPainter, QImage, QPen,
@@ -77,7 +77,7 @@ def _force_topmost(widget: QWidget):
         pass
 
 
-def _start_topmost_timer(widget: QWidget, interval_ms: int = 500):
+def _start_topmost_timer(widget: QWidget, interval_ms: int = 3000):
     """Start a periodic timer that re-applies HWND_TOPMOST to keep the widget above fullscreen apps.
     The timer is stored as widget._topmost_timer to prevent garbage collection."""
     timer = QTimer(widget)
@@ -97,7 +97,7 @@ class OverlayNavArrows(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._pulse_t = 0.0
         self._pulse_timer = QTimer(self)
-        self._pulse_timer.setInterval(50)
+        self._pulse_timer.setInterval(80)
         self._pulse_timer.timeout.connect(self._on_tick)
         self.hide()
 
@@ -111,7 +111,7 @@ class OverlayNavArrows(QWidget):
         self._pulse_timer.stop()
 
     def _on_tick(self):
-        self._pulse_t = (self._pulse_t + 0.08) % 1.0
+        self._pulse_t = (self._pulse_t + 0.13) % 1.0
         self.update()
 
     def paintEvent(self, event):
@@ -659,7 +659,7 @@ class OverlayWindow(QWidget):
             self.title.setVisible(not getattr(self, '_fullsize_mode', False))
             self.body.setVisible(True)
             self._layout_positions_for(pre_w, pre_h, portrait_pre_render=False)
-            QApplication.processEvents()
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 5)
             content_pre = QImage(pre_w, pre_h, QImage.Format.Format_ARGB32_Premultiplied)
             content_pre.fill(Qt.GlobalColor.transparent)
             p_all = QPainter(content_pre)
