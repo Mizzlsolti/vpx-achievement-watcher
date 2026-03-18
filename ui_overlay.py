@@ -591,6 +591,8 @@ class OverlayWindow(QWidget):
             self.text_container.setGeometry(0, 0, w, h)
 
     def _layout_positions(self):
+        if getattr(self, '_rot_in_progress', False):
+            return
         self._layout_positions_for(self.width(), self.height())
         if self.portrait_mode:
             self.request_rotation(force=True)
