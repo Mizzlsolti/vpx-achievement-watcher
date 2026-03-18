@@ -1057,7 +1057,10 @@ class Watcher:
         self.snap_initialized = False
         self.field_stats = {}
         self.bootstrap_phase = False
-        
+
+        # In-memory cache of the last overlay snapshot payload (avoids disk read race)
+        self._overlay_snapshot_cache: Optional[dict] = None
+
         self._flip_init_state()
         self._toasted_titles: set = set()
 
@@ -3975,6 +3978,9 @@ class Watcher:
             "highlights": highlights,
         }
 
+        # Cache the payload in memory so the overlay can read it without waiting for disk I/O
+        self._overlay_snapshot_cache = payload
+
         save_json(os.path.join(active_dir, f"{self.current_rom}_P1.json"), payload)
 
         try:
@@ -5120,6 +5126,17 @@ class Watcher:
                 except Exception as e:
                     log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
 
+                # Fire the overlay signal immediately after the snapshot data is ready,
+                # before slow achievement persistence and cloud uploads.
+                try:
+                    if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
+                        if self.current_rom and self._has_any_map(self.current_rom):
+                            self.bridge.overlay_show.emit()
+                        else:
+                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for {self.current_rom}")
+                except Exception as e:
+                    log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
+
                 try:
                     self._persist_and_toast_achievements(end_audits, duration_sec)
                 except Exception as e:
@@ -5144,18 +5161,15 @@ class Watcher:
                                 if t: unlocked_titles.add(t)
                                 
                             unlocked_total = len(unlocked_titles)
-                            CloudSync.upload_achievement_progress(self.cfg, self.current_rom, unlocked_total, total_achs)
+                            _rom = self.current_rom
+                            _cfg = self.cfg
+                            threading.Thread(
+                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs:
+                                    CloudSync.upload_achievement_progress(_c, _r, _ut, _ta),
+                                daemon=True,
+                            ).start()
                     except Exception as e:
                         log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
-
-            try:
-                if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True) and not is_challenge:
-                    if self.current_rom and self._has_any_map(self.current_rom):
-                        self.bridge.overlay_show.emit()
-                    else:
-                        log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for {self.current_rom}")
-            except Exception as e:
-                log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
         finally:
             self.current_table = None
