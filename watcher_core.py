@@ -1398,14 +1398,6 @@ class Watcher:
     def _generate_default_global_rules(self) -> list[dict]:
         rules: list[dict] = []
         seen: set[str] = set()
-        for mins in [10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 500, 750, 1000, 1500, 2000, 3000, 5000, 7500, 10000]:
-            title = self._unique_title(f"Global – Play {mins} Minutes", seen)
-            rules.append({
-                "title": title,
-                "scope": "global",
-                "condition": {"type": "session_time", "min_seconds": int(mins * 60)}
-            })
-
         candidate_fields = [
             "Games Started", "Balls Played", "Ramps Made", "Jackpots",
             "Total Multiballs", "Loops",
@@ -4140,58 +4132,6 @@ class Watcher:
                     if d >= need and title not in seen_aw:
                         awarded.append(title); seen_aw.add(title)
                         awarded_meta.append({"title": title, "origin": origin})
-                elif rtype == "session_time":
-                    min_s = int(cond.get("min_seconds", cond.get("min", 0)))
-                    need_min = min_s / 60  # convert threshold to minutes
-
-                    state = self._ach_state_load()
-                    already_global = {
-                        str(e.get("title", "")).strip()
-                        for entries in state.get("global", {}).values()
-                        for e in entries
-                    }
-                    if title in already_global:
-                        continue
-
-                    # 1) NVRAM-based: sum "MINUTES ON" across all played ROMs (already in minutes)
-                    roms_played = list(state.get("roms_played") or [])
-                    abs_minutes = self._sum_field_across_all_roms("MINUTES ON", roms_played, _rom_audits_cache)
-
-                    # 2) Incremental tally (stored in minutes)
-                    tally_bucket = state.setdefault("global_tally", {})
-                    tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
-
-                    # One-time migration: if progress was stored in seconds by an older version,
-                    # convert to minutes. Values > 100000 are impossible in minutes (~69 days).
-                    # Also catch mid-range seconds values (120..100000) by comparing against the
-                    # NVRAM absolute minutes which is definitively in minutes.
-                    raw_progress = float(tally.get("progress", 0))
-                    if tally.get("unit") != "minutes":
-                        if raw_progress > 100000:
-                            raw_progress = round(raw_progress / 60, 2)
-                        # 2× multiplier: a genuine minutes value should be close to the NVRAM
-                        # absolute; more than double it almost certainly means stored seconds.
-                        # 120 threshold: below 2 minutes the values are trivially ambiguous.
-                        elif abs_minutes > 0 and raw_progress > abs_minutes * 2 and raw_progress > 120:
-                            raw_progress = round(raw_progress / 60, 2)
-                        tally["progress"] = raw_progress
-
-                    delta_min = round((duration_sec or 0) / 60, 2)
-                    if delta_min > 0:
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        tally["entries"].append({"rom": rom, "delta": delta_min, "ts": now_iso})
-                        tally["progress"] += delta_min
-
-                    # Effective = max(NVRAM absolute, accumulated tally) — both in minutes
-                    effective = max(float(tally["progress"]), float(abs_minutes))
-                    tally["progress"] = effective
-                    tally["unit"] = "minutes"
-
-                    self._ach_state_save(state)
-
-                    if effective >= need_min and title not in seen_aw:
-                        awarded.append(title); seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
                     field = cond.get("field")
                     if not field or is_excluded_field(field):
@@ -4491,7 +4431,7 @@ class Watcher:
             try:
                 data = load_json(path, {}) or {}
                 cur = data.get("rules") or []
-                if isinstance(cur, list) and len(cur) >= 155:
+                if isinstance(cur, list) and len(cur) >= 136:  # 150 nvram_tally + manufacturer + challenge rules (19 session_time rules removed)
                     # Force regeneration if any removed categories are still present
                     REMOVED_FIELDS = {"Drop Targets", "Spinner", "Orbits", "Modes Started", "Modes Completed"}
                     has_removed = any(
@@ -4501,7 +4441,14 @@ class Watcher:
                         for cond in [r.get("condition", {})]
                         if isinstance(cond, dict) and cond.get("type") == "nvram_tally"
                     )
-                    if not has_removed:
+                    has_global_session_time = any(
+                        isinstance(r, dict)
+                        and isinstance(r.get("condition"), dict)
+                        and r["condition"].get("type") == "session_time"
+                        and str(r.get("scope", "")).lower() == "global"
+                        for r in cur
+                    )
+                    if not has_removed and not has_global_session_time:
                         return
             except Exception:
                 pass
