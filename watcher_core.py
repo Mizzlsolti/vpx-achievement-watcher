@@ -1268,75 +1268,86 @@ class Watcher:
             return False
  
     def _emit_mini_info_if_missing_map(self, rom: str, seconds: int = 5):
-        import os, time, win32gui
-        from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+        """Non-blocking: spawns a background thread to wait for VPX window and show info."""
+        import threading
+        def _worker():
+            import os, time
+            try:
+                import win32gui
+            except ImportError:
+                return
+            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+            try:
+                if not rom:
+                    return
+                if self._has_any_map(rom):
+                    return
+
+                maps_dir = p_local_maps(self.cfg)
+                cand1 = os.path.join(maps_dir, f"{rom}.json")
+                cand2 = os.path.join(maps_dir, f"{rom}.map.json")
+                if os.path.isfile(cand1) or os.path.isfile(cand2):
+                    return
+
+                shown = getattr(self, "_mini_info_shown_for_rom", None)
+                if not isinstance(shown, set):
+                    shown = set()
+                if rom in shown:
+                    return
+
+                def _vpx_window_visible() -> bool:
+                    found = False
+                    def _cb(hwnd, _):
+                        nonlocal found
+                        try:
+                            title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
+                            if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
+                                found = True
+                                return False
+                        except Exception:
+                            pass
+                        return True
+                    try:
+                        win32gui.EnumWindows(_cb, None)
+                    except Exception:
+                        return False
+                    return found
+
+                for _ in range(40):  # max 20s warten statt endlos
+                    if self._stop.is_set():
+                        return
+                    try:
+                        if not self.game_active:
+                            return
+                    except Exception:
+                        return
+                    if _vpx_window_visible():
+                        msg = f"NVRAM map not found for {rom}."
+                        dur = max(3, int(seconds))
+                        try:
+                            QMetaObject.invokeMethod(
+                                self.bridge,
+                                "challenge_info_show",
+                                Qt.ConnectionType.QueuedConnection,
+                                Q_ARG(str, msg),
+                                Q_ARG(int, dur),
+                                Q_ARG(str, "#FF3B30")
+                            )
+                            shown.add(rom)
+                            self._mini_info_shown_for_rom = shown
+                            log(self.cfg, f"[INFO] Mini overlay (no map) shown for {rom}")
+                        except Exception as e:
+                            log(self.cfg, f"[OVERLAY] mini info emit failed: {e}", "WARN")
+                        return
+                    time.sleep(0.5)
+            except Exception as e:
+                log(self.cfg, f"[OVERLAY] mini info worker failed: {e}", "WARN")
 
         try:
-            if not rom:
-                return
-            if self._has_any_map(rom):
-                return
-
-            maps_dir = p_local_maps(self.cfg)
-            cand1 = os.path.join(maps_dir, f"{rom}.json")
-            cand2 = os.path.join(maps_dir, f"{rom}.map.json")
-            if os.path.isfile(cand1) or os.path.isfile(cand2):
-                return
-
-            shown = getattr(self, "_mini_info_shown_for_rom", None)
-            if not isinstance(shown, set):
-                shown = set()
-            if rom in shown:
-                return
-
-            def _vpx_window_visible() -> bool:
-                found = False
-                def _cb(hwnd, _):
-                    nonlocal found
-                    try:
-                        title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
-                        if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
-                            found = True
-                            return False
-                    except Exception:
-                        pass
-                    return True
-                try:
-                    win32gui.EnumWindows(_cb, None)
-                except Exception:
-                    return False
-                return found
-
-            while not self._stop.is_set():
-                try:
-                    if not self.game_active:
-                        return
-                except Exception:
-                    return
-
-                if _vpx_window_visible():
-                    msg = f"NVRAM map not found for {rom}."
-                    dur = max(3, int(seconds))
-                    try:
-                        QMetaObject.invokeMethod(
-                            self.bridge,
-                            "challenge_info_show",
-                            Qt.ConnectionType.QueuedConnection,
-                            Q_ARG(str, msg),
-                            Q_ARG(int, dur),
-                            Q_ARG(str, "#FF3B30")
-                        )
-                        shown.add(rom)
-                        self._mini_info_shown_for_rom = shown
-                        log(self.cfg, f"[INFO] Mini overlay (no map) shown (window detected) for {rom}")
-                    except Exception as e:
-                        log(self.cfg, f"[OVERLAY] mini info emit failed: {e}", "WARN")
-                    return
-
-                time.sleep(0.5)
-
-        except Exception as e:
-            log(self.cfg, f"[OVERLAY] mini info init failed: {e}", "WARN")
+            t = threading.Thread(target=_worker, daemon=True, name="MiniInfoMissingMap")
+            t.start()
+        except Exception:
+            pass
                
     def _plausible_counter(self, label: str) -> bool:
         if not label:
@@ -2451,7 +2462,7 @@ class Watcher:
             return False
         now = time.time()
         cache = getattr(self, "_vp_visible_cache", None)
-        if cache and (now - cache[0]) < 1.0:
+        if cache and (now - cache[0]) < 0.3:
             return cache[1]
         visible = {"flag": False}
         def _cb(hwnd, _):
@@ -3081,7 +3092,16 @@ class Watcher:
             now = time.time()
 
             if not self._vp_player_visible():
-                log(self.cfg, "[CHALLENGE] VPX Player window closed early. Aborting challenge.")
+                # Grace Period: erst nach 3s Unsichtbarkeit abbrechen
+                grace_start = float(ch.get("_vpx_gone_since", 0.0))
+                if grace_start == 0.0:
+                    ch["_vpx_gone_since"] = now
+                    self.challenge = ch
+                    return  # noch NICHT abbrechen
+                elif (now - grace_start) < 3.0:
+                    return  # noch innerhalb Grace Period
+                # Ab hier: VPX war > 3s nicht sichtbar → jetzt abbrechen
+                log(self.cfg, "[CHALLENGE] VPX Player window gone for >3s. Aborting challenge.")
                 kind = str(ch.get("kind", "")).lower()
                 
                 if kind == "timed":
@@ -3099,8 +3119,14 @@ class Watcher:
                     
                 ch["active"] = False
                 ch["pending_kill_at"] = None
+                ch.pop("_vpx_gone_since", None)
                 self.challenge = ch
                 return
+            else:
+                # VPX ist sichtbar → Grace-Timer zurücksetzen
+                if ch.get("_vpx_gone_since"):
+                    ch.pop("_vpx_gone_since", None)
+                    self.challenge = ch
 
             if ch.get("kind") == "timed":
                 end_at = float(ch.get("end_at", 0.0) or 0.0)
@@ -3146,7 +3172,7 @@ class Watcher:
                 try:
                     now_t = time.time()
                     last_t = float(ch.get("heat_last_time", now_t) or now_t)
-                    delta = min(now_t - last_t, 0.5)
+                    delta = min(now_t - last_t, 1.5)
                     ch["heat_last_time"] = now_t
 
                     vk_l = int(ch.get("vk_left", 0) or 0) or VK_LSHIFT
@@ -5317,7 +5343,7 @@ class Watcher:
 
             # Sleep longer while game is active to reduce CPU/IO pressure on VPX
             if active_rom is not None:
-                time.sleep(1.5)
+                time.sleep(1.0)
             else:
                 time.sleep(2.0)
 
