@@ -463,9 +463,9 @@ class OverlayWindow(QWidget):
                     bg_img = scaled.copy(cx, cy, min(W, sw - cx), min(H, sh - cy)).toImage().convertToFormat(
                         QImage.Format.Format_ARGB32_Premultiplied)
                 else:
-                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(Qt.GlobalColor.black)
+                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 230))
             else:
-                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(Qt.GlobalColor.black)
+                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 230))
             pre_w, pre_h = H, W
             old_geom = self.text_container.geometry()
             old_title_vis = self.title.isVisible()
