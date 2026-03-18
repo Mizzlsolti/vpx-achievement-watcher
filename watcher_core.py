@@ -1035,6 +1035,9 @@ class Watcher:
             "score_base": 0, "last_balls_played": None, "balls": []
         }
         self._last_audits_global: Dict[str, Any] = {}
+        self._nvram_cache_rom: str = ""
+        self._nvram_cache_mtime: float = 0.0
+        self._nvram_cache_result: Tuple[Dict[str, Any], List[str], bool] = ({}, [], False)
         self.INDEX: Dict[str, Any] = {}
         self.ROMNAMES: Dict[str, Any] = {}
         
@@ -2258,7 +2261,14 @@ class Watcher:
     def read_nvram_audits_with_autofix(self, rom: str) -> Tuple[Dict[str, Any], List[str], bool]:
         if not rom:
             return {}, [], False
+        # mtime-based NVRAM read cache – skip re-read if file unchanged
         nv_path = os.path.join(self.cfg.NVRAM_DIR, rom + ".nv")
+        try:
+            mt = os.path.getmtime(nv_path)
+            if rom == self._nvram_cache_rom and mt == self._nvram_cache_mtime:
+                return self._nvram_cache_result
+        except Exception:
+            pass
         if not os.path.exists(nv_path):
             return {}, [], False
         try:
@@ -2284,6 +2294,12 @@ class Watcher:
                 self._ensure_rom_specific(rom, audits)
             except Exception as e:
                 log(self.cfg, f"[ROM_SPEC] ensure failed (cached path): {e}", "WARN")
+            self._nvram_cache_rom = rom
+            try:
+                self._nvram_cache_mtime = os.path.getmtime(nv_path)
+            except Exception:
+                self._nvram_cache_mtime = 0.0
+            self._nvram_cache_result = (audits, notes, False)
             return audits, notes, False
 
         fields, _ = self.load_map_for_rom(rom)
@@ -2347,6 +2363,12 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[ROM_SPEC] ensure failed: {e}", "WARN")
 
+        self._nvram_cache_rom = rom
+        try:
+            self._nvram_cache_mtime = os.path.getmtime(nv_path)
+        except Exception:
+            self._nvram_cache_mtime = 0.0
+        self._nvram_cache_result = (audits, notes, False)
         return audits, notes, False
 
     HIGHLIGHT_RULES = {
@@ -2729,7 +2751,7 @@ class Watcher:
                 except Exception:
                     continue
             self._flip_inputs["joy_prev_masks"] = prev
-            time.sleep(0.02)
+            time.sleep(0.04)
             
     def _flip_inc(self, side: str):
         if not self._flip.get("active"):
@@ -3018,7 +3040,7 @@ class Watcher:
                     self.challenge = ch
                 else:
                     break
-                time.sleep(0.05)
+                time.sleep(0.1)
         except Exception as e:
             log(self.cfg, f"[HEAT] joy poll loop failed: {e}", "WARN")
 
@@ -5345,9 +5367,9 @@ class Watcher:
 
             # Sleep longer while game is active to reduce CPU/IO pressure on VPX
             if active_rom is not None:
-                time.sleep(1.0)
+                time.sleep(1.5)
             else:
-                time.sleep(0.5)
+                time.sleep(2.0)
 
     def start(self):
         if getattr(self, "thread", None) and self.thread.is_alive():

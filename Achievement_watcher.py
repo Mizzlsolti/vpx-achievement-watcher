@@ -163,7 +163,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         self._joy_toggle_last_mask = 0
         self._joy_toggle_timer = QTimer(self)
-        self._joy_toggle_timer.setInterval(50)
+        self._joy_toggle_timer.setInterval(120)
         self._joy_toggle_timer.timeout.connect(self._on_joy_toggle_poll)
 
         self._apply_toggle_source()
