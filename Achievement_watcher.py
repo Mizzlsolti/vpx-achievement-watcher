@@ -66,6 +66,7 @@ from ui_overlay import (
     FlipDifficultyOverlay,
     HeatBarometerOverlay,
     HeatBarPositionPicker,
+    ChallengeStartCountdown,
 )
 
 class Bridge(QObject):
@@ -953,9 +954,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 except Exception:
                     pass
                 try:
+                    # Show 3…2…1…GO! countdown before the actual challenge timer
+                    csd = ChallengeStartCountdown(None)
+                    csd.finished.connect(lambda: _launch_timer(csd))
+                    csd.start()
+                except Exception:
+                    _launch_timer(None)
+
+            def _launch_timer(csd_widget=None):
+                try:
+                    if csd_widget is not None:
+                        csd_widget.close()
+                except Exception:
+                    pass
+                try:
                     self._challenge_timer = ChallengeCountdownOverlay(self, play_sec)
                 except Exception:
                     self._challenge_timer = None
+
             self._challenge_timer_delay.timeout.connect(lambda: QTimer.singleShot(0, _spawn))
             self._challenge_timer_delay.start(warmup_sec * 1000)
         except Exception:
