@@ -4138,9 +4138,18 @@ class Watcher:
 
                     # One-time migration: if progress was stored in seconds by an older version,
                     # convert to minutes. Values > 100000 are impossible in minutes (~69 days).
+                    # Also catch mid-range seconds values (120..100000) by comparing against the
+                    # NVRAM absolute minutes which is definitively in minutes.
                     raw_progress = float(tally.get("progress", 0))
-                    if raw_progress > 100000:
-                        tally["progress"] = round(raw_progress / 60, 2)
+                    if tally.get("unit") != "minutes":
+                        if raw_progress > 100000:
+                            raw_progress = round(raw_progress / 60, 2)
+                        # 2× multiplier: a genuine minutes value should be close to the NVRAM
+                        # absolute; more than double it almost certainly means stored seconds.
+                        # 120 threshold: below 2 minutes the values are trivially ambiguous.
+                        elif abs_minutes > 0 and raw_progress > abs_minutes * 2 and raw_progress > 120:
+                            raw_progress = round(raw_progress / 60, 2)
+                        tally["progress"] = raw_progress
 
                     delta_min = round((duration_sec or 0) / 60, 2)
                     if delta_min > 0:
@@ -4151,6 +4160,7 @@ class Watcher:
                     # Effective = max(NVRAM absolute, accumulated tally) — both in minutes
                     effective = max(float(tally["progress"]), float(abs_minutes))
                     tally["progress"] = effective
+                    tally["unit"] = "minutes"
 
                     self._ach_state_save(state)
 
