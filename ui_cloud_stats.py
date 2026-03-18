@@ -266,26 +266,29 @@ class CloudStatsMixin:
         def _bg_fetch():
             player_ids = CloudSync.fetch_player_ids(self.cfg)
             data = []
-            for pid in player_ids:
-                try:
-                    if category == "progress":
-                        entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/progress/{rom}")
-                        if entry and isinstance(entry, dict):
-                            data.append(entry)
-                    elif category == "flip":
-                        # Fetch all flip ROM keys for this player and filter by the requested ROM prefix
-                        flip_node = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/flip")
-                        if flip_node and isinstance(flip_node, dict):
-                            for rom_key, entry in flip_node.items():
-                                if rom_key == rom or rom_key.startswith(f"{rom}_"):
-                                    if entry and isinstance(entry, dict):
-                                        data.append(entry)
-                    else:
-                        entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/{category}/{rom}")
-                        if entry and isinstance(entry, dict):
-                            data.append(entry)
-                except Exception:
-                    pass
+            if category == "flip":
+                paths = [f"players/{pid}/scores/flip" for pid in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+                for path, flip_node in batch.items():
+                    if flip_node and isinstance(flip_node, dict):
+                        for rom_key, entry in flip_node.items():
+                            if rom_key == rom or rom_key.startswith(f"{rom}_"):
+                                if entry and isinstance(entry, dict):
+                                    data.append(entry)
+            elif category == "progress":
+                paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+                for path in paths:
+                    entry = batch.get(path)
+                    if entry and isinstance(entry, dict):
+                        data.append(entry)
+            else:
+                paths = [f"players/{pid}/scores/{category}/{rom}" for pid in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+                for path in paths:
+                    entry = batch.get(path)
+                    if entry and isinstance(entry, dict):
+                        data.append(entry)
 
             if data:
                 if category == "progress":

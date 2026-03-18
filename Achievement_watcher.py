@@ -2612,12 +2612,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._overlay_cycle = {"sections": sections, "idx": -1}
         
     def _show_overlay_section(self, payload: dict):
+        from PyQt6.QtWidgets import QApplication
         self._ensure_overlay()
         kind = str(payload.get("kind", "")).lower()
         title = str(payload.get("title", "") or "").strip()
         if kind == "combined_players":
             combined = {"players": payload.get("players", []), "rom_name": payload.get("rom_name", "")}
             self.overlay.set_combined(combined, session_title=title or "Active Player Highlights")
+            QApplication.processEvents()
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
             try:
@@ -2628,6 +2630,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if kind == "html":
             html = payload.get("html", "") or "<div>-</div>"
             self.overlay.set_html(html, session_title=title)
+            QApplication.processEvents()
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
             try:
@@ -2638,6 +2641,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         combined = {"players": [payload]}
         title2 = f"Highlights – {payload.get('title','')}".strip()
         self.overlay.set_combined(combined, session_title=title2)
+        QApplication.processEvents()
         self.overlay.show(); self.overlay.raise_()
         self._start_overlay_auto_close_timer()
         try:
@@ -2663,6 +2667,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _show_overlay_page(self, page_idx: int):
         """Show one of the 5 overlay pages."""
+        from PyQt6.QtWidgets import QApplication
         self._ensure_overlay()
         if page_idx == 0:
             self._vpc_page5_data = None
@@ -2678,6 +2683,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "<div style='text-align:center; color:#888; padding:20px;'>(No session data available)</div>",
                     "Session Overview",
                 )
+                QApplication.processEvents()
                 self.overlay.show(); self.overlay.raise_()
                 self._start_overlay_auto_close_timer()
                 try:
@@ -2689,6 +2695,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # Page 2: Local Achievement Progress for last played ROM
             css, header_html, rows = self._overlay_page2_html()
             self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
+            QApplication.processEvents()
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
             try:
@@ -2700,6 +2707,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # Page 3: Local Challenge Leaderboard (1:1 mirror of GUI)
             html = self._overlay_page3_html()
             self.overlay.set_html(html, "Challenge Leaderboard")
+            QApplication.processEvents()
             self.overlay.show(); self.overlay.raise_()
             self._start_overlay_auto_close_timer()
             try:
@@ -2994,6 +3002,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             )
 
         self.overlay.set_html(loading_html, "Cloud Leaderboard")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
         self.overlay.show(); self.overlay.raise_()
         self._start_overlay_auto_close_timer()
         try:
@@ -3014,21 +3024,22 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 data = []
                 if is_challenge:
                     cat = kind if kind in ("timed", "flip", "heat") else "timed"
-                    for pid in player_ids:
-                        try:
-                            if cat == "flip":
-                                flip_node = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/flip")
-                                if flip_node and isinstance(flip_node, dict):
-                                    for rom_key, entry in flip_node.items():
-                                        if rom_key == rom or rom_key.startswith(f"{rom}_"):
-                                            if entry and isinstance(entry, dict):
-                                                data.append(entry)
-                            else:
-                                entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores/{cat}/{rom}")
-                                if entry and isinstance(entry, dict):
-                                    data.append(entry)
-                        except Exception:
-                            pass
+                    if cat == "flip":
+                        paths = [f"players/{pid}/scores/flip" for pid in player_ids]
+                        batch = CloudSync.fetch_parallel(self.cfg, paths)
+                        for path, flip_node in batch.items():
+                            if flip_node and isinstance(flip_node, dict):
+                                for rom_key, entry in flip_node.items():
+                                    if rom_key == rom or rom_key.startswith(f"{rom}_"):
+                                        if entry and isinstance(entry, dict):
+                                            data.append(entry)
+                    else:
+                        paths = [f"players/{pid}/scores/{cat}/{rom}" for pid in player_ids]
+                        batch = CloudSync.fetch_parallel(self.cfg, paths)
+                        for path in paths:
+                            entry = batch.get(path)
+                            if entry and isinstance(entry, dict):
+                                data.append(entry)
                     if data:
                         if cat == "flip" and difficulty and difficulty != "All Difficulties":
                             data = [
@@ -3039,13 +3050,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     selected_diff = difficulty if (is_challenge and kind == "flip") else None
                     cat_for_html = cat
                 else:
-                    for pid in player_ids:
-                        try:
-                            entry = CloudSync.fetch_node(self.cfg, f"players/{pid}/progress/{rom}")
-                            if entry and isinstance(entry, dict):
-                                data.append(entry)
-                        except Exception:
-                            pass
+                    paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
+                    batch = CloudSync.fetch_parallel(self.cfg, paths)
+                    for path in paths:
+                        entry = batch.get(path)
+                        if entry and isinstance(entry, dict):
+                            data.append(entry)
                     if data:
                         data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
                     selected_diff = None
@@ -3161,8 +3171,44 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         import base64
         import threading
         import ssl
+        import time as _time
 
         self._ensure_overlay()
+
+        # Check TTL-based memory cache (~5 minutes)
+        _VPC_CACHE_TTL_SECONDS = 300
+        vpc_cache = getattr(self, '_vpc_cache', None)
+        if vpc_cache and (_time.time() - vpc_cache.get('ts', 0)) < _VPC_CACHE_TTL_SECONDS:
+            cached = vpc_cache
+            is_portrait = getattr(self.overlay, 'portrait_mode', False) if self.overlay else False
+            b64_img = cached['b64_img']
+            week_text = cached['week_text']
+            table_name = cached['table_name']
+            if is_portrait:
+                pre_w = self.overlay.height() if self.overlay else 1920
+                pre_h = self.overlay.width() if self.overlay else 1080
+                final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
+            else:
+                overlay_w = self.overlay.width() if self.overlay else 1920
+                overlay_h = self.overlay.height() if self.overlay else 1080
+                final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
+            self._vpc_page5_data = {
+                'b64_img': b64_img,
+                'week_text': week_text,
+                'table_name': table_name,
+                'is_portrait': is_portrait,
+            }
+            self.overlay.set_html_fullsize(final_html, "VPC Weekly")
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+            self.overlay.show()
+            self.overlay.raise_()
+            self._start_overlay_auto_close_timer()
+            try:
+                self.overlay.set_nav_arrows(True)
+            except Exception:
+                pass
+            return
 
         # Recommended PyQt6 pattern for cross-thread UI updates
         class VpcWorkerSignals(QObject):
@@ -3272,6 +3318,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     'week_text': week_text,
                     'table_name': table_name,
                     'is_portrait': is_portrait,
+                }
+
+                # Store TTL cache for fast re-open (~5 min TTL)
+                self._vpc_cache = {
+                    'b64_img': b64_img,
+                    'week_text': week_text,
+                    'table_name': table_name,
+                    'ts': _time.time(),
                 }
 
                 # Slider hook: When overlay scale changes, recalculate the image
