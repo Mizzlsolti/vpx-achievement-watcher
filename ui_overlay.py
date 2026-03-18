@@ -38,6 +38,33 @@ def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
     painter.drawRoundedRect(x + 1, y + 1, w - 2, h - 2, radius, radius)
 
 
+def _force_topmost(widget: QWidget):
+    """Force a widget to the topmost z-order using Win32 API.
+    Works even against fullscreen DirectX/OpenGL applications.
+    No-ops silently when the widget is not visible or win32 is unavailable."""
+    if not widget.isVisible():
+        return
+    try:
+        import win32gui, win32con
+        hwnd = int(widget.winId())
+        win32gui.SetWindowPos(
+            hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+        )
+    except Exception:
+        pass
+
+
+def _start_topmost_timer(widget: QWidget, interval_ms: int = 500):
+    """Start a periodic timer that re-applies HWND_TOPMOST to keep the widget above fullscreen apps.
+    The timer is stored as widget._topmost_timer to prevent garbage collection."""
+    timer = QTimer(widget)
+    timer.setInterval(interval_ms)
+    timer.timeout.connect(lambda: _force_topmost(widget))
+    timer.start()
+    widget._topmost_timer = timer
+
+
 class OverlayNavArrows(QWidget):
     """Pulsating ice-blue navigation arrows displayed over the main overlay to indicate page cycling."""
 
@@ -178,6 +205,7 @@ class OverlayWindow(QWidget):
 
     def showEvent(self, e):
         super().showEvent(e)
+        _force_topmost(self)
         QTimer.singleShot(0, self._layout_positions)
         if self.portrait_mode:
             QTimer.singleShot(0, lambda: self.request_rotation(force=True))
@@ -295,6 +323,7 @@ class OverlayWindow(QWidget):
         self._nav_arrows_active = False
         self._layout_positions()
         QTimer.singleShot(0, self._register_raw_input)
+        _start_topmost_timer(self)
         # Page-2 (Achievement Progress) Python-level scroll support
         self._p2_timer = QTimer(self)
         self._p2_timer.setInterval(1500)
@@ -915,6 +944,7 @@ class MiniInfoOverlay(QWidget):
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._on_tick)
         self.hide()
+        _start_topmost_timer(self)
 
     def _primary_center(self) -> tuple[int, int]:
         try:
@@ -1001,6 +1031,7 @@ class MiniInfoOverlay(QWidget):
         self._snap_label.setPixmap(QPixmap.fromImage(img))
         self.show()
         self.raise_()
+        _force_topmost(self)
 
     def _on_tick(self):
         self._remaining -= 1
@@ -1100,6 +1131,7 @@ class FlipCounterOverlay(QWidget):
             )
         except Exception:
             pass
+        _start_topmost_timer(self)
 
     def _compose_image(self) -> QImage:
         ov = self.parent_gui.cfg.OVERLAY or {}
@@ -1939,6 +1971,7 @@ class AchToastWindow(QWidget):
         self._timer.start()
         self.show()
         self.raise_()
+        _start_topmost_timer(self)
 
     def _tick(self):
         self._remaining -= 1
@@ -2242,6 +2275,7 @@ class ChallengeCountdownOverlay(QWidget):
         except Exception:
             pass
         self._render_and_place()
+        _start_topmost_timer(self)
 
     def _tick(self):
         self._left -= 1
@@ -2358,6 +2392,7 @@ class ChallengeSelectOverlay(QWidget):
             )
         except Exception:
             pass
+        _start_topmost_timer(self)
 
     def closeEvent(self, e):
         try:
@@ -2585,6 +2620,7 @@ class FlipDifficultyOverlay(QWidget):
             )
         except Exception:
             pass
+        _start_topmost_timer(self)
 
     def closeEvent(self, e):
         try:
@@ -2770,6 +2806,7 @@ class HeatBarometerOverlay(QWidget):
             )
         except Exception:
             pass
+        _start_topmost_timer(self)
 
     def set_heat(self, heat: int):
         self._heat = max(0, min(100, int(heat)))
