@@ -2614,11 +2614,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.overlay.transition_to(update_cb)
             else:
                 update_cb()
-                QApplication.processEvents()
+                # Give Qt multiple passes to fully compute the rich-text layout
+                # before taking the rotation snapshot. A single processEvents()
+                # is not enough for complex HTML tables.
+                from PyQt6.QtCore import QEventLoop
+                for _ in range(3):
+                    QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 10)
                 # Run rotation synchronously so rotated_label already has the
                 # correct pixmap before the window becomes visible, preventing
                 # a blank/distorted frame on first show.
                 if self.overlay.portrait_mode:
+                    # Force the body label to fully calculate its layout
+                    self.overlay.body.adjustSize()
+                    QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 10)
                     self.overlay._apply_rotation_snapshot(force=True)
                 # Prevent showEvent from re-triggering layout/rotation and
                 # causing additional blink frames.
