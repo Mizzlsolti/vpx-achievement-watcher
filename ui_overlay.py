@@ -1981,8 +1981,35 @@ class AchToastWindow(QWidget):
             line2 = self._title.replace("⬆️ LEVEL UP!  ", "").strip()
         else:
             border_color = QColor("#555555")
-            line1 = self._title or "Achievement unlocked"
-            line2 = self._rom or ""
+            raw_title = self._title or "Achievement unlocked"
+            rom = self._rom or ""
+
+            # Strip ROM prefix from title (e.g. "cc_13 – GOLD MINE MB: 1" → "GOLD MINE MB: 1")
+            prefix = f"{rom} \u2013 "
+            if rom and raw_title.startswith(prefix):
+                line1 = raw_title[len(prefix):]
+            else:
+                prefix2 = f"{rom} - "
+                if rom and raw_title.startswith(prefix2):
+                    line1 = raw_title[len(prefix2):]
+                else:
+                    line1 = raw_title
+
+            # Resolve ROM to clean table name (without version number)
+            table_name = ""
+            try:
+                watcher = getattr(self.parent_gui, "watcher", None)
+                if watcher:
+                    romnames = getattr(watcher, "ROMNAMES", {}) or {}
+                    table_name = romnames.get(rom, "")
+            except Exception:
+                pass
+
+            if table_name:
+                # Strip trailing version number, e.g. "Cactus Canyon (1.3)" → "Cactus Canyon"
+                table_name = re.sub(r'\s*\([\d.]+\)\s*$', '', table_name).strip()
+
+            line2 = table_name if table_name else rom
 
         # Feste Theme-Farben
         title_color = QColor("#FF7F00") # Orange

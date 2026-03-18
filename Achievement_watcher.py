@@ -1460,7 +1460,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_level_table = QGroupBox("Level Table")
         lay_level_table = QVBoxLayout(grp_level_table)
         lv_browser = QTextBrowser()
-        lv_browser.setMaximumHeight(260)
+        lv_browser.setMaximumHeight(400)
         lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
         lay_level_table.addWidget(lv_browser)
         self.lv_table_browser = lv_browser
