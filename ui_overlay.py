@@ -593,7 +593,7 @@ class OverlayWindow(QWidget):
     def _layout_positions(self):
         self._layout_positions_for(self.width(), self.height())
         if self.portrait_mode:
-            self.request_rotation()
+            self.request_rotation(force=True)
 
     def _layout_positions_for(self, w: int, h: int, portrait_pre_render: bool = False):
         if hasattr(self, "text_container"):
@@ -835,7 +835,6 @@ class OverlayWindow(QWidget):
         self.title.setText(self._current_title)
         self.body.setText("<div>Loading highlights …</div>")
         self._layout_positions()
-        self.request_rotation(force=True)
 
     def set_html(self, html: str, session_title: Optional[str] = None):
         self._fullsize_mode = False
@@ -850,7 +849,6 @@ class OverlayWindow(QWidget):
         css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
         self.body.setText(f"<div style='{css}'>{html}</div>")
         self._layout_positions()
-        self.request_rotation(force=True)
 
     def set_html_fullsize(self, html: str, session_title: Optional[str] = None):
         """Like set_html() but expands body to the full window — no title bar, no insets.
@@ -1136,7 +1134,6 @@ class OverlayWindow(QWidget):
         if not players:
             self.body.setText("<div>-</div>")
             self._layout_positions()
-            self.request_rotation(force=True)
             return
 
         html = style + "<div align='center' style='width:100%;'>" + \
@@ -1147,7 +1144,6 @@ class OverlayWindow(QWidget):
         css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
         self.body.setText(f"<div style='{css}'>{html}</div>")
         self._layout_positions()
-        self.request_rotation(force=True)
         
     def _score_spin_tick(self):
         """Animate score display value toward _score_target (slot-machine style)."""

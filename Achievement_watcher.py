@@ -2613,15 +2613,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 # of a hard content swap, which would cause a visible flash.
                 self.overlay.transition_to(update_cb)
             else:
-                # First-time show: hide raw portrait widgets before the window
-                # becomes visible so the user never sees unrotated content.
-                if self.overlay.portrait_mode:
-                    self.overlay.container.hide()
-                    self.overlay.text_container.hide()
                 update_cb()
                 QApplication.processEvents()
-                self.overlay.show()
-                self.overlay.raise_()
+                # Run rotation synchronously so rotated_label already has the
+                # correct pixmap before the window becomes visible, preventing
+                # a blank/distorted frame on first show.
+                if self.overlay.portrait_mode:
+                    self.overlay._apply_rotation_snapshot(force=True)
+                # Prevent showEvent from re-triggering layout/rotation and
+                # causing additional blink frames.
+                self.overlay._ensuring = True
+                try:
+                    self.overlay.show()
+                    self.overlay.raise_()
+                finally:
+                    self.overlay._ensuring = False
             self._start_overlay_auto_close_timer()
             try:
                 self.overlay.set_nav_arrows(True)
