@@ -4,6 +4,8 @@ import os
 import re
 import json
 import sys
+import math
+import random
 
 from typing import Optional
 
@@ -36,6 +38,26 @@ def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
     painter.setPen(pen)
     painter.setBrush(Qt.BrushStyle.NoBrush)
     painter.drawRoundedRect(x + 1, y + 1, w - 2, h - 2, radius, radius)
+
+
+def _ease_out_bounce(t: float) -> float:
+    """Ease-out bounce curve used for icon stamp animation."""
+    if t < 1 / 2.75:
+        return 7.5625 * t * t
+    elif t < 2 / 2.75:
+        t -= 1.5 / 2.75
+        return 7.5625 * t * t + 0.75
+    elif t < 2.5 / 2.75:
+        t -= 2.25 / 2.75
+        return 7.5625 * t * t + 0.9375
+    else:
+        t -= 2.625 / 2.75
+        return 7.5625 * t * t + 0.984375
+
+
+def _ease_out_cubic(t: float) -> float:
+    """Ease-out cubic curve used for slide transitions."""
+    return 1.0 - (1.0 - t) ** 3
 
 
 def _force_topmost(widget: QWidget):
@@ -154,6 +176,103 @@ class OverlayNavArrows(QWidget):
         p_main.end()
 
 
+
+class OverlayEffectsWidget(QWidget):
+    """Transparent overlay that draws the animated glow border and floating particles
+    over the main overlay window. Works for both portrait and landscape modes since it
+    paints in physical screen coordinates."""
+
+    _PARTICLE_COUNT = 12
+
+    def __init__(self, parent: "OverlayWindow"):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # Breathing glow state
+        self._glow_t = 0.0
+
+        # Floating particles
+        self._particles: list = []
+
+        self._tick_timer = QTimer(self)
+        self._tick_timer.setInterval(50)
+        self._tick_timer.timeout.connect(self._on_tick)
+        self.hide()
+
+    def _init_particles(self):
+        W = max(200, self.width() if self.width() > 0 else 400)
+        H = max(200, self.height() if self.height() > 0 else 600)
+        count = self._PARTICLE_COUNT
+        self._particles = []
+        for _ in range(count):
+            self._particles.append(self._make_particle(W, H, spawn_anywhere=True))
+
+    def _make_particle(self, W: int, H: int, spawn_anywhere: bool = False) -> dict:
+        return {
+            'x': random.uniform(0, W),
+            'y': random.uniform(0, H) if spawn_anywhere else H + random.uniform(0, 20),
+            'vx': random.uniform(-8, 8),
+            'vy': random.uniform(-30, -10),
+            'size': random.uniform(2, 4),
+            'alpha': random.randint(30, 80),
+        }
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._particles:
+            self._init_particles()
+        if not self._tick_timer.isActive():
+            self._tick_timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._tick_timer.stop()
+
+    def _on_tick(self):
+        # Advance glow breath (increment ~0.008 per 50ms => ~6.25s period)
+        self._glow_t = (self._glow_t + 0.008) % 1.0
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
+            return
+        dt = 0.05  # 50ms in seconds
+        for pt in self._particles:
+            pt['x'] += pt['vx'] * dt
+            pt['y'] += pt['vy'] * dt
+            # Respawn at bottom if out of bounds
+            if pt['y'] < -10 or pt['x'] < -10 or pt['x'] > W + 10:
+                pt.update(self._make_particle(W, H, spawn_anywhere=False))
+        self.update()
+
+    def paintEvent(self, event):
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        try:
+            # Breathing glow border
+            amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
+            alpha_base = int(120 + 135 * amp)  # 120..255
+            layers = int(2 + 2 * amp)          # 2..4
+            glow_color = QColor(0, 229, 255, alpha_base)
+            _draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
+
+            # Floating particles
+            p.setPen(Qt.PenStyle.NoPen)
+            for pt in self._particles:
+                c = QColor(0, 229, 255, int(pt['alpha']))
+                p.setBrush(c)
+                sz = int(pt['size'])
+                p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+
 class OverlayWindow(QWidget):
     TITLE_OFFSET_X = 0
     TITLE_OFFSET_Y = 0
@@ -211,7 +330,24 @@ class OverlayWindow(QWidget):
             QTimer.singleShot(0, lambda: self.request_rotation(force=True))
         else:
             QTimer.singleShot(0, self._show_live_unrotated)
-            
+        # Start effects overlay (glow border + floating particles)
+        if hasattr(self, '_effects_widget'):
+            self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+            self._effects_widget.show()
+            self._effects_widget.raise_()
+
+    def hideEvent(self, e):
+        super().hideEvent(e)
+        if hasattr(self, '_effects_widget'):
+            self._effects_widget.hide()
+        if hasattr(self, '_score_spin_timer'):
+            self._score_spin_timer.stop()
+        if hasattr(self, '_progress_bar_timer'):
+            self._progress_bar_timer.stop()
+        if hasattr(self, '_transition_timer'):
+            self._transition_timer.stop()
+
+
     def _alpha_bbox(self, img: QImage, min_alpha: int = 8) -> QRect:
         w, h = img.width(), img.height()
         if w == 0 or h == 0:
@@ -333,6 +469,26 @@ class OverlayWindow(QWidget):
         self._p2_visible: int = 10
         self._p2_header: str = ""
         self._p2_css: str = ""
+        # Score counter spin state
+        self._score_display: int = 0
+        self._score_target: int = 0
+        self._score_spin_timer = QTimer(self)
+        self._score_spin_timer.setInterval(50)
+        self._score_spin_timer.timeout.connect(self._score_spin_tick)
+        # Animated progress bar state
+        self._progress_pct_current: float = 0.0
+        self._progress_pct_target: float = 0.0
+        self._progress_bar_timer = QTimer(self)
+        self._progress_bar_timer.setInterval(50)
+        self._progress_bar_timer.timeout.connect(self._progress_bar_tick)
+        # Slide/glitch transition state
+        self._transition_state: dict | None = None
+        self._transition_label: QLabel | None = None
+        self._transition_timer = QTimer(self)
+        self._transition_timer.setInterval(16)
+        self._transition_timer.timeout.connect(self._transition_tick)
+        # Effects widget (glow border + floating particles)
+        self._effects_widget = OverlayEffectsWidget(self)
 
     def request_rotation(self, force: bool = False):
         if not self.portrait_mode:
@@ -539,6 +695,10 @@ class OverlayWindow(QWidget):
                 self._nav_arrows.setGeometry(0, 0, W, H)
                 self._nav_arrows.show()
                 self._nav_arrows.raise_()
+            # Keep effects widget (glow + particles) on top
+            if hasattr(self, '_effects_widget') and self._effects_widget.isVisible():
+                self._effects_widget.setGeometry(0, 0, W, H)
+                self._effects_widget.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()
@@ -613,6 +773,9 @@ class OverlayWindow(QWidget):
         if self._nav_arrows_active:
             self._nav_arrows.setGeometry(0, 0, self.width(), self.height())
             self._nav_arrows.raise_()
+        if hasattr(self, '_effects_widget') and self._effects_widget.isVisible():
+            self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+            self._effects_widget.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._fullsize_mode = False
@@ -775,6 +938,16 @@ class OverlayWindow(QWidget):
         except Exception:
             pass
 
+        # Animated progress bar: update target and start timer if changed
+        new_pct_target = pct if total_achs > 0 else 0.0
+        if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
+            self._progress_pct_target = new_pct_target
+            if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
+                # Fresh start: jump to 0 for a fill animation
+                self._progress_pct_current = 0.0
+            if hasattr(self, '_progress_bar_timer'):
+                self._progress_bar_timer.start()
+
         style = """
         <style>
           table.hltable { border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }
@@ -797,13 +970,23 @@ class OverlayWindow(QWidget):
             except Exception:
                 score_abs = 0
 
+            # Score counter spin: update target and start spin if changed
+            if score_abs != getattr(self, '_score_target', -1):
+                self._score_target = score_abs
+                if getattr(self, '_score_display', 0) == 0:
+                    self._score_display = 0
+                if hasattr(self, '_score_spin_timer'):
+                    self._score_spin_timer.start()
+
             lines = []
 
             display_title = table_title or rom_name or "Unknown ROM"
             lines.append(f"<div class='rom-title'>{esc(display_title)}</div>")
 
             if total_achs > 0:
-                safe_pct = max(0.1, min(100.0, pct))
+                # Use animated progress percentage
+                anim_pct = getattr(self, '_progress_pct_current', pct)
+                safe_pct = max(0.1, min(100.0, anim_pct))
                 rem_pct = 100.0 - safe_pct
 
                 bar_html = f"""
@@ -822,7 +1005,9 @@ class OverlayWindow(QWidget):
                 lines.append("<div style='margin-bottom: 1.2em;'></div>")
 
             if score_abs > 0:
-                sc_txt = f"{score_abs:,d}".replace(",", ".")
+                # Use animated score display value
+                anim_score = getattr(self, '_score_display', score_abs)
+                sc_txt = f"{anim_score:,d}".replace(",", ".")
                 lines.append(f"<div class='score-box'>Score: {sc_txt}</div>")
             else:
                 lines.append("<div style='margin-bottom: 1.8em;'></div>")
@@ -908,6 +1093,182 @@ class OverlayWindow(QWidget):
         self._layout_positions()
         self.request_rotation(force=True)
         
+    def _score_spin_tick(self):
+        """Animate score display value toward _score_target (slot-machine style)."""
+        if self._score_display == self._score_target:
+            self._score_spin_timer.stop()
+            return
+        step = max(1, abs(self._score_target - self._score_display) // 20)
+        if self._score_display < self._score_target:
+            self._score_display = min(self._score_target, self._score_display + step)
+        else:
+            self._score_display = max(self._score_target, self._score_display - step)
+        self._render_fixed_columns()
+
+    def _progress_bar_tick(self):
+        """Animate progress bar fill toward _progress_pct_target (ease-out)."""
+        target = getattr(self, '_progress_pct_target', 0.0)
+        current = getattr(self, '_progress_pct_current', 0.0)
+        if abs(current - target) < 0.5:
+            self._progress_pct_current = target
+            self._progress_bar_timer.stop()
+            self._render_fixed_columns()
+            return
+        step = max(0.5, abs(target - current) * 0.12)
+        if current < target:
+            self._progress_pct_current = min(target, current + step)
+        else:
+            self._progress_pct_current = max(target, current - step)
+        self._render_fixed_columns()
+
+    def _snapshot_current(self):
+        """Capture the current overlay content as a QImage for transition effects."""
+        try:
+            W, H = self.width(), self.height()
+            if W <= 0 or H <= 0:
+                return None
+            if getattr(self, 'portrait_mode', False):
+                pm = self.rotated_label.pixmap()
+                if pm and not pm.isNull():
+                    img = pm.toImage()
+                    if img.width() == W and img.height() == H:
+                        return img
+            pm = self.grab()
+            return pm.toImage()
+        except Exception:
+            return None
+
+    def _draw_glitch_frame(self, source_img, label):
+        """Draw a single glitch frame on the given label by slicing source_img into strips."""
+        W = source_img.width()
+        H = source_img.height()
+        glitched = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+        glitched.fill(Qt.GlobalColor.transparent)
+        p = QPainter(glitched)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        try:
+            n_strips = random.randint(4, 6)
+            strip_h = max(1, H // n_strips)
+            for i in range(n_strips):
+                y0 = i * strip_h
+                y1 = min(H, y0 + strip_h)
+                sh = y1 - y0
+                if sh <= 0:
+                    continue
+                offset_x = random.randint(-15, 15)
+                strip = source_img.copy(0, y0, W, sh)
+                p.drawImage(offset_x, y0, strip)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+        label.setPixmap(QPixmap.fromImage(glitched))
+
+    def transition_to(self, new_content_callback, direction: str = 'left'):
+        """Perform a slide+fade page transition (with a brief glitch pre-effect).
+
+        Call this instead of set_html/set_combined when changing pages.  The method
+        captures the current display, runs the callback to update content, then animates
+        between old and new snapshots.
+        """
+        old_img = self._snapshot_current()
+        if old_img is None or old_img.isNull():
+            new_content_callback()
+            return
+
+        # Ensure transition label exists
+        if self._transition_label is None:
+            self._transition_label = QLabel(self)
+            self._transition_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._transition_label.setStyleSheet("background:transparent;")
+        W, H = self.width(), self.height()
+        self._transition_label.setGeometry(0, 0, W, H)
+        self._transition_label.show()
+        self._transition_label.raise_()
+
+        # Initialise state in glitch phase
+        self._transition_state = {
+            'phase': 'glitch',
+            'direction': direction,
+            'old_img': old_img,
+            'new_img': None,
+            'elapsed': 0.0,
+            'glitch_elapsed': 0.0,
+        }
+
+        # Draw first glitch frame immediately
+        self._draw_glitch_frame(old_img, self._transition_label)
+
+        # After 120 ms of glitch frames, apply callback and switch to slide
+        def _switch_to_slide():
+            new_content_callback()
+            QApplication.processEvents()
+            new_img = self._snapshot_current()
+            if self._transition_state:
+                self._transition_state['new_img'] = new_img
+                self._transition_state['phase'] = 'slide'
+                self._transition_state['elapsed'] = 0.0
+
+        QTimer.singleShot(120, _switch_to_slide)
+        self._transition_timer.start()
+
+    def _transition_tick(self):
+        """Animate the current slide/glitch transition frame."""
+        state = self._transition_state
+        if state is None:
+            self._transition_timer.stop()
+            if self._transition_label:
+                self._transition_label.hide()
+            return
+
+        dt = 16.0
+        if state['phase'] == 'glitch':
+            state['glitch_elapsed'] += dt
+            old_img = state['old_img']
+            if old_img and self._transition_label:
+                self._draw_glitch_frame(old_img, self._transition_label)
+            return
+
+        # Slide + fade phase
+        state['elapsed'] += dt
+        duration = 300.0
+        t = min(1.0, state['elapsed'] / duration)
+        eased = _ease_out_cubic(t)
+
+        W, H = self.width(), self.height()
+        composite = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+        composite.fill(Qt.GlobalColor.transparent)
+        p = QPainter(composite)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        direction = state['direction']
+        try:
+            old_img = state.get('old_img')
+            new_img = state.get('new_img')
+            if old_img and not old_img.isNull():
+                dx_old = -int(W * eased) if direction == 'left' else int(W * eased)
+                p.setOpacity(max(0.0, 1.0 - eased))
+                p.drawImage(dx_old, 0, old_img)
+            if new_img and not new_img.isNull():
+                dx_new = int(W * (1.0 - eased)) if direction == 'left' else -int(W * (1.0 - eased))
+                p.setOpacity(min(1.0, eased))
+                p.drawImage(dx_new, 0, new_img)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+        if self._transition_label:
+            self._transition_label.setPixmap(QPixmap.fromImage(composite))
+
+        if t >= 1.0:
+            self._transition_timer.stop()
+            if self._transition_label:
+                self._transition_label.hide()
+            self._transition_state = None
+
+
 class MiniInfoOverlay(QWidget):
     def __init__(self, parent: "MainWindow"):
         super().__init__(None)
@@ -1967,6 +2328,66 @@ class AchToastWindow(QWidget):
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self._tick)
         self._remaining = self._seconds
+
+        # --- Burst particle animation ---
+        is_level_up = (self._rom == "__levelup__")
+        self._burst_img_margin = 80
+        self._burst_particles = []
+        for _ in range(20):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(80, 200)
+            self._burst_particles.append({
+                'x': 0.0, 'y': 0.0,
+                'vx': math.cos(angle) * speed,
+                'vy': math.sin(angle) * speed,
+                'size': random.uniform(3, 6),
+                'alpha': 255,
+                'color': QColor(random.choice([0xFFD700, 0xFF7F00, 0xFFA500])),
+            })
+        self._burst_elapsed = 0.0
+        self._burst_active = True
+        self._burst_timer = QTimer(self)
+        self._burst_timer.setInterval(30)
+        self._burst_timer.timeout.connect(self._burst_tick)
+        self._burst_timer.start()
+
+        # --- Neon ring pulse (level-up only) ---
+        self._ring_rings = []
+        self._ring_active = False
+        if is_level_up:
+            self._ring_rings = [
+                {'r': 0.0, 'elapsed': 0.0, 'delay': 0.0, 'alpha': 200},
+                {'r': 0.0, 'elapsed': 0.0, 'delay': 200.0, 'alpha': 200},
+            ]
+            self._ring_elapsed = 0.0
+            self._ring_duration = 600.0
+            self._ring_active = True
+            self._ring_timer = QTimer(self)
+            self._ring_timer.setInterval(20)
+            self._ring_timer.timeout.connect(self._ring_tick)
+            self._ring_timer.start()
+
+        # --- Typewriter reveal (subtitle line2) ---
+        self._tw_full: str = ""
+        self._tw_idx: int = 0
+        self._tw_active: bool = True
+        self._tw_cursor_visible: bool = True
+        self._tw_cursor_timer = QTimer(self)
+        self._tw_cursor_timer.setInterval(500)
+        self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
+        self._tw_cursor_timer.start()
+
+        # --- Icon bounce animation ---
+        self._bounce_elapsed: float = 0.0
+        self._bounce_duration: float = 400.0
+        self._bounce_active: bool = True
+
+        # Combined fast animation timer (typewriter + bounce)
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(30)
+        self._anim_timer.timeout.connect(self._anim_tick)
+        self._anim_timer.start()
+
         self._render_and_place()
         self._timer.start()
         self.show()
@@ -1999,6 +2420,15 @@ class AchToastWindow(QWidget):
                 self.finished.emit()
             except Exception:
                 pass
+        # Stop all animation timers
+        for attr in ('_burst_timer', '_ring_timer', '_anim_timer',
+                     '_tw_cursor_timer', '_timer'):
+            t = getattr(self, attr, None)
+            if t is not None:
+                try:
+                    t.stop()
+                except Exception:
+                    pass
         super().closeEvent(e)
 
     def _icon_pixmap(self, size: int = 40) -> QPixmap:
@@ -2096,13 +2526,25 @@ class AchToastWindow(QWidget):
 
             line2 = table_name if table_name else rom
 
+        # Set typewriter full text on first call
+        if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
+            self._tw_full = line2
+
         # Feste Theme-Farben
         title_color = QColor("#FF7F00") # Orange
         text_color = QColor("#FFFFFF")  # Weiß
         levelup_color = QColor("#00E5FF")  # Cyan for level-up line1
 
         title = line1
-        sub = line2
+        # Apply typewriter reveal to subtitle (use full text for sizing, partial for display)
+        sub_for_size = line2  # always use full text for width calculation
+        if getattr(self, '_tw_active', False) and getattr(self, '_tw_full', ''):
+            tw_text = self._tw_full[:self._tw_idx]
+            if self._tw_cursor_visible and self._tw_idx < len(self._tw_full):
+                tw_text += '|'
+            sub = tw_text
+        else:
+            sub = line2
         f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
         f_body = QFont(font_family, body_pt, QFont.Weight.Bold if is_level_up else QFont.Weight.Normal)
         fm_title = QFontMetrics(f_title)
@@ -2112,9 +2554,10 @@ class AchToastWindow(QWidget):
         gap = max(10, int(body_pt * 0.5))
         vgap = max(4, int(body_pt * 0.25))
         title_w = fm_title.horizontalAdvance(title)
-        sub_w = fm_body.horizontalAdvance(sub) if sub else 0
+        sub_w = fm_body.horizontalAdvance(sub_for_size) if sub_for_size else 0
         text_w = max(title_w, sub_w)
-        text_h = fm_title.height() + (vgap + fm_body.height() if sub else 0)
+        # Use sub_for_size for height calculation to keep window stable during typewriter
+        text_h = fm_title.height() + (vgap + fm_body.height() if sub_for_size else 0)
         content_h = max(icon_sz, text_h)
         W = pad + icon_sz + gap + text_w + pad
         H = pad + content_h + pad
@@ -2146,8 +2589,18 @@ class AchToastWindow(QWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, W - 2, H - 2, radius, radius)
         
-        pm = self._icon_pixmap(icon_sz)
-        iy = int((H - icon_sz) / 2)
+        # Icon bounce animation: apply scale and Y-offset
+        if getattr(self, '_bounce_active', False):
+            bounce_t = min(1.0, getattr(self, '_bounce_elapsed', 0.0) / max(1.0, getattr(self, '_bounce_duration', 400.0)))
+            eased = _ease_out_bounce(bounce_t)
+            icon_scale = 1.3 + (1.0 - 1.3) * eased   # 1.3 -> 1.0
+            icon_y_offset = int(-30 * (1.0 - eased))  # -30 -> 0
+            actual_icon_sz = int(icon_sz * icon_scale)
+        else:
+            actual_icon_sz = icon_sz
+            icon_y_offset = 0
+        pm = self._icon_pixmap(actual_icon_sz)
+        iy = int((H - actual_icon_sz) / 2) + icon_y_offset
         p.drawPixmap(pad, iy, pm)
         x_text = pad + icon_sz + gap
         text_top = int((H - text_h) / 2)
@@ -2163,8 +2616,53 @@ class AchToastWindow(QWidget):
                              W - x_text - pad, fm_body.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, sub)
         p.end()
-        
+
         portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
+
+        # Draw burst particles and neon ring in landscape only (portrait adds complexity)
+        if not portrait:
+            burst_active = getattr(self, '_burst_active', False)
+            ring_active = getattr(self, '_ring_active', False)
+            burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
+            if burst_margin > 0:
+                EW = W + 2 * burst_margin
+                EH = H + 2 * burst_margin
+                expanded = QImage(EW, EH, QImage.Format.Format_ARGB32_Premultiplied)
+                expanded.fill(Qt.GlobalColor.transparent)
+                ep = QPainter(expanded)
+                ep.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                try:
+                    ep.drawImage(burst_margin, burst_margin, img)
+                    cx = EW // 2
+                    cy = EH // 2
+                    # Burst particles
+                    ep.setPen(Qt.PenStyle.NoPen)
+                    for pt in getattr(self, '_burst_particles', []):
+                        if pt['alpha'] > 0:
+                            c = QColor(pt['color'])
+                            c.setAlpha(int(max(0, min(255, pt['alpha']))))
+                            ep.setBrush(c)
+                            sz = max(1, int(pt['size']))
+                            ep.drawEllipse(cx + int(pt['x']) - sz // 2,
+                                           cy + int(pt['y']) - sz // 2, sz, sz)
+                    # Neon rings (level-up)
+                    for ring in getattr(self, '_ring_rings', []):
+                        r = int(ring['r'])
+                        alp = int(max(0, min(255, ring['alpha'])))
+                        if r > 0 and alp > 0:
+                            rc = QColor(0, 229, 255, alp)
+                            pen = QPen(rc)
+                            pen.setWidth(3)
+                            ep.setPen(pen)
+                            ep.setBrush(Qt.BrushStyle.NoBrush)
+                            ep.drawEllipse(cx - r, cy - r, 2 * r, 2 * r)
+                finally:
+                    try:
+                        ep.end()
+                    except Exception:
+                        pass
+                img = expanded
+
         if portrait:
             ccw = bool(ov.get("ach_toast_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
             angle = -90 if ccw else 90
@@ -2174,9 +2672,15 @@ class AchToastWindow(QWidget):
     def _render_and_place(self):
         try:
             img = self._compose_image()
-            W, H = img.width(), img.height()
+            EW, EH = img.width(), img.height()
             ov = self.parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
+            # Determine the burst margin embedded in the image (landscape only)
+            burst_active = getattr(self, '_burst_active', False)
+            ring_active = getattr(self, '_ring_active', False)
+            burst_margin = getattr(self, '_burst_img_margin', 0) if (not portrait and (burst_active or ring_active)) else 0
+            W = EW - 2 * burst_margin
+            H = EH - 2 * burst_margin
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
             screen = QApplication.primaryScreen()
             geo = screen.availableGeometry() if screen else QRect(0, 0, 1280, 720)
@@ -2194,8 +2698,11 @@ class AchToastWindow(QWidget):
 
             x = max(geo.left(), min(x, geo.right() - W))
             y = max(geo.top(),  min(y,  geo.bottom() - H))
-            self.setGeometry(x, y, W, H)
-            self._label.setGeometry(0, 0, W, H)
+            # Expand window for burst/ring area
+            x_win = x - burst_margin
+            y_win = y - burst_margin
+            self.setGeometry(x_win, y_win, EW, EH)
+            self._label.setGeometry(0, 0, EW, EH)
             self._label.setPixmap(QPixmap.fromImage(img))
             self.show()
             self.raise_()
@@ -2210,6 +2717,83 @@ class AchToastWindow(QWidget):
                 pass
         except Exception as e:
             print(f"[TOAST] render_and_place failed: {e}")
+
+    def _burst_tick(self):
+        """Advance burst particle positions and fade out. Stops after ~700ms."""
+        dt = 0.030  # 30ms in seconds
+        self._burst_elapsed += dt * 1000
+        duration = 700.0
+        for pt in self._burst_particles:
+            pt['x'] += pt['vx'] * dt
+            pt['y'] += pt['vy'] * dt
+            pt['vy'] += 60 * dt   # slight gravity
+            fade = 1.0 - min(1.0, self._burst_elapsed / duration)
+            pt['alpha'] = int(255 * fade)
+        if self._burst_elapsed >= duration:
+            self._burst_active = False
+            self._burst_img_margin = 0
+            self._burst_timer.stop()
+        self._render_and_place()
+
+    def _ring_tick(self):
+        """Advance neon ring expansion for level-up toasts."""
+        dt = 20.0  # 20ms
+        self._ring_elapsed += dt
+        max_r = self.width() if self.width() > 0 else 300
+        all_done = True
+        for ring in self._ring_rings:
+            effective_elapsed = self._ring_elapsed - ring['delay']
+            if effective_elapsed < 0:
+                all_done = False
+                continue
+            t = min(1.0, effective_elapsed / self._ring_duration)
+            ring['r'] = t * max_r
+            ring['alpha'] = int(200 * (1.0 - t))
+            if t < 1.0:
+                all_done = False
+        if all_done:
+            self._ring_active = False
+            self._ring_timer.stop()
+        self._render_and_place()
+
+    def _anim_tick(self):
+        """Advance typewriter index and icon bounce, then re-render."""
+        dt = 30.0  # 30ms
+        changed = False
+
+        # Typewriter
+        if getattr(self, '_tw_active', False) and getattr(self, '_tw_full', ''):
+            if self._tw_idx < len(self._tw_full):
+                self._tw_idx += 1
+                changed = True
+            else:
+                self._tw_active = False
+                if hasattr(self, '_tw_cursor_timer'):
+                    self._tw_cursor_timer.stop()
+                changed = True
+
+        # Icon bounce
+        if getattr(self, '_bounce_active', False):
+            self._bounce_elapsed += dt
+            if self._bounce_elapsed >= self._bounce_duration:
+                self._bounce_active = False
+                self._bounce_elapsed = self._bounce_duration
+            changed = True
+
+        if changed:
+            self._render_and_place()
+
+        # Stop anim timer when both typewriter and bounce are done
+        if not getattr(self, '_tw_active', False) and not getattr(self, '_bounce_active', False):
+            if hasattr(self, '_anim_timer'):
+                self._anim_timer.stop()
+
+    def _tw_cursor_blink(self):
+        """Toggle cursor visibility for typewriter effect."""
+        self._tw_cursor_visible = not getattr(self, '_tw_cursor_visible', True)
+        if getattr(self, '_tw_active', False):
+            self._render_and_place()
+
 
 class AchToastManager(QObject):
     def __init__(self, parent: "MainWindow"):
@@ -3045,3 +3629,112 @@ class HeatBarPositionPicker(QWidget):
     def current_top_left(self) -> tuple[int, int]:
         g = self.geometry()
         return int(g.x()), int(g.y())
+
+
+class ChallengeStartCountdown(QWidget):
+    """Full-screen transparent countdown overlay: 3…2…1…GO!
+
+    Each number scales from 2.0x → 1.0x with Ease-Out over 800ms.
+    After '1', a brief 'GO!' text appears in orange with scale 1.0 → 1.5 + fade-out.
+    Total duration: ~3.5 s.  Emits `finished` when the animation ends and auto-closes.
+    """
+
+    finished = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.WindowType.FramelessWindowHint |
+                         Qt.WindowType.WindowStaysOnTopHint |
+                         Qt.WindowType.Tool)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        # Cover the primary screen
+        screen = QApplication.primaryScreen()
+        geo = screen.geometry() if screen else QRect(0, 0, 1280, 720)
+        self.setGeometry(geo)
+
+        # Countdown sequence: ('3', cyan), ('2', cyan), ('1', cyan), ('GO!', orange)
+        self._steps = [
+            ('3',   QColor('#00E5FF'), 800, False),
+            ('2',   QColor('#00E5FF'), 800, False),
+            ('1',   QColor('#00E5FF'), 800, False),
+            ('GO!', QColor('#FF7F00'), 500, True),   # last step fades out
+        ]
+        self._step_idx = 0
+        self._step_elapsed = 0.0
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(16)
+        self._timer.timeout.connect(self._tick)
+
+        _start_topmost_timer(self)
+
+    def start(self):
+        self.show()
+        self.raise_()
+        self._timer.start()
+
+    def _tick(self):
+        if self._step_idx >= len(self._steps):
+            self._timer.stop()
+            self.finished.emit()
+            self.close()
+            return
+        self._step_elapsed += 16.0
+        _, _, duration, _ = self._steps[self._step_idx]
+        if self._step_elapsed >= duration:
+            self._step_elapsed = 0.0
+            self._step_idx += 1
+            if self._step_idx >= len(self._steps):
+                self._timer.stop()
+                self.finished.emit()
+                self.close()
+                return
+        self.update()
+
+    def paintEvent(self, event):
+        if self._step_idx >= len(self._steps):
+            return
+        label, color, duration, is_go = self._steps[self._step_idx]
+        t = min(1.0, self._step_elapsed / max(1.0, duration))
+        eased = _ease_out_cubic(t)
+
+        W, H = self.width(), self.height()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+        try:
+            if is_go:
+                # GO! fades out while scaling 1.0 → 1.5
+                scale = 1.0 + 0.5 * eased
+                opacity = max(0.0, 1.0 - eased)
+                p.setOpacity(opacity)
+            else:
+                # Numbers scale 2.0 → 1.0
+                scale = 2.0 - eased
+                p.setOpacity(1.0)
+
+            font_size = int(80 * scale)
+            font = QFont("Segoe UI", max(12, font_size), QFont.Weight.Bold)
+            p.setFont(font)
+
+            # Glow effect
+            glow_col = QColor(color.red(), color.green(), color.blue(), 60)
+            for r in range(4, 0, -1):
+                gp = QPen(glow_col)
+                gp.setWidth(r * 3)
+                p.setPen(gp)
+                p.drawText(QRect(0, 0, W, H),
+                           Qt.AlignmentFlag.AlignCenter, label)
+
+            # Main text
+            p.setPen(QPen(color))
+            p.drawText(QRect(0, 0, W, H),
+                       Qt.AlignmentFlag.AlignCenter, label)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
