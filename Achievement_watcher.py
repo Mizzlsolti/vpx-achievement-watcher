@@ -2614,9 +2614,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.overlay.transition_to(update_cb)
             else:
                 update_cb()
+                # Allow Qt to process any pending layout/paint events so that
+                # font metrics are fully initialized before we measure geometry.
                 QApplication.processEvents()
+                # Re-run layout positions after processEvents() so title height
+                # and body positions are computed with now-correct font metrics.
+                # Using _layout_positions_for() directly avoids scheduling an
+                # extra rotation timer (which _layout_positions() would do for
+                # portrait mode).  This prevents the first-open blink/distortion
+                # where sizeHint() returned stale values before the first paint.
+                self.overlay._layout_positions_for(
+                    self.overlay.width(), self.overlay.height()
+                )
                 if self.overlay.portrait_mode:
                     self.overlay._apply_rotation_snapshot(force=True)
+                else:
+                    # Ensure live (unrotated) widgets are explicitly visible
+                    # before show() so no blank flash occurs on first open.
+                    self.overlay._show_live_unrotated()
                 # Prevent showEvent from re-triggering layout/rotation and
                 # causing additional blink frames.
                 self.overlay._ensuring = True
