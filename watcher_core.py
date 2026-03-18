@@ -4214,7 +4214,8 @@ class Watcher:
                         progress = len(played_for_mfr)
                         need = int(cond.get("min", 1))
                         if progress < need:
-                            log(self.cfg, f"[GLOBAL_ACH] rom_count '{title}': {progress}/{need} ({manufacturer}) – played={list(played_for_mfr)}, roms_played={roms_played}")
+                            if self.cfg.LOG_CTRL:
+                                log(self.cfg, f"[GLOBAL_ACH] rom_count '{title}': {progress}/{need} ({manufacturer}) – played={list(played_for_mfr)}, roms_played={roms_played}")
                     # Update tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": progress}
                     _rom_state_dirty = True
