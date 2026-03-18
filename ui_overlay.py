@@ -354,6 +354,10 @@ class OverlayWindow(QWidget):
         if not self._ensuring:
             QTimer.singleShot(0, self._layout_positions)
             if self.portrait_mode:
+                # Hide raw widgets immediately so the window never exposes
+                # unrotated content while the rotation snapshot is being built.
+                self.container.hide()
+                self.text_container.hide()
                 QTimer.singleShot(0, lambda: self.request_rotation(force=True))
             else:
                 QTimer.singleShot(0, self._show_live_unrotated)
