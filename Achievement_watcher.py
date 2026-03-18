@@ -1460,7 +1460,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_level_table = QGroupBox("Level Table")
         lay_level_table = QVBoxLayout(grp_level_table)
         lv_browser = QTextBrowser()
-        lv_browser.setMaximumHeight(400)
+        lv_browser.setMinimumHeight(250)
         lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
         lay_level_table.addWidget(lv_browser)
         self.lv_table_browser = lv_browser
@@ -1872,7 +1872,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         need_min = need / 60  # convert threshold to minutes
 
                         tally = global_tally.get(title, {})
-                        cached_progress = float(tally.get("progress", 0))  # already in minutes
+                        cached_progress = float(tally.get("progress", 0))
+                        # Sanity check for stale data written by older code that stored seconds:
+                        # A locked achievement must have cached_progress < need_min (in minutes).
+                        # If cached_progress exceeds need_min yet cached_progress/60 is still below
+                        # need_min, the value is almost certainly in seconds — convert it.
+                        if cached_progress > need_min and cached_progress / 60 < need_min:
+                            cached_progress = cached_progress / 60
 
                         # NVRAM-based: "MINUTES ON" summed across all ROMs (already in minutes)
                         live_minutes = _live_nvram_total("MINUTES ON") if _roms_played_for_live else 0
