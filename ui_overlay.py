@@ -358,11 +358,12 @@ class OverlayWindow(QWidget):
     def showEvent(self, e):
         super().showEvent(e)
         _force_topmost(self)
-        QTimer.singleShot(0, self._layout_positions)
-        if self.portrait_mode:
-            QTimer.singleShot(0, lambda: self.request_rotation(force=True))
-        else:
-            QTimer.singleShot(0, self._show_live_unrotated)
+        if not self._ensuring:
+            QTimer.singleShot(0, self._layout_positions)
+            if self.portrait_mode:
+                QTimer.singleShot(0, lambda: self.request_rotation(force=True))
+            else:
+                QTimer.singleShot(0, self._show_live_unrotated)
         # Start effects overlay (glow border + floating particles)
         if hasattr(self, '_effects_widget'):
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
@@ -489,6 +490,8 @@ class OverlayWindow(QWidget):
         self.rotated_label.setStyleSheet("background:transparent;")
         self.rotated_label.hide()
         self._rot_in_progress = False
+        self._rot_deferred = False
+        self._ensuring = False
         self._font_update_in_progress = False
         self._nav_arrows = OverlayNavArrows(self)
         self._nav_arrows_active = False
@@ -664,6 +667,10 @@ class OverlayWindow(QWidget):
             self.body.show()
             return
         if getattr(self, "_rot_in_progress", False):
+            # Queue a deferred re-render so the final state is always correct
+            if not getattr(self, "_rot_deferred", False):
+                self._rot_deferred = True
+                QTimer.singleShot(50, self._deferred_rotation)
             return
         self._rot_in_progress = True
         try:
@@ -744,6 +751,11 @@ class OverlayWindow(QWidget):
             self.text_container.show()
         finally:
             self._rot_in_progress = False
+
+    def _deferred_rotation(self):
+        self._rot_deferred = False
+        if self.portrait_mode and self.isVisible():
+            self._apply_rotation_snapshot(force=True)
 
     def _refresh_current_content(self):
         """Re-render the currently displayed page using the current font settings.
