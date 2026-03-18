@@ -1873,16 +1873,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                         tally = global_tally.get(title, {})
                         cached_progress = float(tally.get("progress", 0))
-                        # Sanity check for stale data written by older code that stored seconds:
-                        # Values > 100000 are impossible in minutes (~69 days) — definitely
-                        # stored in seconds, convert.  For a locked achievement, cached_progress
-                        # must also be < need_min; if it exceeds need_min the data is corrupt/stale
-                        # and was almost certainly stored in seconds.
-                        if cached_progress > 100000 or cached_progress > need_min:
-                            cached_progress = cached_progress / 60
+                        # For data without a "unit" marker (legacy data possibly in seconds),
+                        # use live NVRAM minutes as ground truth to detect seconds-vs-minutes.
+                        # Values > 100000 are impossible as minutes (~69 days) — definitely seconds.
+                        # For mid-range values, if cached_progress is more than 2× the live NVRAM
+                        # minutes total and above 120, the value is almost certainly in seconds.
+                        if tally.get("unit") != "minutes":
+                            if cached_progress > 100000:
+                                cached_progress = cached_progress / 60
 
                         # NVRAM-based: "MINUTES ON" summed across all ROMs (already in minutes)
                         live_minutes = _live_nvram_total("MINUTES ON") if _roms_played_for_live else 0
+
+                        # Additional legacy heuristic: use live_minutes as ground truth.
+                        # 2× multiplier: a genuine minutes value should be close to NVRAM minutes;
+                        # more than double it almost certainly means stored seconds.
+                        # 120 threshold: below 2 minutes the values are trivially ambiguous.
+                        if tally.get("unit") != "minutes" and live_minutes > 0 and cached_progress > live_minutes * 2 and cached_progress > 120:
+                            cached_progress = cached_progress / 60
 
                         progress_min = max(cached_progress, float(live_minutes))
 
