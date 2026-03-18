@@ -362,17 +362,12 @@ class OverlayWindow(QWidget):
             else:
                 QTimer.singleShot(0, self._show_live_unrotated)
         # Start effects overlay (glow border + floating particles)
-        # Delay effects widget to avoid z-order flash before content is ready.
-        # 50 ms is enough for the rotation snapshot to render but short enough
-        # to be imperceptible to the user.
         if hasattr(self, '_effects_widget'):
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
             if not low_perf:
-                def _show_effects():
-                    self._effects_widget.setGeometry(0, 0, self.width(), self.height())
-                    self._effects_widget.show()
-                    self._effects_widget.raise_()
-                QTimer.singleShot(50, _show_effects)
+                self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+                self._effects_widget.show()
+                self._effects_widget.raise_()
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -703,10 +698,7 @@ class OverlayWindow(QWidget):
             self.title.setVisible(not getattr(self, '_fullsize_mode', False))
             self.body.setVisible(True)
             self._layout_positions_for(pre_w, pre_h, portrait_pre_render=False)
-            # Multiple event-loop passes to ensure rich-text is fully laid out
-            self.body.adjustSize()
-            for _ in range(3):
-                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 10)
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 5)
             content_pre = QImage(pre_w, pre_h, QImage.Format.Format_ARGB32_Premultiplied)
             content_pre.fill(Qt.GlobalColor.transparent)
             p_all = QPainter(content_pre)
@@ -1272,9 +1264,7 @@ class OverlayWindow(QWidget):
         # After 120 ms of glitch frames, apply callback and switch to slide
         def _switch_to_slide():
             new_content_callback()
-            # Give Qt time to fully render the new content
-            for _ in range(3):
-                QApplication.processEvents()
+            QApplication.processEvents()
             new_img = self._snapshot_current()
             if self._transition_state:
                 self._transition_state['new_img'] = new_img
