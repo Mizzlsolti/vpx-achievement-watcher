@@ -20,18 +20,20 @@ from watcher_core import APP_DIR, register_raw_input_for_window
 
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
-                      radius: int = 18, color: QColor = None, layers: int = 3):
+                      radius: int = 18, color: QColor = None, layers: int = 3,
+                      low_perf: bool = False):
     """Draw a multi-layer neon glow border for a modern sci-fi look."""
     if color is None:
         color = QColor("#00E5FF")
-    # Outer glow layers
-    for i in range(layers, 0, -1):
-        alpha = int(30 * (layers + 1 - i))
-        glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), alpha))
-        glow_pen.setWidth(i * 2)
-        painter.setPen(glow_pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(x + i, y + i, w - 2 * i, h - 2 * i, radius, radius)
+    if not low_perf:
+        # Outer glow layers
+        for i in range(layers, 0, -1):
+            alpha = int(30 * (layers + 1 - i))
+            glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), alpha))
+            glow_pen.setWidth(i * 2)
+            painter.setPen(glow_pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRoundedRect(x + i, y + i, w - 2 * i, h - 2 * i, radius, radius)
     # Sharp inner border
     pen = QPen(color)
     pen.setWidth(2)
@@ -103,7 +105,13 @@ class OverlayNavArrows(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        if not self._pulse_timer.isActive():
+        parent = self.parent()
+        low_perf = False
+        try:
+            low_perf = bool(parent.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+        except Exception:
+            pass
+        if not low_perf and not self._pulse_timer.isActive():
             self._pulse_timer.start()
 
     def hideEvent(self, event):
@@ -124,6 +132,12 @@ class OverlayNavArrows(QWidget):
         portrait = getattr(parent, "portrait_mode", False)
         ccw = getattr(parent, "rotate_ccw", True)
 
+        low_perf = False
+        try:
+            low_perf = bool(parent.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+        except Exception:
+            pass
+
         if portrait:
             draw_w, draw_h = H, W
         else:
@@ -134,10 +148,15 @@ class OverlayNavArrows(QWidget):
         p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         try:
-            amp = 0.5 + 0.5 * sin(2 * pi * self._pulse_t)
-            alpha = 110 + int(120 * amp)
-            scale = 0.9 + 0.2 * amp
-            wobble = 2.0 * sin(2 * pi * self._pulse_t)
+            if low_perf:
+                alpha = 180
+                scale = 1.0
+                wobble = 0
+            else:
+                amp = 0.5 + 0.5 * sin(2 * pi * self._pulse_t)
+                alpha = 110 + int(120 * amp)
+                scale = 0.9 + 0.2 * amp
+                wobble = 2.0 * sin(2 * pi * self._pulse_t)
             base_h = 18
             ah = int(base_h * scale)
             aw = max(6, int(ah * 0.6))
@@ -680,7 +699,8 @@ class OverlayWindow(QWidget):
                 dy = (H - content_rot.height()) // 2
                 p_final.drawImage(dx, dy, content_rot)
 
-                _draw_glow_border(p_final, 0, 0, W, H, radius=18)
+                _draw_glow_border(p_final, 0, 0, W, H, radius=18,
+                                   low_perf=bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False)))
             finally:
                 p_final.end()
             self.text_container.setGeometry(old_geom)
@@ -1532,7 +1552,8 @@ class FlipCounterOverlay(QWidget):
             p.setBrush(bg)
             p.drawRoundedRect(0, 0, content_w, content_h, radius, radius)
 
-            _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius)
+            _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
+                              low_perf=bool(ov.get("low_performance_mode", False)))
 
             p.setPen(title_color); p.setFont(f_title)
             p.drawText(QRect(0, pad, content_w, fm_title.height()),
@@ -2329,32 +2350,43 @@ class AchToastWindow(QWidget):
         self._timer.timeout.connect(self._tick)
         self._remaining = self._seconds
 
+        low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
-        self._burst_img_margin = 80
-        self._burst_particles = []
-        for _ in range(20):
-            angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(80, 200)
-            self._burst_particles.append({
-                'x': 0.0, 'y': 0.0,
-                'vx': math.cos(angle) * speed,
-                'vy': math.sin(angle) * speed,
-                'size': random.uniform(3, 6),
-                'alpha': 255,
-                'color': QColor(random.choice([0xFFD700, 0xFF7F00, 0xFFA500])),
-            })
-        self._burst_elapsed = 0.0
-        self._burst_active = True
-        self._burst_timer = QTimer(self)
-        self._burst_timer.setInterval(30)
-        self._burst_timer.timeout.connect(self._burst_tick)
-        self._burst_timer.start()
+        if low_perf:
+            self._burst_img_margin = 0
+            self._burst_particles = []
+            self._burst_elapsed = 0.0
+            self._burst_active = False
+            self._burst_timer = QTimer(self)
+            self._burst_timer.setInterval(30)
+            self._burst_timer.timeout.connect(self._burst_tick)
+        else:
+            self._burst_img_margin = 80
+            self._burst_particles = []
+            for _ in range(20):
+                angle = random.uniform(0, 2 * math.pi)
+                speed = random.uniform(80, 200)
+                self._burst_particles.append({
+                    'x': 0.0, 'y': 0.0,
+                    'vx': math.cos(angle) * speed,
+                    'vy': math.sin(angle) * speed,
+                    'size': random.uniform(3, 6),
+                    'alpha': 255,
+                    'color': QColor(random.choice([0xFFD700, 0xFF7F00, 0xFFA500])),
+                })
+            self._burst_elapsed = 0.0
+            self._burst_active = True
+            self._burst_timer = QTimer(self)
+            self._burst_timer.setInterval(30)
+            self._burst_timer.timeout.connect(self._burst_tick)
+            self._burst_timer.start()
 
         # --- Neon ring pulse (level-up only) ---
         self._ring_rings = []
         self._ring_active = False
-        if is_level_up:
+        if is_level_up and not low_perf:
             self._ring_rings = [
                 {'r': 0.0, 'elapsed': 0.0, 'delay': 0.0, 'alpha': 200},
                 {'r': 0.0, 'elapsed': 0.0, 'delay': 200.0, 'alpha': 200},
@@ -2370,23 +2402,25 @@ class AchToastWindow(QWidget):
         # --- Typewriter reveal (subtitle line2) ---
         self._tw_full: str = ""
         self._tw_idx: int = 0
-        self._tw_active: bool = True
+        self._tw_active: bool = not low_perf
         self._tw_cursor_visible: bool = True
         self._tw_cursor_timer = QTimer(self)
         self._tw_cursor_timer.setInterval(500)
         self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
-        self._tw_cursor_timer.start()
+        if not low_perf:
+            self._tw_cursor_timer.start()
 
         # --- Icon bounce animation ---
         self._bounce_elapsed: float = 0.0
         self._bounce_duration: float = 400.0
-        self._bounce_active: bool = True
+        self._bounce_active: bool = not low_perf
 
         # Combined fast animation timer (typewriter + bounce)
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(30)
         self._anim_timer.timeout.connect(self._anim_tick)
-        self._anim_timer.start()
+        if not low_perf:
+            self._anim_timer.start()
 
         self._render_and_place()
         self._timer.start()
@@ -2918,7 +2952,8 @@ class ChallengeCountdownOverlay(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(8, 12, 22, 245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
-        _draw_glow_border(p, 0, 0, w, h, radius=16)
+        _draw_glow_border(p, 0, 0, w, h, radius=16,
+                          low_perf=bool(ov.get("low_performance_mode", False)))
         p.setPen(Qt.GlobalColor.white)
         mins, secs = divmod(self._left, 60)
         txt = f"{mins:02d}:{secs:02d}"
@@ -2962,7 +2997,9 @@ class ChallengeSelectOverlay(QWidget):
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50) 
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
-        self._pulse_timer.start()
+        low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+        if not low_perf:
+            self._pulse_timer.start()
         self._pix = None
         self._render_and_place()
         self.show()
@@ -3046,7 +3083,8 @@ class ChallengeSelectOverlay(QWidget):
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
 
-            _draw_glow_border(p, 0, 0, w, h, radius=radius)
+            _draw_glow_border(p, 0, 0, w, h, radius=radius,
+                              low_perf=bool(ov.get("low_performance_mode", False)))
 
             title_pt = scaled_body_pt + 6
             desc_pt = max(10, scaled_body_pt)
@@ -3181,7 +3219,9 @@ class FlipDifficultyOverlay(QWidget):
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
-        self._pulse_timer.start()
+        low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+        if not low_perf:
+            self._pulse_timer.start()
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -3263,7 +3303,8 @@ class FlipDifficultyOverlay(QWidget):
             p.setBrush(QColor(8, 12, 22, 245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
-            _draw_glow_border(p, 0, 0, w, h, radius=radius)
+            _draw_glow_border(p, 0, 0, w, h, radius=radius,
+                              low_perf=bool(ov.get("low_performance_mode", False)))
 
             title = "Flip Challenge – Choose difficulty"
             title_font_pt = scaled_body_pt + 6
@@ -3431,7 +3472,9 @@ class HeatBarometerOverlay(QWidget):
             p.drawRoundedRect(0, 0, w, h, 10, 10)
 
             # border with glow
-            _draw_glow_border(p, 0, 0, w, h, radius=10)
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            _draw_glow_border(p, 0, 0, w, h, radius=10,
+                              low_perf=bool(ov.get("low_performance_mode", False)))
 
             # bar background (track)
             bx = pad
@@ -3655,6 +3698,12 @@ class ChallengeStartCountdown(QWidget):
         geo = screen.geometry() if screen else QRect(0, 0, 1280, 720)
         self.setGeometry(geo)
 
+        self._low_perf = False
+        try:
+            self._low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+        except Exception:
+            pass
+
         # Countdown sequence: ('3', cyan), ('2', cyan), ('1', cyan), ('GO!', orange)
         self._steps = [
             ('3',   QColor('#00E5FF'), 800, False),
@@ -3706,7 +3755,10 @@ class ChallengeStartCountdown(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
-            if is_go:
+            if self._low_perf:
+                scale = 1.0
+                p.setOpacity(1.0)
+            elif is_go:
                 # GO! fades out while scaling 1.0 → 1.5
                 scale = 1.0 + 0.5 * eased
                 opacity = max(0.0, 1.0 - eased)
@@ -3720,14 +3772,15 @@ class ChallengeStartCountdown(QWidget):
             font = QFont("Segoe UI", max(12, font_size), QFont.Weight.Bold)
             p.setFont(font)
 
-            # Glow effect
-            glow_col = QColor(color.red(), color.green(), color.blue(), 60)
-            for r in range(4, 0, -1):
-                gp = QPen(glow_col)
-                gp.setWidth(r * 3)
-                p.setPen(gp)
-                p.drawText(QRect(0, 0, W, H),
-                           Qt.AlignmentFlag.AlignCenter, label)
+            if not self._low_perf:
+                # Glow effect
+                glow_col = QColor(color.red(), color.green(), color.blue(), 60)
+                for r in range(4, 0, -1):
+                    gp = QPen(glow_col)
+                    gp.setWidth(r * 3)
+                    p.setPen(gp)
+                    p.drawText(QRect(0, 0, W, H),
+                               Qt.AlignmentFlag.AlignCenter, label)
 
             # Main text
             p.setPen(QPen(color))

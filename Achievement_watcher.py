@@ -2113,6 +2113,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_maint.addWidget(lbl_id_warning)
         
         layout.addWidget(grp_maint)
+
+        grp_perf = QGroupBox("Performance")
+        lay_perf = QVBoxLayout(grp_perf)
+        self.chk_low_perf_mode = QCheckBox("🔋 Low Performance Mode (disables all overlay animations)")
+        self.chk_low_perf_mode.setChecked(bool(self.cfg.OVERLAY.get("low_performance_mode", False)))
+        self.chk_low_perf_mode.stateChanged.connect(self._save_low_performance_mode)
+        lay_perf.addWidget(self.chk_low_perf_mode)
+
+        layout.addWidget(grp_perf)
         layout.addStretch(1)
         self.main_tabs.addTab(tab, "⚙️ System")
 
@@ -2132,6 +2141,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.save()
         if getattr(self, "btn_restore_cloud", None):
             self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+
+    def _save_low_performance_mode(self, state: int):
+        self.cfg.OVERLAY["low_performance_mode"] = bool(state)
+        self.cfg.save()
         
     def _save_player_name(self, name):
         self.cfg.OVERLAY["player_name"] = name.strip()

@@ -188,6 +188,7 @@ DEFAULT_OVERLAY.update({
 })
 DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
 DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
+DEFAULT_OVERLAY.setdefault("low_performance_mode", False)
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -280,7 +281,8 @@ class AppConfig:
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
                 "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute"
+                "challenges_voice_volume", "challenges_voice_mute",
+                "low_performance_mode"
             ]
             
             for k in list(loaded_ov.keys()):
@@ -335,7 +337,8 @@ class AppConfig:
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
                 "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute"
+                "challenges_voice_volume", "challenges_voice_mute",
+                "low_performance_mode"
             ]
             
             for k in allowed_keys:
