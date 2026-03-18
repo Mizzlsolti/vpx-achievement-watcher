@@ -3283,6 +3283,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
 
     def _cycle_overlay_button(self):
+        # ── cooldown: ignore rapid re-triggers within 500 ms ──
+        import time as _time
+        _now = _time.monotonic()
+        if _now - getattr(self, "_overlay_last_action", 0.0) < 0.50:
+            return
+        # Record this attempt immediately so all exit paths respect the cooldown
+        self._overlay_last_action = _now
 
         try:
             if self.watcher and self.watcher.game_active:
@@ -3401,9 +3408,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if self.overlay is None:
             self.overlay = OverlayWindow(self)
         self.overlay.portrait_mode = bool(self.cfg.OVERLAY.get("portrait_mode", True))
+        self.overlay._ensuring = True          # suppress showEvent double-work
         self.overlay._apply_geometry()
         self.overlay._layout_positions()
         self.overlay.request_rotation(force=True)
+        # 50ms > QTimer.singleShot(0) delay in request_rotation, so the rotation
+        # pipeline has started before we release the flag.
+        QTimer.singleShot(50, lambda: setattr(self.overlay, '_ensuring', False))
 
     def _show_overlay_latest(self):
         from PyQt6.QtCore import QTimer
@@ -3437,11 +3448,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         _do_show()
                         return
                     tries["n"] += 1
-                    if tries["n"] < 32:
-                        QTimer.singleShot(250, _poll)
+                    if tries["n"] < 16:
+                        QTimer.singleShot(150, _poll)
                     else:
                         _do_show()
-                QTimer.singleShot(250, _poll)
+                QTimer.singleShot(150, _poll)
                 return
         except Exception:
             pass
