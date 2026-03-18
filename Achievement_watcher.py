@@ -1874,10 +1874,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         tally = global_tally.get(title, {})
                         cached_progress = float(tally.get("progress", 0))
                         # Sanity check for stale data written by older code that stored seconds:
-                        # A locked achievement must have cached_progress < need_min (in minutes).
-                        # If cached_progress exceeds need_min yet cached_progress/60 is still below
-                        # need_min, the value is almost certainly in seconds — convert it.
-                        if cached_progress > need_min and cached_progress / 60 < need_min:
+                        # Values > 100000 are impossible in minutes (~69 days) — definitely
+                        # stored in seconds, convert.  For a locked achievement, cached_progress
+                        # must also be < need_min; if it exceeds need_min the data is corrupt/stale
+                        # and was almost certainly stored in seconds.
+                        if cached_progress > 100000 or cached_progress > need_min:
                             cached_progress = cached_progress / 60
 
                         # NVRAM-based: "MINUTES ON" summed across all ROMs (already in minutes)

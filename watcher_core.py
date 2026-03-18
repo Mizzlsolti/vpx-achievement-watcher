@@ -4135,6 +4135,13 @@ class Watcher:
                     # 2) Incremental tally (stored in minutes)
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
+
+                    # One-time migration: if progress was stored in seconds by an older version,
+                    # convert to minutes. Values > 100000 are impossible in minutes (~69 days).
+                    raw_progress = float(tally.get("progress", 0))
+                    if raw_progress > 100000:
+                        tally["progress"] = round(raw_progress / 60, 2)
+
                     delta_min = round((duration_sec or 0) / 60, 2)
                     if delta_min > 0:
                         now_iso = datetime.now(timezone.utc).isoformat()
