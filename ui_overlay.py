@@ -162,18 +162,11 @@ class OverlayNavArrows(QWidget):
             aw = max(6, int(ah * 0.6))
             cy = draw_h // 2
             pad = 16
-            left_cx = pad + int(-wobble)
             right_cx = draw_w - pad + int(wobble)
             arrow_color = QColor("#00E5FF")
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
-            # Left-pointing arrow
-            p.drawPolygon([
-                QPoint(left_cx - aw // 2, cy),
-                QPoint(left_cx + aw // 2, cy - ah // 2),
-                QPoint(left_cx + aw // 2, cy + ah // 2),
-            ])
             # Right-pointing arrow
             p.drawPolygon([
                 QPoint(right_cx + aw // 2, cy),
