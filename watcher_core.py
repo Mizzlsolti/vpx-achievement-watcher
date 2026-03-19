@@ -376,6 +376,8 @@ def f_achievements_state(cfg: "AppConfig") -> str:
 def f_log(cfg):          return os.path.join(cfg.BASE, "watcher.log")
 def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
 def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
+def f_vps_mapping(cfg):  return os.path.join(cfg.BASE, "vps_id_mapping.json")
+def f_vpsdb_cache(cfg):  return os.path.join(cfg.BASE, "tools", "vpsdb.json")
 
 
 def _migrate_runtime_dirs(cfg):
