@@ -22,7 +22,7 @@ Heat Challenge: When the barometer reaches 100%, it's over. The heat rises if yo
 
 VPC Weekly Challene view. Discords Weekly Challenge on Overlay (Only view)
 
-The achievement watcher uses nvram-maps, vpc-data and vpxtool for Visual Pinball
+The achievement watcher uses nvram-maps, vpc-data, vps and vpxtool for Visual Pinball
 
 Many thanks 
 
@@ -32,16 +32,10 @@ francisdb      https://github.com/francisdb/vpxtool
 
 emb417 https://github.com/emb417/vpc-data
 
+VPS Team https://github.com/VirtualPinballSpreadsheet/vps-db
+
 Team Visual Pinball 
 
 The official Visual Pinball and PinMAME hub.
 
 https://github.com/vpinball
-
-## Screenshots
-
-![Watcher](docs/Images/Watchermain.png)
-
-![Overlay](docs/Images/Overlay.png)
-
-![Progress](docs/Images/Progress.png)
