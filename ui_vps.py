@@ -14,7 +14,7 @@ from typing import Optional, Any, List
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QEvent, QPoint
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -90,7 +90,7 @@ def _save_vps_mapping(cfg, mapping: dict):
 
 def _normalize_term(term: str) -> str:
     """Normalize a search term the same way VPin Studio does."""
-    term = re.sub(r"[_'\-\.]", " ", term)
+    term = re.sub(r"[_'\-\.]+", " ", term)
     term = re.sub(r"\bThe\s+", "", term, flags=re.IGNORECASE)
     term = re.sub(r",\s*The\b", "", term, flags=re.IGNORECASE)
     if "(" in term:
@@ -159,7 +159,6 @@ def _table_has_rom(table: dict, rom: str) -> bool:
             if isinstance(rf, str) and rf.lower() == rom_lower:
                 return True
     return False
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -248,9 +247,9 @@ class VpsPickerDialog(QDialog):
         self.table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table_widget.setShowGrid(True)
         self.table_widget.verticalHeader().setVisible(False)
+        # Both columns get equal stretch (50/50)
         self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.table_widget.setColumnWidth(1, 220)
+        self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_widget.setStyleSheet(
             "QTableWidget {"
             "  background:#1a1a1a; color:#DDD; gridline-color:#333;"
@@ -272,19 +271,6 @@ class VpsPickerDialog(QDialog):
         self.table_widget.itemSelectionChanged.connect(self._on_row_selected)
         self.table_widget.cellDoubleClicked.connect(self._on_double_click)
         root.addWidget(self.table_widget, stretch=1)
-
-        # ── Hover image popup ────────────────────────────────────────────────
-        self._img_popup = QLabel(flags=Qt.WindowType.ToolTip)
-        self._img_popup.setStyleSheet(
-            "border:2px solid #00E5FF; background:#111; padding:2px;"
-        )
-        self._img_popup.hide()
-        self._img_fetcher: Optional[_ImgFetcher] = None
-        self._hover_vps_id: Optional[str] = None
-
-        self.table_widget.setMouseTracking(True)
-        self.table_widget.viewport().setMouseTracking(True)
-        self.table_widget.viewport().installEventFilter(self)
 
         # ── Footer buttons ────────────────────────────────────────────────────
         sep = QFrame()
@@ -362,25 +348,32 @@ class VpsPickerDialog(QDialog):
 
         self.table_widget.setRowCount(len(entries))
         for row, (table, table_file, rom_match) in enumerate(entries):
-            # ── Column 0: name + type + features ─────────────────────────────
+            # ── Column 0: name + type + features + table-id + file-id ─────────
             raw_name = table.get("name", "Unknown")
             name = re.sub(r'\s*\(.*?\)', '', raw_name)
             name = re.sub(r'\s*\[.*?\]', '', name).strip()
 
             ttype = table.get("type", "")
             features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
-            vps_id = table.get("id", "")
+            vps_id = table.get("id", "")          # table-level VPS ID
+            tf_id = table_file.get("id", "")      # tableFile-level ID
+
             parts = [name]
             if ttype:
                 parts.append(f"[{ttype}]")
             if features:
                 parts.append("  " + "  ".join(features[:8]))
+            # Show table VPS ID
             if vps_id:
                 parts.append(f"  [{vps_id}]")
+            # Show tableFile ID only if different from table ID
+            if tf_id and tf_id != vps_id:
+                parts.append(f"  [{tf_id}]")
             col0_text = "  ".join(parts)
 
             item0 = QTableWidgetItem(col0_text)
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            # Left-align text in column 0
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             item0.setToolTip(raw_name)
             self.table_widget.setItem(row, 0, item0)
 
@@ -390,7 +383,6 @@ class VpsPickerDialog(QDialog):
             if len(authors) > 4:
                 authors_text += "…"
 
-            tf_id  = table_file.get("id", "")
             tf_ver = table_file.get("version", "")
             id_text = tf_ver or tf_id or ""
 
@@ -448,81 +440,6 @@ class VpsPickerDialog(QDialog):
         self.selected_table_file = None
         self.done(2)  # special code for "remove"
 
-    # ── Hover image popup ─────────────────────────────────────────────────────
-
-    def eventFilter(self, obj, event):
-        if obj is self.table_widget.viewport():
-            etype = event.type()
-            if etype == QEvent.Type.MouseMove:
-                pos = event.pos()
-                col = self.table_widget.columnAt(pos.x())
-                row = self.table_widget.rowAt(pos.y())
-                if col == 0 and 0 <= row < len(self._row_data):
-                    table, _ = self._row_data[row]
-                    vps_id = table.get("id", "")
-                    if vps_id and vps_id != self._hover_vps_id:
-                        self._hover_vps_id = vps_id
-                        img_filename = self._find_table_img(table, vps_id)
-                        if img_filename:
-                            global_pos = self.table_widget.viewport().mapToGlobal(pos)
-                            self._start_img_fetch(vps_id, img_filename, global_pos)
-                    elif vps_id and self._img_popup.isVisible():
-                        # update position while hovering same row
-                        global_pos = self.table_widget.viewport().mapToGlobal(pos)
-                        self._img_popup.move(global_pos.x() + 20,
-                                             global_pos.y() - self._img_popup.height() // 2)
-                else:
-                    self._hover_vps_id = None
-                    self._img_popup.hide()
-            elif etype == QEvent.Type.Leave:
-                self._hover_vps_id = None
-                self._img_popup.hide()
-        return super().eventFilter(obj, event)
-
-    def _find_table_img(self, table: dict, vps_id: str) -> Optional[str]:
-        """Return an image filename for this vps_id (local cache or derived from tableFiles)."""
-        cache = _ImgFetcher.LOCAL_CACHE
-        if cache.exists():
-            candidates = sorted(cache.glob(f"{vps_id}_table_*.webp"))
-            if candidates:
-                return candidates[-1].name
-            candidates = sorted(cache.glob(f"{vps_id}_*.webp"))
-            if candidates:
-                return candidates[-1].name
-        # Derive filename from first tableFile's updatedAt timestamp
-        table_files = table.get("tableFiles") or []
-        if table_files:
-            ts = table_files[0].get("updatedAt")
-            if isinstance(ts, (int, float)) and ts > 0:
-                return f"{vps_id}_table_{int(ts)}.webp"
-        return None
-
-    def _start_img_fetch(self, vps_id: str, filename: str, global_pos: QPoint):
-        local = _ImgFetcher.LOCAL_CACHE / filename
-        if local.exists():
-            pix = QPixmap(str(local))
-            if not pix.isNull():
-                pix = pix.scaledToWidth(300, Qt.TransformationMode.SmoothTransformation)
-                self._show_popup(pix, global_pos)
-                return
-        if self._img_fetcher and self._img_fetcher.isRunning():
-            return
-        fetcher = _ImgFetcher(vps_id, filename, self)
-        fetcher.ready.connect(
-            lambda _id, px, p=global_pos: self._show_popup(px, p)
-        )
-        self._img_fetcher = fetcher
-        fetcher.start()
-
-    def _show_popup(self, pix: QPixmap, global_pos: QPoint):
-        self._img_popup.setPixmap(pix)
-        self._img_popup.adjustSize()
-        x = global_pos.x() + 20
-        y = global_pos.y() - pix.height() // 2
-        self._img_popup.move(x, y)
-        self._img_popup.show()
-        self._img_popup.raise_()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VPS Achievement Info Dialog
@@ -573,10 +490,10 @@ class VpsAchievementInfoDialog(QDialog):
                 mfr = vps_entry.get("manufacturer", "")
                 year = vps_entry.get("year", "")
                 right_lay.addWidget(QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{name}</b>"))
-                right_lay.addWidget(QLabel(f"<span style='color:#999;'>{mfr} · {year}</span>"))
-                right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#999;'>{{mfr}} · {{year}}</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {{vps_id}}</span>"))
             else:
-                right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {vps_id} (not in local cache)</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {{vps_id}} (not in local cache)</span>"))
         else:
             lbl_no = QLabel("🎰 No VPS mapping set")
             lbl_no.setStyleSheet("color:#666;")
