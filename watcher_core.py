@@ -238,6 +238,7 @@ class AppConfig:
     LOG_CTRL: bool = False
     LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
     CLOUD_ENABLED: bool = True
+    CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
 
     @staticmethod
@@ -298,6 +299,7 @@ class AppConfig:
                 OVERLAY=ov,
                 FIRST_RUN=bool(data.get("FIRST_RUN", False)),
                 CLOUD_ENABLED=bool(data.get("CLOUD_ENABLED", True)),
+                CLOUD_BACKUP_ENABLED=bool(data.get("CLOUD_BACKUP_ENABLED", False)),
             )
         except Exception as e:
             print(f"[LOAD ERROR] {e}")
@@ -350,6 +352,7 @@ class AppConfig:
                 "NVRAM_DIR": getattr(self, "NVRAM_DIR", r"C:\vPinball\VisualPinball\VPinMAME\nvram"),
                 "TABLES_DIR": getattr(self, "TABLES_DIR", r"C:\vPinball\VisualPinball\Tables"),
                 "CLOUD_ENABLED": getattr(self, "CLOUD_ENABLED", True),
+                "CLOUD_BACKUP_ENABLED": getattr(self, "CLOUD_BACKUP_ENABLED", False),
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay
             }
@@ -980,6 +983,8 @@ class CloudSync:
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0:
             return
+        if not cfg.CLOUD_BACKUP_ENABLED:
+            return
         if CloudSync._warn_missing_player_name(cfg):
             return
         # Block upload if no VPS-ID assigned for this ROM
@@ -1072,6 +1077,8 @@ class CloudSync:
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
+            return
+        if not cfg.CLOUD_BACKUP_ENABLED:
             return
         if CloudSync._warn_missing_player_name(cfg):
             return
@@ -1262,6 +1269,8 @@ class CloudSync:
         under /players/{pid}/achievements.json. Called automatically after each session
         and each achievement unlock when cloud sync is enabled."""
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        if not cfg.CLOUD_BACKUP_ENABLED:
             return
         pname = player_name.strip() if player_name else cfg.OVERLAY.get("player_name", "Player").strip()
         if not pname or pname.lower() == "player":
