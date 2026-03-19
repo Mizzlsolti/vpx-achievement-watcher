@@ -264,8 +264,8 @@ class _VpsTableCard(QWidget):
         self._rom_match = rom_match
 
         self.setFixedWidth(_CARD_WIDTH)
-        self.setMinimumHeight(_CARD_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        self.setFixedHeight(_CARD_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.setObjectName("VpsCard")
         self._apply_style(False)
@@ -293,6 +293,7 @@ class _VpsTableCard(QWidget):
         content_lay = QVBoxLayout(content)
         content_lay.setContentsMargins(10, 8, 10, 8)
         content_lay.setSpacing(4)
+        content.setFixedHeight(_CARD_HEIGHT - _IMG_HEIGHT)
 
         # Table name (bold, white, 14 px) — strip manufacturer/version info in parentheses/brackets
         raw_name = table.get("name", "Unknown")
@@ -301,6 +302,7 @@ class _VpsTableCard(QWidget):
         lbl_name = QLabel(name)
         lbl_name.setWordWrap(True)
         lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
+        lbl_name.setMaximumHeight(36)
         content_lay.addWidget(lbl_name)
 
         # Authors + type badge row
@@ -312,7 +314,8 @@ class _VpsTableCard(QWidget):
             authors_text += "…"
         lbl_authors = QLabel(authors_text or "—")
         lbl_authors.setStyleSheet("color:#AAAAAA; font-size:10px;")
-        lbl_authors.setWordWrap(True)
+        lbl_authors.setWordWrap(False)
+        lbl_authors.setMaximumHeight(28)
         authors_row.addWidget(lbl_authors, stretch=1)
 
         ttype = table.get("type", "")
