@@ -46,6 +46,7 @@ from watcher_core import (
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
     compute_player_level, LEVEL_TABLE,
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
+    run_vpxtool_get_script_authors,
 )
 
 from ui_dialogs import SetupWizardDialog
@@ -101,7 +102,7 @@ class _AvailableMapsWorker(QThread):
         entries: dict = {}
         for rom in index_roms:
             title = romnames.get(rom, "Unknown Table")
-            entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+            entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": "", "vpx_path": ""}
 
         # Collect all .vpx files first so we can report total count
         tables_dir = getattr(self.cfg, "TABLES_DIR", None)
@@ -126,8 +127,9 @@ class _AvailableMapsWorker(QThread):
                 continue
             if rom not in entries:
                 title = romnames.get(rom, fname.rsplit(".", 1)[0])
-                entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+                entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": "", "vpx_path": ""}
             entries[rom]["is_local"] = True
+            entries[rom]["vpx_path"] = vpx_path   # store path for later author extraction
 
         # Check NVRAM-Map availability (with family fallback, same as during gameplay)
         for rom, entry in entries.items():
@@ -173,6 +175,21 @@ class Bridge(QObject):
     prefetch_progress = pyqtSignal(str)
     prefetch_finished = pyqtSignal(str)
     level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
+
+
+def _authors_match(script_authors: list, vps_table: dict) -> bool:
+    """Check if any script author matches any author in any tableFile of the VPS entry."""
+    if not script_authors:
+        return False
+    script_set = {a.lower().strip() for a in script_authors}
+    for tf in (vps_table.get("tableFiles") or []):
+        for a in (tf.get("authors") or []):
+            a_norm = a.lower().strip()
+            for sa in script_set:
+                if sa == a_norm or sa in a_norm or a_norm in sa:
+                    return True
+    return False
+
 
 class MainWindow(QMainWindow, CloudStatsMixin):
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
@@ -2272,11 +2289,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._filter_available_maps()
 
     def _on_vps_auto_match_all(self):
-        """Attempt automatic VPS match for all locally scanned ROMs."""
-        local_entries = [e for e in self._all_maps_cache if e["is_local"]]
+        """Attempt automatic VPS match for all local ROMs that have an NVRAM map."""
+        # Only process local entries WITH nvram map
+        local_entries = [e for e in self._all_maps_cache if e.get("is_local") and e.get("has_map")]
         if not local_entries:
             QMessageBox.information(self, "Auto-Match",
-                                    "No local ROMs found. Click '🔄 Load List' first.")
+                                    "No local ROMs with NVRAM map found.\n"
+                                    "Make sure tables are loaded and have NVRAM maps (click '🔄 Load List' first).")
             return
 
         tables = _load_vpsdb(self.cfg)
@@ -2286,11 +2305,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return
 
         mapping = _load_vps_mapping(self.cfg)
+
         progress = QProgressDialog("Running Auto-Match…", "Cancel", 0, len(local_entries), self)
         progress.setWindowTitle("⚡ Auto-Match All")
         progress.setMinimumDuration(0)
+
         matched_rom = 0
+        matched_author_name = 0
         matched_name = 0
+        skipped_existing = 0
 
         for i, entry in enumerate(local_entries):
             if progress.wasCanceled():
@@ -2300,22 +2323,43 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             rom = entry["rom"]
             title = entry["title"]
-            results = _vps_find(tables, title, rom)
-            if results:
-                top = results[0]
-                is_rom_match = _table_has_rom(top, rom)
-                is_exact_name = (
-                    _normalize_term(title) == _normalize_term(top.get("name", ""))
-                )
-                # Accept ROM-match or exact normalized name match for confidence
-                if is_rom_match:
-                    mapping[rom] = top.get("id", "")
-                    matched_rom += 1
-                elif is_exact_name:
-                    mapping[rom] = top.get("id", "")
-                    matched_name += 1
+            vpx_path = entry.get("vpx_path", "")
 
-        matched = matched_rom + matched_name
+            # Skip if already mapped
+            if mapping.get(rom, ""):
+                skipped_existing += 1
+                continue
+
+            # Get script authors via vpxtool script show
+            script_authors = []
+            if vpx_path and os.path.isfile(vpx_path):
+                try:
+                    script_authors = run_vpxtool_get_script_authors(self.cfg, vpx_path)
+                except Exception:
+                    script_authors = []
+
+            results = _vps_find(tables, title, rom)
+            if not results:
+                continue
+
+            top = results[0]
+            is_rom_match = _table_has_rom(top, rom)
+            is_exact_name = (
+                _normalize_term(title) == _normalize_term(top.get("name", ""))
+            )
+            is_author_match = _authors_match(script_authors, top)
+
+            if is_rom_match:
+                mapping[rom] = top.get("id", "")
+                matched_rom += 1
+            elif is_author_match and is_exact_name:
+                mapping[rom] = top.get("id", "")
+                matched_author_name += 1
+            elif is_exact_name:
+                mapping[rom] = top.get("id", "")
+                matched_name += 1
+
+        matched = matched_rom + matched_author_name + matched_name
         progress.setValue(len(local_entries))
         _save_vps_mapping(self.cfg, mapping)
 
@@ -2324,11 +2368,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             entry["vps_id"] = mapping.get(entry["rom"], "")
 
         self._filter_available_maps()
+
         details = []
         if matched_rom:
             details.append(f"{matched_rom} via ROM identifier")
+        if matched_author_name:
+            details.append(f"{matched_author_name} via author + name")
         if matched_name:
-            details.append(f"{matched_name} via exact name match")
+            details.append(f"{matched_name} via exact name")
+        if skipped_existing:
+            details.append(f"{skipped_existing} already mapped (skipped)")
         match_detail = f" ({', '.join(details)})" if details else ""
         QMessageBox.information(self, "Auto-Match Complete",
                                 f"Auto-match finished.\n{matched} table(s) matched{match_detail}.")

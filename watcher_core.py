@@ -584,6 +584,80 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = Fal
         return None
 
 
+def run_vpxtool_get_script_authors(cfg: "AppConfig", vpx_path: str) -> list:
+    """
+    Runs: vpxtool script show "<vpx_path>"
+    Parses the VBS script output for author names from comment lines.
+    Returns a list of author name strings (possibly empty).
+    No logging — silent failure is OK.
+    """
+    if not vpx_path or not os.path.isfile(vpx_path):
+        return []
+
+    exe = ensure_vpxtool(cfg)
+    if not exe:
+        return []
+
+    cmd = [exe, "script", "show", vpx_path]
+    try:
+        cp = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=0x08000000,
+            encoding="utf-8",
+            errors="replace",
+        )
+        script = cp.stdout or ""
+        return _parse_authors_from_script(script)
+    except Exception:
+        return []
+
+
+def _parse_authors_from_script(script: str) -> list:
+    """
+    Parse author names from a VBS script.
+    Looks for comment lines containing author indicators.
+    Returns a deduplicated list of author name tokens.
+
+    Patterns searched (case-insensitive):
+      ' Table by JPSalas
+      ' Author: nFozzy, Fleep
+      ' Authors: Brad1X, Sixtoe
+      ' Created by Tom Tower
+      ' VPX by Dozer
+      ' Original by George H
+      ' Adapted by Flukemaster
+    """
+    authors = []
+    seen = set()
+
+    # Match comment lines with author-like patterns
+    patterns = [
+        # ' Author(s): Name1, Name2
+        r"^\s*'[^']*(?:author(?:s)?|created\s+by|table\s+by|vpx\s+by|original\s+by|adapted\s+by|remake\s+by|mod\s+by|script\s+by)\s*:?\s*(.+)",
+    ]
+
+    for line in script.splitlines():
+        for pat in patterns:
+            m = re.match(pat, line, re.IGNORECASE)
+            if m:
+                raw = m.group(1).strip().strip("'").strip()
+                # Split on common separators: comma, ampersand, " and ", " & "
+                tokens = re.split(r"\s*[,&]\s*|\s+and\s+", raw, flags=re.IGNORECASE)
+                for tok in tokens:
+                    tok = tok.strip().strip("'\"").strip()
+                    # Remove trailing version/year info like "(v1.0)" or "2024"
+                    tok = re.sub(r"\s*[\(\[].*", "", tok).strip()
+                    if tok and len(tok) >= 2:
+                        key = tok.lower()
+                        if key not in seen:
+                            seen.add(key)
+                            authors.append(tok)
+    return authors
+
+
 PREFETCH_MODE = "background"
 PREFETCH_LOG_EVERY = 50
 ROLLING_HISTORY_PER_ROM = 10
