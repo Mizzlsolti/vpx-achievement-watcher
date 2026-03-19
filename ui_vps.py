@@ -188,31 +188,48 @@ class VpsImageLoader(QThread):
                     data = f.read()
             else:
                 full_url = VPS_IMG_BASE_URL + urllib.parse.quote(img_url)
-                req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    data = resp.read()
+                print(f"[VpsImageLoader] downloading {full_url}")
+                try:
+                    req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        data = resp.read()
+                except Exception as dl_err:
+                    print(f"[VpsImageLoader] download error for {img_url}: {dl_err}")
+                    return
                 ensure_dir(cache_dir)
                 with open(cache_path, "wb") as f:
                     f.write(data)
 
+            # --- Try Qt native decode first ---
             pixmap = QPixmap()
-            if not pixmap.loadFromData(data):
-                # Fallback: use PIL/Pillow to decode (handles .webp on systems lacking Qt webp plugin)
-                try:
-                    from PIL import Image
-                    import io
-                    img = Image.open(io.BytesIO(data)).convert("RGBA")
-                    buf = io.BytesIO()
-                    img.save(buf, format="PNG")
-                    pixmap = QPixmap()
-                    pixmap.loadFromData(buf.getvalue())
-                except Exception:
-                    pass
-
-            if not pixmap.isNull():
+            if pixmap.loadFromData(data) and not pixmap.isNull():
+                print(f"[VpsImageLoader] loaded {img_url} via Qt native")
                 self.image_ready.emit(img_url, pixmap)
-        except Exception:
-            pass
+                return
+
+            # --- Fallback: Pillow → PNG → QPixmap ---
+            try:
+                from PIL import Image
+                import io
+                img = Image.open(io.BytesIO(data)).convert("RGBA")
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                buf.seek(0)
+                png_bytes = buf.read()
+                pixmap2 = QPixmap()
+                if pixmap2.loadFromData(png_bytes) and not pixmap2.isNull():
+                    print(f"[VpsImageLoader] loaded {img_url} via Pillow+PNG fallback")
+                    self.image_ready.emit(img_url, pixmap2)
+                    return
+                else:
+                    print(f"[VpsImageLoader] Pillow converted but QPixmap still null for {img_url}")
+            except ImportError:
+                print(f"[VpsImageLoader] Pillow not installed – cannot decode {img_url} (install Pillow: pip install Pillow)")
+            except Exception as pil_err:
+                print(f"[VpsImageLoader] Pillow decode error for {img_url}: {pil_err}")
+
+        except Exception as e:
+            print(f"[VpsImageLoader] unexpected error for {img_url}: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
