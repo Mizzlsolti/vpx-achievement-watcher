@@ -191,7 +191,17 @@ def _authors_match(script_authors: list, vps_table: dict) -> bool:
     return False
 
 
+def _parse_version(v_str):
+    """Parse a version string like '2.5' or '2.5.1' into a comparable tuple of ints."""
+    try:
+        return tuple(map(int, str(v_str).split('.')))
+    except Exception:
+        return (0,)
+
+
 class MainWindow(QMainWindow, CloudStatsMixin):
+    CURRENT_VERSION = "2.5"
+
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
         super().__init__()
         self.cfg = cfg
@@ -2468,12 +2478,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
         lay_maint.addWidget(self.btn_restore_cloud)
 
-        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB)")
-        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json and vpsdb.json, then reload.")
+        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
+        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
         self.btn_update_dbs.clicked.connect(self._update_databases_now)
         lay_maint.addWidget(self.btn_update_dbs)
 
-        self.btn_self_update = QPushButton("⬆️ Check for App Updates")
+        self.btn_self_update = QPushButton("⬆️ Watcher Update")
         self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
         self.btn_self_update.clicked.connect(self._check_for_app_update)
         lay_maint.addWidget(self.btn_self_update)
@@ -2693,7 +2703,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             try:
                 from watcher_core import (
                     f_index, f_romnames, f_vpsdb_cache,
-                    INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log
+                    INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log,
+                    VPXTOOL_PATH, ensure_vpxtool
                 )
                 from ui_vps import VPSDB_URL
                 import os
@@ -2716,6 +2727,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 _force_download(f_romnames(cfg), ROMNAMES_URL)
                 _force_download(f_vpsdb_cache(cfg), VPSDB_URL)
 
+                try:
+                    if os.path.isfile(VPXTOOL_PATH):
+                        os.remove(VPXTOOL_PATH)
+                    ensure_vpxtool(cfg)
+                except Exception as e:
+                    log(cfg, f"[UPDATE] vpxtool re-download failed: {e}", "WARN")
+
                 self.watcher.INDEX = load_json(f_index(cfg), {}) or {}
                 self.watcher.ROMNAMES = load_json(f_romnames(cfg), {}) or {}
 
@@ -2730,8 +2748,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     @pyqtSlot()
     def _on_update_databases_done(self):
         self.btn_update_dbs.setEnabled(True)
-        self.btn_update_dbs.setText("🔄 Update Databases (Index, NVRAM Maps, VPS DB)")
-        self._msgbox_topmost("info", "Update Databases", "Databases updated successfully!\n\nindex.json, romnames.json and vpsdb.json have been refreshed.")
+        self.btn_update_dbs.setText("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
+        self._msgbox_topmost("info", "Update Databases", "Databases updated successfully!\n\nindex.json, romnames.json, vpsdb.json and vpxtool have been refreshed.")
 
     def _check_for_app_update(self):
         import threading
@@ -2747,6 +2765,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 release = _fetch_json_url(RELEASES_API, timeout=15)
                 tag = str(release.get("tag_name", "")).strip().lstrip("v")
                 body = str(release.get("body", ""))
+
+                if _parse_version(tag) <= _parse_version(self.CURRENT_VERSION):
+                    from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                    QMetaObject.invokeMethod(self, "_on_update_check_result",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, "up_to_date"),
+                        Q_ARG(str, tag),
+                        Q_ARG(str, ""),
+                        Q_ARG(str, ""))
+                    return
 
                 assets = release.get("assets") or []
                 exe_asset = None
@@ -2789,23 +2817,58 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     @pyqtSlot(str, str, str, str)
     def _on_update_check_result(self, status: str, tag: str, download_url: str, body: str):
         self.btn_self_update.setEnabled(True)
-        self.btn_self_update.setText("⬆️ Check for App Updates")
+        self.btn_self_update.setText("⬆️ Watcher Update")
 
+        if status == "up_to_date":
+            self._msgbox_topmost("info", "Watcher Update", f"You are running the latest version (v{self.CURRENT_VERSION}).")
+            return
         if status == "no_asset":
-            self._msgbox_topmost("info", "App Update", f"Latest release: v{tag}\nNo .exe asset found in this release.")
+            self._msgbox_topmost("info", "Watcher Update", f"Latest release: v{tag}\nNo .exe asset found in this release.")
             return
         if status.startswith("error:"):
-            self._msgbox_topmost("warn", "App Update", f"Could not check for updates:\n{status[6:]}")
+            self._msgbox_topmost("warn", "Watcher Update", f"Could not check for updates:\n{status[6:]}")
             return
         if status == "available":
-            from PyQt6.QtWidgets import QMessageBox
-            msg = f"New version available: v{tag}\n\nDo you want to download and install it now?\n\nThe app will restart automatically after the update."
+            from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
+                                          QLabel, QTextBrowser, QDialogButtonBox)
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Watcher Update Available")
+            dlg.resize(600, 500)
+            lay = QVBoxLayout(dlg)
+
+            lbl_heading = QLabel(f"<b>New version available: v{tag}</b>")
+            lbl_heading.setStyleSheet("font-size: 13pt;")
+            lay.addWidget(lbl_heading)
+
+            lbl_info = QLabel("Do you want to download and install it now?\nThe app will restart automatically after the update.")
+            lbl_info.setWordWrap(True)
+            lay.addWidget(lbl_info)
+
+            notes_browser = QTextBrowser()
+            notes_browser.setReadOnly(True)
+            notes_browser.setOpenExternalLinks(True)
             if body:
-                msg += f"\n\n--- Release Notes ---\n{body[:500]}"
-            reply = QMessageBox.question(self, "App Update Available", msg,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes)
-            if reply != QMessageBox.StandardButton.Yes:
+                sb = notes_browser.verticalScrollBar()
+                old_val = sb.value()
+                old_max = max(1, sb.maximum())
+                at_bottom = (old_val >= old_max - 2)
+                ratio = old_val / old_max if old_max > 0 else 0.0
+                notes_browser.setPlainText(body)
+                new_max = max(1, sb.maximum())
+                if at_bottom:
+                    sb.setValue(sb.maximum())
+                else:
+                    sb.setValue(max(0, min(int(round(ratio * new_max)), new_max)))
+            lay.addWidget(notes_browser, 1)
+
+            btn_box = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Yes | QDialogButtonBox.StandardButton.No)
+            btn_box.accepted.connect(dlg.accept)
+            btn_box.rejected.connect(dlg.reject)
+            lay.addWidget(btn_box)
+
+            if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             self._do_app_update(download_url)
 
@@ -2869,7 +2932,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     @pyqtSlot(str)
     def _on_update_download_failed(self, error: str):
         self.btn_self_update.setEnabled(True)
-        self.btn_self_update.setText("⬆️ Check for App Updates")
+        self.btn_self_update.setText("⬆️ Watcher Update")
         self._msgbox_topmost("warn", "App Update Failed", f"Download or install failed:\n{error}")
 
     def _init_tooltips_main(self):
@@ -4972,7 +5035,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._reset_status_label()
 
     def _check_for_updates(self):
-        CURRENT_VERSION = "2.5"
         
         def _task():
             try:
@@ -4991,17 +5053,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     data = json.loads(resp.read().decode('utf-8'))
                     
                 if data and isinstance(data, dict):
-                    latest = str(data.get("latest_version", CURRENT_VERSION))
+                    latest = str(data.get("latest_version", self.CURRENT_VERSION))
                     
-                    def parse_v(v_str):
-                        try:
-                            return tuple(map(int, str(v_str).split('.')))
-                        except Exception:
-                            return (0,)
-                    
-                    if parse_v(latest) > parse_v(CURRENT_VERSION):
+                    if _parse_version(latest) > _parse_version(self.CURRENT_VERSION):
                         from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
-                        msg = f"An important update is available!\n\nCurrent version: {CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
+                        msg = f"An important update is available!\n\nCurrent version: {self.CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
                         QMetaObject.invokeMethod(self, "_show_update_warning", Qt.ConnectionType.QueuedConnection, Q_ARG(str, msg))
             except Exception as e:
                 print(f"[UPDATE CHECK] failed: {e}")
