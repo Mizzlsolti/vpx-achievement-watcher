@@ -8,6 +8,7 @@ import re
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from typing import Optional, Dict, Any, List
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
+VPS_IMG_BASE_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/img/"
 VPSDB_TTL = 24 * 3600  # 24 hours in seconds
 MAX_PICKER_RESULTS = 80  # Maximum entries shown in VpsPickerDialog
 
@@ -163,22 +165,52 @@ def _table_has_rom(table: dict, rom: str) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VpsImageLoader(QThread):
-    """Download an image URL in background and emit a QPixmap when done."""
-    image_ready = pyqtSignal(str, QPixmap)  # (url, pixmap)
+    """Download a VPS table image in background, cache it locally, and emit a QPixmap when done."""
+    image_ready = pyqtSignal(str, QPixmap)  # (img_url key, pixmap)
 
-    def __init__(self, url: str, parent=None):
+    def __init__(self, cfg, img_url: str, parent=None):
         super().__init__(parent)
-        self.url = url
+        self.cfg = cfg
+        self.img_url = img_url  # filename from vpsdb, e.g. "attack_from_mars.webp"
 
     def run(self):
+        img_url = self.img_url
+        if not img_url:
+            return
         try:
-            req = urllib.request.Request(self.url, headers={"User-Agent": "vpx-achievement-watcher"})
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = resp.read()
+            from watcher_core import p_vps_img, ensure_dir
+            cache_filename = os.path.basename(img_url)
+            cache_dir = p_vps_img(self.cfg)
+            cache_path = os.path.join(cache_dir, cache_filename)
+
+            if os.path.isfile(cache_path):
+                with open(cache_path, "rb") as f:
+                    data = f.read()
+            else:
+                full_url = VPS_IMG_BASE_URL + urllib.parse.quote(img_url)
+                req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    data = resp.read()
+                ensure_dir(cache_dir)
+                with open(cache_path, "wb") as f:
+                    f.write(data)
+
             pixmap = QPixmap()
-            pixmap.loadFromData(data)
+            if not pixmap.loadFromData(data):
+                # Fallback: use PIL/Pillow to decode (handles .webp on systems lacking Qt webp plugin)
+                try:
+                    from PIL import Image
+                    import io
+                    img = Image.open(io.BytesIO(data)).convert("RGBA")
+                    buf = io.BytesIO()
+                    img.save(buf, format="PNG")
+                    pixmap = QPixmap()
+                    pixmap.loadFromData(buf.getvalue())
+                except Exception:
+                    pass
+
             if not pixmap.isNull():
-                self.image_ready.emit(self.url, pixmap.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+                self.image_ready.emit(img_url, pixmap)
         except Exception:
             pass
 
@@ -216,8 +248,12 @@ class _TableEntryWidget(QWidget):
 
         # Line 1: Name + ROM-Match badge
         name_row = QHBoxLayout()
-        lbl_name = QLabel(f"<b>{table.get('name', 'Unknown')}</b>")
-        lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px;")
+        raw_name = table.get('name', 'Unknown')
+        name = re.sub(r'\s*\(.*\)', '', raw_name)
+        name = re.sub(r'\s*\[.*\]', '', name).strip()
+        lbl_name = QLabel(f"<b>{name}</b>")
+        lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; padding-bottom:2px;")
+        lbl_name.setWordWrap(True)
         name_row.addWidget(lbl_name)
 
         if rom_match:
@@ -352,7 +388,12 @@ class _TableEntryWidget(QWidget):
         layout.addWidget(info, stretch=1)
 
     def set_image(self, pixmap: QPixmap):
-        self.img_label.setPixmap(pixmap)
+        scaled = pixmap.scaled(
+            self.img_label.width(), self.img_label.height(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self.img_label.setPixmap(scaled)
         self.img_label.setText("")
 
 
@@ -446,7 +487,7 @@ class VpsPickerDialog(QDialog):
                 if img_url in self._image_cache:
                     entry_widget.set_image(self._image_cache[img_url])
                 else:
-                    loader = VpsImageLoader(img_url, self)
+                    loader = VpsImageLoader(self.cfg, img_url, self)
                     loader.image_ready.connect(self._on_image_ready)
                     self._loaders.append(loader)
                     loader.start()
@@ -551,7 +592,7 @@ class VpsAchievementInfoDialog(QDialog):
                 right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
                 self._img_url = vps_entry.get("imgUrl", "")
                 if self._img_url:
-                    loader = VpsImageLoader(self._img_url, self)
+                    loader = VpsImageLoader(self.cfg, self._img_url, self)
                     loader.image_ready.connect(self._on_image_ready)
                     self._loaders.append(loader)
                     loader.start()

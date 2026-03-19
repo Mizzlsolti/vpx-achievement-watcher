@@ -377,6 +377,7 @@ def f_log(cfg):          return os.path.join(cfg.BASE, "watcher.log")
 def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
 def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
 def p_vps(cfg):          return os.path.join(cfg.BASE, "tools", "vps")
+def p_vps_img(cfg):      return os.path.join(p_vps(cfg), "img")
 def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
 def f_progress_upload_log(cfg: "AppConfig") -> str:
