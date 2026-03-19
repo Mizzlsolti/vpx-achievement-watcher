@@ -6,6 +6,7 @@ import random
 import subprocess
 import hashlib
 import os, sys, time, json, re, glob, threading, uuid
+import urllib.parse as _urlparse
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, Tuple
@@ -16,10 +17,12 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QTextEdit, QTextBrowser, QSystemTrayIcon, QMenu, QFileDialog, QMessageBox, QTabWidget,
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
-    QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar
+    QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
+    QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog,
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
-                          QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot)
+                          QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
+                          QThread, QUrl)
 from PyQt6.QtGui import (QIcon, QColor, QFont, QTransform, QPixmap,
                          QPainter, QImage, QPen)
 
@@ -42,11 +45,17 @@ from watcher_core import (
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
     compute_player_level, LEVEL_TABLE,
+    f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
 )
 
 from ui_dialogs import SetupWizardDialog
 from theme import pinball_arcade_style
 from ui_cloud_stats import CloudStatsMixin
+
+from ui_vps import (
+    VpsPickerDialog, VpsAchievementInfoDialog,
+    _load_vpsdb, _load_vps_mapping, _save_vps_mapping, _vps_find, _table_has_rom,
+)
 
 from ui_overlay import (
     OverlayWindow,
@@ -1678,6 +1687,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addLayout(row)
         
         self.progress_view = QTextBrowser()
+        self.progress_view.setOpenLinks(False)
+        self.progress_view.anchorClicked.connect(self._on_progress_anchor_clicked)
         lay.addWidget(self.progress_view)
         
         layout.addWidget(grp)
@@ -1862,10 +1873,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             title = str(r.get("title", "Unknown")).strip()
             clean_title = title.replace(" (Session)", "").replace(" (Global)", "")
 
+            # Build ℹ️ info link for ROM-specific achievements only
+            if rom != "Global":
+                encoded = _urlparse.quote(title, safe="")
+                info_link = f" <a href='achinfo://{rom}/{encoded}' style='color:#00E5FF; text-decoration:none;'>ℹ️</a>"
+            else:
+                info_link = ""
+
             if title in unlocked_titles or clean_title in unlocked_titles:
                 unlocked_count += 1
                 tooltip = _tooltip_for_rule(r, unlocked=True).replace("'", "&#39;")
-                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}</td>")
+                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}{info_link}</td>")
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
@@ -1889,7 +1907,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                             f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
                         )
                 else:
-                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}</td>")
+                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}{info_link}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
@@ -1918,88 +1936,307 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             sb.setValue(old_val)
         except Exception:
             self.progress_view.setHtml(final_html)
-            
-    def _build_tab_available_maps(self):
+
+    def _on_progress_anchor_clicked(self, url):
+        """Handle ℹ️ anchor clicks in the progress view."""
+        url_str = url.toString() if isinstance(url, QUrl) else str(url)
+        if not url_str.startswith("achinfo://"):
+            return
+        # Parse achinfo://ROM/ENCODED_TITLE
+        rest = url_str[len("achinfo://"):]
+        parts = rest.split("/", 1)
+        if len(parts) < 2:
+            return
+        rom = parts[0]
+        title = _urlparse.unquote(parts[1])
+
+        # Find the rule for this achievement
+        rule = None
+        try:
+            s_rules = self.watcher._collect_player_rules_for_rom(rom)
+            for r in s_rules:
+                if isinstance(r, dict):
+                    t = str(r.get("title", "")).strip()
+                    clean = t.replace(" (Session)", "").replace(" (Global)", "")
+                    if t == title or clean == title:
+                        rule = r
+                        break
+        except Exception:
+            pass
+
+        # Find unlock entry (with timestamp if available)
+        unlock_entry = None
+        try:
+            state = self.watcher._ach_state_load()
+            for e in state.get("session", {}).get(rom, []):
+                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                clean = t.replace(" (Session)", "").replace(" (Global)", "")
+                if t == title or clean == title:
+                    unlock_entry = e if isinstance(e, dict) else {"title": e}
+                    break
+        except Exception:
+            pass
+
+        dlg = VpsAchievementInfoDialog(self.cfg, rom, title, rule, unlock_entry, parent=self)
+        dlg.exec()
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        
-        grp = QGroupBox("Supported Tables (from Cloud/Index)")
+
+        grp = QGroupBox("Supported Tables (from Cloud/Index + Local Scan)")
         lay = QVBoxLayout(grp)
-        
+
+        # Toolbar row
         row = QHBoxLayout()
         self.txt_map_search = QLineEdit()
-        self.txt_map_search.setPlaceholderText("Search for Table or ROM...")
+        self.txt_map_search.setPlaceholderText("🔍 Search Table or ROM...")
         self.txt_map_search.textChanged.connect(self._filter_available_maps)
         row.addWidget(self.txt_map_search)
-        
+
         btn_refresh = QPushButton("🔄 Load List")
         btn_refresh.setStyleSheet("background:#FF7F00; color:black; font-weight:bold;")
         btn_refresh.clicked.connect(self._refresh_available_maps)
         row.addWidget(btn_refresh)
+
+        self.btn_nvram_filter = QPushButton("🎯 Only with NVRAM-Map")
+        self.btn_nvram_filter.setCheckable(True)
+        self.btn_nvram_filter.setChecked(False)
+        self.btn_nvram_filter.setStyleSheet(
+            "QPushButton {background:#222; color:#FF7F00; border:1px solid #FF7F00;} "
+            "QPushButton:checked {background:#3D2600; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold;}"
+        )
+        self.btn_nvram_filter.toggled.connect(self._filter_available_maps)
+        row.addWidget(self.btn_nvram_filter)
+
+        btn_auto = QPushButton("⚡ Auto-Match All")
+        btn_auto.setStyleSheet("background:#003333; color:#00E5FF; border:1px solid #00E5FF;")
+        btn_auto.clicked.connect(self._on_vps_auto_match_all)
+        row.addWidget(btn_auto)
+
         lay.addLayout(row)
-        
-        self.maps_view = QTextBrowser()
-        lay.addWidget(self.maps_view)
-        
+
+        # Table widget
+        self.maps_table = QTableWidget(0, 6)
+        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "▼"])
+        self.maps_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.maps_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.maps_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.maps_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.maps_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.maps_table.setColumnWidth(5, 36)
+        self.maps_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.maps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.maps_table.setStyleSheet(
+            "QTableWidget {background:#111; color:#DDD; gridline-color:#333;} "
+            "QHeaderView::section {background:#1a1a1a; color:#FF7F00; padding:4px; border-bottom:2px solid #555;} "
+            "QTableWidget::item:selected {background:#003D00;}"
+        )
+        lay.addWidget(self.maps_table)
+
         layout.addWidget(grp)
         self.main_tabs.addTab(tab, "📚 Available Maps")
+        # Cache: list of dicts {rom, title, has_map, is_local, vps_id}
         self._all_maps_cache = []
 
     def _refresh_available_maps(self):
-        self.maps_view.setHtml("<div style='color:#00E5FF; text-align:center; font-size:1.2em; margin-top:20px;'>Loading maps from database... Please wait.</div>")
+        self.maps_table.setRowCount(0)
+        self.maps_table.setRowCount(1)
+        info_item = QTableWidgetItem("⏳ Loading… Please wait.")
+        info_item.setForeground(QColor("#00E5FF"))
+        self.maps_table.setItem(0, 0, info_item)
         QApplication.processEvents()
-        
-        index_roms = list(self.watcher.INDEX.keys())
-        all_roms = sorted(list(set(index_roms)))
-        
-        self._all_maps_cache = []
+
         romnames = self.watcher.ROMNAMES or {}
-        
-        for rom in all_roms:
-            if rom.startswith("_"): continue
+
+        # Build base list from cloud index
+        index_roms = set(k for k in (self.watcher.INDEX or {}).keys() if not k.startswith("_"))
+        entries: dict = {}
+        for rom in index_roms:
             title = romnames.get(rom, "Unknown Table")
-            self._all_maps_cache.append((rom, title))
-            
+            entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+
+        # Scan TABLES_DIR for local .vpx files
+        tables_dir = getattr(self.cfg, "TABLES_DIR", None)
+        local_roms: dict = {}  # rom -> vpx filename
+        if tables_dir and os.path.isdir(tables_dir):
+            for root, _dirs, files in os.walk(tables_dir):
+                for fname in files:
+                    if not fname.lower().endswith(".vpx"):
+                        continue
+                    vpx_path = os.path.join(root, fname)
+                    try:
+                        rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True)
+                    except Exception:
+                        rom = None
+                    if not rom:
+                        continue
+                    local_roms[rom] = fname
+                    if rom not in entries:
+                        title = romnames.get(rom, fname.rsplit(".", 1)[0])
+                        entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+                    entries[rom]["is_local"] = True
+
+        # Check NVRAM-Map availability
+        for rom, entry in entries.items():
+            try:
+                entry["has_map"] = self.watcher._has_any_map(rom)
+            except Exception:
+                entry["has_map"] = False
+
+        # Load current VPS mappings
+        mapping = _load_vps_mapping(self.cfg)
+        for rom, entry in entries.items():
+            entry["vps_id"] = mapping.get(rom, "")
+
+        self._all_maps_cache = sorted(entries.values(), key=lambda e: e["title"].lower())
         self._filter_available_maps()
 
     def _filter_available_maps(self):
         query = self.txt_map_search.text().lower()
-        
+        nvram_only = self.btn_nvram_filter.isChecked()
+
         if not self._all_maps_cache:
-            self.maps_view.setHtml("<div style='color:#888; text-align:center; margin-top:20px;'>(Click 'Load List' to see all supported tables)</div>")
+            self.maps_table.setRowCount(1)
+            item = QTableWidgetItem("(Click '🔄 Load List' to see supported tables)")
+            item.setForeground(QColor("#888"))
+            self.maps_table.setItem(0, 0, item)
             return
-            
-        html = ["<style>table {border-collapse:collapse;} th {width:25%; text-align:center; color:#FF7F00; padding:8px; border-bottom:2px solid #555; background:#111;} td {width:25%; padding:6px 8px; border-bottom:1px solid #333; color:#DDD; font-weight:bold; text-align:center;}</style>"]
-        html.append(f"<div style='margin-bottom:15px; color:#00E5FF; font-weight:bold; text-align:center;'>The online database currently contains NVRAM maps for {len(self._all_maps_cache)} tables.</div>")
-        
-        html.append("<table align='center' width='100%'><tr><th>Table Name</th><th>ROM Identifier</th><th style='border-left: 2px solid #555;'>Table Name</th><th>ROM Identifier</th></tr>")
-        
-        filtered_items = []
-        for rom, title in self._all_maps_cache:
-            if query in rom.lower() or query in title.lower():
-                filtered_items.append((title, rom))
-                if len(filtered_items) > 800: # UI-Freeze Schutz
-                    break
-                    
-        for i in range(0, len(filtered_items), 2):
-            title1, rom1 = filtered_items[i]
-            html.append("<tr>")
-            
-            html.append(f"<td>{title1}</td><td style='color:#888;'>{rom1}</td>")
-            
-            if i + 1 < len(filtered_items):
-                title2, rom2 = filtered_items[i + 1]
-                html.append(f"<td style='border-left: 2px solid #333;'>{title2}</td><td style='color:#888;'>{rom2}</td>")
+
+        filtered = []
+        for entry in self._all_maps_cache:
+            rom = entry["rom"]
+            title = entry["title"]
+            if query and query not in rom.lower() and query not in title.lower():
+                continue
+            if nvram_only and not (entry["has_map"] and entry["is_local"]):
+                continue
+            filtered.append(entry)
+            if len(filtered) > 800:
+                break
+
+        self.maps_table.setRowCount(0)
+        self.maps_table.setRowCount(len(filtered))
+
+        # Re-load mapping to get fresh VPS-IDs
+        mapping = _load_vps_mapping(self.cfg)
+
+        for row, entry in enumerate(filtered):
+            rom = entry["rom"]
+            title = entry["title"]
+            has_map = entry["has_map"]
+            is_local = entry["is_local"]
+            vps_id = mapping.get(rom, "")
+
+            # Determine row background
+            if vps_id:
+                bg = QColor("#003D00")
+            elif is_local:
+                bg = QColor("#3D2600")
             else:
-                html.append("<td style='border-left: 2px solid #333;'></td><td></td>")
-                
-            html.append("</tr>")
-                
-        if len(filtered_items) > 800:
-            html.append("<tr><td colspan='4' style='color:#FF3B30; text-align:center; padding-top:15px;'>(List truncated... Please refine your search)</td></tr>")
-                    
-        html.append("</table>")
-        self.maps_view.setHtml("".join(html))
+                bg = QColor("#111111")
+
+            def _make_item(text, color=None, align=None):
+                it = QTableWidgetItem(text)
+                it.setBackground(bg)
+                if color:
+                    it.setForeground(QColor(color))
+                if align:
+                    it.setTextAlignment(align)
+                return it
+
+            self.maps_table.setItem(row, 0, _make_item(title))
+            self.maps_table.setItem(row, 1, _make_item(rom, "#888"))
+            self.maps_table.setItem(row, 2, _make_item("✅" if has_map else "❌",
+                                                        "#00E5FF" if has_map else "#555",
+                                                        Qt.AlignmentFlag.AlignCenter))
+            self.maps_table.setItem(row, 3, _make_item("🟠" if is_local else "⬜",
+                                                        align=Qt.AlignmentFlag.AlignCenter))
+            self.maps_table.setItem(row, 4, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
+
+            # ▼ picker button
+            btn = QPushButton("▼")
+            btn.setFixedSize(30, 28)
+            btn.setStyleSheet(
+                "QPushButton {background:#222; color:#FF7F00; border:1px solid #555; font-weight:bold;} "
+                "QPushButton:hover {background:#3D2600;}"
+            )
+            btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
+            self.maps_table.setCellWidget(row, 5, btn)
+
+    def _on_vps_picker_clicked(self, rom: str, title: str):
+        """Open the VPS picker dialog for the given ROM."""
+        tables = _load_vpsdb(self.cfg)
+        if tables is None:
+            QMessageBox.warning(self, "VPS-DB not available",
+                                "Could not load vpsdb.json.\nCheck your internet connection and try again.")
+            return
+
+        dlg = VpsPickerDialog(self.cfg, tables, rom, title, parent=self)
+        result = dlg.exec()
+
+        mapping = _load_vps_mapping(self.cfg)
+        if result == QDialog.DialogCode.Accepted and dlg.selected_table:
+            mapping[rom] = dlg.selected_table.get("id", "")
+            _save_vps_mapping(self.cfg, mapping)
+        elif result == 2:  # "Remove assignment"
+            mapping.pop(rom, None)
+            _save_vps_mapping(self.cfg, mapping)
+
+        # Update cache entry
+        for entry in self._all_maps_cache:
+            if entry["rom"] == rom:
+                entry["vps_id"] = mapping.get(rom, "")
+                break
+
+        self._filter_available_maps()
+
+    def _on_vps_auto_match_all(self):
+        """Attempt automatic VPS match for all locally scanned ROMs."""
+        local_entries = [e for e in self._all_maps_cache if e["is_local"]]
+        if not local_entries:
+            QMessageBox.information(self, "Auto-Match",
+                                    "No local ROMs found. Click '🔄 Load List' first.")
+            return
+
+        tables = _load_vpsdb(self.cfg)
+        if tables is None:
+            QMessageBox.warning(self, "VPS-DB not available",
+                                "Could not load vpsdb.json.\nCheck your internet connection and try again.")
+            return
+
+        mapping = _load_vps_mapping(self.cfg)
+        progress = QProgressDialog("Running Auto-Match…", "Cancel", 0, len(local_entries), self)
+        progress.setWindowTitle("⚡ Auto-Match All")
+        progress.setMinimumDuration(0)
+        matched = 0
+
+        for i, entry in enumerate(local_entries):
+            if progress.wasCanceled():
+                break
+            progress.setValue(i)
+            QApplication.processEvents()
+
+            rom = entry["rom"]
+            title = entry["title"]
+            results = _vps_find(tables, title, rom)
+            if results:
+                top = results[0]
+                is_rom_match = _table_has_rom(top, rom)
+                # Accept only ROM-match or exact name match for confidence
+                if is_rom_match:
+                    mapping[rom] = top.get("id", "")
+                    matched += 1
+
+        progress.setValue(len(local_entries))
+        _save_vps_mapping(self.cfg, mapping)
+
+        # Refresh cache vps_id entries
+        for entry in self._all_maps_cache:
+            entry["vps_id"] = mapping.get(entry["rom"], "")
+
+        self._filter_available_maps()
+        QMessageBox.information(self, "Auto-Match Complete",
+                                f"Auto-match finished.\n{matched} table(s) matched via ROM identifier.")
 
     # ==========================================
     # TAB: SYSTEM
