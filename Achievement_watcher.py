@@ -2517,6 +2517,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_profile.addWidget(QLabel("Player ID (Restore):"), 0, 2)
         lay_profile.addWidget(self.txt_player_id, 0, 3)
         lay_profile.addWidget(self.chk_cloud_enabled, 1, 0, 1, 4)
+
+        self.chk_cloud_backup = QCheckBox("💾 Auto-Backup Progress to Cloud")
+        self.chk_cloud_backup.setToolTip(
+            "When enabled, your achievement progress, challenge scores, and VPS mapping "
+            "are automatically uploaded to the cloud for backup purposes. "
+            "Use 'Restore from Cloud' to recover your data on a new PC."
+        )
+        self.chk_cloud_backup.setChecked(self.cfg.CLOUD_BACKUP_ENABLED)
+        self.chk_cloud_backup.setVisible(self.cfg.CLOUD_ENABLED)
+        self.chk_cloud_backup.stateChanged.connect(self._save_cloud_backup_settings)
+        lay_profile.addWidget(self.chk_cloud_backup, 2, 0, 1, 4)
         
         layout.addWidget(grp_profile)
 
@@ -2600,6 +2611,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.save()
         if getattr(self, "btn_restore_cloud", None):
             self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        if getattr(self, "chk_cloud_backup", None):
+            self.chk_cloud_backup.setVisible(self.cfg.CLOUD_ENABLED)
+            if not self.cfg.CLOUD_ENABLED:
+                self.chk_cloud_backup.setChecked(False)
+                self.cfg.CLOUD_BACKUP_ENABLED = False
+                self.cfg.save()
+
+    def _save_cloud_backup_settings(self):
+        self.cfg.CLOUD_BACKUP_ENABLED = self.chk_cloud_backup.isChecked()
+        self.cfg.save()
 
     def _save_low_performance_mode(self, state: int):
         self.cfg.OVERLAY["low_performance_mode"] = bool(state)
@@ -2754,6 +2775,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _cloud_upload_vps_mapping(self):
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            return
+        if not self.cfg.CLOUD_BACKUP_ENABLED:
             return
         pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
         if not pid or pid == "unknown":
@@ -3049,6 +3072,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         _set_tip("txt_player_name", "Enter your display name (used for local records and leaderboards).")
         _set_tip("txt_player_id", "Your unique 4-character ID. Keep this safe to restore your cloud progress after a reinstall!")
         _set_tip("chk_cloud_enabled", "Turn automatic cloud sync for scores and progress on or off.")
+        _set_tip("chk_cloud_backup", "Enable automatic backup of your achievement progress, scores, and VPS mapping to the cloud.")
         _set_tip("btn_repair", "Recreates missing folders and downloads the base database if corrupted.")
         _set_tip("btn_prefetch", "Forces a background download of all missing NVRAM maps from the internet.")
         _set_tip("base_label", "Current base directory for achievements data.")
