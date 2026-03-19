@@ -14,8 +14,7 @@ from typing import Optional, Any, List
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QWidget, QFrame,
@@ -159,39 +158,6 @@ def _table_has_rom(table: dict, rom: str) -> bool:
             if isinstance(rf, str) and rf.lower() == rom_lower:
                 return True
     return False
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Image download worker
-# ─────────────────────────────────────────────────────────────────────────────
-
-class _ImgFetcher(QThread):
-    ready = pyqtSignal(str, QPixmap)  # vps_id, pixmap
-
-    VPS_IMG_BASE = (
-        "https://raw.githubusercontent.com/"
-        "VirtualPinballSpreadsheet/vps-db/main/img/"
-    )
-    LOCAL_CACHE = Path("tools/vps/img")
-
-    def __init__(self, vps_id: str, img_filename: str, parent=None):
-        super().__init__(parent)
-        self.vps_id = vps_id
-        self.img_filename = img_filename
-
-    def run(self):
-        self.LOCAL_CACHE.mkdir(parents=True, exist_ok=True)
-        local = self.LOCAL_CACHE / self.img_filename
-        if not local.exists():
-            url = self.VPS_IMG_BASE + self.img_filename
-            try:
-                urllib.request.urlretrieve(url, local)
-            except Exception:
-                return
-        pix = QPixmap(str(local))
-        if not pix.isNull():
-            pix = pix.scaledToWidth(300, Qt.TransformationMode.SmoothTransformation)
-            self.ready.emit(self.vps_id, pix)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -348,26 +314,22 @@ class VpsPickerDialog(QDialog):
 
         self.table_widget.setRowCount(len(entries))
         for row, (table, table_file, rom_match) in enumerate(entries):
-            # ── Column 0: name + type + features + table-id + file-id ─────────
+            # ── Column 0: name + type + features + tableFile-id ───────────────
             raw_name = table.get("name", "Unknown")
             name = re.sub(r'\s*\(.*?\)', '', raw_name)
             name = re.sub(r'\s*\[.*?\]', '', name).strip()
 
             ttype = table.get("type", "")
             features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
-            vps_id = table.get("id", "")          # table-level VPS ID
-            tf_id = table_file.get("id", "")      # tableFile-level ID
+            tf_id = table_file.get("id", "")  # tableFile-level ID only
 
             parts = [name]
             if ttype:
                 parts.append(f"[{ttype}]")
             if features:
                 parts.append("  " + "  ".join(features[:8]))
-            # Show table VPS ID
-            if vps_id:
-                parts.append(f"  [{vps_id}]")
-            # Show tableFile ID only if different from table ID
-            if tf_id and tf_id != vps_id:
+            # Show only the tableFile ID
+            if tf_id:
                 parts.append(f"  [{tf_id}]")
             col0_text = "  ".join(parts)
 
@@ -377,7 +339,7 @@ class VpsPickerDialog(QDialog):
             item0.setToolTip(raw_name)
             self.table_widget.setItem(row, 0, item0)
 
-            # ── Column 1: authors + version/id + date + ROM match ─────────────
+            # ── Column 1: authors + version + date + ROM match ────────────────
             authors = table_file.get("authors") or []
             authors_text = ", ".join(authors[:4])
             if len(authors) > 4:
@@ -490,10 +452,10 @@ class VpsAchievementInfoDialog(QDialog):
                 mfr = vps_entry.get("manufacturer", "")
                 year = vps_entry.get("year", "")
                 right_lay.addWidget(QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{name}</b>"))
-                right_lay.addWidget(QLabel(f"<span style='color:#999;'>{{mfr}} · {{year}}</span>"))
-                right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {{vps_id}}</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#999;'>{mfr} · {year}</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
             else:
-                right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {{vps_id}} (not in local cache)</span>"))
+                right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {vps_id} (not in local cache)</span>"))
         else:
             lbl_no = QLabel("🎰 No VPS mapping set")
             lbl_no.setStyleSheet("color:#666;")
