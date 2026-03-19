@@ -988,6 +988,28 @@ class CloudSync:
         return results
 
     @staticmethod
+    def set_node(cfg: AppConfig, node_path: str, data) -> bool:
+        """Write (PUT) arbitrary data to a Firebase node. Returns True on success."""
+        if not cfg.CLOUD_URL or not node_path:
+            return False
+        url = cfg.CLOUD_URL.strip().rstrip('/')
+        endpoint = f"{url}/{node_path}.json"
+        try:
+            import ssl
+            payload = json.dumps(data).encode('utf-8')
+            put_req = urllib.request.Request(endpoint, data=payload, method='PUT')
+            put_req.add_header('Content-Type', 'application/json')
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(put_req, timeout=10, context=ctx) as resp:
+                pass
+            return True
+        except Exception as e:
+            log(cfg, f"[CLOUD] set_node error for {endpoint}: {e}", "WARN")
+            return False
+
+    @staticmethod
     def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):
         """Upload the full achievements state (global + session + roms_played) to Firebase
         under /players/{pid}/achievements.json. Called automatically after each session
@@ -1832,6 +1854,8 @@ class Watcher:
 
         ensure_file(f_index(self.cfg), INDEX_URL)
         ensure_file(f_romnames(self.cfg), ROMNAMES_URL)
+        from ui_vps import VPSDB_URL as _VPSDB_URL
+        ensure_file(f_vpsdb_cache(self.cfg), _VPSDB_URL)
         try:
             ensure_vpxtool(self.cfg)
         except Exception as e:

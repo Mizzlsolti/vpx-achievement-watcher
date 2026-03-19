@@ -2301,6 +2301,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
         self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
         lay_maint.addWidget(self.btn_restore_cloud)
+
+        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB)")
+        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json and vpsdb.json, then reload.")
+        self.btn_update_dbs.clicked.connect(self._update_databases_now)
+        lay_maint.addWidget(self.btn_update_dbs)
+
+        self.btn_self_update = QPushButton("⬆️ Check for App Updates")
+        self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
+        self.btn_self_update.clicked.connect(self._check_for_app_update)
+        lay_maint.addWidget(self.btn_self_update)
         
         lbl_id_warning = QLabel(
             "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
@@ -2459,6 +2469,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception as _scores_err:
             log(self.cfg, f"[CLOUD] Restore: challenge scores restore failed: {_scores_err}", "WARN")
 
+        # Restore VPS ID Mapping from Cloud
+        vps_mapping_restored = False
+        try:
+            vps_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/vps_mapping")
+            if vps_data and isinstance(vps_data, dict):
+                from ui_vps import _save_vps_mapping
+                _save_vps_mapping(self.cfg, vps_data)
+                vps_mapping_restored = True
+                log(self.cfg, f"[CLOUD] VPS mapping restored: {len(vps_data)} entries")
+        except Exception as _vps_err:
+            log(self.cfg, f"[CLOUD] VPS mapping restore failed: {_vps_err}", "WARN")
+
         # Refresh level display and notify listeners
         try:
             self._refresh_level_display()
@@ -2469,11 +2491,220 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-        if scores_restored:
+        if scores_restored and vps_mapping_restored:
+            msg = "Achievement data, challenge scores and VPS ID mapping successfully restored from the cloud!"
+        elif scores_restored:
             msg = "Achievement data and challenge scores successfully restored from the cloud!"
+        elif vps_mapping_restored:
+            msg = "Achievement data and VPS ID mapping successfully restored from the cloud!"
         else:
             msg = "Achievement data successfully restored from the cloud!"
         self._msgbox_topmost("info", "Restore from Cloud", msg)
+
+    def _cloud_upload_vps_mapping(self):
+        """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            return
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            return
+        try:
+            from ui_vps import _load_vps_mapping
+            mapping = _load_vps_mapping(self.cfg)
+            if not mapping:
+                return
+            CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping)
+            log(self.cfg, f"[CLOUD] VPS mapping uploaded: {len(mapping)} entries")
+        except Exception as e:
+            log(self.cfg, f"[CLOUD] VPS mapping upload failed: {e}", "WARN")
+
+    def _update_databases_now(self):
+        import threading
+        self.btn_update_dbs.setEnabled(False)
+        self.btn_update_dbs.setText("⏳ Updating...")
+
+        def _worker():
+            try:
+                from watcher_core import (
+                    f_index, f_romnames, f_vpsdb_cache,
+                    INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log
+                )
+                from ui_vps import VPSDB_URL
+                import os
+
+                cfg = self.cfg
+
+                def _force_download(path, url):
+                    try:
+                        data = _fetch_bytes_url(url, timeout=30)
+                        ensure_dir(os.path.dirname(path))
+                        with open(path, "wb") as f:
+                            f.write(data)
+                        log(cfg, f"[UPDATE] Re-downloaded {url} -> {path}")
+                        return True
+                    except Exception as e:
+                        log(cfg, f"[UPDATE] Failed to download {url}: {e}", "WARN")
+                        return False
+
+                _force_download(f_index(cfg), INDEX_URL)
+                _force_download(f_romnames(cfg), ROMNAMES_URL)
+                _force_download(f_vpsdb_cache(cfg), VPSDB_URL)
+
+                self.watcher.INDEX = load_json(f_index(cfg), {}) or {}
+                self.watcher.ROMNAMES = load_json(f_romnames(cfg), {}) or {}
+
+            except Exception as e:
+                log(self.cfg, f"[UPDATE] _update_databases_now worker failed: {e}", "WARN")
+            finally:
+                from PyQt6.QtCore import QMetaObject, Qt
+                QMetaObject.invokeMethod(self, "_on_update_databases_done", Qt.ConnectionType.QueuedConnection)
+
+        threading.Thread(target=_worker, daemon=True, name="UpdateDatabases").start()
+
+    @pyqtSlot()
+    def _on_update_databases_done(self):
+        self.btn_update_dbs.setEnabled(True)
+        self.btn_update_dbs.setText("🔄 Update Databases (Index, NVRAM Maps, VPS DB)")
+        self._msgbox_topmost("info", "Update Databases", "Databases updated successfully!\n\nindex.json, romnames.json and vpsdb.json have been refreshed.")
+
+    def _check_for_app_update(self):
+        import threading
+        self.btn_self_update.setEnabled(False)
+        self.btn_self_update.setText("⏳ Checking...")
+
+        def _worker():
+            try:
+                from watcher_core import _fetch_json_url, log
+
+                RELEASES_API = "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/releases/latest"
+
+                release = _fetch_json_url(RELEASES_API, timeout=15)
+                tag = str(release.get("tag_name", "")).strip().lstrip("v")
+                body = str(release.get("body", ""))
+
+                assets = release.get("assets") or []
+                exe_asset = None
+                for a in assets:
+                    name = str(a.get("name", "")).lower()
+                    if name.endswith(".exe"):
+                        exe_asset = a
+                        break
+
+                if not exe_asset:
+                    from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                    QMetaObject.invokeMethod(self, "_on_update_check_result",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, "no_asset"),
+                        Q_ARG(str, tag),
+                        Q_ARG(str, ""),
+                        Q_ARG(str, body))
+                    return
+
+                download_url = exe_asset.get("browser_download_url", "")
+
+                from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                QMetaObject.invokeMethod(self, "_on_update_check_result",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, "available"),
+                    Q_ARG(str, tag),
+                    Q_ARG(str, download_url),
+                    Q_ARG(str, body))
+            except Exception as e:
+                from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                QMetaObject.invokeMethod(self, "_on_update_check_result",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, f"error:{e}"),
+                    Q_ARG(str, ""),
+                    Q_ARG(str, ""),
+                    Q_ARG(str, ""))
+
+        threading.Thread(target=_worker, daemon=True, name="AppUpdateCheck").start()
+
+    @pyqtSlot(str, str, str, str)
+    def _on_update_check_result(self, status: str, tag: str, download_url: str, body: str):
+        self.btn_self_update.setEnabled(True)
+        self.btn_self_update.setText("⬆️ Check for App Updates")
+
+        if status == "no_asset":
+            self._msgbox_topmost("info", "App Update", f"Latest release: v{tag}\nNo .exe asset found in this release.")
+            return
+        if status.startswith("error:"):
+            self._msgbox_topmost("warn", "App Update", f"Could not check for updates:\n{status[6:]}")
+            return
+        if status == "available":
+            from PyQt6.QtWidgets import QMessageBox
+            msg = f"New version available: v{tag}\n\nDo you want to download and install it now?\n\nThe app will restart automatically after the update."
+            if body:
+                msg += f"\n\n--- Release Notes ---\n{body[:500]}"
+            reply = QMessageBox.question(self, "App Update Available", msg,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            self._do_app_update(download_url)
+
+    def _do_app_update(self, download_url: str):
+        import threading
+        self.btn_self_update.setEnabled(False)
+        self.btn_self_update.setText("⏳ Downloading update...")
+
+        def _download_and_install():
+            try:
+                import os, sys, tempfile, subprocess
+                from watcher_core import _fetch_bytes_url, log
+
+                log(self.cfg, f"[UPDATE] Downloading from {download_url}")
+                data = _fetch_bytes_url(download_url, timeout=120)
+
+                current_exe = os.path.abspath(sys.argv[0])
+                exe_dir = os.path.dirname(current_exe)
+                exe_name = os.path.basename(current_exe)
+                new_exe = os.path.join(exe_dir, exe_name + ".new")
+
+                with open(new_exe, "wb") as f:
+                    f.write(data)
+                log(self.cfg, f"[UPDATE] Downloaded to {new_exe}")
+
+                bat_path = os.path.join(tempfile.gettempdir(), "vpx_ach_update.bat")
+                bat = (
+                    "@echo off\r\n"
+                    "timeout /t 2 /nobreak >nul\r\n"
+                    f'move /y "{new_exe}" "{current_exe}"\r\n'
+                    f'start "" "{current_exe}"\r\n'
+                    'del "%~f0"\r\n'
+                )
+                with open(bat_path, "w") as f:
+                    f.write(bat)
+
+                log(self.cfg, "[UPDATE] Launching updater batch and quitting")
+                subprocess.Popen(
+                    ["cmd.exe", "/c", bat_path],
+                    creationflags=0x08000000 | 0x00000008,
+                    close_fds=True,
+                )
+
+                from PyQt6.QtCore import QMetaObject, Qt
+                QMetaObject.invokeMethod(self, "_on_update_ready_quit", Qt.ConnectionType.QueuedConnection)
+
+            except Exception as e:
+                from watcher_core import log
+                log(self.cfg, f"[UPDATE] Download/install failed: {e}", "ERROR")
+                from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                QMetaObject.invokeMethod(self, "_on_update_download_failed",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, str(e)))
+
+        threading.Thread(target=_download_and_install, daemon=True, name="AppUpdateDownload").start()
+
+    @pyqtSlot()
+    def _on_update_ready_quit(self):
+        self.quit_all()
+
+    @pyqtSlot(str)
+    def _on_update_download_failed(self, error: str):
+        self.btn_self_update.setEnabled(True)
+        self.btn_self_update.setText("⬆️ Check for App Updates")
+        self._msgbox_topmost("warn", "App Update Failed", f"Download or install failed:\n{error}")
 
     def _init_tooltips_main(self):
         def _set_tip(attr: str, tip: str):
