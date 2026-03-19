@@ -955,6 +955,36 @@ class CloudSync:
                 extra_data = {}
             extra_data = dict(extra_data)
             extra_data.setdefault("vps_id", _vps_id)
+            # Enrich extra_data with VPS table metadata (table_name, author, version)
+            try:
+                from ui_vps import _load_vpsdb
+                tables = _load_vpsdb(cfg)
+                if tables:
+                    for t in tables:
+                        vps_entry = None
+                        tf_entry = None
+                        if t.get("id") == _vps_id:
+                            vps_entry = t
+                        else:
+                            for tf in (t.get("tableFiles") or []):
+                                if tf.get("id") == _vps_id:
+                                    vps_entry = t
+                                    tf_entry = tf
+                                    break
+                        if vps_entry:
+                            table_name = vps_entry.get("name", "")
+                            if table_name:
+                                extra_data["table_name"] = table_name
+                            if tf_entry:
+                                version = tf_entry.get("version", "")
+                                authors = tf_entry.get("authors") or []
+                                if version:
+                                    extra_data["version"] = version
+                                if authors:
+                                    extra_data["author"] = ", ".join(authors)
+                            break
+            except Exception:
+                pass
         except Exception as e:
             log(cfg, f"[CLOUD] upload_score blocked for {rom}: VPS mapping error: {e}", "WARN")
             return
