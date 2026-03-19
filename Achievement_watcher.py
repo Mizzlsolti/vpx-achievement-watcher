@@ -213,7 +213,7 @@ def _parse_version(v_str):
 
 
 class MainWindow(QMainWindow, CloudStatsMixin):
-    CURRENT_VERSION = "2.5"
+    CURRENT_VERSION = "2.6"
 
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
         super().__init__()
