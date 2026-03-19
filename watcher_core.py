@@ -5277,6 +5277,13 @@ class Watcher:
             except Exception:
                 return str(e).strip()
         seen = { _entry_title(e) for e in lst if _entry_title(e) }
+        _current_vps_id = ""
+        try:
+            from ui_vps import _load_vps_mapping
+            _vps_mapping = _load_vps_mapping(self.cfg)
+            _current_vps_id = (_vps_mapping.get(rom) or "").strip()
+        except Exception:
+            pass
         added = 0
         for t in titles:
             if isinstance(t, dict):
@@ -5286,6 +5293,8 @@ class Watcher:
                 entry = {"title": title, "ts": now_iso}
                 if t.get("origin"):
                     entry["origin"] = str(t["origin"])
+                if _current_vps_id:
+                    entry["vps_id"] = _current_vps_id
                 lst.append(entry)
                 seen.add(title)
                 added += 1
@@ -5294,6 +5303,8 @@ class Watcher:
                 if not title or title in seen:
                     continue
                 entry = {"title": title, "ts": now_iso}
+                if _current_vps_id:
+                    entry["vps_id"] = _current_vps_id
                 lst.append(entry)
                 seen.add(title)
                 added += 1
