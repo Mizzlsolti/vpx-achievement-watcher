@@ -10,10 +10,9 @@ import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
+from typing import Optional, Any, List
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QWidget, QFrame,
@@ -21,7 +20,6 @@ from PyQt6.QtWidgets import (
 )
 
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
-VPS_IMG_BASE_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/img/"
 VPSDB_TTL = 24 * 3600  # 24 hours in seconds
 MAX_PICKER_RESULTS = 100  # Maximum entries shown in VpsPickerDialog
 
@@ -159,86 +157,6 @@ def _table_has_rom(table: dict, rom: str) -> bool:
                 return True
     return False
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Background image loader
-# ─────────────────────────────────────────────────────────────────────────────
-
-class VpsImageLoader(QThread):
-    """Download a VPS table image in background, cache it locally, and emit a QPixmap when done."""
-    image_ready = pyqtSignal(str, QPixmap)  # (img_url key, pixmap)
-
-    def __init__(self, cfg, img_url: str, parent=None):
-        super().__init__(parent)
-        self.cfg = cfg
-        self.img_url = img_url  # filename from vpsdb, e.g. "attack_from_mars.webp"
-
-    def run(self):
-        img_url = self.img_url
-        if not img_url:
-            return
-        try:
-            from watcher_core import p_vps_img, ensure_dir
-            filename = img_url.rstrip("/").split("/")[-1]
-            if not filename or ".." in filename or "/" in filename or "\\" in filename:
-                return
-            cache_dir = p_vps_img(self.cfg)
-            cache_path = os.path.join(cache_dir, filename)
-
-            if os.path.isfile(cache_path):
-                with open(cache_path, "rb") as f:
-                    data = f.read()
-            else:
-                full_url = VPS_IMG_BASE_URL + filename
-                try:
-                    req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
-                    with urllib.request.urlopen(req, timeout=15) as resp:
-                        data = resp.read()
-                except Exception:
-                    return
-                ensure_dir(cache_dir)
-                with open(cache_path, "wb") as f:
-                    f.write(data)
-
-            # --- Try Qt native decode first ---
-            pixmap = QPixmap()
-            if pixmap.loadFromData(data) and not pixmap.isNull():
-                self.image_ready.emit(img_url, pixmap)
-                return
-
-            # --- Fallback: Pillow → PNG → QPixmap ---
-            try:
-                from PIL import Image
-                import io
-                img = Image.open(io.BytesIO(data)).convert("RGBA")
-                buf = io.BytesIO()
-                img.save(buf, format="PNG")
-                buf.seek(0)
-                png_bytes = buf.read()
-                pixmap2 = QPixmap()
-                if pixmap2.loadFromData(png_bytes) and not pixmap2.isNull():
-                    self.image_ready.emit(img_url, pixmap2)
-            except Exception:
-                pass
-
-        except Exception:
-            pass
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Feature-tag colour map (used for text labels in the picker table)
-# ─────────────────────────────────────────────────────────────────────────────
-
-_TAG_COLORS: Dict[str, str] = {
-    "FASTFLIPS": "#FF4444",
-    "SSF":       "#00BFFF",
-    "LUT":       "#888888",
-    "DOF":       "#4444FF",
-    "MOD":       "#AA44FF",
-    "NFOZZY":    "#FF8800",
-    "FLEEP":     "#FFCC00",
-    "VPU PATCH": "#00AA44",
-}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -482,12 +400,11 @@ class VpsPickerDialog(QDialog):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VpsAchievementInfoDialog(QDialog):
-    """Show achievement details with VPS table image."""
+    """Show achievement details with VPS table info."""
 
     def __init__(self, cfg, rom: str, title: str, rule: Optional[dict], unlock_entry: Any, parent=None):
         super().__init__(parent)
         self.cfg = cfg
-        self._loaders: List[VpsImageLoader] = []
         self.setWindowTitle(f"ℹ️  {title}")
         self.setMinimumSize(500, 320)
         self.setStyleSheet("background:#111; color:#DDD;")
@@ -504,24 +421,14 @@ class VpsAchievementInfoDialog(QDialog):
         sep.setStyleSheet("color:#333;")
         layout.addWidget(sep)
 
-        body = QHBoxLayout()
-
-        # Left: table image
-        self.img_label = QLabel("🎰")
-        self.img_label.setFixedSize(120, 120)
-        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.img_label.setStyleSheet("background:#1a1a1a; border:1px solid #444; font-size:40px; border-radius:4px;")
-        body.addWidget(self.img_label, alignment=Qt.AlignmentFlag.AlignTop)
-
-        # Right: info
+        # Info
         right = QWidget()
         right_lay = QVBoxLayout(right)
-        right_lay.setContentsMargins(12, 0, 0, 0)
+        right_lay.setContentsMargins(0, 0, 0, 0)
 
         # VPS table info
         mapping = _load_vps_mapping(cfg)
         vps_id = mapping.get(rom)
-        self._img_url = ""
 
         if vps_id:
             tables = _load_vpsdb(cfg)
@@ -539,12 +446,6 @@ class VpsAchievementInfoDialog(QDialog):
                 right_lay.addWidget(QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{name}</b>"))
                 right_lay.addWidget(QLabel(f"<span style='color:#999;'>{mfr} · {year}</span>"))
                 right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
-                self._img_url = vps_entry.get("imgUrl", "")
-                if self._img_url:
-                    loader = VpsImageLoader(self.cfg, self._img_url, self)
-                    loader.image_ready.connect(self._on_image_ready)
-                    self._loaders.append(loader)
-                    loader.start()
             else:
                 right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {vps_id} (not in local cache)</span>"))
         else:
@@ -594,25 +495,10 @@ class VpsAchievementInfoDialog(QDialog):
             right_lay.addWidget(QLabel("🔒 <span style='color:#666;'>Not yet unlocked</span>"))
 
         right_lay.addStretch()
-        body.addWidget(right, stretch=1)
-        layout.addLayout(body)
+        layout.addWidget(right)
 
         # Close button
         btn_close = QPushButton("Close")
         btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
-
-    def _on_image_ready(self, url: str, pixmap: QPixmap):
-        scaled = pixmap.scaled(120, 120, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        self.img_label.setPixmap(scaled)
-        self.img_label.setText("")
-
-    def closeEvent(self, event):
-        for loader in self._loaders:
-            try:
-                loader.image_ready.disconnect()
-                loader.quit()
-            except Exception:
-                pass
-        super().closeEvent(event)
