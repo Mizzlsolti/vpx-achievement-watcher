@@ -9,21 +9,21 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea,
-    QWidget, QFrame, QSizePolicy,
-    QMessageBox, QGridLayout,
+    QPushButton, QWidget, QFrame,
+    QTableWidget, QTableWidgetItem, QHeaderView,
 )
 
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
 VPS_IMG_BASE_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/img/"
 VPSDB_TTL = 24 * 3600  # 24 hours in seconds
-MAX_PICKER_RESULTS = 30  # Maximum entries shown in VpsPickerDialog
+MAX_PICKER_RESULTS = 100  # Maximum entries shown in VpsPickerDialog
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VPS-DB helpers
@@ -226,7 +226,7 @@ class VpsImageLoader(QThread):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Feature-tag colour map (used by _VpsTableCard)
+# Feature-tag colour map (used for text labels in the picker table)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _TAG_COLORS: Dict[str, str] = {
@@ -240,220 +240,13 @@ _TAG_COLORS: Dict[str, str] = {
     "VPU PATCH": "#00AA44",
 }
 
-_CARD_WIDTH  = 270
-_CARD_HEIGHT = 320
-_IMG_HEIGHT  = 160
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Card widget — one card per tableFile entry
-# ─────────────────────────────────────────────────────────────────────────────
-
-class _VpsTableCard(QWidget):
-    """Card widget showing a single tableFile version of a VPS table."""
-
-    clicked       = pyqtSignal()
-    double_clicked = pyqtSignal()
-
-    def __init__(self, table: dict, table_file: dict, rom_match: bool, parent=None):
-        super().__init__(parent)
-        self.table      = table
-        self.table_file = table_file
-        self.img_url    = table_file.get("imgUrl", "") or table.get("imgUrl", "")
-        self._selected  = False
-        self._rom_match = rom_match
-
-        self.setFixedWidth(_CARD_WIDTH)
-        self.setFixedHeight(_CARD_HEIGHT)
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.setObjectName("VpsCard")
-        self._apply_style(False)
-
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-
-        # ── Image area ──────────────────────────────────────────────────────
-        self.img_label = QLabel("🎰")
-        self.img_label.setFixedSize(_CARD_WIDTH, _IMG_HEIGHT)
-        self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.img_label.setStyleSheet(
-            "background:#1a1a1a; border:none; font-size:40px; border-radius:0px;"
-        )
-        self.img_label.setScaledContents(False)
-        outer.addWidget(self.img_label)
-
-        # ── Text content area ────────────────────────────────────────────────
-        content = QWidget()
-        content.setObjectName("cardContent")
-        content.setStyleSheet(
-            "QWidget#cardContent { background: transparent; }"
-        )
-        content_lay = QVBoxLayout(content)
-        content_lay.setContentsMargins(10, 8, 10, 8)
-        content_lay.setSpacing(4)
-        content.setFixedHeight(_CARD_HEIGHT - _IMG_HEIGHT)
-
-        # Table name (bold, white, 14 px) — strip manufacturer/version info in parentheses/brackets
-        raw_name = table.get("name", "Unknown")
-        name = re.sub(r'\s*\(.*?\)', '', raw_name)
-        name = re.sub(r'\s*\[.*?\]', '', name).strip()
-        lbl_name = QLabel(name)
-        lbl_name.setWordWrap(True)
-        lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
-        lbl_name.setMaximumHeight(36)
-        content_lay.addWidget(lbl_name)
-
-        # Authors + type badge row
-        authors_row = QHBoxLayout()
-        authors_row.setSpacing(6)
-        authors = table_file.get("authors") or []
-        authors_text = ", ".join(authors[:4])
-        if len(authors) > 4:
-            authors_text += "…"
-        lbl_authors = QLabel(authors_text or "—")
-        lbl_authors.setStyleSheet("color:#AAAAAA; font-size:10px;")
-        lbl_authors.setWordWrap(False)
-        lbl_authors.setMaximumHeight(28)
-        authors_row.addWidget(lbl_authors, stretch=1)
-
-        ttype = table.get("type", "")
-        if ttype:
-            lbl_type = QLabel(ttype)
-            lbl_type.setStyleSheet(
-                "color:#FFFFFF; background:#444; border-radius:3px;"
-                " padding:1px 5px; font-size:10px; font-weight:bold;"
-            )
-            lbl_type.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-            authors_row.addWidget(lbl_type)
-        content_lay.addLayout(authors_row)
-
-        # Feature tags
-        features: list = []
-        for feat in (table_file.get("features") or []):
-            if isinstance(feat, str):
-                features.append(feat.upper())
-        if features:
-            tags_row = QHBoxLayout()
-            tags_row.setSpacing(4)
-            tags_row.setContentsMargins(0, 2, 0, 2)
-            for feat in features[:8]:
-                color = _TAG_COLORS.get(feat, "#666666")
-                dot = QLabel(feat)
-                dot.setStyleSheet(
-                    f"color:#FFFFFF; background:{color}; border-radius:3px;"
-                    f" padding:1px 6px; font-size:9px; font-weight:bold;"
-                )
-                dot.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-                tags_row.addWidget(dot)
-            tags_row.addStretch()
-            content_lay.addLayout(tags_row)
-
-        # ROM-match badge
-        if rom_match:
-            lbl_rom = QLabel("✅ ROM-Match")
-            lbl_rom.setStyleSheet(
-                "color:#00E5FF; background:#003333; border:1px solid #00E5FF;"
-                " border-radius:3px; padding:2px 6px; font-size:10px;"
-            )
-            lbl_rom.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
-            content_lay.addWidget(lbl_rom)
-
-        # Bottom row: version ID + date
-        bottom_row = QHBoxLayout()
-        tf_id  = table_file.get("id", "")
-        tf_ver = table_file.get("version", "")
-        id_text = tf_id or tf_ver or ""
-        lbl_id = QLabel(id_text)
-        lbl_id.setStyleSheet("color:#666; font-size:10px; font-family:monospace;")
-        bottom_row.addWidget(lbl_id, stretch=1)
-
-        ts = table_file.get("updatedAt")
-        if isinstance(ts, (int, float)) and ts > 0:
-            from datetime import datetime, timezone
-            try:
-                dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
-                date_str = dt.strftime("%d.%m.%Y")
-            except Exception:
-                date_str = ""
-            if date_str:
-                lbl_date = QLabel(date_str)
-                lbl_date.setStyleSheet("color:#666; font-size:10px;")
-                lbl_date.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                bottom_row.addWidget(lbl_date)
-
-        content_lay.addLayout(bottom_row)
-        content_lay.addStretch()
-        outer.addWidget(content, stretch=1)
-
-    # ── Style helpers ────────────────────────────────────────────────────────
-
-    def _apply_style(self, hovered: bool):
-        if self._selected:
-            border_color = "#00E5FF"
-            border_width = 2
-        elif self._rom_match:
-            border_color = "#00E5FF"
-            border_width = 1
-        elif hovered:
-            border_color = "#888888"
-            border_width = 1
-        else:
-            border_color = "#444444"
-            border_width = 1
-        self.setStyleSheet(
-            f"QWidget#VpsCard {{"
-            f" background: #2a2a2a;"
-            f" border: {border_width}px solid {border_color};"
-            f" border-radius: 8px;"
-            f"}}"
-        )
-
-    def set_selected(self, selected: bool):
-        self._selected = selected
-        self._apply_style(False)
-
-    def set_image(self, pixmap: QPixmap):
-        scaled = pixmap.scaled(
-            _CARD_WIDTH, _IMG_HEIGHT,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self.img_label.setPixmap(scaled)
-        self.img_label.setText("")
-
-    # ── Event overrides ──────────────────────────────────────────────────────
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit()
-        super().mousePressEvent(event)
-
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.double_clicked.emit()
-        super().mouseDoubleClickEvent(event)
-
-    def enterEvent(self, event):
-        if not self._selected:
-            self._apply_style(True)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        if not self._selected:
-            self._apply_style(False)
-        super().leaveEvent(event)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# VPS Picker Dialog — card-grid view
+# VPS Picker Dialog — 2-column table view
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VpsPickerDialog(QDialog):
-    """Card-grid VPS table picker with per-version selection and lazy-loaded images."""
-
-    _GRID_COLS = 3
+    """2-column table VPS picker with per-version selection."""
 
     def __init__(self, cfg, tables: List[dict], rom: str, table_title: str, parent=None):
         super().__init__(parent)
@@ -463,14 +256,11 @@ class VpsPickerDialog(QDialog):
         self.table_title = table_title
         self.selected_table: Optional[dict] = None
         self.selected_table_file: Optional[dict] = None
-        self._image_cache: Dict[str, QPixmap] = {}
-        self._loaders: List[VpsImageLoader] = []
-        self._cards: List[_VpsTableCard] = []
-        self._selected_card: Optional[_VpsTableCard] = None
+        self._row_data: List[tuple] = []  # (table, table_file) per row
 
         self.setWindowTitle(f"Select VPS Table — {table_title} [{rom}]")
-        self.setMinimumSize(1100, 750)
-        self.resize(1200, 820)
+        self.setMinimumSize(900, 600)
+        self.resize(1000, 700)
         self.setStyleSheet("background:#1a1a1a; color:#DDD;")
 
         root = QVBoxLayout(self)
@@ -495,22 +285,39 @@ class VpsPickerDialog(QDialog):
         hdr.addWidget(self.txt_search)
         root.addLayout(hdr)
 
-        # ── Scroll area with card grid ────────────────────────────────────────
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet(
-            "QScrollArea { border: none; background: #1a1a1a; }"
+        # ── Table widget ──────────────────────────────────────────────────────
+        self.table_widget = QTableWidget()
+        self.table_widget.setColumnCount(2)
+        self.table_widget.setHorizontalHeaderLabels(["Table / Type / Features", "Authors · Version · Date"])
+        self.table_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table_widget.setShowGrid(True)
+        self.table_widget.verticalHeader().setVisible(False)
+        self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.table_widget.setColumnWidth(1, 320)
+        self.table_widget.setStyleSheet(
+            "QTableWidget {"
+            "  background:#1a1a1a; color:#DDD; gridline-color:#333;"
+            "  border:none; font-size:12px; outline:0;"
+            "}"
+            "QTableWidget::item { padding:6px 8px; }"
+            "QTableWidget::item:selected {"
+            "  background:#003344; color:#00E5FF;"
+            "  border-left:2px solid #00E5FF;"
+            "}"
+            "QTableWidget::item:hover { background:#2e2e2e; }"
+            "QHeaderView::section {"
+            "  background:#2a2a2a; color:#888; border:none;"
+            "  padding:4px 8px; font-size:11px;"
+            "}"
             "QScrollBar:vertical { background:#222; width:10px; }"
             "QScrollBar::handle:vertical { background:#555; border-radius:5px; }"
         )
-        self.grid_container = QWidget()
-        self.grid_container.setStyleSheet("background:#1a1a1a;")
-        self.grid_layout = QGridLayout(self.grid_container)
-        self.grid_layout.setHorizontalSpacing(6)
-        self.grid_layout.setVerticalSpacing(6)
-        self.grid_layout.setContentsMargins(4, 4, 4, 4)
-        self.scroll.setWidget(self.grid_container)
-        root.addWidget(self.scroll, stretch=1)
+        self.table_widget.itemSelectionChanged.connect(self._on_row_selected)
+        self.table_widget.cellDoubleClicked.connect(self._on_double_click)
+        root.addWidget(self.table_widget, stretch=1)
 
         # ── Footer buttons ────────────────────────────────────────────────────
         sep = QFrame()
@@ -545,122 +352,129 @@ class VpsPickerDialog(QDialog):
         btn_row.addWidget(btn_ok)
         root.addLayout(btn_row)
 
-        # Pre-fill search and populate grid
-        self.txt_search.setText(table_title)
-        self._populate_grid(table_title)
+        # Pre-fill search with clean table name and populate table
+        clean_title = self._clean_table_title(table_title)
+        self.txt_search.setText(clean_title)
+        self._populate_table(clean_title)
 
-    # ── Grid management ───────────────────────────────────────────────────────
+    # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _clear_grid(self):
-        self._stop_loaders()
-        self._cards.clear()
-        self._selected_card = None
-        while self.grid_layout.count():
-            item = self.grid_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+    @staticmethod
+    def _clean_table_title(title: str) -> str:
+        """Strip brackets, parentheses and extra info — keep only the table name."""
+        name = re.sub(r'\s*\[.*?\]', '', title)
+        name = re.sub(r'\s*\(.*?\)', '', name)
+        return name.strip()
 
-    def _populate_grid(self, search_term: str):
-        self._clear_grid()
+    # ── Table management ──────────────────────────────────────────────────────
+
+    def _populate_table(self, search_term: str):
+        self.table_widget.setRowCount(0)
+        self._row_data.clear()
+        self.selected_table = None
+        self.selected_table_file = None
 
         results = _vps_find(self.tables, search_term, self.rom)
         if not results:
             results = self.tables[:50]
 
-        # Flatten: one card per tableFile entry (up to MAX_PICKER_RESULTS cards total)
-        card_entries: List[tuple] = []  # (table, table_file, rom_match)
+        # Flatten: one row per tableFile entry
+        entries: List[tuple] = []
         for table in results:
             rom_match = _table_has_rom(table, self.rom)
             table_files = table.get("tableFiles") or []
             if table_files:
                 for tf in table_files:
-                    card_entries.append((table, tf, rom_match))
-                    if len(card_entries) >= MAX_PICKER_RESULTS:
+                    entries.append((table, tf, rom_match))
+                    if len(entries) >= MAX_PICKER_RESULTS:
                         break
             else:
-                # Table with no tableFiles: show one card with empty tableFile
-                card_entries.append((table, {}, rom_match))
-            if len(card_entries) >= MAX_PICKER_RESULTS:
+                entries.append((table, {}, rom_match))
+            if len(entries) >= MAX_PICKER_RESULTS:
                 break
 
-        _loading_urls: set = set()
-        for i, (table, table_file, rom_match) in enumerate(card_entries):
-            card = _VpsTableCard(table, table_file, rom_match)
-            card.clicked.connect(lambda t=table, tf=table_file, c=card: self._on_card_clicked(t, tf, c))
-            card.double_clicked.connect(lambda t=table, tf=table_file, c=card: self._on_card_double_clicked(t, tf, c))
-            row, col = divmod(i, self._GRID_COLS)
-            self.grid_layout.addWidget(card, row, col)
-            self._cards.append(card)
+        self.table_widget.setRowCount(len(entries))
+        for row, (table, table_file, rom_match) in enumerate(entries):
+            # ── Column 0: name + type + features ─────────────────────────────
+            raw_name = table.get("name", "Unknown")
+            name = re.sub(r'\s*\(.*?\)', '', raw_name)
+            name = re.sub(r'\s*\[.*?\]', '', name).strip()
 
-            # Lazy image load
-            img_url = table_file.get("imgUrl", "") or table.get("imgUrl", "")
-            if img_url:
-                if img_url in self._image_cache:
-                    card.set_image(self._image_cache[img_url])
-                elif img_url not in _loading_urls:
-                    _loading_urls.add(img_url)
-                    loader = VpsImageLoader(self.cfg, img_url, self)
-                    loader.image_ready.connect(self._on_image_ready)
-                    self._loaders.append(loader)
-                    loader.start()
+            ttype = table.get("type", "")
+            features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
+            parts = [name]
+            if ttype:
+                parts.append(f"[{ttype}]")
+            if features:
+                parts.append("  " + "  ".join(features[:8]))
+            col0_text = "  ".join(parts)
 
-        # Fill remaining cells in last row so grid doesn't stretch
-        total = len(card_entries)
-        remainder = total % self._GRID_COLS
-        if remainder:
-            for col in range(remainder, self._GRID_COLS):
-                placeholder = QWidget()
-                placeholder.setFixedWidth(_CARD_WIDTH)
-                placeholder.setStyleSheet("background:transparent;")
-                row = total // self._GRID_COLS
-                self.grid_layout.addWidget(placeholder, row, col)
+            item0 = QTableWidgetItem(col0_text)
+            item0.setToolTip(raw_name)
+            self.table_widget.setItem(row, 0, item0)
+
+            # ── Column 1: authors + version/id + date + ROM match ─────────────
+            authors = table_file.get("authors") or []
+            authors_text = ", ".join(authors[:4])
+            if len(authors) > 4:
+                authors_text += "…"
+
+            tf_id  = table_file.get("id", "")
+            tf_ver = table_file.get("version", "")
+            id_text = tf_ver or tf_id or ""
+
+            date_str = ""
+            ts = table_file.get("updatedAt")
+            if isinstance(ts, (int, float)) and ts > 0:
+                try:
+                    dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                    date_str = dt.strftime("%d.%m.%Y")
+                except Exception:
+                    pass
+
+            col1_parts = []
+            if authors_text:
+                col1_parts.append(authors_text)
+            if id_text:
+                col1_parts.append(id_text)
+            if date_str:
+                col1_parts.append(date_str)
+            if rom_match:
+                col1_parts.append("✅")
+            col1_text = "  ·  ".join(col1_parts)
+
+            item1 = QTableWidgetItem(col1_text)
+            self.table_widget.setItem(row, 1, item1)
+
+            self._row_data.append((table, table_file))
+
+        self.table_widget.resizeRowsToContents()
 
     def _on_search(self, text: str):
-        self._populate_grid(text)
+        self._populate_table(text)
 
-    def _on_image_ready(self, url: str, pixmap: QPixmap):
-        self._image_cache[url] = pixmap
-        for card in self._cards:
-            if card.img_url == url:
-                card.set_image(pixmap)
+    def _on_row_selected(self):
+        rows = self.table_widget.selectedItems()
+        if not rows:
+            return
+        row = self.table_widget.currentRow()
+        if 0 <= row < len(self._row_data):
+            self.selected_table, self.selected_table_file = self._row_data[row]
 
-    def _on_card_clicked(self, table: dict, table_file: dict, card: _VpsTableCard):
-        if self._selected_card and self._selected_card is not card:
-            self._selected_card.set_selected(False)
-        self._selected_card = card
-        card.set_selected(True)
-        self.selected_table      = table
-        self.selected_table_file = table_file or None
-
-    def _on_card_double_clicked(self, table: dict, table_file: dict, card: _VpsTableCard):
-        self._on_card_clicked(table, table_file, card)
-        self._accept_selection()
+    def _on_double_click(self, row: int, _col: int):
+        if 0 <= row < len(self._row_data):
+            self.selected_table, self.selected_table_file = self._row_data[row]
+            self._accept_selection()
 
     def _accept_selection(self):
         if not self.selected_table:
             return
-        self._stop_loaders()
         self.accept()
 
     def _remove_assignment(self):
-        self.selected_table      = None
+        self.selected_table = None
         self.selected_table_file = None
-        self._stop_loaders()
         self.done(2)  # special code for "remove"
-
-    def _stop_loaders(self):
-        for loader in self._loaders:
-            try:
-                loader.image_ready.disconnect()
-                loader.quit()
-                loader.wait(200)
-            except Exception:
-                pass
-        self._loaders.clear()
-
-    def closeEvent(self, event):
-        self._stop_loaders()
-        super().closeEvent(event)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
