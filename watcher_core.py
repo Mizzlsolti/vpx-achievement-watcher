@@ -376,8 +376,9 @@ def f_achievements_state(cfg: "AppConfig") -> str:
 def f_log(cfg):          return os.path.join(cfg.BASE, "watcher.log")
 def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
 def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
-def f_vps_mapping(cfg):  return os.path.join(cfg.BASE, "vps_id_mapping.json")
-def f_vpsdb_cache(cfg):  return os.path.join(cfg.BASE, "tools", "vpsdb.json")
+def p_vps(cfg):          return os.path.join(cfg.BASE, "tools", "vps")
+def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
+def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
 def f_progress_upload_log(cfg: "AppConfig") -> str:
     """Tracks which (rom, vps_id) combos have already had progress uploaded."""
     return os.path.join(p_achievements(cfg), "progress_upload_log.json")
@@ -452,6 +453,20 @@ def _migrate_runtime_dirs(cfg):
     if os.path.isdir(old_challenges) and not os.path.isdir(new_challenges):
         ensure_dir(os.path.dirname(new_challenges))
         shutil.move(old_challenges, new_challenges)
+
+    # vps_id_mapping.json: root → tools/vps/
+    old_vps_mapping = os.path.join(cfg.BASE, "vps_id_mapping.json")
+    new_vps_mapping = f_vps_mapping(cfg)
+    if os.path.isfile(old_vps_mapping) and not os.path.isfile(new_vps_mapping):
+        ensure_dir(os.path.dirname(new_vps_mapping))
+        shutil.move(old_vps_mapping, new_vps_mapping)
+
+    # vpsdb.json: tools/ → tools/vps/
+    old_vpsdb = os.path.join(cfg.BASE, "tools", "vpsdb.json")
+    new_vpsdb = f_vpsdb_cache(cfg)
+    if os.path.isfile(old_vpsdb) and not os.path.isfile(new_vpsdb):
+        ensure_dir(os.path.dirname(new_vpsdb))
+        shutil.move(old_vpsdb, new_vpsdb)
 
     # Clean up old .txt session dumps
     if os.path.isdir(p_session(cfg)):
