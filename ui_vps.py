@@ -179,15 +179,18 @@ class VpsImageLoader(QThread):
             return
         try:
             from watcher_core import p_vps_img, ensure_dir
-            cache_filename = os.path.basename(img_url)
+            filename = img_url.rstrip("/").split("/")[-1]
+            if not filename or ".." in filename or "/" in filename or "\\" in filename:
+                print(f"[VpsImageLoader] invalid filename extracted from img_url: {img_url!r}")
+                return
             cache_dir = p_vps_img(self.cfg)
-            cache_path = os.path.join(cache_dir, cache_filename)
+            cache_path = os.path.join(cache_dir, filename)
 
             if os.path.isfile(cache_path):
                 with open(cache_path, "rb") as f:
                     data = f.read()
             else:
-                full_url = VPS_IMG_BASE_URL + urllib.parse.quote(img_url)
+                full_url = VPS_IMG_BASE_URL + filename
                 print(f"[VpsImageLoader] downloading {full_url}")
                 try:
                     req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
