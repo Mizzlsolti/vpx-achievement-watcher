@@ -496,8 +496,13 @@ class VpsAchievementInfoDialog(QDialog):
         right_lay.setContentsMargins(0, 0, 0, 0)
 
         # VPS table info
-        mapping = _load_vps_mapping(cfg)
-        vps_id = mapping.get(rom)
+        # Prefer the VPS-ID that was recorded at unlock time (immutable snapshot).
+        # Fall back to the current mapping only for legacy entries without vps_id.
+        if isinstance(unlock_entry, dict) and unlock_entry.get("vps_id"):
+            vps_id = unlock_entry["vps_id"]
+        else:
+            mapping = _load_vps_mapping(cfg)
+            vps_id = mapping.get(rom)
 
         if vps_id:
             tables = _load_vpsdb(cfg)
