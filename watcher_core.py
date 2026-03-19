@@ -824,6 +824,22 @@ class CloudSync:
             return
         if CloudSync._warn_missing_player_name(cfg):
             return
+        # Block upload if no VPS-ID assigned for this ROM
+        try:
+            from ui_vps import _load_vps_mapping
+            _vps_mapping = _load_vps_mapping(cfg)
+            _vps_id = (_vps_mapping.get(rom) or "").strip()
+            if not _vps_id:
+                log(cfg, f"[CLOUD] upload_score blocked for {rom}: no VPS-ID assigned", "WARN")
+                return
+            # Inject vps_id into extra_data so it gets included in the payload
+            if extra_data is None:
+                extra_data = {}
+            extra_data = dict(extra_data)
+            extra_data.setdefault("vps_id", _vps_id)
+        except Exception as e:
+            log(cfg, f"[CLOUD] upload_score blocked for {rom}: VPS mapping error: {e}", "WARN")
+            return
         
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
@@ -871,6 +887,18 @@ class CloudSync:
             return
         if CloudSync._warn_missing_player_name(cfg):
             return
+        # Block upload if no VPS-ID assigned for this ROM
+        try:
+            from ui_vps import _load_vps_mapping
+            _vps_mapping = _load_vps_mapping(cfg)
+            _vps_id = (_vps_mapping.get(rom) or "").strip()
+            if not _vps_id:
+                log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: no VPS-ID assigned", "WARN")
+                return
+            _extra_vps_id = _vps_id
+        except Exception as e:
+            log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: VPS mapping error: {e}", "WARN")
+            return
             
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
@@ -885,6 +913,8 @@ class CloudSync:
                 "percentage": percentage,
                 "ts": datetime.now(timezone.utc).isoformat()
             }
+            if _extra_vps_id:
+                payload["vps_id"] = _extra_vps_id
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
             try:
@@ -1402,7 +1432,93 @@ class Watcher:
             t.start()
         except Exception:
             pass
-               
+
+    def _emit_mini_info_if_missing_vps_id(self, rom: str, seconds: int = 8):
+        """Non-blocking: spawns a background thread to warn if cloud sync is enabled but no VPS-ID is set for the ROM."""
+        import threading
+        def _worker():
+            import time
+            try:
+                import win32gui
+            except ImportError:
+                return
+            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+            try:
+                if not rom:
+                    return
+                if not self.cfg.CLOUD_ENABLED:
+                    return
+                if not self._has_any_map(rom):
+                    return
+
+                shown = getattr(self, "_mini_info_vps_shown_for_rom", None)
+                if not isinstance(shown, set):
+                    shown = set()
+                if rom in shown:
+                    return
+
+                try:
+                    from ui_vps import _load_vps_mapping
+                    mapping = _load_vps_mapping(self.cfg)
+                    if mapping.get(rom):
+                        return
+                except Exception:
+                    return
+
+                def _vpx_window_visible() -> bool:
+                    found = False
+                    def _cb(hwnd, _):
+                        nonlocal found
+                        try:
+                            title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
+                            if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
+                                found = True
+                                return False
+                        except Exception:
+                            pass
+                        return True
+                    try:
+                        win32gui.EnumWindows(_cb, None)
+                    except Exception:
+                        return False
+                    return found
+
+                for _ in range(40):  # max 20s warten
+                    if self._stop.is_set():
+                        return
+                    try:
+                        if not self.game_active:
+                            return
+                    except Exception:
+                        return
+                    if _vpx_window_visible():
+                        msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
+                        dur = max(5, int(seconds))
+                        try:
+                            QMetaObject.invokeMethod(
+                                self.bridge,
+                                "challenge_info_show",
+                                Qt.ConnectionType.QueuedConnection,
+                                Q_ARG(str, msg),
+                                Q_ARG(int, dur),
+                                Q_ARG(str, "#FF7F00")
+                            )
+                            shown.add(rom)
+                            self._mini_info_vps_shown_for_rom = shown
+                            log(self.cfg, f"[INFO] Mini overlay (no VPS-ID) shown for {rom}")
+                        except Exception as e:
+                            log(self.cfg, f"[OVERLAY] mini info vps emit failed: {e}", "WARN")
+                        return
+                    time.sleep(0.5)
+            except Exception as e:
+                log(self.cfg, f"[OVERLAY] mini info vps worker failed: {e}", "WARN")
+
+        try:
+            t = threading.Thread(target=_worker, daemon=True, name="MiniInfoMissingVpsId")
+            t.start()
+        except Exception:
+            pass
+
     def _plausible_counter(self, label: str) -> bool:
         if not label:
             return False
@@ -5338,6 +5454,7 @@ class Watcher:
                     self.on_session_start(rom, is_rom=True)
                     active_rom = rom
                     self._emit_mini_info_if_missing_map(rom, 5)
+                    self._emit_mini_info_if_missing_vps_id(rom, 8)
 
                 elif active_rom and rom and rom != active_rom:
                     self.on_session_end()
@@ -5345,6 +5462,7 @@ class Watcher:
                     self.on_session_start(rom, is_rom=True)
                     active_rom = rom
                     self._emit_mini_info_if_missing_map(rom, 5)
+                    self._emit_mini_info_if_missing_vps_id(rom, 8)
 
                 if active_rom:
                     audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
