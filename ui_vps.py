@@ -12,7 +12,10 @@ import urllib.parse
 from datetime import datetime, timezone
 from typing import Optional, Any, List
 
-from PyQt6.QtCore import Qt
+from pathlib import Path
+
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QEvent, QPoint
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QWidget, QFrame,
@@ -160,6 +163,39 @@ def _table_has_rom(table: dict, rom: str) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Image download worker
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _ImgFetcher(QThread):
+    ready = pyqtSignal(str, QPixmap)  # vps_id, pixmap
+
+    VPS_IMG_BASE = (
+        "https://raw.githubusercontent.com/"
+        "VirtualPinballSpreadsheet/vps-db/main/img/"
+    )
+    LOCAL_CACHE = Path("tools/vps/img")
+
+    def __init__(self, vps_id: str, img_filename: str, parent=None):
+        super().__init__(parent)
+        self.vps_id = vps_id
+        self.img_filename = img_filename
+
+    def run(self):
+        self.LOCAL_CACHE.mkdir(parents=True, exist_ok=True)
+        local = self.LOCAL_CACHE / self.img_filename
+        if not local.exists():
+            url = self.VPS_IMG_BASE + self.img_filename
+            try:
+                urllib.request.urlretrieve(url, local)
+            except Exception:
+                return
+        pix = QPixmap(str(local))
+        if not pix.isNull():
+            pix = pix.scaledToWidth(300, Qt.TransformationMode.SmoothTransformation)
+            self.ready.emit(self.vps_id, pix)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # VPS Picker Dialog — 2-column table view
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -214,7 +250,7 @@ class VpsPickerDialog(QDialog):
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.table_widget.setColumnWidth(1, 320)
+        self.table_widget.setColumnWidth(1, 220)
         self.table_widget.setStyleSheet(
             "QTableWidget {"
             "  background:#1a1a1a; color:#DDD; gridline-color:#333;"
@@ -236,6 +272,19 @@ class VpsPickerDialog(QDialog):
         self.table_widget.itemSelectionChanged.connect(self._on_row_selected)
         self.table_widget.cellDoubleClicked.connect(self._on_double_click)
         root.addWidget(self.table_widget, stretch=1)
+
+        # ── Hover image popup ────────────────────────────────────────────────
+        self._img_popup = QLabel(flags=Qt.WindowType.ToolTip)
+        self._img_popup.setStyleSheet(
+            "border:2px solid #00E5FF; background:#111; padding:2px;"
+        )
+        self._img_popup.hide()
+        self._img_fetcher: Optional[_ImgFetcher] = None
+        self._hover_vps_id: Optional[str] = None
+
+        self.table_widget.setMouseTracking(True)
+        self.table_widget.viewport().setMouseTracking(True)
+        self.table_widget.viewport().installEventFilter(self)
 
         # ── Footer buttons ────────────────────────────────────────────────────
         sep = QFrame()
@@ -320,14 +369,18 @@ class VpsPickerDialog(QDialog):
 
             ttype = table.get("type", "")
             features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
+            vps_id = table.get("id", "")
             parts = [name]
             if ttype:
                 parts.append(f"[{ttype}]")
             if features:
                 parts.append("  " + "  ".join(features[:8]))
+            if vps_id:
+                parts.append(f"  [{vps_id}]")
             col0_text = "  ".join(parts)
 
             item0 = QTableWidgetItem(col0_text)
+            item0.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
             item0.setToolTip(raw_name)
             self.table_widget.setItem(row, 0, item0)
 
@@ -362,6 +415,7 @@ class VpsPickerDialog(QDialog):
             col1_text = "  ·  ".join(col1_parts)
 
             item1 = QTableWidgetItem(col1_text)
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
             self.table_widget.setItem(row, 1, item1)
 
             self._row_data.append((table, table_file))
@@ -393,6 +447,81 @@ class VpsPickerDialog(QDialog):
         self.selected_table = None
         self.selected_table_file = None
         self.done(2)  # special code for "remove"
+
+    # ── Hover image popup ─────────────────────────────────────────────────────
+
+    def eventFilter(self, obj, event):
+        if obj is self.table_widget.viewport():
+            etype = event.type()
+            if etype == QEvent.Type.MouseMove:
+                pos = event.pos()
+                col = self.table_widget.columnAt(pos.x())
+                row = self.table_widget.rowAt(pos.y())
+                if col == 0 and 0 <= row < len(self._row_data):
+                    table, _ = self._row_data[row]
+                    vps_id = table.get("id", "")
+                    if vps_id and vps_id != self._hover_vps_id:
+                        self._hover_vps_id = vps_id
+                        img_filename = self._find_table_img(table, vps_id)
+                        if img_filename:
+                            global_pos = self.table_widget.viewport().mapToGlobal(pos)
+                            self._start_img_fetch(vps_id, img_filename, global_pos)
+                    elif vps_id and self._img_popup.isVisible():
+                        # update position while hovering same row
+                        global_pos = self.table_widget.viewport().mapToGlobal(pos)
+                        self._img_popup.move(global_pos.x() + 20,
+                                             global_pos.y() - self._img_popup.height() // 2)
+                else:
+                    self._hover_vps_id = None
+                    self._img_popup.hide()
+            elif etype == QEvent.Type.Leave:
+                self._hover_vps_id = None
+                self._img_popup.hide()
+        return super().eventFilter(obj, event)
+
+    def _find_table_img(self, table: dict, vps_id: str) -> Optional[str]:
+        """Return an image filename for this vps_id (local cache or derived from tableFiles)."""
+        cache = _ImgFetcher.LOCAL_CACHE
+        if cache.exists():
+            candidates = sorted(cache.glob(f"{vps_id}_table_*.webp"))
+            if candidates:
+                return candidates[-1].name
+            candidates = sorted(cache.glob(f"{vps_id}_*.webp"))
+            if candidates:
+                return candidates[-1].name
+        # Derive filename from first tableFile's updatedAt timestamp
+        table_files = table.get("tableFiles") or []
+        if table_files:
+            ts = table_files[0].get("updatedAt")
+            if isinstance(ts, (int, float)) and ts > 0:
+                return f"{vps_id}_table_{int(ts)}.webp"
+        return None
+
+    def _start_img_fetch(self, vps_id: str, filename: str, global_pos: QPoint):
+        local = _ImgFetcher.LOCAL_CACHE / filename
+        if local.exists():
+            pix = QPixmap(str(local))
+            if not pix.isNull():
+                pix = pix.scaledToWidth(300, Qt.TransformationMode.SmoothTransformation)
+                self._show_popup(pix, global_pos)
+                return
+        if self._img_fetcher and self._img_fetcher.isRunning():
+            return
+        fetcher = _ImgFetcher(vps_id, filename, self)
+        fetcher.ready.connect(
+            lambda _id, px, p=global_pos: self._show_popup(px, p)
+        )
+        self._img_fetcher = fetcher
+        fetcher.start()
+
+    def _show_popup(self, pix: QPixmap, global_pos: QPoint):
+        self._img_popup.setPixmap(pix)
+        self._img_popup.adjustSize()
+        x = global_pos.x() + 20
+        y = global_pos.y() - pix.height() // 2
+        self._img_popup.move(x, y)
+        self._img_popup.show()
+        self._img_popup.raise_()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
