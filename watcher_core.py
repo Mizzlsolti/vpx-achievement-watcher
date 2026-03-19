@@ -378,6 +378,34 @@ def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
 def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
 def f_vps_mapping(cfg):  return os.path.join(cfg.BASE, "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(cfg.BASE, "tools", "vpsdb.json")
+def f_progress_upload_log(cfg: "AppConfig") -> str:
+    """Tracks which (rom, vps_id) combos have already had progress uploaded."""
+    return os.path.join(p_achievements(cfg), "progress_upload_log.json")
+
+
+def _load_progress_upload_log(cfg) -> dict:
+    """Load the progress upload log dict {rom: vps_id}."""
+    path = f_progress_upload_log(cfg)
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_progress_upload_log(cfg, log_data: dict):
+    """Save the progress upload log dict {rom: vps_id}."""
+    path = f_progress_upload_log(cfg)
+    ensure_dir(os.path.dirname(path))
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(log_data, f, indent=2)
+    except Exception:
+        pass
 
 
 def _migrate_runtime_dirs(cfg):
@@ -5336,6 +5364,22 @@ class Watcher:
                                     CloudSync.upload_achievement_progress(_c, _r, _ut, _ta),
                                 daemon=True,
                             ).start()
+                            # Retroactive upload: if this ROM now has a VPS-ID but was previously
+                            # blocked (progress_upload_log has no entry or a different vps_id),
+                            # the upload above will succeed this time. Record the vps_id used.
+                            try:
+                                from ui_vps import _load_vps_mapping
+                                _vps_mapping = _load_vps_mapping(self.cfg)
+                                _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
+                                if _vps_id:
+                                    _upload_log = _load_progress_upload_log(self.cfg)
+                                    _prev_vps_id = _upload_log.get(self.current_rom, "")
+                                    if _prev_vps_id != _vps_id:
+                                        _upload_log[self.current_rom] = _vps_id
+                                        _save_progress_upload_log(self.cfg, _upload_log)
+                                        log(self.cfg, f"[CLOUD] Progress upload log updated for {self.current_rom} -> vps_id={_vps_id}")
+                            except Exception as e:
+                                log(self.cfg, f"[CLOUD] Progress upload log update failed: {e}", "WARN")
                     except Exception as e:
                         log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
