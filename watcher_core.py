@@ -1033,6 +1033,35 @@ class CloudSync:
             }
             if _extra_vps_id:
                 payload["vps_id"] = _extra_vps_id
+                try:
+                    from ui_vps import _load_vpsdb
+                    tables = _load_vpsdb(cfg)
+                    if tables:
+                        for t in tables:
+                            vps_entry = None
+                            tf_entry = None
+                            if t.get("id") == _extra_vps_id:
+                                vps_entry = t
+                            else:
+                                for tf in (t.get("tableFiles") or []):
+                                    if tf.get("id") == _extra_vps_id:
+                                        vps_entry = t
+                                        tf_entry = tf
+                                        break
+                            if vps_entry:
+                                table_name = vps_entry.get("name", "")
+                                if table_name:
+                                    payload["table_name"] = table_name
+                                if tf_entry:
+                                    version = tf_entry.get("version", "")
+                                    authors = tf_entry.get("authors") or []
+                                    if version:
+                                        payload["version"] = version
+                                    if authors:
+                                        payload["author"] = ", ".join(authors)
+                                break
+                except Exception:
+                    pass
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
             try:

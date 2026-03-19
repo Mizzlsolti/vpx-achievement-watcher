@@ -2007,7 +2007,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                             f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
                         )
                 else:
-                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}{info_link}</td>")
+                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
