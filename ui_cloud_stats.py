@@ -384,6 +384,7 @@ class CloudStatsMixin:
             medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
             
             if category == "progress":
+                badge = _cloud_info_badge(row)
                 unlocked = int(row.get('unlocked', 0))
                 total = int(row.get('total', 1))
                 pct = float(row.get('percentage', 0))
@@ -394,7 +395,7 @@ class CloudStatsMixin:
                     <div class='bar-text'>{unlocked} / {total} ({pct}%)</div>
                 </div>
                 """
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}</td><td>{bar}</td><td>{ts}</td></tr>")
+                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td>{bar}</td><td>{ts}</td></tr>")
             elif category == "flip":
                 badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
