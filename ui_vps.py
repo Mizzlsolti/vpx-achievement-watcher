@@ -160,6 +160,67 @@ def _table_has_rom(table: dict, rom: str) -> bool:
     return False
 
 
+def _find_table_file_by_filename_and_authors(
+    table: dict,
+    vpx_basename: str,
+    script_authors: list,
+) -> Optional[dict]:
+    """Search table["tableFiles"] for the best match by .vpx filename and/or script authors.
+
+    Match priority:
+      1. fileName match AND author match → best match
+      2. fileName match only → good
+      3. Author match only → fallback
+
+    vpx_basename: e.g. "AC-DC_Premium_1_3_nFozzy_Roth.vpx" (filename without path)
+    script_authors: list of author strings from the VPX script
+
+    Returns the matching tableFile dict, or None if no match.
+    """
+    if not table:
+        return None
+
+    vpx_lower = vpx_basename.lower()
+    vpx_stem = re.sub(r"\.vpx$", "", vpx_lower)
+    script_set = {a.lower().strip() for a in (script_authors or [])}
+
+    best_filename_and_author: Optional[dict] = None
+    best_filename: Optional[dict] = None
+    best_author: Optional[dict] = None
+
+    for tf in (table.get("tableFiles") or []):
+        tf_name = (tf.get("fileName") or "").lower()
+        tf_stem = re.sub(r"\.vpx$", "", tf_name)
+
+        # fileName match: exact or substring (without extension)
+        exact_match = tf_name == vpx_lower
+        tf_contains_vpx = bool(tf_stem and tf_stem in vpx_stem)
+        vpx_contains_tf = bool(vpx_stem and vpx_stem in tf_stem)
+        filename_match = exact_match or tf_contains_vpx or vpx_contains_tf
+
+        # author match: same logic as _authors_match — at least one author overlaps
+        author_match = False
+        if script_set:
+            for a in (tf.get("authors") or []):
+                a_norm = a.lower().strip()
+                for sa in script_set:
+                    if sa == a_norm or sa in a_norm or a_norm in sa:
+                        author_match = True
+                        break
+                if author_match:
+                    break
+
+        if filename_match and author_match:
+            best_filename_and_author = tf
+            break  # can't do better
+        elif filename_match and best_filename is None:
+            best_filename = tf
+        elif author_match and best_author is None:
+            best_author = tf
+
+    return best_filename_and_author or best_filename or best_author
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # VPS Picker Dialog — 2-column table view
 # ─────────────────────────────────────────────────────────────────────────────
@@ -441,10 +502,19 @@ class VpsAchievementInfoDialog(QDialog):
         if vps_id:
             tables = _load_vpsdb(cfg)
             vps_entry = None
+            tf_entry = None
             if tables:
                 for t in tables:
                     if t.get("id") == vps_id:
                         vps_entry = t
+                        break
+                    # Also search inside tableFiles so tableFile.id values resolve correctly
+                    for tf in (t.get("tableFiles") or []):
+                        if tf.get("id") == vps_id:
+                            vps_entry = t
+                            tf_entry = tf
+                            break
+                    if vps_entry:
                         break
 
             if vps_entry:
@@ -453,7 +523,16 @@ class VpsAchievementInfoDialog(QDialog):
                 year = vps_entry.get("year", "")
                 right_lay.addWidget(QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{name}</b>"))
                 right_lay.addWidget(QLabel(f"<span style='color:#999;'>{mfr} · {year}</span>"))
-                right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
+                if tf_entry:
+                    tf_version = tf_entry.get("version", "")
+                    tf_authors = ", ".join(tf_entry.get("authors") or [])
+                    if tf_version:
+                        right_lay.addWidget(QLabel(f"<span style='color:#AAA; font-size:11px;'>Version: {tf_version}</span>"))
+                    if tf_authors:
+                        right_lay.addWidget(QLabel(f"<span style='color:#AAA; font-size:11px;'>Authors: {tf_authors}</span>"))
+                    right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>tableFile.id: {vps_id}</span>"))
+                else:
+                    right_lay.addWidget(QLabel(f"<span style='color:#555; font-size:10px;'>ID: {vps_id}</span>"))
             else:
                 right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {vps_id} (not in local cache)</span>"))
         else:
