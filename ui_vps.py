@@ -258,24 +258,75 @@ class _TableEntryWidget(QWidget):
             lbl_roms.setStyleSheet("color:#7AC; font-size:10px;")
             info_lay.addWidget(lbl_roms)
 
-        # Line 5: File counts + players
-        n_tables = len(table.get("tableFiles") or [])
-        n_b2s = len(table.get("b2sFiles") or [])
-        n_rom_groups = len(table.get("romFiles") or [])
+        # Line 5: Table file count + players (tableFiles only, no B2S/ROM groups)
+        table_files = table.get("tableFiles") or []
+        n_tables = len(table_files)
         players = table.get("players", "")
         count_parts = []
         if n_tables:
-            count_parts.append(f"{n_tables} table{'s' if n_tables != 1 else ''}")
-        if n_b2s:
-            count_parts.append(f"{n_b2s} B2S")
-        if n_rom_groups:
-            count_parts.append(f"{n_rom_groups} ROM group{'s' if n_rom_groups != 1 else ''}")
+            count_parts.append(f"{n_tables} table file{'s' if n_tables != 1 else ''}")
         if players:
             count_parts.append(f"{players}p")
         if count_parts:
             lbl_counts = QLabel("Files: " + ", ".join(count_parts))
             lbl_counts.setStyleSheet("color:#666; font-size:10px;")
             info_lay.addWidget(lbl_counts)
+
+        # Table Authors (from tableFiles[].authors)
+        seen_authors: list[str] = []
+        for tf in table_files:
+            for a in (tf.get("authors") or []):
+                if a and a not in seen_authors:
+                    seen_authors.append(a)
+        if seen_authors:
+            MAX_AUTHORS = 6
+            authors_display = ", ".join(seen_authors[:MAX_AUTHORS])
+            if len(seen_authors) > MAX_AUTHORS:
+                authors_display += f" +{len(seen_authors) - MAX_AUTHORS} more"
+            lbl_authors = QLabel(f"Table Authors: {authors_display}")
+            lbl_authors.setStyleSheet("color:#CCA; font-size:10px;")
+            lbl_authors.setWordWrap(True)
+            info_lay.addWidget(lbl_authors)
+
+        # Table Versions (from tableFiles[].version)
+        seen_versions: list[str] = []
+        for tf in table_files:
+            v = tf.get("version", "")
+            if v and v not in seen_versions:
+                seen_versions.append(v)
+        if seen_versions:
+            MAX_VERSIONS = 6
+            versions_display = ", ".join(seen_versions[:MAX_VERSIONS])
+            if len(seen_versions) > MAX_VERSIONS:
+                versions_display += f" +{len(seen_versions) - MAX_VERSIONS} more"
+            lbl_versions = QLabel(f"Versions: {versions_display}")
+            lbl_versions.setStyleSheet("color:#CCA; font-size:10px;")
+            info_lay.addWidget(lbl_versions)
+
+        # Latest Update (most recent updatedAt across all tableFiles)
+        latest_ts = max(
+            (tf.get("updatedAt") for tf in table_files if isinstance(tf.get("updatedAt"), (int, float))),
+            default=None,
+        )
+        if latest_ts is not None:
+            from datetime import datetime, timezone
+            try:
+                dt = datetime.fromtimestamp(latest_ts / 1000, tz=timezone.utc)
+                date_str = dt.strftime("%Y-%m-%d")
+            except Exception:
+                date_str = str(latest_ts)
+            lbl_updated = QLabel(f"Last Updated: {date_str}")
+            lbl_updated.setStyleSheet("color:#888; font-size:10px;")
+            info_lay.addWidget(lbl_updated)
+
+        # Download Sources (total URL count across all tableFiles[].urls[])
+        total_urls = 0
+        for tf in table_files:
+            total_urls += len(tf.get("urls") or [])
+        if total_urls:
+            lbl_dl = QLabel(f"Downloads: {total_urls} source{'s' if total_urls != 1 else ''} available")
+            lbl_dl.setStyleSheet("color:#888; font-size:10px;")
+            info_lay.addWidget(lbl_dl)
 
         # Line 6: ID + optional IPDB link
         table_id = table.get("id", "")
@@ -377,7 +428,7 @@ class VpsPickerDialog(QDialog):
             rom_match = _table_has_rom(table, self.rom)
             entry_widget = _TableEntryWidget(table, rom_match)
             item = QListWidgetItem()
-            item.setSizeHint(QSize(400, 140))
+            item.setSizeHint(QSize(400, 180))
             item.setData(Qt.ItemDataRole.UserRole, table)
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, entry_widget)
