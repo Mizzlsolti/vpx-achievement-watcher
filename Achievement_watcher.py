@@ -2098,7 +2098,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Table widget
         self.maps_table = QTableWidget(0, 6)
-        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "▼"])
+        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "+"])
         self.maps_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.maps_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -2232,15 +2232,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                                         align=Qt.AlignmentFlag.AlignCenter))
             self.maps_table.setItem(row, 4, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
 
-            # ▼ picker button
-            btn = QPushButton("▼")
-            btn.setFixedSize(30, 28)
-            btn.setStyleSheet(
-                "QPushButton {background:#222; color:#FF7F00; border:1px solid #555; font-weight:bold;} "
-                "QPushButton:hover {background:#3D2600;}"
-            )
-            btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
-            self.maps_table.setCellWidget(row, 5, btn)
+            # + picker button (only for entries with an NVRAM map)
+            if has_map:
+                btn = QPushButton("+")
+                btn.setFixedSize(30, 28)
+                btn.setStyleSheet(
+                    "QPushButton {background:#2a1800; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; font-size:16px;} "
+                    "QPushButton:hover {background:#4a2e00;}"
+                )
+                btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
+                self.maps_table.setCellWidget(row, 5, btn)
 
     def _on_vps_picker_clicked(self, rom: str, title: str):
         """Open the VPS picker dialog for the given ROM."""

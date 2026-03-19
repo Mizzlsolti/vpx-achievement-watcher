@@ -197,8 +197,14 @@ class _TableEntryWidget(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
+        if rom_match:
+            marker = QFrame()
+            marker.setFixedWidth(3)
+            marker.setStyleSheet("background: #00E5FF;")
+            layout.addWidget(marker, alignment=Qt.AlignmentFlag.AlignVCenter)
+
         self.img_label = QLabel("🎰")
-        self.img_label.setFixedSize(80, 80)
+        self.img_label.setFixedSize(100, 100)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.img_label.setStyleSheet("background:#1a1a1a; border:1px solid #444; font-size:28px;")
         layout.addWidget(self.img_label, alignment=Qt.AlignmentFlag.AlignTop)
@@ -338,7 +344,7 @@ class _TableEntryWidget(QWidget):
             id_html_parts.append(f'<a href="{ipdb_url}" style="color:#FF7F00;">IPDB</a>')
         if id_html_parts:
             lbl_id = QLabel("  |  ".join(id_html_parts))
-            lbl_id.setStyleSheet("color:#555; font-size:10px;")
+            lbl_id.setStyleSheet("color:#888; font-size:10px;")
             lbl_id.setOpenExternalLinks(True)
             info_lay.addWidget(lbl_id)
 
@@ -369,7 +375,7 @@ class VpsPickerDialog(QDialog):
         self._entry_widgets: Dict[int, _TableEntryWidget] = {}  # list row -> widget
 
         self.setWindowTitle(f"Select VPS Table — {table_title} [{rom}]")
-        self.setMinimumSize(580, 520)
+        self.setMinimumSize(680, 600)
         self.setStyleSheet("background:#111; color:#DDD;")
 
         layout = QVBoxLayout(self)
@@ -428,7 +434,7 @@ class VpsPickerDialog(QDialog):
             rom_match = _table_has_rom(table, self.rom)
             entry_widget = _TableEntryWidget(table, rom_match)
             item = QListWidgetItem()
-            item.setSizeHint(QSize(400, 180))
+            item.setSizeHint(QSize(400, 110))
             item.setData(Qt.ItemDataRole.UserRole, table)
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, entry_widget)
