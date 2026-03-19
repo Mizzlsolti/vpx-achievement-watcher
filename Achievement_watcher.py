@@ -2097,16 +2097,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addWidget(lbl_legend)
 
         # Table widget
-        self.maps_table = QTableWidget(0, 7)
-        self.maps_table.setHorizontalHeaderLabels(["Table Name", "Author", "ROM", "NVRAM Map", "Local", "VPS-ID", "▼"])
+        self.maps_table = QTableWidget(0, 6)
+        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "▼"])
         self.maps_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.maps_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.maps_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.maps_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
-        self.maps_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
-        self.maps_table.setColumnWidth(6, 36)
+        self.maps_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.maps_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.maps_table.setColumnWidth(5, 36)
         self.maps_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.maps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.maps_table.setStyleSheet(
@@ -2209,34 +2208,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         # Re-load mapping to get fresh VPS-IDs
         mapping = _load_vps_mapping(self.cfg)
 
-        # Build VPS-DB lookup by id for author extraction
-        vpsdb_by_id: dict = {}
-        try:
-            vpsdb = _load_vpsdb(self.cfg)
-            if vpsdb:
-                for tbl in vpsdb:
-                    tid = tbl.get("id")
-                    if tid:
-                        vpsdb_by_id[tid] = tbl
-        except Exception:
-            pass
-
         for row, entry in enumerate(filtered):
             rom = entry["rom"]
             title = entry["title"]
             has_map = entry["has_map"]
             is_local = entry["is_local"]
             vps_id = mapping.get(rom, "")
-
-            # Extract authors from VPS tableFiles
-            author_str = ""
-            if vps_id and vps_id in vpsdb_by_id:
-                seen_authors: list = []
-                for tf in vpsdb_by_id[vps_id].get("tableFiles", []):
-                    for a in tf.get("authors", []):
-                        if a and a not in seen_authors:
-                            seen_authors.append(a)
-                author_str = ", ".join(seen_authors)
 
             def _make_item(text, color=None, align=None):
                 it = QTableWidgetItem(text)
@@ -2247,14 +2224,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 return it
 
             self.maps_table.setItem(row, 0, _make_item(title))
-            self.maps_table.setItem(row, 1, _make_item(author_str, "#AAA"))
-            self.maps_table.setItem(row, 2, _make_item(rom, "#888"))
-            self.maps_table.setItem(row, 3, _make_item("✅" if has_map else "❌",
+            self.maps_table.setItem(row, 1, _make_item(rom, "#888"))
+            self.maps_table.setItem(row, 2, _make_item("✅" if has_map else "❌",
                                                         "#00E5FF" if has_map else "#555",
                                                         Qt.AlignmentFlag.AlignCenter))
-            self.maps_table.setItem(row, 4, _make_item("🟠" if is_local else "",
+            self.maps_table.setItem(row, 3, _make_item("🟠" if is_local else "",
                                                         align=Qt.AlignmentFlag.AlignCenter))
-            self.maps_table.setItem(row, 5, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
+            self.maps_table.setItem(row, 4, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
 
             # ▼ picker button
             btn = QPushButton("▼")
@@ -2264,7 +2240,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 "QPushButton:hover {background:#3D2600;}"
             )
             btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
-            self.maps_table.setCellWidget(row, 6, btn)
+            self.maps_table.setCellWidget(row, 5, btn)
 
     def _on_vps_picker_clicked(self, rom: str, title: str):
         """Open the VPS picker dialog for the given ROM."""
