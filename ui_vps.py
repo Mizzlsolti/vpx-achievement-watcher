@@ -181,7 +181,6 @@ class VpsImageLoader(QThread):
             from watcher_core import p_vps_img, ensure_dir
             filename = img_url.rstrip("/").split("/")[-1]
             if not filename or ".." in filename or "/" in filename or "\\" in filename:
-                print(f"[VpsImageLoader] invalid filename extracted from img_url: {img_url!r}")
                 return
             cache_dir = p_vps_img(self.cfg)
             cache_path = os.path.join(cache_dir, filename)
@@ -191,13 +190,11 @@ class VpsImageLoader(QThread):
                     data = f.read()
             else:
                 full_url = VPS_IMG_BASE_URL + filename
-                print(f"[VpsImageLoader] downloading {full_url}")
                 try:
                     req = urllib.request.Request(full_url, headers={"User-Agent": "vpx-achievement-watcher"})
                     with urllib.request.urlopen(req, timeout=15) as resp:
                         data = resp.read()
-                except Exception as dl_err:
-                    print(f"[VpsImageLoader] download error for {img_url}: {dl_err}")
+                except Exception:
                     return
                 ensure_dir(cache_dir)
                 with open(cache_path, "wb") as f:
@@ -220,18 +217,12 @@ class VpsImageLoader(QThread):
                 png_bytes = buf.read()
                 pixmap2 = QPixmap()
                 if pixmap2.loadFromData(png_bytes) and not pixmap2.isNull():
-                    print(f"[VpsImageLoader] loaded {img_url} via Pillow+PNG fallback")
                     self.image_ready.emit(img_url, pixmap2)
-                    return
-                else:
-                    print(f"[VpsImageLoader] Pillow converted but QPixmap still null for {img_url}")
-            except ImportError:
-                print(f"[VpsImageLoader] Pillow not installed – cannot decode {img_url} (install Pillow: pip install Pillow)")
-            except Exception as pil_err:
-                print(f"[VpsImageLoader] Pillow decode error for {img_url}: {pil_err}")
+            except Exception:
+                pass
 
-        except Exception as e:
-            print(f"[VpsImageLoader] unexpected error for {img_url}: {e}")
+        except Exception:
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -276,6 +267,7 @@ class _VpsTableCard(QWidget):
         self.setMinimumHeight(_CARD_HEIGHT)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.setObjectName("VpsCard")
         self._apply_style(False)
 
         outer = QVBoxLayout(self)
@@ -302,9 +294,11 @@ class _VpsTableCard(QWidget):
         content_lay.setContentsMargins(10, 8, 10, 8)
         content_lay.setSpacing(4)
 
-        # Table name (bold, white, 14 px)
+        # Table name (bold, white, 14 px) — strip manufacturer/version info in parentheses/brackets
         raw_name = table.get("name", "Unknown")
-        lbl_name = QLabel(raw_name)
+        name = re.sub(r'\s*\(.*?\)', '', raw_name)
+        name = re.sub(r'\s*\[.*?\]', '', name).strip()
+        lbl_name = QLabel(name)
         lbl_name.setWordWrap(True)
         lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
         content_lay.addWidget(lbl_name)
@@ -406,9 +400,11 @@ class _VpsTableCard(QWidget):
             border_color = "#444444"
             border_width = 1
         self.setStyleSheet(
-            f"background: #2a2a2a;"
-            f"border: {border_width}px solid {border_color};"
-            f"border-radius: 8px;"
+            f"QWidget#VpsCard {{"
+            f" background: #2a2a2a;"
+            f" border: {border_width}px solid {border_color};"
+            f" border-radius: 8px;"
+            f"}}"
         )
 
     def set_selected(self, selected: bool):
@@ -418,14 +414,9 @@ class _VpsTableCard(QWidget):
     def set_image(self, pixmap: QPixmap):
         scaled = pixmap.scaled(
             _CARD_WIDTH, _IMG_HEIGHT,
-            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
-        # Centre-crop to exact card width × image height
-        if scaled.width() > _CARD_WIDTH or scaled.height() > _IMG_HEIGHT:
-            x_off = max(0, (scaled.width()  - _CARD_WIDTH) // 2)
-            y_off = max(0, (scaled.height() - _IMG_HEIGHT) // 2)
-            scaled = scaled.copy(x_off, y_off, _CARD_WIDTH, _IMG_HEIGHT)
         self.img_label.setPixmap(scaled)
         self.img_label.setText("")
 

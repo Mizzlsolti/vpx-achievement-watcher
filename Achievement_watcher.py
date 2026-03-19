@@ -2256,7 +2256,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         mapping = _load_vps_mapping(self.cfg)
         if result == QDialog.DialogCode.Accepted and dlg.selected_table:
-            mapping[rom] = dlg.selected_table.get("id", "")
+            tf = dlg.selected_table_file or {}
+            mapping[rom] = tf.get("id", "") or dlg.selected_table.get("id", "")
             _save_vps_mapping(self.cfg, mapping)
         elif result == 2:  # "Remove assignment"
             mapping.pop(rom, None)
