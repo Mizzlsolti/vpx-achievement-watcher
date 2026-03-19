@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
 VPS_IMG_BASE_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/img/"
 VPSDB_TTL = 24 * 3600  # 24 hours in seconds
-MAX_PICKER_RESULTS = 80  # Maximum entries shown in VpsPickerDialog
+MAX_PICKER_RESULTS = 30  # Maximum entries shown in VpsPickerDialog
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VPS-DB helpers
@@ -206,7 +206,6 @@ class VpsImageLoader(QThread):
             # --- Try Qt native decode first ---
             pixmap = QPixmap()
             if pixmap.loadFromData(data) and not pixmap.isNull():
-                print(f"[VpsImageLoader] loaded {img_url} via Qt native")
                 self.image_ready.emit(img_url, pixmap)
                 return
 
@@ -250,9 +249,9 @@ _TAG_COLORS: Dict[str, str] = {
     "VPU PATCH": "#00AA44",
 }
 
-_CARD_WIDTH  = 320
-_CARD_HEIGHT = 370
-_IMG_HEIGHT  = 200
+_CARD_WIDTH  = 270
+_CARD_HEIGHT = 320
+_IMG_HEIGHT  = 160
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -269,7 +268,7 @@ class _VpsTableCard(QWidget):
         super().__init__(parent)
         self.table      = table
         self.table_file = table_file
-        self.img_url    = table.get("imgUrl", "")
+        self.img_url    = table_file.get("imgUrl", "") or table.get("imgUrl", "")
         self._selected  = False
         self._rom_match = rom_match
 
@@ -307,7 +306,7 @@ class _VpsTableCard(QWidget):
         raw_name = table.get("name", "Unknown")
         lbl_name = QLabel(raw_name)
         lbl_name.setWordWrap(True)
-        lbl_name.setStyleSheet("color:#FFFFFF; font-size:14px; font-weight:bold;")
+        lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
         content_lay.addWidget(lbl_name)
 
         # Authors + type badge row
@@ -318,7 +317,7 @@ class _VpsTableCard(QWidget):
         if len(authors) > 4:
             authors_text += "…"
         lbl_authors = QLabel(authors_text or "—")
-        lbl_authors.setStyleSheet("color:#AAAAAA; font-size:11px;")
+        lbl_authors.setStyleSheet("color:#AAAAAA; font-size:10px;")
         lbl_authors.setWordWrap(True)
         authors_row.addWidget(lbl_authors, stretch=1)
 
@@ -589,6 +588,7 @@ class VpsPickerDialog(QDialog):
             if len(card_entries) >= MAX_PICKER_RESULTS:
                 break
 
+        _loading_urls: set = set()
         for i, (table, table_file, rom_match) in enumerate(card_entries):
             card = _VpsTableCard(table, table_file, rom_match)
             card.clicked.connect(lambda t=table, tf=table_file, c=card: self._on_card_clicked(t, tf, c))
@@ -598,11 +598,12 @@ class VpsPickerDialog(QDialog):
             self._cards.append(card)
 
             # Lazy image load
-            img_url = table.get("imgUrl", "")
+            img_url = table_file.get("imgUrl", "") or table.get("imgUrl", "")
             if img_url:
                 if img_url in self._image_cache:
                     card.set_image(self._image_cache[img_url])
-                else:
+                elif img_url not in _loading_urls:
+                    _loading_urls.add(img_url)
                     loader = VpsImageLoader(self.cfg, img_url, self)
                     loader.image_ready.connect(self._on_image_ready)
                     self._loaders.append(loader)
@@ -657,6 +658,7 @@ class VpsPickerDialog(QDialog):
             try:
                 loader.image_ready.disconnect()
                 loader.quit()
+                loader.wait(200)
             except Exception:
                 pass
         self._loaders.clear()
