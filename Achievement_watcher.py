@@ -55,6 +55,7 @@ from ui_cloud_stats import CloudStatsMixin
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog,
     _load_vpsdb, _load_vps_mapping, _save_vps_mapping, _vps_find, _table_has_rom,
+    _normalize_term,
 )
 
 from ui_overlay import (
@@ -77,6 +78,74 @@ from ui_overlay import (
     HeatBarPositionPicker,
     ChallengeStartCountdown,
 )
+
+class _AvailableMapsWorker(QThread):
+    """Background worker that scans TABLES_DIR and builds the available-maps list."""
+    progress = pyqtSignal(int, int, str)   # (current_index, total, filename)
+    finished = pyqtSignal(list)            # sorted list of entry dicts
+
+    def __init__(self, cfg, watcher, parent=None):
+        super().__init__(parent)
+        self.cfg = cfg
+        self.watcher = watcher
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        romnames = self.watcher.ROMNAMES or {}
+
+        # Build base list from cloud index
+        index_roms = set(k for k in (self.watcher.INDEX or {}).keys() if not k.startswith("_"))
+        entries: dict = {}
+        for rom in index_roms:
+            title = romnames.get(rom, "Unknown Table")
+            entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+
+        # Collect all .vpx files first so we can report total count
+        tables_dir = getattr(self.cfg, "TABLES_DIR", None)
+        vpx_files = []
+        if tables_dir and os.path.isdir(tables_dir):
+            for root, _dirs, files in os.walk(tables_dir):
+                for fname in files:
+                    if fname.lower().endswith(".vpx"):
+                        vpx_files.append((root, fname))
+
+        total = len(vpx_files)
+        for i, (root, fname) in enumerate(vpx_files):
+            if self._cancel:
+                break
+            self.progress.emit(i, total, fname)
+            vpx_path = os.path.join(root, fname)
+            try:
+                rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True)
+            except Exception:
+                rom = None
+            if not rom:
+                continue
+            if rom not in entries:
+                title = romnames.get(rom, fname.rsplit(".", 1)[0])
+                entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+            entries[rom]["is_local"] = True
+
+        # Check NVRAM-Map availability
+        for rom, entry in entries.items():
+            if self._cancel:
+                break
+            try:
+                entry["has_map"] = self.watcher._has_any_map(rom)
+            except Exception:
+                entry["has_map"] = False
+
+        # Load current VPS mappings
+        mapping = _load_vps_mapping(self.cfg)
+        for rom, entry in entries.items():
+            entry["vps_id"] = mapping.get(rom, "")
+
+        result = sorted(entries.values(), key=lambda e: e["title"].lower())
+        self.finished.emit(result)
+
 
 class Bridge(QObject):
     overlay_trigger = pyqtSignal()
@@ -2016,6 +2085,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         lay.addLayout(row)
 
+        # Legend bar
+        lbl_legend = QLabel(
+            "Legend:  ✅ = NVRAM Map available  |  ❌ = No NVRAM Map  |  "
+            "🟠 = Local .vpx found  |  ⬜ = Online only  |  "
+            "🟢 Row = VPS-ID assigned  |  🟠 Row = Found locally"
+        )
+        lbl_legend.setStyleSheet("color:#777; font-size:10px; padding:2px 4px;")
+        lay.addWidget(lbl_legend)
+
         # Table widget
         self.maps_table = QTableWidget(0, 6)
         self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "▼"])
@@ -2041,57 +2119,43 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._all_maps_cache = []
 
     def _refresh_available_maps(self):
+        # Cancel any previously running worker
+        if hasattr(self, "_maps_worker") and self._maps_worker and self._maps_worker.isRunning():
+            self._maps_worker.cancel()
+            self._maps_worker.wait()
+
         self.maps_table.setRowCount(0)
         self.maps_table.setRowCount(1)
         info_item = QTableWidgetItem("⏳ Loading… Please wait.")
         info_item.setForeground(QColor("#00E5FF"))
         self.maps_table.setItem(0, 0, info_item)
+
+        self._maps_progress_dlg = QProgressDialog("Scanning tables…", "Cancel", 0, 0, self)
+        self._maps_progress_dlg.setWindowTitle("🔄 Load List")
+        self._maps_progress_dlg.setMinimumDuration(0)
+        self._maps_progress_dlg.setModal(True)
+        self._maps_progress_dlg.show()
         QApplication.processEvents()
 
-        romnames = self.watcher.ROMNAMES or {}
+        self._maps_worker = _AvailableMapsWorker(self.cfg, self.watcher, self)
+        self._maps_progress_dlg.canceled.connect(self._maps_worker.cancel)
 
-        # Build base list from cloud index
-        index_roms = set(k for k in (self.watcher.INDEX or {}).keys() if not k.startswith("_"))
-        entries: dict = {}
-        for rom in index_roms:
-            title = romnames.get(rom, "Unknown Table")
-            entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
+        def _on_progress(current, total, fname):
+            if total:
+                self._maps_progress_dlg.setMaximum(total)
+                self._maps_progress_dlg.setValue(current)
+                self._maps_progress_dlg.setLabelText(
+                    f"Scanning: {fname}\n({current}/{total} files)"
+                )
 
-        # Scan TABLES_DIR for local .vpx files
-        tables_dir = getattr(self.cfg, "TABLES_DIR", None)
-        local_roms: dict = {}  # rom -> vpx filename
-        if tables_dir and os.path.isdir(tables_dir):
-            for root, _dirs, files in os.walk(tables_dir):
-                for fname in files:
-                    if not fname.lower().endswith(".vpx"):
-                        continue
-                    vpx_path = os.path.join(root, fname)
-                    try:
-                        rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True)
-                    except Exception:
-                        rom = None
-                    if not rom:
-                        continue
-                    local_roms[rom] = fname
-                    if rom not in entries:
-                        title = romnames.get(rom, fname.rsplit(".", 1)[0])
-                        entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": ""}
-                    entries[rom]["is_local"] = True
+        def _on_finished(entries):
+            self._maps_progress_dlg.close()
+            self._all_maps_cache = entries
+            self._filter_available_maps()
 
-        # Check NVRAM-Map availability
-        for rom, entry in entries.items():
-            try:
-                entry["has_map"] = self.watcher._has_any_map(rom)
-            except Exception:
-                entry["has_map"] = False
-
-        # Load current VPS mappings
-        mapping = _load_vps_mapping(self.cfg)
-        for rom, entry in entries.items():
-            entry["vps_id"] = mapping.get(rom, "")
-
-        self._all_maps_cache = sorted(entries.values(), key=lambda e: e["title"].lower())
-        self._filter_available_maps()
+        self._maps_worker.progress.connect(_on_progress)
+        self._maps_worker.finished.connect(_on_finished)
+        self._maps_worker.start()
 
     def _filter_available_maps(self):
         query = self.txt_map_search.text().lower()
@@ -2131,11 +2195,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             # Determine row background
             if vps_id:
-                bg = QColor("#003D00")
+                bg = QColor(0, 180, 0, 40)
             elif is_local:
-                bg = QColor("#3D2600")
+                bg = QColor(255, 127, 0, 40)
             else:
-                bg = QColor("#111111")
+                bg = QColor(17, 17, 17)
 
             def _make_item(text, color=None, align=None):
                 it = QTableWidgetItem(text)
@@ -2210,7 +2274,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         progress = QProgressDialog("Running Auto-Match…", "Cancel", 0, len(local_entries), self)
         progress.setWindowTitle("⚡ Auto-Match All")
         progress.setMinimumDuration(0)
-        matched = 0
+        matched_rom = 0
+        matched_name = 0
 
         for i, entry in enumerate(local_entries):
             if progress.wasCanceled():
@@ -2224,11 +2289,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if results:
                 top = results[0]
                 is_rom_match = _table_has_rom(top, rom)
-                # Accept only ROM-match or exact name match for confidence
+                is_exact_name = (
+                    _normalize_term(title) == _normalize_term(top.get("name", ""))
+                )
+                # Accept ROM-match or exact normalized name match for confidence
                 if is_rom_match:
                     mapping[rom] = top.get("id", "")
-                    matched += 1
+                    matched_rom += 1
+                elif is_exact_name:
+                    mapping[rom] = top.get("id", "")
+                    matched_name += 1
 
+        matched = matched_rom + matched_name
         progress.setValue(len(local_entries))
         _save_vps_mapping(self.cfg, mapping)
 
@@ -2237,8 +2309,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             entry["vps_id"] = mapping.get(entry["rom"], "")
 
         self._filter_available_maps()
+        details = []
+        if matched_rom:
+            details.append(f"{matched_rom} via ROM identifier")
+        if matched_name:
+            details.append(f"{matched_name} via exact name match")
+        match_detail = f" ({', '.join(details)})" if details else ""
         QMessageBox.information(self, "Auto-Match Complete",
-                                f"Auto-match finished.\n{matched} table(s) matched via ROM identifier.")
+                                f"Auto-match finished.\n{matched} table(s) matched{match_detail}.")
 
     # ==========================================
     # TAB: SYSTEM

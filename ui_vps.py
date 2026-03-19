@@ -125,6 +125,13 @@ def _vps_find(tables: List[dict], search_term: str, rom: Optional[str] = None) -
         term = term[:term.rfind(" ")].strip()
         results = _find_internal(tables, term)
 
+    # 3. If still no results, try using the ROM identifier prefix as a name search
+    #    (e.g., "acd_170h" → "acd") to handle tables missing ROM file listings
+    if not results and rom:
+        prefix = re.split(r"[_\d]+", rom.lower())[0].strip()
+        if len(prefix) >= 3:
+            results = _find_internal(tables, prefix)
+
     # Sort ROM-matching entries first
     if rom and results:
         rom_lower = rom.lower()
@@ -194,12 +201,14 @@ class _TableEntryWidget(QWidget):
         self.img_label.setFixedSize(80, 80)
         self.img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.img_label.setStyleSheet("background:#1a1a1a; border:1px solid #444; font-size:28px;")
-        layout.addWidget(self.img_label)
+        layout.addWidget(self.img_label, alignment=Qt.AlignmentFlag.AlignTop)
 
         info = QWidget()
         info_lay = QVBoxLayout(info)
         info_lay.setContentsMargins(8, 0, 0, 0)
+        info_lay.setSpacing(2)
 
+        # Line 1: Name + ROM-Match badge
         name_row = QHBoxLayout()
         lbl_name = QLabel(f"<b>{table.get('name', 'Unknown')}</b>")
         lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px;")
@@ -212,15 +221,76 @@ class _TableEntryWidget(QWidget):
         name_row.addStretch()
         info_lay.addLayout(name_row)
 
+        # Line 2: Manufacturer · Year · Type
         mfr = table.get("manufacturer", "")
-        year = table.get("year", "")
-        lbl_sub = QLabel(f"{mfr} · {year}" if mfr else str(year))
+        year = str(table.get("year", "")) if table.get("year") else ""
+        ttype = table.get("type", "")
+        sub_parts = [p for p in [mfr, year, ttype] if p]
+        lbl_sub = QLabel(" · ".join(sub_parts))
         lbl_sub.setStyleSheet("color:#999; font-size:11px;")
         info_lay.addWidget(lbl_sub)
 
-        lbl_id = QLabel(f"ID: {table.get('id', '')}")
-        lbl_id.setStyleSheet("color:#555; font-size:10px;")
-        info_lay.addWidget(lbl_id)
+        # Line 3: Theme | Designers
+        theme = ", ".join(table.get("theme") or [])
+        designers = ", ".join(table.get("designers") or [])
+        line3_parts = []
+        if theme:
+            line3_parts.append(f"Theme: {theme}")
+        if designers:
+            line3_parts.append(f"Designers: {designers}")
+        if line3_parts:
+            lbl_line3 = QLabel("  |  ".join(line3_parts))
+            lbl_line3.setStyleSheet("color:#888; font-size:10px;")
+            lbl_line3.setWordWrap(True)
+            info_lay.addWidget(lbl_line3)
+
+        # Line 4: ROM names (flattened from romFiles entries)
+        all_roms: list = []
+        for rg in (table.get("romFiles") or []):
+            for rf in (rg.get("romFiles") or []):
+                if isinstance(rf, str) and rf not in all_roms:
+                    all_roms.append(rf)
+        if all_roms:
+            roms_text = ", ".join(all_roms[:8])
+            if len(all_roms) > 8:
+                roms_text += f", … (+{len(all_roms) - 8})"
+            lbl_roms = QLabel(f"ROMs: {roms_text}")
+            lbl_roms.setStyleSheet("color:#7AC; font-size:10px;")
+            info_lay.addWidget(lbl_roms)
+
+        # Line 5: File counts + players
+        n_tables = len(table.get("tableFiles") or [])
+        n_b2s = len(table.get("b2sFiles") or [])
+        n_rom_groups = len(table.get("romFiles") or [])
+        players = table.get("players", "")
+        count_parts = []
+        if n_tables:
+            count_parts.append(f"{n_tables} table{'s' if n_tables != 1 else ''}")
+        if n_b2s:
+            count_parts.append(f"{n_b2s} B2S")
+        if n_rom_groups:
+            count_parts.append(f"{n_rom_groups} ROM group{'s' if n_rom_groups != 1 else ''}")
+        if players:
+            count_parts.append(f"{players}p")
+        if count_parts:
+            lbl_counts = QLabel("Files: " + ", ".join(count_parts))
+            lbl_counts.setStyleSheet("color:#666; font-size:10px;")
+            info_lay.addWidget(lbl_counts)
+
+        # Line 6: ID + optional IPDB link
+        table_id = table.get("id", "")
+        ipdb_url = table.get("IPDBUrl", "")
+        id_html_parts = []
+        if table_id:
+            id_html_parts.append(f"ID: {table_id}")
+        if ipdb_url:
+            id_html_parts.append(f'<a href="{ipdb_url}" style="color:#FF7F00;">IPDB</a>')
+        if id_html_parts:
+            lbl_id = QLabel("  |  ".join(id_html_parts))
+            lbl_id.setStyleSheet("color:#555; font-size:10px;")
+            lbl_id.setOpenExternalLinks(True)
+            info_lay.addWidget(lbl_id)
+
         info_lay.addStretch()
         layout.addWidget(info, stretch=1)
 
@@ -307,7 +377,7 @@ class VpsPickerDialog(QDialog):
             rom_match = _table_has_rom(table, self.rom)
             entry_widget = _TableEntryWidget(table, rom_match)
             item = QListWidgetItem()
-            item.setSizeHint(QSize(400, 92))
+            item.setSizeHint(QSize(400, 140))
             item.setData(Qt.ItemDataRole.UserRole, table)
             self.list_widget.addItem(item)
             self.list_widget.setItemWidget(item, entry_widget)
