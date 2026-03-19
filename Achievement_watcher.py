@@ -56,7 +56,7 @@ from ui_cloud_stats import CloudStatsMixin
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog,
     _load_vpsdb, _load_vps_mapping, _save_vps_mapping, _vps_find, _table_has_rom,
-    _normalize_term,
+    _normalize_term, _find_table_file_by_filename_and_authors,
 )
 
 from ui_overlay import (
@@ -2314,6 +2314,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         matched_author_name = 0
         matched_name = 0
         skipped_existing = 0
+        matched_tablefile_id = 0
+
+        def _resolve_id(table: dict, tf: Optional[dict]) -> str:
+            if tf:
+                tf_id = tf.get("id", "")
+                if tf_id:
+                    return tf_id
+            return table.get("id", "")
 
         for i, entry in enumerate(local_entries):
             if progress.wasCanceled():
@@ -2349,15 +2357,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             )
             is_author_match = _authors_match(script_authors, top)
 
+            # Try to find the exact tableFile via .vpx filename + script authors
+            vpx_basename = os.path.basename(vpx_path) if vpx_path else ""
+            best_table_file = None
+            if vpx_basename:
+                best_table_file = _find_table_file_by_filename_and_authors(top, vpx_basename, script_authors)
+
             if is_rom_match:
-                mapping[rom] = top.get("id", "")
                 matched_rom += 1
             elif is_author_match and is_exact_name:
-                mapping[rom] = top.get("id", "")
                 matched_author_name += 1
             elif is_exact_name:
-                mapping[rom] = top.get("id", "")
                 matched_name += 1
+            else:
+                continue
+
+            resolved_id = _resolve_id(top, best_table_file)
+            mapping[rom] = resolved_id
+            if best_table_file:
+                matched_tablefile_id += 1
+                log(self.cfg, f"[VPS-MATCH] {rom} → tableFile.id={resolved_id} (via filename+author)")
+            else:
+                log(self.cfg, f"[VPS-MATCH] {rom} → table.id={resolved_id} (no tableFile match)")
 
         matched = matched_rom + matched_author_name + matched_name
         progress.setValue(len(local_entries))
@@ -2379,8 +2400,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if skipped_existing:
             details.append(f"{skipped_existing} already mapped (skipped)")
         match_detail = f" ({', '.join(details)})" if details else ""
+        tablefile_line = f"\n  → of which {matched_tablefile_id} matched to exact tableFile version" if matched_tablefile_id else ""
         QMessageBox.information(self, "Auto-Match Complete",
-                                f"Auto-match finished.\n{matched} table(s) matched{match_detail}.")
+                                f"Auto-match finished.\n{matched} table(s) matched{match_detail}.{tablefile_line}")
 
     # ==========================================
     # TAB: SYSTEM
