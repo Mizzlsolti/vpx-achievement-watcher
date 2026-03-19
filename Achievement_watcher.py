@@ -1979,6 +1979,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         dlg = VpsAchievementInfoDialog(self.cfg, rom, title, rule, unlock_entry, parent=self)
         dlg.exec()
+
+    def _build_tab_available_maps(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
