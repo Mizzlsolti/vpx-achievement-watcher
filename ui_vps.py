@@ -430,7 +430,7 @@ class VpsPickerDialog(QDialog):
             col1_text = "  ·  ".join(col1_parts)
 
             item1 = QTableWidgetItem(col1_text)
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            item1.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             self.table_widget.setItem(row, 1, item1)
 
             self._row_data.append((table, table_file))
