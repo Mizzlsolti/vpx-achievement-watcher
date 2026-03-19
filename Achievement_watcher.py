@@ -2124,15 +2124,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addWidget(lbl_legend)
 
         # Table widget
-        self.maps_table = QTableWidget(0, 6)
-        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "+"])
+        self.maps_table = QTableWidget(0, 7)
+        self.maps_table.setHorizontalHeaderLabels(["Table Name", "ROM", "NVRAM Map", "Local", "VPS-ID", "Author", "+"])
         self.maps_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.maps_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.maps_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        self.maps_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self.maps_table.setColumnWidth(5, 36)
+        self.maps_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.maps_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        self.maps_table.setColumnWidth(6, 36)
         self.maps_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.maps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.maps_table.setStyleSheet(
@@ -2234,6 +2235,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Re-load mapping to get fresh VPS-IDs
         mapping = _load_vps_mapping(self.cfg)
+        # Pre-load VPS DB once for author lookups
+        _vpsdb_tables = _load_vpsdb(self.cfg) or []
 
         for row, entry in enumerate(filtered):
             rom = entry["rom"]
@@ -2259,6 +2262,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                                         align=Qt.AlignmentFlag.AlignCenter))
             self.maps_table.setItem(row, 4, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
 
+            # Author column: look up authors from VPS DB when a VPS-ID is assigned
+            author_text = ""
+            if vps_id:
+                try:
+                    for t in _vpsdb_tables:
+                        if t.get("id") == vps_id:
+                            # Table-level match: no specific tableFile, no authors
+                            break
+                        for tf in (t.get("tableFiles") or []):
+                            if tf.get("id") == vps_id:
+                                author_text = ", ".join(tf.get("authors") or [])
+                                break
+                        else:
+                            continue
+                        break
+                except Exception:
+                    author_text = ""
+            self.maps_table.setItem(row, 5, _make_item(author_text, "#AAA" if author_text else "#444"))
+
             # + picker button (only for entries with an NVRAM map)
             if has_map:
                 btn = QPushButton("+")
@@ -2268,7 +2290,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "QPushButton:hover {background:#4a2e00;}"
                 )
                 btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
-                self.maps_table.setCellWidget(row, 5, btn)
+                self.maps_table.setCellWidget(row, 6, btn)
 
     def _on_vps_picker_clicked(self, rom: str, title: str):
         """Open the VPS picker dialog for the given ROM."""
@@ -2412,7 +2434,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         match_detail = f" ({', '.join(details)})" if details else ""
         tablefile_line = f"\n  → of which {matched_tablefile_id} matched to exact tableFile version" if matched_tablefile_id else ""
         QMessageBox.information(self, "Auto-Match Complete",
-                                f"Auto-match finished.\n{matched} table(s) matched{match_detail}.{tablefile_line}")
+                                f"Auto-match finished.\n{matched} table(s) matched{match_detail}.{tablefile_line}\n\n⚠️ Please review the assignments manually to ensure correctness.")
 
     # ==========================================
     # TAB: SYSTEM
