@@ -47,6 +47,7 @@ from watcher_core import (
     compute_player_level, LEVEL_TABLE,
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
+    run_vpxtool_info_show,
 )
 
 from ui_dialogs import SetupWizardDialog
@@ -130,6 +131,18 @@ class _AvailableMapsWorker(QThread):
                 entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": "", "vpx_path": ""}
             entries[rom]["is_local"] = True
             entries[rom]["vpx_path"] = vpx_path   # store path for later author extraction
+
+            # Store vpx_info metadata for richer table display
+            try:
+                vpx_info = run_vpxtool_info_show(self.cfg, vpx_path)
+                if vpx_info:
+                    entries[rom]["vpx_info"] = vpx_info
+                    # Use table_name from info if the current title is just the filename
+                    info_name = (vpx_info.get("table_name") or "").strip()
+                    if info_name and entries[rom]["title"] == fname.rsplit(".", 1)[0]:
+                        entries[rom]["title"] = info_name
+            except Exception:
+                pass
 
         # Check NVRAM-Map availability (with family fallback, same as during gameplay)
         for rom, entry in entries.items():
@@ -2345,6 +2358,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         matched_rom = 0
         matched_author_name = 0
         matched_name = 0
+        matched_info_name = 0
         skipped_existing = 0
         matched_tablefile_id = 0
 
@@ -2378,7 +2392,37 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 except Exception:
                     script_authors = []
 
-            results = _vps_find(tables, title, rom)
+            # Get table metadata via vpxtool info show
+            vpx_info = {}
+            if vpx_path and os.path.isfile(vpx_path):
+                try:
+                    vpx_info = run_vpxtool_info_show(self.cfg, vpx_path)
+                except Exception:
+                    vpx_info = {}
+
+            # Merge authors from info show as fallback
+            info_author = (vpx_info.get("author") or "").strip()
+            if info_author and not script_authors:
+                info_author_tokens = [
+                    t for t in re.split(r"\s+", info_author)
+                    if t and "@" not in t and not re.match(r"https?://", t) and not re.search(r"\.\w{2,}$", t)
+                ]
+                if not info_author_tokens and info_author:
+                    parts = info_author.split()
+                    info_author_tokens = [parts[0]] if parts else []
+                script_authors = info_author_tokens
+
+            # Use table_name from vpxtool info show as primary search term if available
+            info_table_name = (vpx_info.get("table_name") or "").strip()
+            search_title = info_table_name if info_table_name else title
+
+            if info_table_name and info_table_name != title:
+                log(self.cfg, f"[VPS-MATCH] {rom}: using vpx_info table_name='{info_table_name}' instead of romnames title='{title}'")
+
+            results = _vps_find(tables, search_title, rom)
+            # Fallback: if info table_name gave no results but differs from title, try original title
+            if not results and info_table_name and info_table_name != title:
+                results = _vps_find(tables, title, rom)
             if not results:
                 continue
 
@@ -2388,6 +2432,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 _normalize_term(title) == _normalize_term(top.get("name", ""))
             )
             is_author_match = _authors_match(script_authors, top)
+            is_info_name_match = bool(
+                info_table_name
+                and _normalize_term(info_table_name) == _normalize_term(top.get("name", ""))
+            )
 
             # Try to find the exact tableFile via .vpx filename + script authors
             vpx_basename = os.path.basename(vpx_path) if vpx_path else ""
@@ -2397,10 +2445,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             if is_rom_match:
                 matched_rom += 1
-            elif is_author_match and is_exact_name:
+            elif is_author_match and (is_exact_name or is_info_name_match):
                 matched_author_name += 1
             elif is_exact_name:
                 matched_name += 1
+            elif is_info_name_match:
+                matched_info_name += 1
             else:
                 continue
 
@@ -2412,7 +2462,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             else:
                 log(self.cfg, f"[VPS-MATCH] {rom} → table.id={resolved_id} (no tableFile match)")
 
-        matched = matched_rom + matched_author_name + matched_name
+        matched = matched_rom + matched_author_name + matched_name + matched_info_name
         progress.setValue(len(local_entries))
         _save_vps_mapping(self.cfg, mapping)
 
@@ -2429,6 +2479,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             details.append(f"{matched_author_name} via author + name")
         if matched_name:
             details.append(f"{matched_name} via exact name")
+        if matched_info_name:
+            details.append(f"{matched_info_name} via vpx info name")
         if skipped_existing:
             details.append(f"{skipped_existing} already mapped (skipped)")
         match_detail = f" ({', '.join(details)})" if details else ""

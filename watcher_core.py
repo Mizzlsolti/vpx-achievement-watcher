@@ -615,6 +615,46 @@ def run_vpxtool_get_script_authors(cfg: "AppConfig", vpx_path: str) -> list:
         return []
 
 
+def run_vpxtool_info_show(cfg: "AppConfig", vpx_path: str) -> dict:
+    """
+    Runs: vpxtool info show "<vpx_path>"
+    Parses the human-readable key: value output into a dict.
+    Returns a dict with keys like 'table_name', 'version', 'author', 'release_date',
+    'description', 'blurb', 'rules', 'save_revision', 'save_date', 'vpx_version'.
+    Returns {} on any failure (silent).
+    """
+    if not vpx_path or not os.path.isfile(vpx_path):
+        return {}
+
+    exe = ensure_vpxtool(cfg)
+    if not exe:
+        return {}
+
+    cmd = [exe, "info", "show", vpx_path]
+    try:
+        cp = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            creationflags=0x08000000,
+            encoding="utf-8",
+            errors="replace",
+        )
+        output = cp.stdout or ""
+        result = {}
+        for line in output.splitlines():
+            m = re.match(r"^\s*(.+?):\s+(.*)$", line)
+            if m:
+                raw_key = m.group(1).strip()
+                value = m.group(2).strip()
+                key = re.sub(r"\s+", "_", raw_key).lower()
+                result[key] = value
+        return result
+    except Exception:
+        return {}
+
+
 def _parse_authors_from_script(script: str) -> list:
     """
     Parse author names from a VBS script.
