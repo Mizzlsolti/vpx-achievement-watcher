@@ -237,8 +237,8 @@ _IMG_CALLBACK_QUEUE: queue.SimpleQueue = queue.SimpleQueue()
 # Card / hero dimensions
 _CARD_IMG_W = 140
 _CARD_IMG_H = 105
-_HERO_IMG_W = 340
-_HERO_IMG_H = 255
+_HERO_IMG_W = 420
+_HERO_IMG_H = 315
 
 # Font stack: Segoe UI on Windows, system sans-serif elsewhere
 _FONT_UI = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
@@ -533,7 +533,7 @@ class VpsHeroPanel(QFrame):
         self.img_dir = img_dir
         self._current_url: Optional[str] = None
 
-        self.setFixedHeight(_HERO_IMG_H + 20)
+        self.setMinimumHeight(_HERO_IMG_H + 20)
         self.setStyleSheet(
             "VpsHeroPanel{background:#151515; border:1px solid #2a2a2a; border-radius:6px;}"
         )
@@ -702,8 +702,8 @@ class VpsPickerDialog(QDialog):
         self._img_dir = p_vps_img(cfg)
 
         self.setWindowTitle(f"Select VPS Table — {table_title} [{rom}]")
-        self.setMinimumSize(980, 680)
-        self.resize(1100, 760)
+        self.setMinimumSize(980, 820)
+        self.resize(1100, 940)
         self.setStyleSheet("background:#141414; color:#DDD;")
 
         root = QVBoxLayout(self)
