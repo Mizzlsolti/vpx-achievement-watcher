@@ -1,7 +1,48 @@
 # Cloud Anti-Cheat Rules
 
-This document describes the server-side validation approach used for cloud
-uploads (scores, achievement progress) in the VPX Achievement Watcher.
+This document describes both the **watcher-side responsibilities** and the
+**server-side validation approach** used for cloud uploads (scores, achievement
+progress) in the VPX Achievement Watcher.
+
+---
+
+## Watcher-Side Responsibilities
+
+The watcher (this repository) is responsible for collecting and forwarding
+reliable metadata to the server.  It is **not** responsible for being the
+final arbiter of fair play — that role belongs to the server.
+
+### What the watcher must do
+
+1. **Include all required metadata fields** in every upload payload (see
+   [Required Fields](#required-fields) below).
+2. **Block uploads** when the player name is missing or set to the default
+   `"Player"`.
+3. **Block uploads** when no VPS-ID has been assigned to the ROM.  The ROM
+   must be linked to a known VPS table entry before any cloud submission is
+   allowed.
+4. **Normalise the ROM name** using the VPinMAME ROM identifier so the server
+   can cross-check it against the VPS entry.
+5. **Include the `watcher_version` field** so the server can enforce minimum
+   version requirements and reject stale clients.
+6. **Enrich payloads with VPS context** where available: `vps_id`,
+   `table_name`, `author`, `version` are added from the local VPS database
+   cache when the ROM is linked.
+7. **Surface the submission state** (`accepted` / `flagged` / `rejected`)
+   returned by the server via the **Status Overlay** so the player receives
+   immediate feedback.
+8. **Apply local integrity protection** as a supporting signal (see
+   [Local Integrity Protection](#local-integrity-protection) below).
+
+### What the watcher must NOT claim
+
+- The watcher must **not** make final `accepted` / `flagged` / `rejected`
+  decisions.  Those decisions belong to the server.
+- Local integrity checks (hash signatures, file validation) are **supporting
+  signals only** — they help detect casual tampering or file corruption, but
+  they are not proof that a submission is clean.
+- Rate limiting, duplicate detection, event-window enforcement, and all
+  cross-player comparisons are **server-side responsibilities**.
 
 ---
 
@@ -184,15 +225,11 @@ Suspicious data must never be implicitly treated the same as normal data.
 
 ## Client-Side Responsibilities
 
-The client (this repository) is responsible for:
+See the [Watcher-Side Responsibilities](#watcher-side-responsibilities) section
+at the top of this document for the full list of what the watcher does and does
+not do.
 
-1. Including all required metadata fields in every upload payload.
-2. Not uploading when the player name is missing or set to the default
-   `"Player"`.
-3. Not uploading when no VPS-ID has been assigned to the ROM.
-4. Including the `watcher_version` field so the server can enforce minimum
-   version requirements.
-5. Displaying the submission state returned by the server via the
-   **Status Overlay**.
-
-The client is **not** responsible for being the final arbiter of fair play.
+In summary, the watcher is responsible for **collecting, enriching, and
+forwarding** reliable metadata.  It surfaces the server's verdict via the
+**Status Overlay**.  It is **not** responsible for being the final arbiter of
+fair play — server-side validation is always authoritative.

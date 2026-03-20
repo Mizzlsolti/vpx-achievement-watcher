@@ -18,7 +18,7 @@ Heat Challenge: When the barometer reaches 100%, it's over. The heat rises if yo
 
 (Tip: You can find your personal 4-digit player ID in the "System" tab. Make a note of it! If you ever install Watcher on a new PC, you can use it to restore your cloud progress.)
 
-🛡️ Fair play & anti-cheat To keep the leaderboards fair, local saves and scores are protected by hash signatures. Every cloud upload includes metadata (player ID, ROM, watcher version, timestamp) that the server uses to validate submissions. Submissions may be `accepted`, `flagged` for review, or `rejected`. The client surfaces the result via the **Status Overlay** so you always know the state of your upload. For the full server-side validation rules, see [docs/cloud-anti-cheat.md](docs/cloud-anti-cheat.md). 
+🛡️ Fair play & anti-cheat To keep the leaderboards fair, local saves and scores are protected by hash signatures (supporting signals that help detect casual tampering, but not final proof). Every cloud upload includes metadata (player ID, ROM, VPS table ID, watcher version, timestamp) that the server uses to validate submissions. The watcher blocks uploads when a required field is missing or when the ROM is not linked to a VPS table. Submissions may be `accepted`, `flagged` for review, or `rejected` — the server is always the authoritative anti-cheat layer. The client surfaces the result via the **Status Overlay** so you always know the state of your upload. For the full rules and watcher/server responsibility split, see [docs/cloud-anti-cheat.md](docs/cloud-anti-cheat.md). 
 
 VPC Weekly Challene view. Discords Weekly Challenge on Overlay (Only view)
 
