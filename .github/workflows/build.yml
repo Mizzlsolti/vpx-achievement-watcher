@@ -33,10 +33,6 @@ jobs:
       run: |
         pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
 
-    - name: Build AW_Setup.exe with PyInstaller
-      run: |
-        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "AW_Setup" "aw_setup.py"
-
     - name: Install Inno Setup
       run: choco install innosetup -y
 

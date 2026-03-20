@@ -25,19 +25,24 @@ git push origin v1.0.0
 ### How the release flow works
 
 1. GitHub Actions checks out the repository on a Windows runner.
-2. PyInstaller compiles `Achievement_watcher.py` → `Achievement_Watcher.exe` and `aw_setup.py` → `AW_Setup.exe`.
-3. Inno Setup reads `installer.iss` and bundles both EXEs into a single installer: **`VPX-Achievement-Watcher-Setup.exe`**.
+2. PyInstaller compiles `Achievement_watcher.py` → `Achievement_Watcher.exe`.
+3. Inno Setup reads `installer.iss` and packages the EXE into a single installer: **`VPX-Achievement-Watcher-Setup.exe`**.
 4. The installer is uploaded as a workflow artifact and (on tagged releases) attached to the GitHub Release.
 
 ### What the installer does
 
-- Installs `Achievement_Watcher.exe` to `%ProgramFiles%\VPX Achievement Watcher`.
-- Installs `AW_Setup.exe` (first-run configuration wizard) to the same folder.
-- Creates Start Menu shortcuts for both the app and the setup wizard.
-- Creates a Desktop shortcut for the main app.
-- After installation, optionally runs `AW_Setup.exe` so the user can configure their paths (BASE directory, NVRAM folder, Tables folder) before launching the app for the first time.
+1. Presents a **Configure Paths** page with three pre-filled fields:
+   - **Base folder** (achievements data): `C:\vPinball\VPX Achievement Watcher`
+   - **Tables folder** (.vpx files): `C:\vPinball\VisualPinball\Tables`
+   - **NVRAM folder** (VPinMAME .nv files): `C:\vPinball\VisualPinball\VPinMAME\nvram`
+2. Installs `Achievement_Watcher.exe` to `%ProgramFiles%\VPX Achievement Watcher`.
+3. Writes `config.json` next to the executable with the paths entered during installation.
+4. Creates a Desktop shortcut and Start Menu entries for the app.
+5. Offers to launch `Achievement_Watcher.exe` directly — no separate setup step needed.
 
-> **Note on `aw_setup.py`:** This standalone setup wizard is packaged alongside the main app because it helps users configure the three required paths on first install. It is *not* needed on subsequent launches — the main app reads `config.json` directly. If you prefer to skip the wizard, just cancel it after installation; `Achievement_Watcher.exe` can be launched at any time via the Desktop or Start Menu shortcut.
+> **Testing the installer:** Run `VPX-Achievement-Watcher-Setup.exe`, review or edit the three path fields on the *Configure Paths* page, complete the wizard, and then launch `Achievement_Watcher.exe` via the Desktop or Start Menu shortcut. The app should start without asking for paths because `config.json` was already written by the installer.
+
+> **Note on `aw_setup.py`:** This file is kept in the repository for developer and manual-recovery use. It is no longer part of the standard installer flow. End users do not need it.
 
 ---
 
