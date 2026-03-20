@@ -237,8 +237,8 @@ _IMG_CALLBACK_QUEUE: queue.SimpleQueue = queue.SimpleQueue()
 # Card / hero dimensions
 _CARD_IMG_W = 140
 _CARD_IMG_H = 105
-_HERO_IMG_W = 230
-_HERO_IMG_H = 172
+_HERO_IMG_W = 340
+_HERO_IMG_H = 255
 
 # Font stack: Segoe UI on Windows, system sans-serif elsewhere
 _FONT_UI = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
@@ -569,6 +569,7 @@ class VpsHeroPanel(QFrame):
 
         self.lbl_authors = QLabel()
         self.lbl_authors.setStyleSheet("color:#AAA; font-size:12px;")
+        self.lbl_authors.setWordWrap(True)
         details.addWidget(self.lbl_authors)
 
         self.lbl_ver = QLabel()
