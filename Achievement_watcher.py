@@ -3285,11 +3285,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                 assets = release.get("assets") or []
                 exe_asset = None
+                # Prefer the Setup installer (e.g. VPX-Achievement-Watcher-Setup.exe)
                 for a in assets:
                     name = str(a.get("name", "")).lower()
-                    if name.endswith(".exe"):
+                    if "setup" in name and name.endswith(".exe"):
                         exe_asset = a
                         break
+                # Fall back to any .exe asset if no Setup asset found
+                if not exe_asset:
+                    for a in assets:
+                        name = str(a.get("name", "")).lower()
+                        if name.endswith(".exe"):
+                            exe_asset = a
+                            break
 
                 if not exe_asset:
                     from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
@@ -3381,63 +3389,80 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _do_app_update(self, download_url: str):
         import threading
+        from PyQt6.QtWidgets import QProgressDialog
+        from PyQt6.QtCore import Qt
+
         self.btn_self_update.setEnabled(False)
         self.btn_self_update.setText("⏳ Downloading update...")
 
+        progress_dlg = QProgressDialog("Downloading update…", None, 0, 0, self)
+        progress_dlg.setWindowTitle("Watcher Update")
+        progress_dlg.setWindowModality(Qt.WindowModality.ApplicationModal)
+        progress_dlg.setMinimumDuration(0)
+        progress_dlg.setCancelButton(None)
+        progress_dlg.setMinimum(0)
+        progress_dlg.setMaximum(0)
+        progress_dlg.show()
+        self._update_progress_dlg = progress_dlg
+
         def _download_and_install():
             try:
-                import os, sys, tempfile, subprocess
+                import os, tempfile, subprocess
                 from watcher_core import _fetch_bytes_url, log
 
-                log(self.cfg, f"[UPDATE] Downloading from {download_url}")
+                log(self.cfg, f"[UPDATE] Downloading Setup from {download_url}")
                 data = _fetch_bytes_url(download_url, timeout=120)
 
-                current_exe = os.path.abspath(sys.argv[0])
-                exe_dir = os.path.dirname(current_exe)
-                exe_name = os.path.basename(current_exe)
-                new_exe = os.path.join(exe_dir, exe_name + ".new")
+                tmp_dir = tempfile.mkdtemp(prefix="vpx_ach_update_")
+                setup_exe = os.path.join(tmp_dir, "VPX-Achievement-Watcher-Setup.exe")
 
-                with open(new_exe, "wb") as f:
+                with open(setup_exe, "wb") as f:
                     f.write(data)
-                log(self.cfg, f"[UPDATE] Downloaded to {new_exe}")
+                log(self.cfg, f"[UPDATE] Downloaded Setup to {setup_exe}")
 
-                bat_path = os.path.join(tempfile.gettempdir(), "vpx_ach_update.bat")
+                # Batch file runs the installer silently then cleans up the temp files.
+                # The installer restarts Achievement_Watcher.exe via its silent [Run] entry.
+                bat_path = os.path.join(tmp_dir, "vpx_ach_update.bat")
                 bat = (
                     "@echo off\r\n"
                     "timeout /t 2 /nobreak >nul\r\n"
-                    f'move /y "{new_exe}" "{current_exe}"\r\n'
-                    f'start "" "{current_exe}"\r\n'
-                    'del "%~f0"\r\n'
+                    f'"{setup_exe}" /SILENT /NORESTART /SP-\r\n'
+                    f'del /f /q "{setup_exe}"\r\n'
+                    'del /f /q "%~f0"\r\n'
                 )
                 with open(bat_path, "w") as f:
                     f.write(bat)
 
-                log(self.cfg, "[UPDATE] Launching updater batch and quitting")
+                log(self.cfg, "[UPDATE] Launching silent installer and quitting")
                 subprocess.Popen(
                     ["cmd.exe", "/c", bat_path],
                     creationflags=0x08000000 | 0x00000008,
                     close_fds=True,
                 )
 
-                from PyQt6.QtCore import QMetaObject, Qt
-                QMetaObject.invokeMethod(self, "_on_update_ready_quit", Qt.ConnectionType.QueuedConnection)
+                from PyQt6.QtCore import QMetaObject, Qt as _Qt
+                QMetaObject.invokeMethod(self, "_on_update_ready_quit", _Qt.ConnectionType.QueuedConnection)
 
             except Exception as e:
                 from watcher_core import log
                 log(self.cfg, f"[UPDATE] Download/install failed: {e}", "ERROR")
-                from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                from PyQt6.QtCore import QMetaObject, Qt as _Qt, Q_ARG
                 QMetaObject.invokeMethod(self, "_on_update_download_failed",
-                    Qt.ConnectionType.QueuedConnection,
+                    _Qt.ConnectionType.QueuedConnection,
                     Q_ARG(str, str(e)))
 
         threading.Thread(target=_download_and_install, daemon=True, name="AppUpdateDownload").start()
 
     @pyqtSlot()
     def _on_update_ready_quit(self):
+        if hasattr(self, "_update_progress_dlg"):
+            self._update_progress_dlg.close()
         self.quit_all()
 
     @pyqtSlot(str)
     def _on_update_download_failed(self, error: str):
+        if hasattr(self, "_update_progress_dlg"):
+            self._update_progress_dlg.close()
         self.btn_self_update.setEnabled(True)
         self.btn_self_update.setText("⬆️ Watcher Update")
         self._msgbox_topmost("warn", "App Update Failed", f"Download or install failed:\n{error}")
