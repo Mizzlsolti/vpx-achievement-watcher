@@ -3072,17 +3072,11 @@ class OverlayPositionPicker(QWidget):
     def _calc_overlay_size(self) -> tuple[int, int]:
         ov = self.parent_gui.cfg.OVERLAY or {}
         scale_pct = int(ov.get("scale_pct", 100))
-        # Use the same screen-geometry source as OverlayWindow._apply_geometry so
-        # the picker preview dimensions exactly match the final rendered overlay.
+        # Mirror OverlayWindow._ref_screen_geometry(): use the primary screen so
+        # the picker dimensions exactly match the actual rendered overlay size.
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                ref = vgeo
-            else:
-                ref = self._safe_screen_geo()
+            scr = QApplication.primaryScreen()
+            ref = scr.geometry() if scr else self._safe_screen_geo()
         except Exception:
             ref = self._safe_screen_geo()
         if self._portrait:
