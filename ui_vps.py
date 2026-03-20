@@ -465,8 +465,8 @@ class VpsCardWidget(QFrame):
             for feat in features:
                 lbl_f = QLabel(feat)
                 lbl_f.setStyleSheet(
-                    "background:#003333; color:#00E5FF; font-size:9px;"
-                    " border:1px solid #00E5FF; border-radius:3px; padding:1px 4px;"
+                    "QLabel { background:#003333; color:#00E5FF; font-size:9px;"
+                    " border:1px solid #00E5FF; border-radius:3px; padding:1px 4px; }"
                 )
                 feat_row.addWidget(lbl_f)
             feat_row.addStretch()
@@ -583,7 +583,7 @@ class VpsHeroPanel(QFrame):
 
         # Feature-tag row: use a dedicated container widget so we can clear it
         self.feat_widget = QWidget()
-        self.feat_widget.setStyleSheet("background:transparent;")
+        self.feat_widget.setStyleSheet("QWidget { background: transparent; }")
         self._feat_lay = QHBoxLayout(self.feat_widget)
         self._feat_lay.setContentsMargins(0, 0, 0, 0)
         self._feat_lay.setSpacing(4)
@@ -632,14 +632,14 @@ class VpsHeroPanel(QFrame):
         for feat in features:
             lbl_f = QLabel(feat)
             lbl_f.setStyleSheet(
-                "background:#003333; color:#00E5FF; font-size:9px;"
-                " border:1px solid #00E5FF; border-radius:3px; padding:1px 5px;"
+                "QLabel { background:#003333; color:#00E5FF; font-size:9px;"
+                " border:1px solid #00E5FF; border-radius:3px; padding:1px 5px; }"
             )
             self._feat_lay.addWidget(lbl_f)
         if features:
             spacer = QWidget()
             spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-            spacer.setStyleSheet("background:transparent;")
+            spacer.setStyleSheet("QWidget { background: transparent; }")
             self._feat_lay.addWidget(spacer)
 
         # IDs
