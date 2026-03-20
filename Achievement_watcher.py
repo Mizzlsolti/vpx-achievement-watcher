@@ -1815,6 +1815,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.lbl_rs_leaderboard = QLabel("Leaderboard:  —")
         for lbl in (self.lbl_rs_table, self.lbl_rs_session, self.lbl_rs_cloud, self.lbl_rs_leaderboard):
             lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
+            lbl.setTextFormat(Qt.TextFormat.RichText)
             lay_rs.addWidget(lbl)
         lay_rs.addStretch(1)
 
@@ -4673,6 +4674,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
+    @staticmethod
+    def _dot(color: str, label: str, value: str) -> str:
+        """Return an HTML string with a colored dot indicator followed by label and value."""
+        return (
+            f"<span style='color:{color};'>&#9679;</span>"
+            f"&nbsp;<span style='color:#CCC;'>{label}&nbsp;&nbsp;{value}</span>"
+        )
+
     def _refresh_dashboard_cards(self):
         """Populate the Last Run and Run Status cards in the Dashboard tab."""
         import json as _json
@@ -4814,10 +4823,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     rs_cloud = "Disabled"
                     rs_lb = "Local only"
 
-            self.lbl_rs_table.setText(f"Table:  {rs_table}")
-            self.lbl_rs_session.setText(f"Session:  {rs_session}")
-            self.lbl_rs_cloud.setText(f"Cloud:  {rs_cloud}")
-            self.lbl_rs_leaderboard.setText(f"Leaderboard:  {rs_lb}")
+            # Table: green when active, red when no game
+            tbl_color = "#00C853" if (game_active and current_rom) else "#FF3B30"
+            # Session: green when active/counting, yellow when idle
+            ses_color = "#FFA500" if rs_session == "Idle" else "#00C853"
+            # Cloud: green=online/verified, yellow=pending/offline, red=disabled
+            cld_color = (
+                "#00C853" if rs_cloud in ("Online", "Verified")
+                else "#FF3B30" if rs_cloud == "Disabled"
+                else "#FFA500"
+            )
+            # Leaderboard: green=ready, yellow=pending/local
+            lb_color = "#00C853" if rs_lb == "Ready" else "#FFA500"
+
+            self.lbl_rs_table.setText(self._dot(tbl_color, "Table:", rs_table))
+            self.lbl_rs_session.setText(self._dot(ses_color, "Session:", rs_session))
+            self.lbl_rs_cloud.setText(self._dot(cld_color, "Cloud:", rs_cloud))
+            self.lbl_rs_leaderboard.setText(self._dot(lb_color, "Leaderboard:", rs_lb))
         except Exception:
             pass
 
