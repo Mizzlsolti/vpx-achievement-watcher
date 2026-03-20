@@ -19,6 +19,31 @@ comes from the server.
 
 ---
 
+## Local Integrity Protection
+
+In addition to server-side validation, the Watcher also uses local integrity
+protection for saved data and score-related files.
+
+This local protection is intended to:
+- detect casual file tampering
+- detect broken or corrupted local save/state files
+- provide additional trust signals for cloud uploads
+
+Examples include:
+- hash-based protection of local save/state data
+- integrity checks for locally stored score-related data before upload
+
+**Important:**  
+Local integrity protection is still entirely client-side.  
+A modified client may bypass or recreate local integrity markers.
+
+Because of that, local integrity checks must be treated as **supporting
+signals**, not as final proof that a submission is legitimate.
+
+Server-side validation always remains the authoritative anti-cheat layer.
+
+---
+
 ## Required Fields
 
 Every upload payload must contain all of the following fields.  Submissions
