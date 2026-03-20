@@ -255,11 +255,11 @@ def _table_sub_parts(table: dict) -> List[str]:
     ]
 
 
-def _format_authors(authors: list, max_count: int = 4) -> str:
-    """Join author names, truncating at *max_count* with an ellipsis."""
+def _format_authors(authors: list) -> str:
+    """Join all author names without truncation."""
     if not authors:
         return ""
-    return ", ".join(authors[:max_count]) + ("…" if len(authors) > max_count else "")
+    return ", ".join(authors)
 
 
 def _resolve_img_url(table: dict, table_file: dict) -> Optional[str]:
@@ -416,7 +416,7 @@ class VpsCardWidget(QFrame):
         clean_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', raw_name).strip()
         lbl_name = QLabel(clean_name)
         lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
-        lbl_name.setWordWrap(False)
+        lbl_name.setWordWrap(True)
         title_row.addWidget(lbl_name, stretch=1)
         if rom_match:
             lbl_rom = QLabel("✅ ROM")
@@ -431,6 +431,7 @@ class VpsCardWidget(QFrame):
         if sub_parts:
             lbl_sub = QLabel("  ·  ".join(sub_parts))
             lbl_sub.setStyleSheet("color:#888; font-size:11px;")
+            lbl_sub.setWordWrap(True)
             meta.addWidget(lbl_sub)
 
         # Authors
@@ -452,6 +453,7 @@ class VpsCardWidget(QFrame):
         if ver_parts:
             lbl_ver = QLabel("  ·  ".join(ver_parts))
             lbl_ver.setStyleSheet("color:#666; font-size:11px;")
+            lbl_ver.setWordWrap(True)
             meta.addWidget(lbl_ver)
 
         # Feature tags
@@ -460,11 +462,11 @@ class VpsCardWidget(QFrame):
             feat_row = QHBoxLayout()
             feat_row.setContentsMargins(0, 0, 0, 0)
             feat_row.setSpacing(3)
-            for feat in features[:7]:
+            for feat in features:
                 lbl_f = QLabel(feat)
                 lbl_f.setStyleSheet(
-                    "background:#1a3040; color:#00C8FF; font-size:9px;"
-                    " border:1px solid #00608F; border-radius:3px; padding:1px 4px;"
+                    "background:#003333; color:#00E5FF; font-size:9px;"
+                    " border:1px solid #00E5FF; border-radius:3px; padding:1px 4px;"
                 )
                 feat_row.addWidget(lbl_f)
             feat_row.addStretch()
@@ -566,6 +568,7 @@ class VpsHeroPanel(QFrame):
 
         self.lbl_sub = QLabel()
         self.lbl_sub.setStyleSheet("color:#888; font-size:12px;")
+        self.lbl_sub.setWordWrap(True)
         details.addWidget(self.lbl_sub)
 
         self.lbl_authors = QLabel()
@@ -575,6 +578,7 @@ class VpsHeroPanel(QFrame):
 
         self.lbl_ver = QLabel()
         self.lbl_ver.setStyleSheet("color:#666; font-size:11px;")
+        self.lbl_ver.setWordWrap(True)
         details.addWidget(self.lbl_ver)
 
         # Feature-tag row: use a dedicated container widget so we can clear it
@@ -587,6 +591,7 @@ class VpsHeroPanel(QFrame):
 
         self.lbl_ids = QLabel()
         self.lbl_ids.setStyleSheet("color:#3a3a3a; font-size:10px;")
+        self.lbl_ids.setWordWrap(True)
         details.addWidget(self.lbl_ids)
 
         details.addStretch()
@@ -608,7 +613,7 @@ class VpsHeroPanel(QFrame):
         self.lbl_sub.setText("  ·  ".join(_table_sub_parts(table)))
 
         # Authors
-        authors_text = _format_authors(table_file.get("authors") or [], max_count=6)
+        authors_text = _format_authors(table_file.get("authors") or [])
         self.lbl_authors.setText(f"👤 {authors_text}" if authors_text else "")
 
         # Version · date
@@ -624,11 +629,11 @@ class VpsHeroPanel(QFrame):
         # Features
         self._clear_features()
         features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
-        for feat in features[:8]:
+        for feat in features:
             lbl_f = QLabel(feat)
             lbl_f.setStyleSheet(
-                "background:#1a3040; color:#00C8FF; font-size:9px;"
-                " border:1px solid #00608F; border-radius:3px; padding:1px 5px;"
+                "background:#003333; color:#00E5FF; font-size:9px;"
+                " border:1px solid #00E5FF; border-radius:3px; padding:1px 5px;"
             )
             self._feat_lay.addWidget(lbl_f)
         if features:
