@@ -2164,6 +2164,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.chk_status_overlay_portrait,
         ]
 
+    def _ccw_checkboxes(self):
+        """Returns the list of all overlay CCW-rotation checkboxes."""
+        return [
+            self.chk_portrait_ccw,
+            self.chk_ach_toast_ccw,
+            self.chk_ch_ov_ccw,
+            self.chk_ch_timer_ccw,
+            self.chk_mini_info_ccw,
+            self.chk_heat_bar_ccw,
+            self.chk_status_overlay_ccw,
+        ]
+
     def _update_switch_all_button_label(self):
         """Updates the Switch All button label to reflect current portrait checkbox state."""
         try:
@@ -2177,9 +2189,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _on_switch_all_portrait_landscape(self):
-        """Toggles all overlay portrait checkboxes between Portrait and Landscape at once."""
+        """Toggles all overlay portrait + CCW checkboxes between Portrait and Landscape at once."""
         should_be_portrait = not any(chk.isChecked() for chk in self._portrait_checkboxes())
         for chk in self._portrait_checkboxes():
+            chk.setChecked(should_be_portrait)
+        for chk in self._ccw_checkboxes():
             chk.setChecked(should_be_portrait)
         self.cfg.save()
         self._update_switch_all_button_label()
