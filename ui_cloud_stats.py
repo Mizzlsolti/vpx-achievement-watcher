@@ -201,6 +201,7 @@ class CloudStatsMixin:
         self.stats_tabs.addTab(ch_tab, "⚔️ Challenge Leaderboards")
 
         layout.addWidget(self.stats_tabs)
+        self._add_tab_help_button(layout, "stats")
         self.main_tabs.addTab(tab, "📊 Records & Stats")
         
         try: self._update_challenges_results_view()

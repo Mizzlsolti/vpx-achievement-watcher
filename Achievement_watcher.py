@@ -1730,6 +1730,101 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
 
     # ==========================================
+    # TAB HELP TEXTS & HELPERS
+    # ==========================================
+    _TAB_HELP = {
+        "dashboard": (
+            "<b>🏠 Dashboard</b><br><br>"
+            "Der Dashboard-Tab zeigt dir auf einen Blick den aktuellen Status des Watchers, "
+            "dein Spieler-Level sowie die letzten Session-Informationen.<br><br>"
+            "• <b>System Status</b>: Zeigt an, ob der Watcher läuft und VPX aktiv ist.<br>"
+            "• <b>Spieler-Level</b>: Dein aktuelles Level und Fortschritts-Balken basierend "
+            "auf freigeschalteten Achievements.<br>"
+            "• <b>Session Summary</b>: Übersicht über den letzten und aktuellen Spieldurchlauf "
+            "inkl. Score, Achievements und Cloud-Status.<br>"
+            "• <b>Quick Actions</b>: Engine neustarten, Fenster minimieren oder Programm beenden."
+        ),
+        "progress": (
+            "<b>📈 Progress</b><br><br>"
+            "Der Progress-Tab zeigt dir den lokalen Achievement-Fortschritt je Tisch.<br><br>"
+            "• Wähle oben eine ROM aus der Dropdown-Liste aus.<br>"
+            "• Die Ansicht zeigt alle verfügbaren Achievements mit ihrem Status "
+            "(freigeschaltet ✅ / gesperrt 🔒).<br>"
+            "• Klicke auf einen Achievement-Link für weitere Details.<br>"
+            "• Mit <b>🔄 Refresh</b> wird die Liste neu geladen."
+        ),
+        "appearance": (
+            "<b>🎨 Appearance</b><br><br>"
+            "Im Appearance-Tab konfigurierst du das visuelle Erscheinungsbild aller Overlays.<br><br>"
+            "• <b>Style</b>: Wähle Schriftart und Basisgröße für die Overlays.<br>"
+            "• <b>Widget Placement</b>: Positioniere und rotiere die einzelnen Overlay-Fenster "
+            "(Main Overlay, Toast, Channel-Timer, Flip Counter, Mini Info, Heat Bar, Status).<br>"
+            "• Mit <b>Place</b> öffnest du ein Positionierfenster, mit <b>Test</b> kannst du "
+            "das Overlay probeweise anzeigen."
+        ),
+        "available_maps": (
+            "<b>📚 Available Maps</b><br><br>"
+            "Dieser Tab zeigt alle bekannten Tische aus dem Cloud-Index und der lokalen "
+            "VPX-Installation.<br><br>"
+            "• <b>Suche</b>: Filtere nach Tischname oder ROM-Namen.<br>"
+            "• <b>🎯 Only with NVRAM-Map</b>: Zeigt nur Tische mit vorhandenem NVRAM-Mapping.<br>"
+            "• <b>⚡ Auto-Match All</b>: Versucht alle lokalen ROMs automatisch VPS-IDs "
+            "zuzuordnen.<br>"
+            "• <b>Spalten</b>: Tischname, ROM, NVRAM Map (✅/❌), lokal vorhanden (🟠), "
+            "VPS-ID, Autor sowie ein Detail-Button (+)."
+        ),
+        "system": (
+            "<b>⚙️ System</b><br><br>"
+            "Im System-Tab verwaltest du dein Spielerprofil, Verzeichnisse und "
+            "Wartungsfunktionen.<br><br>"
+            "• <b>Player Profile</b>: Lege deinen Anzeigenamen und deine 4-stellige Spieler-ID "
+            "fest. Die Spieler-ID wird für Cloud-Sync und Wiederherstellung benötigt – "
+            "bitte sicher aufbewahren!<br>"
+            "• <b>Cloud Sync</b>: Aktiviere die Cloud-Synchronisation und das automatische "
+            "Backup deines Fortschritts.<br>"
+            "• <b>Directory Setup</b>: Pfade für BASE, NVRAM und Tische-Verzeichnis.<br>"
+            "• <b>Maintenance</b>: Datenordner reparieren, Maps-Cache erzwingen, Datenbanken "
+            "aktualisieren oder ein App-Update durchführen."
+        ),
+        "stats": (
+            "<b>📊 Records &amp; Stats</b><br><br>"
+            "Der Records &amp; Stats-Tab gibt dir einen Überblick über Highscores und "
+            "Statistiken.<br><br>"
+            "• <b>🌍 Global NVRAM Dumps</b>: Zeigt alle gespeicherten NVRAM-Scores für den "
+            "ausgewählten Tisch (global über alle Spieler).<br>"
+            "• <b>👤 Player Session Deltas</b>: Deine persönlichen Score-Veränderungen je "
+            "Session.<br>"
+            "• <b>⚔️ Challenge Leaderboards</b>: Ranglisten der letzten Challenge-Ergebnisse."
+        ),
+    }
+
+    def _add_tab_help_button(self, layout, help_key: str):
+        """Fügt einen Hilfe-Button (❓) unten rechts in das angegebene Layout ein."""
+        row = QHBoxLayout()
+        row.addStretch(1)
+        btn = QPushButton("❓")
+        btn.setFixedSize(28, 28)
+        btn.setToolTip("Hilfe zu diesem Tab anzeigen")
+        btn.setStyleSheet(
+            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background: #FF7F00; color: #000; }"
+        )
+        btn.clicked.connect(lambda: self._show_tab_help(help_key))
+        row.addWidget(btn)
+        layout.addLayout(row)
+
+    def _show_tab_help(self, help_key: str):
+        """Zeigt einen tab-spezifischen Hilfe-Dialog an."""
+        text = self._TAB_HELP.get(help_key, "Keine Hilfe verfügbar.")
+        box = QMessageBox(self)
+        box.setWindowTitle("Hilfe")
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(text)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.exec()
+
+    # ==========================================
     # TAB 1: DASHBOARD
     # ==========================================
     def _build_tab_dashboard(self):
@@ -1855,6 +1950,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         layout.addWidget(lbl_legend)
 
         layout.addStretch(1)
+        self._add_tab_help_button(layout, "dashboard")
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
         QTimer.singleShot(1500, self._refresh_level_display)
@@ -1999,6 +2095,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)
+        self._add_tab_help_button(layout, "appearance")
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
     # ==========================================
@@ -2074,6 +2171,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addWidget(self.progress_view)
         
         layout.addWidget(grp)
+        self._add_tab_help_button(layout, "progress")
         self.main_tabs.addTab(tab, "📈 Progress")
         
         from PyQt6.QtCore import QTimer
@@ -2455,6 +2553,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addWidget(self.maps_table)
 
         layout.addWidget(grp)
+        self._add_tab_help_button(layout, "available_maps")
         self.main_tabs.addTab(tab, "📚 Available Maps")
         # Cache: list of dicts {rom, title, has_map, is_local, vps_id}
         self._all_maps_cache = []
@@ -2891,6 +2990,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         layout.addWidget(grp_perf)
         layout.addStretch(1)
+        self._add_tab_help_button(layout, "system")
         self.main_tabs.addTab(tab, "⚙️ System")
 
     # ==========================================
