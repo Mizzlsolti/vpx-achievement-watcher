@@ -240,7 +240,7 @@ DEFAULT_LOG_SUPPRESS = [
  
 @dataclass
 class AppConfig:
-    BASE: str = r"C:\vPinball\Achievements"
+    BASE: str = r"C:\vPinball\VPX Achievement Watcher"
     NVRAM_DIR: str = r"C:\vPinball\VisualPinball\VPinMAME\nvram"
     TABLES_DIR: str = r"C:\vPinball\VisualPinball\Tables"
     OVERLAY: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_OVERLAY))
@@ -366,7 +366,7 @@ class AppConfig:
                     clean_overlay[k] = ov[k]
 
             to_dump = {
-                "BASE": getattr(self, "BASE", r"C:\vPinball\Achievements"),
+                "BASE": getattr(self, "BASE", r"C:\vPinball\VPX Achievement Watcher"),
                 "NVRAM_DIR": getattr(self, "NVRAM_DIR", r"C:\vPinball\VisualPinball\VPinMAME\nvram"),
                 "TABLES_DIR": getattr(self, "TABLES_DIR", r"C:\vPinball\VisualPinball\Tables"),
                 "CLOUD_ENABLED": getattr(self, "CLOUD_ENABLED", True),
