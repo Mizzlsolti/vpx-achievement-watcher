@@ -89,7 +89,7 @@ class FeedbackDialog(QDialog):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("🐛 Bug melden / Verbesserungsvorschlag")
+        self.setWindowTitle("🐛 Report Bug / Suggest Feature")
         self.setMinimumWidth(520)
         self.setStyleSheet(
             "QDialog { background: #1a1a1a; color: #e0e0e0; }"
@@ -107,8 +107,8 @@ class FeedbackDialog(QDialog):
         main.setSpacing(10)
 
         lbl_info = QLabel(
-            "Hast du einen Bug gefunden oder einen Verbesserungsvorschlag?\n"
-            "Trage die Details ein – das Issue wird direkt im GitHub-Repo erstellt."
+            "Found a bug or have a suggestion?\n"
+            "Fill in the details – the issue will be created directly in the GitHub repo."
         )
         lbl_info.setWordWrap(True)
         lbl_info.setStyleSheet("color: #00E5FF; font-size: 9pt;")
@@ -116,25 +116,28 @@ class FeedbackDialog(QDialog):
 
         # Type selector
         row_type = QHBoxLayout()
-        row_type.addWidget(QLabel("Typ:"))
+        row_type.addWidget(QLabel("Type:"))
         self.cmb_type = QComboBox()
+        self.cmb_type.setStyleSheet(
+            "QComboBox QAbstractItemView { min-height: 24px; }"
+        )
         self.cmb_type.addItem("🐛 Bug Report", "bug")
-        self.cmb_type.addItem("💡 Feature Request / Verbesserungsvorschlag", "enhancement")
+        self.cmb_type.addItem("💡 Feature Request / Suggestion", "enhancement")
         row_type.addWidget(self.cmb_type, 1)
         main.addLayout(row_type)
 
         # Title
-        main.addWidget(QLabel("Titel:"))
+        main.addWidget(QLabel("Title:"))
         self.ed_title = QLineEdit()
-        self.ed_title.setPlaceholderText("Kurze Zusammenfassung …")
+        self.ed_title.setPlaceholderText("Brief summary …")
         main.addWidget(self.ed_title)
 
         # Body
-        main.addWidget(QLabel("Beschreibung:"))
+        main.addWidget(QLabel("Description:"))
         self.ed_body = QTextEdit()
         self.ed_body.setPlaceholderText(
-            "Beschreibe den Bug / Vorschlag so detailliert wie möglich …\n\n"
-            "Schritte zum Reproduzieren (bei Bugs):\n1. …\n2. …"
+            "Describe the bug / suggestion in as much detail as possible …\n\n"
+            "Steps to reproduce (for bugs):\n1. …\n2. …"
         )
         self.ed_body.setMinimumHeight(140)
         main.addWidget(self.ed_body)
@@ -142,9 +145,9 @@ class FeedbackDialog(QDialog):
         # Buttons
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        self.btn_cancel = QPushButton("Abbrechen")
+        self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
-        self.btn_submit = QPushButton("📤 Senden")
+        self.btn_submit = QPushButton("📤 Submit")
         self.btn_submit.setStyleSheet(
             "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
@@ -161,7 +164,7 @@ class FeedbackDialog(QDialog):
     def _submit(self) -> None:
         title = self.ed_title.text().strip()
         if not title:
-            QMessageBox.warning(self, "Titel fehlt", "Bitte gib einen Titel ein.")
+            QMessageBox.warning(self, "Title Missing", "Please enter a title.")
             return
 
         issue_type = self.cmb_type.currentData()
@@ -178,7 +181,7 @@ class FeedbackDialog(QDialog):
 
         self.btn_submit.setEnabled(False)
         self.btn_cancel.setEnabled(False)
-        self.btn_submit.setText("Wird gesendet …")
+        self.btn_submit.setText("Submitting …")
 
         worker = _SubmitWorker(issue_type, title, full_body)
         worker.finished.connect(self._on_done)
@@ -192,21 +195,21 @@ class FeedbackDialog(QDialog):
     def _on_done(self, success: bool, message: str) -> None:
         self.btn_submit.setEnabled(True)
         self.btn_cancel.setEnabled(True)
-        self.btn_submit.setText("📤 Senden")
+        self.btn_submit.setText("📤 Submit")
         self._worker = None  # release reference
 
         if success:
             QMessageBox.information(
                 self,
-                "Issue erstellt ✅",
-                f"Danke! Das Issue wurde erfolgreich erstellt:\n{message}",
+                "Issue Created ✅",
+                f"Thanks! The issue was created successfully:\n{message}",
             )
             self.accept()
         else:
             QMessageBox.critical(
                 self,
-                "Fehler beim Senden ❌",
-                f"Das Issue konnte nicht erstellt werden:\n\n{message}",
+                "Submission Error ❌",
+                f"The issue could not be created:\n\n{message}",
             )
 
 

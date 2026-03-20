@@ -3149,13 +3149,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_feedback = QGroupBox("Feedback & Bug Reports")
         lay_feedback = QVBoxLayout(grp_feedback)
         lbl_feedback = QLabel(
-            "Hast du einen Bug gefunden oder einen Verbesserungsvorschlag? "
-            "Melde es direkt hier!"
+            "Found a bug or have a suggestion? Report it directly here!"
         )
         lbl_feedback.setWordWrap(True)
         lbl_feedback.setStyleSheet("color: #00E5FF; font-size: 9pt;")
         lay_feedback.addWidget(lbl_feedback)
-        btn_feedback = QPushButton("🐛 Bug melden / Vorschlag")
+        btn_feedback = QPushButton("🐛 Report Bug / Suggestion")
         btn_feedback.setStyleSheet(
             "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
