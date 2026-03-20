@@ -752,11 +752,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._toast_picker = None
             self.btn_ach_toast_place.setText("Place / Save position")
             return
-        
-        body_pt = int(self.cfg.OVERLAY.get("base_body_size", 20))
-        width_hint = 420 + max(0, (body_pt - 20) * 6)
-        height_hint = 120 + max(0, (body_pt - 20) * 2)
-        self._toast_picker = ToastPositionPicker(self, width_hint=width_hint, height_hint=height_hint)
+
+        self._toast_picker = ToastPositionPicker(self)
         self.btn_ach_toast_place.setText("Save position")
 
     def _on_mini_info_portrait_toggle(self, state: int):
@@ -884,25 +881,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.btn_status_overlay_place.setText("Place / Save position")
             return
 
-        # Derive the preview dimensions from the actual rendered badge so the
-        # picker exactly mirrors the final status overlay size.
-        w_hint, h_hint = 420, 100
-        try:
-            so = getattr(self, "_status_overlay", None)
-            if so is None:
-                so = StatusOverlay(self)
-            # Render with the current (or a representative) status text to get
-            # the correct badge dimensions.
-            if not so._status_text:
-                so._status_text = "Online · Tracking"
-                so._color = "#00C853"
-            img = so._render_badge_image(so._compose_html())
-            if img.width() > 0 and img.height() > 0:
-                w_hint = img.width()
-                h_hint = img.height()
-        except Exception:
-            pass
-        self._status_overlay_picker = StatusOverlayPositionPicker(self, width_hint=w_hint, height_hint=h_hint)
+        self._status_overlay_picker = StatusOverlayPositionPicker(self)
         self.btn_status_overlay_place.setText("Save position")
 
     # Agreed status states for the persistent status badge (traffic-light semantics)

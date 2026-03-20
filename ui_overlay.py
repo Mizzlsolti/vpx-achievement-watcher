@@ -1910,12 +1910,11 @@ class FlipCounterPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(220, int(width_hint))
-        self._base_h = max(90, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
 
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
@@ -1939,18 +1938,31 @@ class FlipCounterPositionPicker(QWidget):
 
     def _screen_geo(self) -> QRect:
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                return vgeo
             scr = QApplication.primaryScreen()
             if scr:
-                return scr.geometry()
+                return scr.availableGeometry()
         except Exception:
             pass
         return QRect(0, 0, 1280, 720)
+
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        font_family = str(ov.get("font_family", "Segoe UI"))
+        body_pt = 15
+        title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
+        f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
+        f_body = QFont(font_family, body_pt)
+        fm_title = QFontMetrics(f_title)
+        fm_body = QFontMetrics(f_body)
+        pad = max(12, int(body_pt * 0.9))
+        vgap = max(4, int(body_pt * 0.25))
+        title = "Total flips: 9999/9999"
+        sub = "Remaining: 9999"
+        text_w = max(fm_title.horizontalAdvance(title), fm_body.horizontalAdvance(sub))
+        text_h = fm_title.height() + vgap + fm_body.height()
+        w = max(280, text_w + 2 * pad)
+        h = max(96, text_h + 2 * pad)
+        return w, h
 
     def _sync_from_cfg(self):
         try:
@@ -1965,6 +1977,7 @@ class FlipCounterPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -1987,7 +2000,7 @@ class FlipCounterPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Flip Counter\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -2030,12 +2043,11 @@ class TimerPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(200, int(width_hint))
-        self._base_h = max(80, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
         else:
@@ -2056,18 +2068,15 @@ class TimerPositionPicker(QWidget):
 
     def _screen_geo(self) -> QRect:
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                return vgeo
             scr = QApplication.primaryScreen()
             if scr:
-                return scr.geometry()
+                return scr.availableGeometry()
         except Exception:
             pass
         return QRect(0, 0, 1280, 720)
+
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        return 400, 120
 
     def _sync_from_cfg(self):
         try:
@@ -2082,6 +2091,7 @@ class TimerPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -2104,7 +2114,7 @@ class TimerPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Challenge Timer\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -2147,12 +2157,11 @@ class ToastPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(200, int(width_hint))
-        self._base_h = max(80, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
         else:
@@ -2173,18 +2182,34 @@ class ToastPositionPicker(QWidget):
 
     def _screen_geo(self) -> QRect:
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                return vgeo
             scr = QApplication.primaryScreen()
             if scr:
-                return scr.geometry()
+                return scr.availableGeometry()
         except Exception:
             pass
         return QRect(0, 0, 1280, 720)
+
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        font_family = str(ov.get("font_family", "Segoe UI"))
+        body_pt = 15
+        title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
+        f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
+        f_body = QFont(font_family, body_pt)
+        fm_title = QFontMetrics(f_title)
+        fm_body = QFontMetrics(f_body)
+        icon_sz = max(28, int(body_pt * 2.0))
+        pad = max(12, int(body_pt * 0.8))
+        gap = max(10, int(body_pt * 0.5))
+        vgap = max(4, int(body_pt * 0.25))
+        title_text = "GREAT ACHIEVEMENT UNLOCKED!"
+        sub_text = "Table Name"
+        text_w = max(fm_title.horizontalAdvance(title_text), fm_body.horizontalAdvance(sub_text))
+        text_h = fm_title.height() + vgap + fm_body.height()
+        content_h = max(icon_sz, text_h)
+        W = max(320, pad + icon_sz + gap + text_w + pad)
+        H = max(96, pad + content_h + pad)
+        return W, H
 
     def _sync_from_cfg(self):
         try:
@@ -2200,6 +2225,7 @@ class ToastPositionPicker(QWidget):
         self._sync_from_cfg()
         new_portrait = bool(self._portrait)
         if new_portrait != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -2211,7 +2237,7 @@ class ToastPositionPicker(QWidget):
             y = min(max(geo.top(),  y), geo.bottom() - self._h)
             self.setGeometry(x, y, self._w, self._h)
         self.update()
-        
+
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -2221,7 +2247,7 @@ class ToastPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Achievement Toast\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -2252,7 +2278,7 @@ class ToastPositionPicker(QWidget):
         return int(g.x()), int(g.y())
 
 class ChallengeOVPositionPicker(QWidget):
-    def __init__(self, parent: "MainWindow", width_hint: int = 500, height_hint: int = 200):
+    def __init__(self, parent: "MainWindow", width_hint: int = 520, height_hint: int = 200):
         super().__init__(None)
         self.parent_gui = parent
         self.setWindowTitle("Place Challenge Overlay")
@@ -2263,12 +2289,11 @@ class ChallengeOVPositionPicker(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._base_w = max(260, int(width_hint))
-        self._base_h = max(120, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
         else:
@@ -2289,18 +2314,15 @@ class ChallengeOVPositionPicker(QWidget):
 
     def _screen_geo(self) -> QRect:
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                return vgeo
             scr = QApplication.primaryScreen()
             if scr:
-                return scr.geometry()
+                return scr.availableGeometry()
         except Exception:
             pass
         return QRect(0, 0, 1280, 720)
+
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        return 520, 200
 
     def _sync_from_cfg(self):
         try:
@@ -2315,6 +2337,7 @@ class ChallengeOVPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -2336,7 +2359,7 @@ class ChallengeOVPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Challenge Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -2379,20 +2402,19 @@ class MiniInfoPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(200, int(width_hint))
-        self._base_h = max(80, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
         else:
             self._w, self._h = self._base_w, self._base_h
-            
+
         ov = self.parent_gui.cfg.OVERLAY or {}
         geo = self._screen_geo()
-        
+
         if bool(ov.get("notifications_saved", False)):
             if self._portrait:
                 x0 = int(ov.get("notifications_x_portrait", 100))
@@ -2404,7 +2426,7 @@ class MiniInfoPositionPicker(QWidget):
             # Wenn noch nie gespeichert, starte in der Mitte
             x0 = int(geo.left() + (geo.width() - self._w) // 2)
             y0 = int(geo.top() + (geo.height() - self._h) // 2)
-            
+
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2420,6 +2442,34 @@ class MiniInfoPositionPicker(QWidget):
             pass
         return QRect(0, 0, 1280, 720)
 
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        font_family = str(ov.get("font_family", "Segoe UI"))
+        body_pt = 20
+        pad_w = 28
+        pad_h = 22
+        max_text_width = 520
+        html = (
+            f"<div style='font-size:{body_pt}pt;font-family:\"{font_family}\";'>"
+            f"<span style='color:#FF3B30;'>NVRAM file not found or not readable</span>"
+            f"<br><span style='color:#DDDDDD;'>closing in 5…</span>"
+            f"</div>"
+        )
+        tmp = QLabel()
+        tmp.setTextFormat(Qt.TextFormat.RichText)
+        tmp.setStyleSheet("color:#FF3B30;background:transparent;")
+        tmp.setFont(QFont(font_family, body_pt))
+        tmp.setWordWrap(True)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tmp.setText(html)
+        tmp.setFixedWidth(max_text_width)
+        tmp.adjustSize()
+        text_w = tmp.width()
+        text_h = tmp.sizeHint().height()
+        W = max(200, text_w + pad_w)
+        H = max(60, text_h + pad_h)
+        return W, H
+
     def _sync_from_cfg(self):
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
@@ -2433,6 +2483,7 @@ class MiniInfoPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -2444,7 +2495,7 @@ class MiniInfoPositionPicker(QWidget):
             y = min(max(geo.top(),  y), geo.bottom() - self._h)
             self.setGeometry(x, y, self._w, self._h)
         self.update()
-        
+
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -2454,7 +2505,7 @@ class MiniInfoPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Mini Info\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -2829,12 +2880,11 @@ class StatusOverlayPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(200, int(width_hint))
-        self._base_h = max(80, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = False
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
         else:
@@ -2869,6 +2919,34 @@ class StatusOverlayPositionPicker(QWidget):
             pass
         return QRect(0, 0, 1280, 720)
 
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        font_family = str(ov.get("font_family", "Segoe UI"))
+        badge_font_pt = 13
+        pad_w = 22
+        pad_h = 14
+        max_text_width = 340
+        status_text = "Online · Tracking"
+        html = (
+            f"<span style='font-size:{badge_font_pt}pt;font-family:\"{font_family}\";'>"
+            f"<span style='color:#00C853;'>&#9679;</span>"
+            f"&nbsp;<span style='color:#EEEEEE;'>{status_text}</span>"
+            f"</span>"
+        )
+        tmp = QLabel()
+        tmp.setTextFormat(Qt.TextFormat.RichText)
+        tmp.setStyleSheet("color:#EEEEEE;background:transparent;")
+        tmp.setFont(QFont(font_family, badge_font_pt))
+        tmp.setWordWrap(False)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        tmp.setText(html)
+        sh = tmp.sizeHint()
+        text_w = max(60, min(sh.width(), max_text_width))
+        text_h = max(1, sh.height())
+        W = max(120, text_w + pad_w)
+        H = max(36, text_h + pad_h)
+        return W, H
+
     def _sync_from_cfg(self):
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
@@ -2882,6 +2960,7 @@ class StatusOverlayPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -2898,12 +2977,12 @@ class StatusOverlayPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00C853")); pen.setWidth(2)
+        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Status Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -3038,7 +3117,7 @@ class OverlayPositionPicker(QWidget):
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick the button again to save"
+        msg = "Main Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
@@ -4576,12 +4655,11 @@ class HeatBarPositionPicker(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        self._base_w = max(36, int(width_hint))
-        self._base_h = max(120, int(height_hint))
         self._drag_off = QPoint(0, 0)
         self._portrait = False
         self._ccw = True
         self._sync_from_cfg()
+        self._base_w, self._base_h = self._calc_overlay_size()
 
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
@@ -4605,18 +4683,21 @@ class HeatBarPositionPicker(QWidget):
 
     def _screen_geo(self) -> QRect:
         try:
-            screens = QApplication.screens() or []
-            if screens:
-                vgeo = screens[0].geometry()
-                for s in screens[1:]:
-                    vgeo = vgeo.united(s.geometry())
-                return vgeo
             scr = QApplication.primaryScreen()
             if scr:
-                return scr.geometry()
+                return scr.availableGeometry()
         except Exception:
             pass
         return QRect(0, 0, 1280, 720)
+
+    def _calc_overlay_size(self) -> tuple[int, int]:
+        bar_w = 36
+        bar_h = 220
+        label_h = 28
+        pad = 6
+        w = bar_w + 2 * pad
+        h = bar_h + label_h + 2 * pad
+        return w, h
 
     def _sync_from_cfg(self):
         try:
@@ -4631,6 +4712,7 @@ class HeatBarPositionPicker(QWidget):
         old_portrait = bool(self._portrait)
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
+            self._base_w, self._base_h = self._calc_overlay_size()
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
@@ -4647,14 +4729,14 @@ class HeatBarPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#FF7F00"))
+        pen = QPen(QColor("#00E5FF"))
         pen.setWidth(2)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 8, 8)
+        p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
         p.setPen(QColor("#FF7F00"))
         p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        msg = "Drag to position.\nClick button again to save"
+        msg = "Heat Bar\nDrag to position. Click the button again to save"
         if self._portrait:
             p.save()
             angle = -90 if self._ccw else 90
