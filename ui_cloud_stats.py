@@ -4,12 +4,14 @@ import html as _html
 import os
 import json
 import threading
+import urllib.parse as _urlparse
 from datetime import datetime
 from typing import Any, List, Tuple
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextBrowser,
     QTabWidget, QGroupBox, QComboBox, QLineEdit, QPushButton,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl
 from PyQt6.QtGui import QDesktopServices
@@ -238,9 +240,27 @@ class CloudStatsMixin:
             self.cmb_cloud_diff.hide()
 
     def _on_cloud_view_anchor_clicked(self, url: QUrl):
-        """Open info badge links (https://...) in the system browser."""
+        """Handle info badge clicks: show VPS table info dialog instead of opening a browser."""
         url_str = url.toString() if isinstance(url, QUrl) else str(url)
-        if url_str.startswith("http://") or url_str.startswith("https://"):
+        if url_str.startswith("vpsinfo://"):
+            parsed = _urlparse.urlparse(url_str)
+            params = _urlparse.parse_qs(parsed.query)
+            table_name = params.get("t", [""])[0]
+            author = params.get("a", [""])[0]
+            version = params.get("v", [""])[0]
+            vps_id = params.get("id", [""])[0]
+            lines = []
+            if table_name:
+                lines.append(f"Table: {table_name}")
+            if author:
+                lines.append(f"Author: {author}")
+            if version:
+                lines.append(f"Version: {version}")
+            if vps_id:
+                lines.append(f"VPS ID: {vps_id}")
+            msg = "\n".join(lines) if lines else "No VPS information available."
+            QMessageBox.information(self, "Linked VPS Table", msg)
+        elif url_str.startswith("http://") or url_str.startswith("https://"):
             QDesktopServices.openUrl(QUrl(url_str))
 
     def _fetch_cloud_leaderboard(self):
@@ -361,8 +381,6 @@ class CloudStatsMixin:
         else:
             html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Score</th><th>Date</th></tr>")
         
-        vps_base = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
-
         def _cloud_info_badge(r: dict) -> str:
             if not include_info_badges:
                 return ""
@@ -380,11 +398,23 @@ class CloudStatsMixin:
             if not parts and not vps_id:
                 return ""
             tooltip = "&#10;".join(parts) if parts else _html.escape(vps_id)
-            safe_vps_id = _html.escape(vps_id, quote=True)
+            params: dict[str, str] = {}
+            if table_name:
+                params["t"] = table_name
+            if author:
+                params["a"] = author
+            if version:
+                params["v"] = version
             if vps_id:
+                params["id"] = vps_id
+            if params:
+                safe_url = _html.escape(
+                    "vpsinfo://?" + _urlparse.urlencode(params, quote_via=_urlparse.quote),
+                    quote=True,
+                )
                 return (
-                    f" <a href='{vps_base}{safe_vps_id}' title='{tooltip}'"
-                    " style='text-decoration:none;'>ℹ️</a>"
+                    f" <a href='{safe_url}' title='{tooltip}'"
+                    " style='text-decoration:none; cursor:pointer;'>ℹ️</a>"
                 )
             return f" <span title='{tooltip}' style='cursor:help;'>ℹ️</span>"
 
