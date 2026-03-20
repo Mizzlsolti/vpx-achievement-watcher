@@ -4989,6 +4989,8 @@ class Watcher:
                 "end_audits": end_audits,
                 "global_deltas": global_deltas,
                 "end_timestamp": datetime.now(timezone.utc).isoformat(),
+                # Convenience fields for dashboard display
+                "score": int(best_ball.get("score", 0)) if isinstance(best_ball, dict) else None,
             }
 
             save_json(summary_path, payload)

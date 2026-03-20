@@ -2328,15 +2328,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
         # Find unlock entry (with timestamp if available)
+        # Search both session and global achievement buckets to handle
+        # all achievement types (session-specific and global).
         unlock_entry = None
         try:
             state = self.watcher._ach_state_load()
+            # 1. Search session achievements for this ROM
             for e in state.get("session", {}).get(rom, []):
                 t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
                 clean = t.replace(" (Session)", "").replace(" (Global)", "")
                 if t == title or clean == title:
                     unlock_entry = e if isinstance(e, dict) else {"title": e}
                     break
+            # 2. If not found, also search the global "__global__" bucket
+            if unlock_entry is None:
+                for e in state.get("global", {}).get("__global__", []):
+                    t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                    clean = t.replace(" (Session)", "").replace(" (Global)", "")
+                    if t == title or clean == title:
+                        unlock_entry = e if isinstance(e, dict) else {"title": e}
+                        break
         except Exception:
             pass
 
@@ -4128,7 +4139,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
                     )
                 else:
-                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff)
+                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff, include_info_badges=False)
                     final_html = header_html + cloud_body
 
                 QMetaObject.invokeMethod(
@@ -4682,19 +4693,74 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
                     table_title = romnames.get(rom, rom.upper() if rom else "")
                     lr_table = table_title or rom.upper() or "Unknown table"
+
+                    # Score: try top-level "score" (added by newer exports),
+                    # then best_ball.score, then P1 Score from players deltas.
                     raw_score = _data.get("score", _data.get("best_score", None))
+                    if raw_score is None:
+                        best_ball = _data.get("best_ball") or {}
+                        raw_score = best_ball.get("score", None) if isinstance(best_ball, dict) else None
+                    if raw_score is None:
+                        try:
+                            players = _data.get("players") or []
+                            if players and isinstance(players[0], dict):
+                                p1_deltas = players[0].get("deltas", {}) or {}
+                                # Look for score-related field
+                                for k, v in p1_deltas.items():
+                                    if "score" in k.lower():
+                                        raw_score = v
+                                        break
+                        except Exception:
+                            pass
                     if raw_score is not None:
                         try:
                             lr_score = f"{int(raw_score):,}"
                         except Exception:
                             lr_score = str(raw_score)
+
+                    # Achievements: try stored counts first, then live lookup from state
                     ach_count = _data.get("achievements_unlocked", _data.get("unlocked", None))
                     ach_total = _data.get("achievements_total", _data.get("total", None))
+                    if ach_count is None and rom:
+                        try:
+                            state = self.watcher._ach_state_load()
+                            unlocked_titles = set()
+                            for e in state.get("session", {}).get(rom, []):
+                                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                                if t:
+                                    unlocked_titles.add(t)
+                            ach_count = len(unlocked_titles)
+                            try:
+                                s_rules = self.watcher._collect_player_rules_for_rom(rom)
+                                unique_titles = {str(r.get("title", "")).strip() for r in s_rules if isinstance(r, dict) and r.get("title")}
+                                ach_total = len(unique_titles) if unique_titles else None
+                            except Exception:
+                                ach_total = None
+                        except Exception:
+                            pass
                     if ach_count is not None and ach_total is not None:
                         lr_achievements = f"{ach_count} / {ach_total}"
                     elif ach_count is not None:
                         lr_achievements = str(ach_count)
+
+                    # Result: use end_timestamp as human-readable date, fall back to duration
                     result = str(_data.get("result", _data.get("outcome", "")) or "").strip()
+                    if not result:
+                        end_ts = str(_data.get("end_timestamp", "") or "").strip()
+                        if end_ts:
+                            try:
+                                dt = datetime.fromisoformat(end_ts)
+                                result = dt.astimezone().strftime("%Y-%m-%d %H:%M")
+                            except Exception:
+                                result = end_ts[:16]
+                        if not result:
+                            dur = _data.get("duration_sec")
+                            if dur is not None:
+                                try:
+                                    mins, secs = divmod(int(dur), 60)
+                                    result = f"{mins}m {secs}s"
+                                except Exception:
+                                    pass
                     lr_result = result if result else "—"
             except Exception:
                 pass
