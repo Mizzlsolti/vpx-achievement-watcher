@@ -1922,14 +1922,19 @@ class FlipCounterPositionPicker(QWidget):
             self._w, self._h = self._base_w, self._base_h
 
         ov = self.parent_gui.cfg.OVERLAY or {}
-        if self._portrait:
-            x0 = int(ov.get("flip_counter_x_portrait", 100))
-            y0 = int(ov.get("flip_counter_y_portrait", 100))
-        else:
-            x0 = int(ov.get("flip_counter_x_landscape", 100))
-            y0 = int(ov.get("flip_counter_y_landscape", 100))
-
         geo = self._screen_geo()
+        # fall back to legacy "custom" key for backward compatibility with older configs
+        if bool(ov.get("flip_counter_saved", ov.get("flip_counter_custom", False))):
+            if self._portrait:
+                x0 = int(ov.get("flip_counter_x_portrait", 100))
+                y0 = int(ov.get("flip_counter_y_portrait", 100))
+            else:
+                x0 = int(ov.get("flip_counter_x_landscape", 100))
+                y0 = int(ov.get("flip_counter_y_landscape", 100))
+        else:
+            x0 = int(geo.left() + (geo.width() - self._w) // 2)
+            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -1956,8 +1961,10 @@ class FlipCounterPositionPicker(QWidget):
         fm_body = QFontMetrics(f_body)
         pad = max(12, int(body_pt * 0.9))
         vgap = max(4, int(body_pt * 0.25))
-        title = "Total flips: 9999/9999"
-        sub = "Remaining: 9999"
+        # Use the configured goal so the picker matches the actual overlay size
+        goal = int(ov.get("flip_counter_goal_total", 400))
+        title = f"Total flips: {goal}/{goal}"
+        sub = f"Remaining: {goal}"
         text_w = max(fm_title.horizontalAdvance(title), fm_body.horizontalAdvance(sub))
         text_h = fm_title.height() + vgap + fm_body.height()
         w = max(280, text_w + 2 * pad)
@@ -2053,13 +2060,18 @@ class TimerPositionPicker(QWidget):
         else:
             self._w, self._h = self._base_w, self._base_h
         ov = self.parent_gui.cfg.OVERLAY or {}
-        if self._portrait:
-            x0 = int(ov.get("ch_timer_x_portrait", 100))
-            y0 = int(ov.get("ch_timer_y_portrait", 100))
-        else:
-            x0 = int(ov.get("ch_timer_x_landscape", 100))
-            y0 = int(ov.get("ch_timer_y_landscape", 100))
         geo = self._screen_geo()
+        # fall back to legacy "custom" key for backward compatibility with older configs
+        if bool(ov.get("ch_timer_saved", ov.get("ch_timer_custom", False))):
+            if self._portrait:
+                x0 = int(ov.get("ch_timer_x_portrait", 100))
+                y0 = int(ov.get("ch_timer_y_portrait", 100))
+            else:
+                x0 = int(ov.get("ch_timer_x_landscape", 100))
+                y0 = int(ov.get("ch_timer_y_landscape", 100))
+        else:
+            x0 = int(geo.left() + (geo.width() - self._w) // 2)
+            y0 = int(geo.top() + (geo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2167,13 +2179,18 @@ class ToastPositionPicker(QWidget):
         else:
             self._w, self._h = self._base_w, self._base_h
         ov = self.parent_gui.cfg.OVERLAY or {}
-        if self._portrait:
-            x0 = int(ov.get("ach_toast_x_portrait", 100))
-            y0 = int(ov.get("ach_toast_y_portrait", 100))
-        else:
-            x0 = int(ov.get("ach_toast_x_landscape", 100))
-            y0 = int(ov.get("ach_toast_y_landscape", 100))
         geo = self._screen_geo()
+        # fall back to legacy "custom" key for backward compatibility with older configs
+        if bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False))):
+            if self._portrait:
+                x0 = int(ov.get("ach_toast_x_portrait", 100))
+                y0 = int(ov.get("ach_toast_y_portrait", 100))
+            else:
+                x0 = int(ov.get("ach_toast_x_landscape", 100))
+                y0 = int(ov.get("ach_toast_y_landscape", 100))
+        else:
+            x0 = int(geo.left() + (geo.width() - self._w) // 2)
+            y0 = int(geo.top() + (geo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2299,13 +2316,18 @@ class ChallengeOVPositionPicker(QWidget):
         else:
             self._w, self._h = self._base_w, self._base_h
         ov = self.parent_gui.cfg.OVERLAY or {}
-        if self._portrait:
-            x0 = int(ov.get("ch_ov_x_portrait", 100))
-            y0 = int(ov.get("ch_ov_y_portrait", 100))
-        else:
-            x0 = int(ov.get("ch_ov_x_landscape", 100))
-            y0 = int(ov.get("ch_ov_y_landscape", 100))
         geo = self._screen_geo()
+        # fall back to legacy "custom" key for backward compatibility with older configs
+        if bool(ov.get("ch_ov_saved", ov.get("ch_ov_custom", False))):
+            if self._portrait:
+                x0 = int(ov.get("ch_ov_x_portrait", 100))
+                y0 = int(ov.get("ch_ov_y_portrait", 100))
+            else:
+                x0 = int(ov.get("ch_ov_x_landscape", 100))
+                y0 = int(ov.get("ch_ov_y_landscape", 100))
+        else:
+            x0 = int(geo.left() + (geo.width() - self._w) // 2)
+            y0 = int(geo.top() + (geo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -4661,14 +4683,19 @@ class HeatBarPositionPicker(QWidget):
             self._w, self._h = self._base_w, self._base_h
 
         ov = self.parent_gui.cfg.OVERLAY or {}
-        if self._portrait:
-            x0 = int(ov.get("heat_bar_x_portrait", 20))
-            y0 = int(ov.get("heat_bar_y_portrait", 100))
-        else:
-            x0 = int(ov.get("heat_bar_x_landscape", 20))
-            y0 = int(ov.get("heat_bar_y_landscape", 100))
-
         geo = self._screen_geo()
+        # fall back to legacy "custom" key for backward compatibility with older configs
+        if bool(ov.get("heat_bar_saved", ov.get("heat_bar_custom", False))):
+            if self._portrait:
+                x0 = int(ov.get("heat_bar_x_portrait", 20))
+                y0 = int(ov.get("heat_bar_y_portrait", 100))
+            else:
+                x0 = int(ov.get("heat_bar_x_landscape", 20))
+                y0 = int(ov.get("heat_bar_y_landscape", 100))
+        else:
+            x0 = int(geo.left() + (geo.width() - self._w) // 2)
+            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
