@@ -17,6 +17,21 @@ from PyQt6.QtGui import QDesktopServices
 from watcher_core import CloudSync, secure_load_json
 
 
+class _NoBrowseBrowser(QTextBrowser):
+    """QTextBrowser subclass that never attempts to load external HTTP/HTTPS
+    URLs as documents.  Without this override Qt prints a noisy warning:
+    ``QTextBrowser: No document for https://…`` even when ``setOpenLinks``
+    is False, because the base class still calls ``loadResource`` internally
+    after emitting ``anchorClicked``.  Returning *None* here suppresses
+    both the warning and any attempt to navigate away from the current HTML.
+    """
+
+    def loadResource(self, resource_type: int, url: QUrl):  # type: ignore[override]
+        if url.scheme() in ("http", "https", "ftp"):
+            return None
+        return super().loadResource(resource_type, url)
+
+
 class CloudStatsMixin:
     """
     Mixin for MainWindow that provides the Stats and Cloud-Leaderboard tabs,
@@ -223,7 +238,7 @@ class CloudStatsMixin:
         lay_ctrl.addWidget(self.btn_cloud_fetch)
         layout.addWidget(grp_controls)
         
-        self.cloud_view = QTextBrowser()
+        self.cloud_view = _NoBrowseBrowser()
         self.cloud_view.setOpenLinks(False)
         self.cloud_view.anchorClicked.connect(self._on_cloud_view_anchor_clicked)
         self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM and click Fetch)</div>")

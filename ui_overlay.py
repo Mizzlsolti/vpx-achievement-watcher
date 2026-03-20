@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect, QObject, QPoint, QEventLoop
 from PyQt6.QtGui import (
     QColor, QFont, QFontMetrics, QTransform, QPixmap,
-    QPainter, QImage, QPen, QTextDocument,
+    QPainter, QImage, QPen,
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
@@ -2317,18 +2317,8 @@ class StatusOverlay(QWidget):
         )
 
     def _render_badge_image(self, html: str) -> QImage:
-        # Measure the actual text size using QTextDocument so we don't over-size
-        # the badge when the status text is short.
-        doc = QTextDocument()
-        doc.setDefaultFont(QFont(self._font_family, self._BADGE_FONT_PT))
-        doc.setHtml(html)
-        text_w = min(int(doc.idealWidth()), self._MAX_TEXT_WIDTH)
-        text_h = max(1, int(doc.size().height()))
-
-        W = max(120, text_w + self._PAD_W)
-        H = max(36, text_h + self._PAD_H)
-
-        # Render the label into the badge image
+        # Measure the actual rendered text size using a QLabel sizeHint so the
+        # badge is sized to fit the content tightly (no excess right padding).
         tmp = QLabel()
         tmp.setTextFormat(Qt.TextFormat.RichText)
         tmp.setStyleSheet("color:#EEEEEE;background:transparent;")
@@ -2336,8 +2326,16 @@ class StatusOverlay(QWidget):
         tmp.setWordWrap(False)
         tmp.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         tmp.setText(html)
+        # sizeHint() gives the natural (unwrapped) dimensions of the label.
+        sh = tmp.sizeHint()
+        text_w = max(60, min(sh.width(), self._MAX_TEXT_WIDTH))
+        text_h = max(1, sh.height())
+
+        W = max(120, text_w + self._PAD_W)
+        H = max(36, text_h + self._PAD_H)
+
         tmp.setFixedWidth(text_w)
-        tmp.adjustSize()
+        tmp.resize(text_w, text_h)
 
         img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
@@ -2347,7 +2345,7 @@ class StatusOverlay(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(self._bg_color)
             p.drawRoundedRect(0, 0, W, H, self._RADIUS, self._RADIUS)
-            # Left-align content with padding
+            # Left-align content with equal horizontal padding on both sides
             margin_left = self._PAD_W // 2
             margin_top = (H - text_h) // 2
             tmp.render(p, QPoint(margin_left, margin_top))
@@ -2609,7 +2607,19 @@ class OverlayPositionPicker(QWidget):
     def _calc_overlay_size(self) -> tuple[int, int]:
         ov = self.parent_gui.cfg.OVERLAY or {}
         scale_pct = int(ov.get("scale_pct", 100))
-        ref = self._safe_screen_geo()
+        # Use the same screen-geometry source as OverlayWindow._apply_geometry so
+        # the picker preview dimensions exactly match the final rendered overlay.
+        try:
+            screens = QApplication.screens() or []
+            if screens:
+                vgeo = screens[0].geometry()
+                for s in screens[1:]:
+                    vgeo = vgeo.united(s.geometry())
+                ref = vgeo
+            else:
+                ref = self._safe_screen_geo()
+        except Exception:
+            ref = self._safe_screen_geo()
         if self._portrait:
             base_h = int(ref.height() * 0.55)
             base_w = int(base_h * 9 / 16)

@@ -30,8 +30,53 @@ VPSDB_TTL = 24 * 3600  # 24 hours in seconds
 MAX_PICKER_RESULTS = 100  # Maximum entries shown in VpsPickerDialog
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VPS-DB helpers
+# VPS feature-tag colour palette
+# Colours are derived from the VPS spreadsheet visual identity and community
+# conventions for each feature tag.  Where an exact upstream colour is not
+# published the palette uses a stable, distinctive mapping so each tag always
+# looks the same regardless of the order it appears.
 # ─────────────────────────────────────────────────────────────────────────────
+
+_VPS_FEATURE_COLORS: dict[str, tuple[str, str, str]] = {
+    # tag           background  foreground  border
+    "SSF":          ("#1A0000",  "#FF4040",  "#FF4040"),   # Surround Sound Feedback  – red
+    "NFOZZY":       ("#1A1700",  "#F5E642",  "#C8BC00"),   # NFozzy physics           – yellow
+    "HYBRID":       ("#1A0020",  "#CC55FF",  "#9900CC"),   # Hybrid physics           – purple
+    "VR":           ("#000833",  "#5599FF",  "#2266DD"),   # Virtual Reality          – blue
+    "FLEEP":        ("#001818",  "#00CCCC",  "#009999"),   # Fleep sounds             – teal
+    "LUT":          ("#1A0D00",  "#FF9900",  "#CC6600"),   # Look-Up Table lighting   – orange
+    "4K":           ("#181400",  "#FFD700",  "#AA9000"),   # 4 K rendering            – gold
+    "DOF":          ("#001400",  "#44DD44",  "#228822"),   # Direct Output Framework  – green
+    "FASTFLIPS":    ("#1A0000",  "#FF7777",  "#CC2222"),   # Fast Flips physics       – light red
+    "FAST FLIPS":   ("#1A0000",  "#FF7777",  "#CC2222"),
+    "LIGHTMAPS":    ("#00001A",  "#7799FF",  "#3355CC"),   # Lightmaps                – cornflower
+    "LIGHT MAPS":   ("#00001A",  "#7799FF",  "#3355CC"),
+    "MOD":          ("#0D1A00",  "#88FF44",  "#559900"),   # Modification             – lime
+    "ORIGINAL":     ("#1A1A00",  "#FFEE88",  "#BBAA00"),   # Original table           – pale gold
+    "FS":           ("#001A1A",  "#44FFCC",  "#008866"),   # Full Screen              – cyan-green
+    "2K":           ("#101010",  "#BBBBBB",  "#666666"),   # 2 K rendering            – grey
+    "B2S":          ("#0A001A",  "#BB66FF",  "#7700BB"),   # Backglass (B2S)          – violet
+    "NIGHT":        ("#080010",  "#8888EE",  "#4444AA"),   # Night mode               – indigo
+    "HIGHRES":      ("#001508",  "#33FF99",  "#009944"),   # High resolution          – mint
+    "TOPPER":       ("#1A1000",  "#FF9944",  "#BB5500"),   # Topper support           – amber
+    "POPPER":       ("#1A0A00",  "#FFAA44",  "#BB6600"),   # Popper integration       – warm orange
+}
+
+_VPS_FEATURE_DEFAULT = ("#003333", "#00E5FF", "#00E5FF")  # generic cyan fallback
+
+
+def _vps_feature_stylesheet(tag: str) -> str:
+    """Return a QLabel stylesheet string with the correct VPS colour for *tag*.
+
+    Falls back to the generic cyan style when the tag is not in the palette.
+    """
+    key = tag.upper().strip()
+    bg, fg, border = _VPS_FEATURE_COLORS.get(key, _VPS_FEATURE_DEFAULT)
+    return (
+        f"QLabel {{ background:{bg}; color:{fg}; font-size:9px;"
+        f" border:1px solid {border}; border-radius:3px; padding:1px 4px; }}"
+    )
+
 
 def _load_vpsdb(cfg) -> Optional[List[dict]]:
     """Load vpsdb.json, using a local cache with 24-hour TTL."""
@@ -464,10 +509,7 @@ class VpsCardWidget(QFrame):
             feat_row.setSpacing(3)
             for feat in features:
                 lbl_f = QLabel(feat)
-                lbl_f.setStyleSheet(
-                    "QLabel { background:#003333; color:#00E5FF; font-size:9px;"
-                    " border:1px solid #00E5FF; border-radius:3px; padding:1px 4px; }"
-                )
+                lbl_f.setStyleSheet(_vps_feature_stylesheet(feat))
                 feat_row.addWidget(lbl_f)
             feat_row.addStretch()
             meta.addLayout(feat_row)
@@ -631,10 +673,7 @@ class VpsHeroPanel(QFrame):
         features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
         for feat in features:
             lbl_f = QLabel(feat)
-            lbl_f.setStyleSheet(
-                "QLabel { background:#003333; color:#00E5FF; font-size:9px;"
-                " border:1px solid #00E5FF; border-radius:3px; padding:1px 5px; }"
-            )
+            lbl_f.setStyleSheet(_vps_feature_stylesheet(feat))
             self._feat_lay.addWidget(lbl_f)
         if features:
             spacer = QWidget()
