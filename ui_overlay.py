@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect, QObject, QPoint, QEventLoop
 from PyQt6.QtGui import (
     QColor, QFont, QFontMetrics, QTransform, QPixmap,
-    QPainter, QImage, QPen,
+    QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
@@ -208,6 +208,10 @@ class OverlayEffectsWidget(QWidget):
         # Floating particles
         self._particles: list = []
 
+        # Per-page accent colour (smoothly lerped)
+        self._accent_color: QColor = QColor(0, 229, 255)
+        self._target_accent: QColor = QColor(0, 229, 255)
+
         self._tick_timer = QTimer(self)
         self._tick_timer.setInterval(50)
         self._tick_timer.timeout.connect(self._on_tick)
@@ -233,12 +237,14 @@ class OverlayEffectsWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        low_perf = False
         try:
-            low_perf = bool(self.parent().parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            ov = self.parent().parent_gui.cfg.OVERLAY
+            low_perf = bool(ov.get("low_performance_mode", False))
+            anim_glow = bool(ov.get("anim_main_glow", True))
         except Exception:
-            pass
-        if low_perf:
+            low_perf = False
+            anim_glow = True
+        if low_perf or not anim_glow:
             return
         if not self._particles:
             self._init_particles()
@@ -252,6 +258,16 @@ class OverlayEffectsWidget(QWidget):
     def _on_tick(self):
         # Advance glow breath (increment ~0.008 per 50ms => ~6.25s period)
         self._glow_t = (self._glow_t + 0.008) % 1.0
+        # Smoothly lerp accent color toward target (~1s transition)
+        tgt = self._target_accent
+        cur = self._accent_color
+        lerp = 0.06
+        r = int(cur.red()   + (tgt.red()   - cur.red())   * lerp)
+        g = int(cur.green() + (tgt.green() - cur.green()) * lerp)
+        b = int(cur.blue()  + (tgt.blue()  - cur.blue())  * lerp)
+        self._accent_color = QColor(max(0, min(255, r)),
+                                    max(0, min(255, g)),
+                                    max(0, min(255, b)))
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
@@ -264,34 +280,127 @@ class OverlayEffectsWidget(QWidget):
                 pt.update(self._make_particle(W, H, spawn_anywhere=False))
         self.update()
 
+    def set_accent(self, color: QColor):
+        """Set the target accent color; the glow will smoothly lerp to it."""
+        self._target_accent = QColor(color)
+
     def paintEvent(self, event):
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
-        low_perf = False
         try:
-            low_perf = bool(self.parent().parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            ov = self.parent().parent_gui.cfg.OVERLAY
+            low_perf = bool(ov.get("low_performance_mode", False))
+            anim_glow = bool(ov.get("anim_main_glow", True))
         except Exception:
-            pass
-        if low_perf:
+            low_perf = False
+            anim_glow = True
+        if low_perf or not anim_glow:
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         try:
-            # Breathing glow border
+            # Breathing glow border — use smoothly lerped accent colour
             amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
             alpha_base = int(120 + 135 * amp)  # 120..255
             layers = int(2 + 2 * amp)          # 2..4
-            glow_color = QColor(0, 229, 255, alpha_base)
+            ac = self._accent_color
+            glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
             _draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
 
-            # Floating particles
+            # Floating particles — tinted to accent colour
             p.setPen(Qt.PenStyle.NoPen)
             for pt in self._particles:
-                c = QColor(0, 229, 255, int(pt['alpha']))
+                c = QColor(ac.red(), ac.green(), ac.blue(), int(pt['alpha']))
                 p.setBrush(c)
                 sz = int(pt['size'])
                 p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+
+# Per-page accent colours for the main overlay (cycles as user navigates)
+_OVERLAY_PAGE_ACCENTS = [
+    QColor(0, 229, 255),    # page 0: cyan (default/highlights)
+    QColor(255, 127, 0),    # page 1: orange (achievement progress)
+    QColor(0, 200, 110),    # page 2: green (other views)
+    QColor(180, 80, 255),   # page 3: purple (cloud/VPS)
+]
+
+
+class _OverlayShineWidget(QWidget):
+    """Transparent overlay that draws a horizontal shine/sweep stripe
+    over the estimated progress bar area of the main overlay."""
+
+    # Progress bar is placed roughly in the upper-middle of the body content:
+    # ~25-38% down from the widget top, spanning the centred 75%-width bar.
+    _BAR_TOP_FRAC = 0.25    # fraction of widget height where bar area starts
+    _BAR_H_FRAC   = 0.13    # fraction of widget height that covers bar area
+    _STRIPE_W_FRAC = 0.22   # width of the shine stripe relative to widget width
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._t: float = 0.0  # 0.0..1.0 sweep position
+        self.hide()
+
+    def paintEvent(self, _ev):
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
+            return
+        bar_top  = int(H * self._BAR_TOP_FRAC)
+        bar_h    = int(H * self._BAR_H_FRAC)
+        stripe_w = int(W * self._STRIPE_W_FRAC)
+        x = int(-stripe_w + self._t * (W + stripe_w * 2))
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        try:
+            grad = QLinearGradient(float(x), float(bar_top),
+                                   float(x + stripe_w), float(bar_top))
+            grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+            grad.setColorAt(0.35, QColor(255, 255, 255, 55))
+            grad.setColorAt(0.65, QColor(255, 255, 255, 55))
+            grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+            p.fillRect(x, bar_top, stripe_w, bar_h, QBrush(grad))
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+
+class _OverlayHighlightWidget(QWidget):
+    """Briefly flashes a warm amber highlight over the overlay content area
+    when score or progress values change."""
+
+    # Warm amber tint used for the value-change highlight flash
+    _FLASH_COLOR = QColor(255, 200, 80)
+    # Starting alpha (0-255) for the highlight; fades to 0 over ~240 ms
+    _INITIAL_ALPHA = 45
+    # Alpha step subtracted each 16 ms tick → fade duration ≈ alpha/step*16 ms
+    _FADE_STEP = 3
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._alpha: int = 0
+        self.hide()
+
+    def paintEvent(self, _ev):
+        if self._alpha <= 0:
+            return
+        p = QPainter(self)
+        try:
+            c = QColor(self._FLASH_COLOR)
+            c.setAlpha(self._alpha)
+            p.fillRect(self.rect(), c)
         finally:
             try:
                 p.end()
@@ -361,13 +470,20 @@ class OverlayWindow(QWidget):
                 QTimer.singleShot(0, lambda: self.request_rotation(force=True))
             else:
                 QTimer.singleShot(0, self._show_live_unrotated)
+        W, H = self.width(), self.height()
         # Start effects overlay (glow border + floating particles)
         if hasattr(self, '_effects_widget'):
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-            if not low_perf:
-                self._effects_widget.setGeometry(0, 0, self.width(), self.height())
+            anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True))
+            if not low_perf and anim_glow:
+                self._effects_widget.setGeometry(0, 0, W, H)
                 self._effects_widget.show()
                 self._effects_widget.raise_()
+        # Size the shine and highlight overlay widgets
+        if hasattr(self, '_shine_widget'):
+            self._shine_widget.setGeometry(0, 0, W, H)
+        if hasattr(self, '_highlight_widget'):
+            self._highlight_widget.setGeometry(0, 0, W, H)
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -379,6 +495,10 @@ class OverlayWindow(QWidget):
             self._progress_bar_timer.stop()
         if hasattr(self, '_transition_timer'):
             self._transition_timer.stop()
+        if hasattr(self, '_shine_timer'):
+            self._shine_timer.stop()
+        if hasattr(self, '_highlight_timer'):
+            self._highlight_timer.stop()
 
 
     def _alpha_bbox(self, img: QImage, min_alpha: int = 8) -> QRect:
@@ -461,9 +581,9 @@ class OverlayWindow(QWidget):
         if self.bg_url:
             css = ("QWidget#overlay_bg {"
                    f"border-image: url('{self.bg_url}') 0 0 0 0 stretch stretch;"
-                   "background:rgba(8,12,22,245);border:2px solid #00E5FF;border-radius:18px;}")
+                   "background:rgba(8,12,22,252);border:2px solid #00E5FF;border-radius:18px;}")
         else:
-            css = ("QWidget#overlay_bg {background:rgba(8,12,22,245);"
+            css = ("QWidget#overlay_bg {background:rgba(8,12,22,252);"
                    "border:2px solid #00E5FF;border-radius:18px;}")
         self.container.setStyleSheet(css)
         self.text_container = QWidget(self)
@@ -524,6 +644,18 @@ class OverlayWindow(QWidget):
         self._transition_timer.timeout.connect(self._transition_tick)
         # Effects widget (glow border + floating particles)
         self._effects_widget = OverlayEffectsWidget(self)
+        # Per-page accent colour index
+        self._page_index: int = 0
+        # Shine/sweep effect for progress bar
+        self._shine_widget = _OverlayShineWidget(self)
+        self._shine_timer = QTimer(self)
+        self._shine_timer.setInterval(16)
+        self._shine_timer.timeout.connect(self._shine_tick)
+        # Value highlight/pulse flash
+        self._highlight_widget = _OverlayHighlightWidget(self)
+        self._highlight_timer = QTimer(self)
+        self._highlight_timer.setInterval(16)
+        self._highlight_timer.timeout.connect(self._highlight_tick)
 
     def request_rotation(self, force: bool = False):
         if not self.portrait_mode:
@@ -589,6 +721,10 @@ class OverlayWindow(QWidget):
             self.container.setGeometry(0, 0, w, h)
         if hasattr(self, "text_container"):
             self.text_container.setGeometry(0, 0, w, h)
+        if hasattr(self, '_shine_widget'):
+            self._shine_widget.setGeometry(0, 0, w, h)
+        if hasattr(self, '_highlight_widget'):
+            self._highlight_widget.setGeometry(0, 0, w, h)
 
     def _layout_positions(self):
         if getattr(self, '_rot_in_progress', False):
@@ -990,9 +1126,9 @@ class OverlayWindow(QWidget):
         # Animated progress bar: update target and start timer if changed
         new_pct_target = pct if total_achs > 0 else 0.0
         if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
+            old_pct_target = getattr(self, '_progress_pct_target', -1.0)
             self._progress_pct_target = new_pct_target
-            low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-            if low_perf:
+            if not self._anim_ok("anim_main_score_progress"):
                 self._progress_pct_current = self._progress_pct_target
             else:
                 if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
@@ -1000,6 +1136,9 @@ class OverlayWindow(QWidget):
                     self._progress_pct_current = 0.0
                 if hasattr(self, '_progress_bar_timer'):
                     self._progress_bar_timer.start()
+                # Trigger shine when progress actually changes (not first display)
+                if old_pct_target >= 0:
+                    self._trigger_shine()
 
         style = """
         <style>
@@ -1025,14 +1164,17 @@ class OverlayWindow(QWidget):
 
             # Score counter spin: update target and start spin if changed
             if score_abs != getattr(self, '_score_target', -1):
+                old_score = getattr(self, '_score_target', 0)
                 self._score_target = score_abs
                 if getattr(self, '_score_display', 0) == 0:
                     self._score_display = 0
-                low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-                if low_perf:
+                if not self._anim_ok("anim_main_score_progress"):
                     self._score_display = self._score_target
                 elif hasattr(self, '_score_spin_timer'):
                     self._score_spin_timer.start()
+                # Flash highlight when score changes (not on initial 0→value)
+                if old_score > 0 and score_abs != old_score:
+                    self._trigger_highlight()
 
             lines = []
 
@@ -1223,6 +1365,59 @@ class OverlayWindow(QWidget):
                 pass
         label.setPixmap(QPixmap.fromImage(glitched))
 
+    # ------------------------------------------------------------------
+    # Animation helpers
+    # ------------------------------------------------------------------
+
+    def _anim_ok(self, key: str) -> bool:
+        """Return True only when low_performance_mode is off AND *key* is enabled."""
+        ov = self.parent_gui.cfg.OVERLAY
+        if bool(ov.get("low_performance_mode", False)):
+            return False
+        return bool(ov.get(key, True))
+
+    def _trigger_shine(self):
+        """Start a shine/sweep over the estimated progress bar area."""
+        if not self._anim_ok("anim_main_highlights"):
+            return
+        W, H = self.width(), self.height()
+        self._shine_widget.setGeometry(0, 0, W, H)
+        self._shine_widget._t = 0.0
+        self._shine_widget.show()
+        self._shine_widget.raise_()
+        if not self._shine_timer.isActive():
+            self._shine_timer.start()
+
+    def _shine_tick(self):
+        """Advance the progress bar shine sweep (~800 ms full pass)."""
+        self._shine_widget._t = min(1.0, self._shine_widget._t + 16.0 / 800.0)
+        self._shine_widget.update()
+        if self._shine_widget._t >= 1.0:
+            self._shine_timer.stop()
+            self._shine_widget.hide()
+
+    def _trigger_highlight(self):
+        """Flash a brief warm highlight to signal a value change."""
+        if not self._anim_ok("anim_main_highlights"):
+            return
+        W, H = self.width(), self.height()
+        self._highlight_widget.setGeometry(0, 0, W, H)
+        self._highlight_widget._alpha = _OverlayHighlightWidget._INITIAL_ALPHA
+        self._highlight_widget.show()
+        self._highlight_widget.raise_()
+        if not self._highlight_timer.isActive():
+            self._highlight_timer.start()
+
+    def _highlight_tick(self):
+        """Fade the highlight overlay out at the rate defined by _FADE_STEP."""
+        self._highlight_widget._alpha = max(
+            0, self._highlight_widget._alpha - _OverlayHighlightWidget._FADE_STEP
+        )
+        self._highlight_widget.update()
+        if self._highlight_widget._alpha <= 0:
+            self._highlight_timer.stop()
+            self._highlight_widget.hide()
+
     def transition_to(self, new_content_callback, direction: str = 'left'):
         """Perform a slide+fade page transition (with a brief glitch pre-effect).
 
@@ -1230,8 +1425,7 @@ class OverlayWindow(QWidget):
         captures the current display, runs the callback to update content, then animates
         between old and new snapshots.
         """
-        low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-        if low_perf:
+        if not self._anim_ok("anim_main_transitions"):
             new_content_callback()
             return
 
@@ -1239,6 +1433,15 @@ class OverlayWindow(QWidget):
         if old_img is None or old_img.isNull():
             new_content_callback()
             return
+
+        # Advance page index for accent colour cycling
+        n = len(_OVERLAY_PAGE_ACCENTS)
+        if direction == 'left':
+            self._page_index = (self._page_index + 1) % n
+        else:
+            self._page_index = (self._page_index - 1) % n
+        if hasattr(self, '_effects_widget'):
+            self._effects_widget.set_accent(_OVERLAY_PAGE_ACCENTS[self._page_index])
 
         # Ensure transition label exists
         if self._transition_label is None:
@@ -1286,11 +1489,45 @@ class OverlayWindow(QWidget):
             return
 
         dt = 16.0
+
         if state['phase'] == 'glitch':
             state['glitch_elapsed'] += dt
             old_img = state['old_img']
             if old_img and self._transition_label:
                 self._draw_glitch_frame(old_img, self._transition_label)
+            return
+
+        if state['phase'] == 'zoom':
+            # Zoom-settle phase: new content eases in from 0.97x → 1.0x
+            state['zoom_elapsed'] += dt
+            zoom_duration = 180.0
+            zt = min(1.0, state['zoom_elapsed'] / zoom_duration)
+            zoom_eased = _ease_out_cubic(zt)
+            scale = 0.97 + 0.03 * zoom_eased
+            new_img = state.get('new_img')
+            if new_img and not new_img.isNull() and self._transition_label:
+                W, H = new_img.width(), new_img.height()
+                out = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+                out.fill(Qt.GlobalColor.transparent)
+                pp = QPainter(out)
+                pp.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+                try:
+                    sw = int(W * scale)
+                    sh = int(H * scale)
+                    ox = (W - sw) // 2
+                    oy = (H - sh) // 2
+                    pp.drawImage(QRect(ox, oy, sw, sh), new_img)
+                finally:
+                    try:
+                        pp.end()
+                    except Exception:
+                        pass
+                self._transition_label.setPixmap(QPixmap.fromImage(out))
+            if zt >= 1.0:
+                self._transition_timer.stop()
+                if self._transition_label:
+                    self._transition_label.hide()
+                self._transition_state = None
             return
 
         # Slide + fade phase
@@ -1326,10 +1563,16 @@ class OverlayWindow(QWidget):
             self._transition_label.setPixmap(QPixmap.fromImage(composite))
 
         if t >= 1.0:
-            self._transition_timer.stop()
-            if self._transition_label:
-                self._transition_label.hide()
-            self._transition_state = None
+            # Enter zoom-settle phase
+            new_img = state.get('new_img')
+            if new_img and not new_img.isNull():
+                state['phase'] = 'zoom'
+                state['zoom_elapsed'] = 0.0
+            else:
+                self._transition_timer.stop()
+                if self._transition_label:
+                    self._transition_label.hide()
+                self._transition_state = None
 
 
 class MiniInfoOverlay(QWidget):
@@ -2295,7 +2538,8 @@ class StatusOverlay(QWidget):
 
         # Animation state
         low_perf = bool(ov.get("low_performance_mode", False))
-        self._low_perf = low_perf
+        anim_status = bool(ov.get("anim_status", True))
+        self._low_perf = low_perf or not anim_status
         # Scan-in animation
         self._scan_active: bool = False
         self._scan_elapsed: float = 0.0
@@ -2855,10 +3099,11 @@ class AchToastWindow(QWidget):
         self._remaining = self._seconds
 
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+        anim_toast = not low_perf and bool(parent.cfg.OVERLAY.get("anim_toast", True))
 
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
-        if low_perf:
+        if not anim_toast:
             self._burst_img_margin = 0
             self._burst_particles = []
             self._burst_elapsed = 0.0
@@ -2890,7 +3135,7 @@ class AchToastWindow(QWidget):
         # --- Neon ring pulse (level-up only) ---
         self._ring_rings = []
         self._ring_active = False
-        if is_level_up and not low_perf:
+        if is_level_up and anim_toast:
             self._ring_rings = [
                 {'r': 0.0, 'elapsed': 0.0, 'delay': 0.0, 'alpha': 200},
                 {'r': 0.0, 'elapsed': 0.0, 'delay': 150.0, 'alpha': 200},
@@ -2906,28 +3151,28 @@ class AchToastWindow(QWidget):
             self._ring_timer.start()
 
         # --- Energy flash for level-up ---
-        self._flash_active: bool = is_level_up and not low_perf
+        self._flash_active: bool = is_level_up and anim_toast
         self._flash_elapsed: float = 0.0
         self._flash_duration: float = 300.0
 
         # --- Typewriter reveal (title line1) ---
         self._tw_full: str = ""
         self._tw_idx: int = 0
-        self._tw_active: bool = not low_perf
+        self._tw_active: bool = anim_toast
         self._tw_cursor_visible: bool = True
         self._tw_cursor_timer = QTimer(self)
         self._tw_cursor_timer.setInterval(500)
         self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
-        if not low_perf:
+        if anim_toast:
             self._tw_cursor_timer.start()
 
         # --- Icon bounce animation ---
         self._bounce_elapsed: float = 0.0
         self._bounce_duration: float = 400.0
-        self._bounce_active: bool = not low_perf
+        self._bounce_active: bool = anim_toast
 
         # --- Slide-in/slide-out entry/exit animation ---
-        self._entry_active: bool = not low_perf
+        self._entry_active: bool = anim_toast
         self._entry_elapsed: float = 0.0
         self._entry_duration: float = 250.0
         self._exit_active: bool = False
@@ -2936,14 +3181,14 @@ class AchToastWindow(QWidget):
         self._motion_timer = QTimer(self)
         self._motion_timer.setInterval(16)
         self._motion_timer.timeout.connect(self._motion_tick)
-        if not low_perf:
+        if anim_toast:
             self._motion_timer.start()
 
         # Combined fast animation timer (typewriter + bounce + flash)
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(30)
         self._anim_timer.timeout.connect(self._anim_tick)
-        if not low_perf:
+        if anim_toast:
             self._anim_timer.start()
 
         self._render_and_place()
@@ -3594,7 +3839,8 @@ class ChallengeSelectOverlay(QWidget):
         self._pulse_timer.setInterval(50) 
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        self._low_perf = low_perf
+        anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
+        self._low_perf = low_perf or not anim_challenge
         # Carousel slide animation
         self._slide_active: bool = False
         self._slide_t: float = 0.0
@@ -3604,7 +3850,7 @@ class ChallengeSelectOverlay(QWidget):
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
-        if not low_perf:
+        if not self._low_perf:
             self._pulse_timer.start()
         self._pix = None
         self._render_and_place()
@@ -3891,7 +4137,8 @@ class FlipDifficultyOverlay(QWidget):
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        self._low_perf = low_perf
+        anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
+        self._low_perf = low_perf or not anim_challenge
         # Slot-machine snap animation
         self._snap_active: bool = False
         self._snap_elapsed: float = 0.0
@@ -3899,7 +4146,7 @@ class FlipDifficultyOverlay(QWidget):
         self._snap_timer = QTimer(self)
         self._snap_timer.setInterval(16)
         self._snap_timer.timeout.connect(self._on_snap_tick)
-        if not low_perf:
+        if not self._low_perf:
             self._pulse_timer.start()
 
         self.setWindowFlags(
@@ -4136,7 +4383,8 @@ class HeatBarometerOverlay(QWidget):
         # Reactive pulse animation timer (warning/critical)
         ov = self.parent_gui.cfg.OVERLAY or {}
         low_perf = bool(ov.get("low_performance_mode", False))
-        self._low_perf = low_perf
+        anim_challenge = bool(ov.get("anim_challenge", True))
+        self._low_perf = low_perf or not anim_challenge
         self._pulse_t: float = 0.0
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)

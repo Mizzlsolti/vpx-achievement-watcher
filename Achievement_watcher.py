@@ -1765,7 +1765,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "<b>📚 Available Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
             "• <b>Search</b>: Filter by table name or ROM name.<br>"
-            "• <b>🎯 Local tables with nvram map</b>: Show only tables that have an NVRAM mapping.<br>"
+            "• <b>🎯 Local tables with nvram map</b>: Show only local tables that have an NVRAM mapping.<br>"
             "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs.<br>"
             "• <b>Columns</b>: Table name, ROM, NVRAM Map (✅/❌), local .vpx found (🟠), "
             "VPS-ID, author, and a detail button (+)."
@@ -3001,6 +3001,58 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_perf.addWidget(self.chk_low_perf_mode)
 
         layout.addWidget(grp_perf)
+
+        grp_anim = QGroupBox("🎬 Animation Controls")
+        lay_anim = QVBoxLayout(grp_anim)
+        lbl_anim_note = QLabel("Enable or disable individual animation groups. Low Performance Mode overrides all.")
+        lbl_anim_note.setWordWrap(True)
+        lbl_anim_note.setStyleSheet("color:#AAA; font-size:9pt; margin-bottom:4px;")
+        lay_anim.addWidget(lbl_anim_note)
+
+        lbl_main_anim = QLabel("Main / Large Overlay:")
+        lbl_main_anim.setStyleSheet("font-weight:bold; margin-top:4px;")
+        lay_anim.addWidget(lbl_main_anim)
+
+        self.chk_anim_main_transitions = QCheckBox("  ↔  Page / content transitions")
+        self.chk_anim_main_transitions.setChecked(bool(self.cfg.OVERLAY.get("anim_main_transitions", True)))
+        self.chk_anim_main_transitions.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_main_transitions)
+
+        self.chk_anim_main_glow = QCheckBox("  ✨  Glow border & floating particles")
+        self.chk_anim_main_glow.setChecked(bool(self.cfg.OVERLAY.get("anim_main_glow", True)))
+        self.chk_anim_main_glow.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_main_glow)
+
+        self.chk_anim_main_score_progress = QCheckBox("  📊  Score counter & progress bar")
+        self.chk_anim_main_score_progress.setChecked(bool(self.cfg.OVERLAY.get("anim_main_score_progress", True)))
+        self.chk_anim_main_score_progress.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_main_score_progress)
+
+        self.chk_anim_main_highlights = QCheckBox("  💡  Value update highlights & shine sweep")
+        self.chk_anim_main_highlights.setChecked(bool(self.cfg.OVERLAY.get("anim_main_highlights", True)))
+        self.chk_anim_main_highlights.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_main_highlights)
+
+        lbl_other_anim = QLabel("Other Overlays:")
+        lbl_other_anim.setStyleSheet("font-weight:bold; margin-top:6px;")
+        lay_anim.addWidget(lbl_other_anim)
+
+        self.chk_anim_toast = QCheckBox("  🏆  Achievement toast")
+        self.chk_anim_toast.setChecked(bool(self.cfg.OVERLAY.get("anim_toast", True)))
+        self.chk_anim_toast.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_toast)
+
+        self.chk_anim_status = QCheckBox("  🔵  Status overlay")
+        self.chk_anim_status.setChecked(bool(self.cfg.OVERLAY.get("anim_status", True)))
+        self.chk_anim_status.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_status)
+
+        self.chk_anim_challenge = QCheckBox("  ⚡  Challenge overlays")
+        self.chk_anim_challenge.setChecked(bool(self.cfg.OVERLAY.get("anim_challenge", True)))
+        self.chk_anim_challenge.stateChanged.connect(self._save_anim_settings)
+        lay_anim.addWidget(self.chk_anim_challenge)
+
+        layout.addWidget(grp_anim)
         layout.addStretch(1)
         self._add_tab_help_button(layout, "system")
         self.main_tabs.addTab(tab, "⚙️ System")
@@ -3035,7 +3087,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _save_low_performance_mode(self, state: int):
         self.cfg.OVERLAY["low_performance_mode"] = bool(state)
         self.cfg.save()
-        
+
+    def _save_anim_settings(self):
+        self.cfg.OVERLAY["anim_main_transitions"] = bool(getattr(self, "chk_anim_main_transitions", None) and self.chk_anim_main_transitions.isChecked())
+        self.cfg.OVERLAY["anim_main_glow"] = bool(getattr(self, "chk_anim_main_glow", None) and self.chk_anim_main_glow.isChecked())
+        self.cfg.OVERLAY["anim_main_score_progress"] = bool(getattr(self, "chk_anim_main_score_progress", None) and self.chk_anim_main_score_progress.isChecked())
+        self.cfg.OVERLAY["anim_main_highlights"] = bool(getattr(self, "chk_anim_main_highlights", None) and self.chk_anim_main_highlights.isChecked())
+        self.cfg.OVERLAY["anim_toast"] = bool(getattr(self, "chk_anim_toast", None) and self.chk_anim_toast.isChecked())
+        self.cfg.OVERLAY["anim_status"] = bool(getattr(self, "chk_anim_status", None) and self.chk_anim_status.isChecked())
+        self.cfg.OVERLAY["anim_challenge"] = bool(getattr(self, "chk_anim_challenge", None) and self.chk_anim_challenge.isChecked())
+        self.cfg.save()
+
     def _save_player_name(self, name):
         self.cfg.OVERLAY["player_name"] = name.strip()
         self.cfg.save()
