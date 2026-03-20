@@ -884,7 +884,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.btn_status_overlay_place.setText("Place / Save position")
             return
 
-        self._status_overlay_picker = StatusOverlayPositionPicker(self, width_hint=420, height_hint=100)
+        # Derive the preview dimensions from the actual rendered badge so the
+        # picker exactly mirrors the final status overlay size.
+        w_hint, h_hint = 420, 100
+        try:
+            so = getattr(self, "_status_overlay", None)
+            if so is None:
+                so = StatusOverlay(self)
+            # Render with the current (or a representative) status text to get
+            # the correct badge dimensions.
+            if not so._status_text:
+                so._status_text = "Online · Tracking"
+                so._color = "#00C853"
+            img = so._render_badge_image(so._compose_html())
+            if img.width() > 0 and img.height() > 0:
+                w_hint = img.width()
+                h_hint = img.height()
+        except Exception:
+            pass
+        self._status_overlay_picker = StatusOverlayPositionPicker(self, width_hint=w_hint, height_hint=h_hint)
         self.btn_status_overlay_place.setText("Save position")
 
     # Agreed status states for the persistent status badge (traffic-light semantics)
@@ -1800,7 +1818,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.lbl_lr_table = QLabel("Table:  —")
         self.lbl_lr_score = QLabel("Score:  —")
         self.lbl_lr_achievements = QLabel("Achievements:  —")
-        self.lbl_lr_result = QLabel("Result:  —")
+        self.lbl_lr_result = QLabel("Last run:  —")
         for lbl in (self.lbl_lr_table, self.lbl_lr_score, self.lbl_lr_achievements, self.lbl_lr_result):
             lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
             lay_last.addWidget(lbl)
@@ -2351,6 +2369,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         break
         except Exception:
             pass
+
+        # Ensure unlock_entry always carries a vps_id so the info dialog shows
+        # stable VPS info.  For newly-unlocked achievements the vps_id was
+        # already embedded in the entry by watcher_core.  For legacy entries
+        # (unlocked before vps_id was stored in the entry) we snapshot the
+        # current mapping value here so subsequent opens of the same achievement
+        # always show the same table — changing the mapping later no longer
+        # silently rewrites what was displayed.
+        if isinstance(unlock_entry, dict) and not unlock_entry.get("vps_id"):
+            try:
+                _snap_mapping = _load_vps_mapping(self.cfg)
+                _snap_id = (_snap_mapping.get(rom) or "").strip()
+                if _snap_id:
+                    # Work on a shallow copy so we don't mutate the live state
+                    unlock_entry = dict(unlock_entry)
+                    unlock_entry["vps_id"] = _snap_id
+            except Exception:
+                pass
 
         dlg = VpsAchievementInfoDialog(self.cfg, rom, title, rule, unlock_entry, parent=self)
         dlg.exec()
@@ -4752,7 +4788,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     elif ach_count is not None:
                         lr_achievements = str(ach_count)
 
-                    # Result: use end_timestamp as human-readable date, fall back to duration
+                    # Last run date: try end_timestamp → duration_sec → file mtime
                     result = str(_data.get("result", _data.get("outcome", "")) or "").strip()
                     if not result:
                         end_ts = str(_data.get("end_timestamp", "") or "").strip()
@@ -4770,13 +4806,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                     result = f"{mins}m {secs}s"
                                 except Exception:
                                     pass
+                        if not result:
+                            # Final fallback: use file modification time
+                            try:
+                                mtime = os.path.getmtime(summary_path)
+                                result = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                            except Exception:
+                                pass
                     lr_result = result if result else "—"
             except Exception:
                 pass
             self.lbl_lr_table.setText(f"Table:  {lr_table}")
             self.lbl_lr_score.setText(f"Score:  {lr_score}")
             self.lbl_lr_achievements.setText(f"Achievements:  {lr_achievements}")
-            self.lbl_lr_result.setText(f"Result:  {lr_result}")
+            self.lbl_lr_result.setText(f"Last run:  {lr_result}")
         except Exception:
             pass
 
