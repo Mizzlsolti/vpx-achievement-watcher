@@ -1765,10 +1765,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "<b>📚 Available Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
             "• <b>Search</b>: Filter by table name or ROM name.<br>"
-            "• <b>🎯 Only with NVRAM-Map</b>: Show only tables that have an NVRAM mapping.<br>"
+            "• <b>🎯 Local tables with nvram map</b>: Show only tables that have an NVRAM mapping.<br>"
             "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs.<br>"
             "• <b>Columns</b>: Table name, ROM, NVRAM Map (✅/❌), local .vpx found (🟠), "
             "VPS-ID, author, and a detail button (+)."
+        ),
+        "controls": (
+            "<b>🕹️ Controls</b><br><br>"
+            "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
+            "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
+            "• <b>Challenge Action / Start</b>: Bind a key or button to start or trigger a challenge action.<br>"
+            "• <b>Challenge Left / Right</b>: Bind keys or buttons for left/right challenge navigation.<br>"
+            "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
+            "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
+            "• <b>Mute</b>: Silence all voice announcements."
+        ),
+        "cloud": (
+            "<b>☁️ Cloud</b><br><br>"
+            "The Cloud tab lets you browse the global leaderboard stored in the cloud.<br><br>"
+            "• <b>Category</b>: Choose between Achievement Progress, Timed Challenge, Flip Challenge, or Heat Challenge.<br>"
+            "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
+            "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM.<br>"
+            "• Cloud features require a valid Cloud URL configured in the System tab."
         ),
         "system": (
             "<b>⚙️ System</b><br><br>"
@@ -1935,7 +1953,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "&nbsp;&nbsp;&nbsp;"
             "<span style='color:#FFA500;'>●</span> Yellow = pending/local"
             "&nbsp;&nbsp;&nbsp;"
-            "<span style='color:#FF3B30;'>●</span> Red = cloud off"
+            "<span style='color:#FF3B30;'>●</span> Red = cloud off and table off"
         )
         lbl_legend.setTextFormat(Qt.TextFormat.RichText)
         lbl_legend.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -2133,6 +2151,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_voice.addLayout(row_v1); lay_voice.addWidget(self.chk_ch_voice_mute); layout.addWidget(grp_voice)
 
         layout.addStretch(1)
+        self._add_tab_help_button(layout, "controls")
         self.main_tabs.addTab(tab, "🕹️ Controls")
 
     def _build_tab_progress(self):
@@ -2501,7 +2520,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn_refresh.clicked.connect(self._refresh_available_maps)
         row.addWidget(btn_refresh)
 
-        self.btn_nvram_filter = QPushButton("🎯 Only with NVRAM-Map")
+        self.btn_nvram_filter = QPushButton("🎯 Local tables with nvram map")
         self.btn_nvram_filter.setCheckable(True)
         self.btn_nvram_filter.setChecked(False)
         self.btn_nvram_filter.setStyleSheet(
