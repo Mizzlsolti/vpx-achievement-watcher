@@ -1,3 +1,46 @@
+## Automated Build & Release
+
+The repository uses GitHub Actions to build a Windows installer automatically — no manual steps needed.
+
+### How to trigger a build
+
+**Option A – Manual trigger (any time):**
+1. Go to the **Actions** tab in the GitHub repository.
+2. Select the **"Build Windows Installer"** workflow.
+3. Click **"Run workflow"** → **"Run workflow"**.
+
+**Option B – Version release (recommended for stable releases):**
+Push a version tag to trigger the build and automatically attach the installer to a GitHub Release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Where to find the installer
+
+- **Workflow artifact:** In the Actions tab, open the workflow run and download **`VPX-Achievement-Watcher-Setup`** from the *Artifacts* section. This is available for every run (manual or tag).
+- **GitHub Release:** When a `v*` tag is pushed, the installer (`VPX-Achievement-Watcher-Setup.exe`) is also uploaded directly to the corresponding GitHub Release.
+
+### How the release flow works
+
+1. GitHub Actions checks out the repository on a Windows runner.
+2. PyInstaller compiles `Achievement_watcher.py` → `Achievement_Watcher.exe` and `aw_setup.py` → `AW_Setup.exe`.
+3. Inno Setup reads `installer.iss` and bundles both EXEs into a single installer: **`VPX-Achievement-Watcher-Setup.exe`**.
+4. The installer is uploaded as a workflow artifact and (on tagged releases) attached to the GitHub Release.
+
+### What the installer does
+
+- Installs `Achievement_Watcher.exe` to `%ProgramFiles%\VPX Achievement Watcher`.
+- Installs `AW_Setup.exe` (first-run configuration wizard) to the same folder.
+- Creates Start Menu shortcuts for both the app and the setup wizard.
+- Creates a Desktop shortcut for the main app.
+- After installation, optionally runs `AW_Setup.exe` so the user can configure their paths (BASE directory, NVRAM folder, Tables folder) before launching the app for the first time.
+
+> **Note on `aw_setup.py`:** This standalone setup wizard is packaged alongside the main app because it helps users configure the three required paths on first install. It is *not* needed on subsequent launches — the main app reads `config.json` directly. If you prefer to skip the wizard, just cancel it after installation; `Achievement_Watcher.exe` can be launched at any time via the Desktop or Start Menu shortcut.
+
+---
+
 🏆 Achievement Progress & System: The tool recognizes game actions (e.g., ramps hit, multiballs activated, jackpots) and automatically unlocks achievements—either for the current game session or globally as long-term motivation.
 
 📊 Highlights & Overlays: After a game (or at the touch of a button on the keyboard/controller), transparent info windows appear directly above the pinball machine. These show the best actions of the game and statistics. Supports portrait mode specifically for pinball cabinets.

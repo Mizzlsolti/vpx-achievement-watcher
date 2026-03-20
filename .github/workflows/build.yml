@@ -1,8 +1,9 @@
-name: Build Windows EXE
+name: Build Windows Installer
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 env:
@@ -28,18 +29,30 @@ jobs:
         python -m pip install --upgrade pip
         pip install PyQt6 requests pywin32 pyinstaller
 
-    - name: Build EXE with PyInstaller
+    - name: Build Achievement_Watcher.exe with PyInstaller
       run: |
         pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
 
-    - name: Upload EXE as Artifact
+    - name: Build AW_Setup.exe with PyInstaller
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "AW_Setup" "aw_setup.py"
+
+    - name: Install Inno Setup
+      run: choco install innosetup -y
+
+    - name: Build Installer with Inno Setup
+      run: |
+        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "0.0.0-dev" }
+        iscc /DMyAppVersion="$version" installer.iss
+
+    - name: Upload Installer as Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: AchievementWatcher
-        path: dist/Achievement_Watcher.exe
+        name: VPX-Achievement-Watcher-Setup
+        path: installer-output/VPX-Achievement-Watcher-Setup.exe
 
-    - name: Upload EXE to Release
+    - name: Upload Installer to Release
       uses: softprops/action-gh-release@v2
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: dist/Achievement_Watcher.exe
+        files: installer-output/VPX-Achievement-Watcher-Setup.exe
