@@ -76,7 +76,7 @@ begin
   P2 := Pos('"', Raw);
   if P2 = 0 then Exit;
   Raw := Copy(Raw, 1, P2 - 1);
-  { Unescape JSON \\ -> \ }
+  { Unescape JSON \\ -> \; StringChange mutates Raw in place (it is a procedure, not a function) }
   StringChange(Raw, '\\', '\');
   Result := Raw;
 end;
