@@ -50,7 +50,7 @@ from watcher_core import (
     run_vpxtool_info_show,
 )
 
-from ui_dialogs import SetupWizardDialog
+from ui_dialogs import SetupWizardDialog, FeedbackDialog
 from theme import pinball_arcade_style
 from ui_cloud_stats import CloudStatsMixin
 
@@ -3102,6 +3102,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_anim.addWidget(self.chk_anim_challenge)
 
         layout.addWidget(grp_anim)
+
+        # --- Feedback & Bug Reports ---
+        grp_feedback = QGroupBox("Feedback & Bug Reports")
+        lay_feedback = QVBoxLayout(grp_feedback)
+        lbl_feedback = QLabel(
+            "Hast du einen Bug gefunden oder einen Verbesserungsvorschlag? "
+            "Melde es direkt hier!"
+        )
+        lbl_feedback.setWordWrap(True)
+        lbl_feedback.setStyleSheet("color: #00E5FF; font-size: 9pt;")
+        lay_feedback.addWidget(lbl_feedback)
+        btn_feedback = QPushButton("🐛 Bug melden / Vorschlag")
+        btn_feedback.setStyleSheet(
+            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            "  border: none; padding: 6px 18px; border-radius: 4px; }"
+            "QPushButton:hover { background: #e06d00; }"
+        )
+        btn_feedback.clicked.connect(lambda: FeedbackDialog(self).exec())
+        lay_feedback.addWidget(btn_feedback)
+        layout.addWidget(grp_feedback)
+
         layout.addStretch(1)
         self._add_tab_help_button(layout, "system")
         self.main_tabs.addTab(tab, "⚙️ System")

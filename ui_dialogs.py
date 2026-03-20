@@ -1,12 +1,213 @@
 from __future__ import annotations
 
+import base64
+import json
 import os
+import platform
+import sys
+import threading
+import urllib.request
 
+from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog,
+    QComboBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QMessageBox, QPushButton, QFileDialog, QTextEdit,
 )
 
-from watcher_core import AppConfig, log, ensure_dir
+from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
+
+
+# ---------------------------------------------------------------------------
+# GitHub token for issue creation (public_repo / issues:write scope only).
+# This token is stored base64-encoded to discourage casual misuse – it is
+# NOT truly secret in an open-source app.  The repo owner must replace the
+# placeholder below with a real fine-grained PAT that has ONLY
+# "Issues: Write" permission on Mizzlsolti/vpx-achievement-watcher.
+# ---------------------------------------------------------------------------
+_TOKEN_B64 = b"R0lUSFVCX1RPS0VOX1BMQUNFSE9MREVS"  # base64("GITHUB_TOKEN_PLACEHOLDER")
+
+
+def _gh_token() -> str:
+    return base64.b64decode(_TOKEN_B64).decode()
+
+
+class _SubmitWorker(QObject):
+    """Runs the GitHub API call on a background thread and emits result."""
+
+    finished = pyqtSignal(bool, str)  # (success, message)
+
+    def __init__(self, issue_type: str, title: str, body: str) -> None:
+        super().__init__()
+        self._issue_type = issue_type
+        self._title = title
+        self._body = body
+
+    def run(self) -> None:
+        try:
+            labels = ["from-app"]
+            if self._issue_type == "bug":
+                labels.append("bug")
+            else:
+                labels.append("enhancement")
+
+            payload = json.dumps({
+                "title": self._title,
+                "body": self._body,
+                "labels": labels,
+            }).encode("utf-8")
+
+            token = _gh_token()
+            req = urllib.request.Request(
+                "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/issues",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Accept": "application/vnd.github+json",
+                    "Content-Type": "application/json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                resp_body = resp.read().decode("utf-8")
+                data = json.loads(resp_body)
+                issue_url = data.get("html_url", "")
+                self.finished.emit(True, issue_url)
+        except urllib.request.HTTPError as exc:
+            try:
+                detail = exc.read().decode("utf-8")
+                msg = json.loads(detail).get("message", detail)
+            except Exception as parse_exc:
+                msg = f"{exc} (parse error: {parse_exc})"
+            self.finished.emit(False, f"HTTP {exc.code}: {msg}")
+        except Exception as exc:
+            self.finished.emit(False, str(exc))
+
+
+class FeedbackDialog(QDialog):
+    """Dialog for submitting bug reports / feature requests as GitHub Issues."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("🐛 Bug melden / Verbesserungsvorschlag")
+        self.setMinimumWidth(520)
+        self.setStyleSheet(
+            "QDialog { background: #1a1a1a; color: #e0e0e0; }"
+            "QLabel { color: #e0e0e0; }"
+            "QGroupBox { color: #FF7F00; border: 1px solid #444; margin-top: 8px; }"
+            "QGroupBox::title { subcontrol-origin: margin; left: 8px; }"
+            "QLineEdit, QTextEdit, QComboBox {"
+            "  background: #222; color: #e0e0e0; border: 1px solid #555; padding: 4px; }"
+            "QPushButton { background: #333; color: #e0e0e0; border: 1px solid #555;"
+            "  padding: 6px 14px; border-radius: 4px; }"
+            "QPushButton:disabled { color: #666; }"
+        )
+
+        main = QVBoxLayout(self)
+        main.setSpacing(10)
+
+        lbl_info = QLabel(
+            "Hast du einen Bug gefunden oder einen Verbesserungsvorschlag?\n"
+            "Trage die Details ein – das Issue wird direkt im GitHub-Repo erstellt."
+        )
+        lbl_info.setWordWrap(True)
+        lbl_info.setStyleSheet("color: #00E5FF; font-size: 9pt;")
+        main.addWidget(lbl_info)
+
+        # Type selector
+        row_type = QHBoxLayout()
+        row_type.addWidget(QLabel("Typ:"))
+        self.cmb_type = QComboBox()
+        self.cmb_type.addItem("🐛 Bug Report", "bug")
+        self.cmb_type.addItem("💡 Feature Request / Verbesserungsvorschlag", "enhancement")
+        row_type.addWidget(self.cmb_type, 1)
+        main.addLayout(row_type)
+
+        # Title
+        main.addWidget(QLabel("Titel:"))
+        self.ed_title = QLineEdit()
+        self.ed_title.setPlaceholderText("Kurze Zusammenfassung …")
+        main.addWidget(self.ed_title)
+
+        # Body
+        main.addWidget(QLabel("Beschreibung:"))
+        self.ed_body = QTextEdit()
+        self.ed_body.setPlaceholderText(
+            "Beschreibe den Bug / Vorschlag so detailliert wie möglich …\n\n"
+            "Schritte zum Reproduzieren (bei Bugs):\n1. …\n2. …"
+        )
+        self.ed_body.setMinimumHeight(140)
+        main.addWidget(self.ed_body)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.btn_cancel = QPushButton("Abbrechen")
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_submit = QPushButton("📤 Senden")
+        self.btn_submit.setStyleSheet(
+            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            "  border: none; padding: 6px 18px; border-radius: 4px; }"
+            "QPushButton:hover { background: #e06d00; }"
+            "QPushButton:disabled { background: #555; color: #999; }"
+        )
+        self.btn_submit.clicked.connect(self._submit)
+        btn_row.addWidget(self.btn_cancel)
+        btn_row.addWidget(self.btn_submit)
+        main.addLayout(btn_row)
+
+        self._thread: threading.Thread | None = None
+
+    def _submit(self) -> None:
+        title = self.ed_title.text().strip()
+        if not title:
+            QMessageBox.warning(self, "Titel fehlt", "Bitte gib einen Titel ein.")
+            return
+
+        issue_type = self.cmb_type.currentData()
+        user_body = self.ed_body.toPlainText().strip()
+
+        # Append system info
+        sysinfo = (
+            f"\n\n---\n**System Info**\n"
+            f"- App Version: {WATCHER_VERSION}\n"
+            f"- Python: {sys.version}\n"
+            f"- OS: {platform.platform()}"
+        )
+        full_body = (user_body + sysinfo) if user_body else sysinfo.lstrip()
+
+        self.btn_submit.setEnabled(False)
+        self.btn_cancel.setEnabled(False)
+        self.btn_submit.setText("Wird gesendet …")
+
+        worker = _SubmitWorker(issue_type, title, full_body)
+        worker.finished.connect(self._on_done)
+
+        # Keep a reference so Python doesn't GC the worker
+        self._worker = worker
+        t = threading.Thread(target=worker.run, daemon=False)
+        self._thread = t
+        t.start()
+
+    def _on_done(self, success: bool, message: str) -> None:
+        self.btn_submit.setEnabled(True)
+        self.btn_cancel.setEnabled(True)
+        self.btn_submit.setText("📤 Senden")
+        self._worker = None  # release reference
+
+        if success:
+            QMessageBox.information(
+                self,
+                "Issue erstellt ✅",
+                f"Danke! Das Issue wurde erfolgreich erstellt:\n{message}",
+            )
+            self.accept()
+        else:
+            QMessageBox.critical(
+                self,
+                "Fehler beim Senden ❌",
+                f"Das Issue konnte nicht erstellt werden:\n\n{message}",
+            )
 
 
 class SetupWizardDialog(QDialog):
