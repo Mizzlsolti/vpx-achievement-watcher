@@ -11,7 +11,7 @@ from typing import Any, List, Tuple
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextBrowser,
     QTabWidget, QGroupBox, QComboBox, QLineEdit, QPushButton,
-    QMessageBox,
+    QMessageBox, QCompleter,
 )
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl
 from PyQt6.QtGui import QDesktopServices
@@ -228,6 +228,22 @@ class CloudStatsMixin:
         
         self.txt_cloud_rom = QLineEdit()
         self.txt_cloud_rom.setPlaceholderText("Enter ROM Name (e.g. afm_113b)")
+        self.txt_cloud_rom.returnPressed.connect(self._fetch_cloud_leaderboard)
+
+        try:
+            rom_list = sorted(getattr(self.watcher, "ROMNAMES", {}).keys())
+        except Exception:
+            rom_list = []
+        if rom_list:
+            completer = QCompleter(rom_list, self)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            popup = completer.popup()
+            popup.setStyleSheet(
+                "QListView { background:#1E1E1E; color:#E0E0E0; border:1px solid #444; }"
+                "QListView::item:selected { background:#00E5FF; color:#000000; }"
+            )
+            self.txt_cloud_rom.setCompleter(completer)
         
         self.btn_cloud_fetch = QPushButton("Fetch Highscores ☁️")
         self.btn_cloud_fetch.setStyleSheet("background:#00E5FF; color:black; font-weight:bold;")
