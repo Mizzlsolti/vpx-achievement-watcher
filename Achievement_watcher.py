@@ -1736,7 +1736,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "The Appearance tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, Channel Timer, Flip Counter, Mini Info, Heat Bar, Status).<br>"
+            "(Main Overlay, Toast, Challenge Menu, Timers & Counters, System Notifications, Heat Bar, Status Overlay).<br>"
+            "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
+            "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
+            "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay."
         ),
@@ -2046,6 +2049,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_pos = QGroupBox("Widget Placement & Orientation")
         lay_pos = QGridLayout(grp_pos)
 
+        self.btn_switch_all_orientation = QPushButton("🔄 Switch All → Portrait")
+        self.btn_switch_all_orientation.setStyleSheet(
+            "QPushButton { background: #FF7F00; color: #000; font-weight: bold; padding: 6px 16px; border-radius: 6px; font-size: 10pt; }"
+            "QPushButton:hover { background: #FFA040; }"
+        )
+        self.btn_switch_all_orientation.clicked.connect(self._on_switch_all_portrait_landscape)
+        _row_switch = QHBoxLayout()
+        _row_switch.addWidget(self.btn_switch_all_orientation)
+        _row_switch.addStretch(1)
+        lay_pos.addLayout(_row_switch, 0, 0, 1, 2)
+
         def create_overlay_box(title, chk_port, chk_ccw, btn_place, btn_test=None, btn_hide=None, extra=None):
             box = QVBoxLayout()
             box.addWidget(QLabel(f"<b>{title}</b>"))
@@ -2121,15 +2135,43 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         box_status_overlay.addLayout(_btns_status)
         box_status_overlay.addStretch(1)
 
-        lay_pos.addLayout(box_main, 0, 0); lay_pos.addLayout(box_toast, 0, 1)
-        lay_pos.addLayout(box_ch_sel, 1, 0); lay_pos.addLayout(box_tc, 1, 1)
-        lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_heat_bar, 2, 1)
-        lay_pos.addLayout(box_status_overlay, 3, 0)
+        lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
+        lay_pos.addLayout(box_ch_sel, 2, 0); lay_pos.addLayout(box_tc, 2, 1)
+        lay_pos.addLayout(box_mini_info, 3, 0); lay_pos.addLayout(box_heat_bar, 3, 1)
+        lay_pos.addLayout(box_status_overlay, 4, 0)
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)
         self._add_tab_help_button(layout, "appearance")
+        self._update_switch_all_button_label()
         self.main_tabs.addTab(tab, "🎨 Appearance")
+
+    def _portrait_checkboxes(self):
+        """Returns the list of all overlay portrait-mode checkboxes."""
+        return [
+            self.chk_portrait,
+            self.chk_ach_toast_portrait,
+            self.chk_ch_ov_portrait,
+            self.chk_ch_timer_portrait,
+            self.chk_mini_info_portrait,
+            self.chk_heat_bar_portrait,
+            self.chk_status_overlay_portrait,
+        ]
+
+    def _update_switch_all_button_label(self):
+        """Updates the Switch All button label to reflect current portrait checkbox state."""
+        if any(chk.isChecked() for chk in self._portrait_checkboxes()):
+            self.btn_switch_all_orientation.setText("🔄 Switch All → Landscape")
+        else:
+            self.btn_switch_all_orientation.setText("🔄 Switch All → Portrait")
+
+    def _on_switch_all_portrait_landscape(self):
+        """Toggles all overlay portrait checkboxes between Portrait and Landscape at once."""
+        should_be_portrait = not any(chk.isChecked() for chk in self._portrait_checkboxes())
+        for chk in self._portrait_checkboxes():
+            chk.setChecked(should_be_portrait)
+        self.cfg.save()
+        self._update_switch_all_button_label()
 
     # ==========================================
     # TAB 3: CONTROLS
@@ -3719,7 +3761,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "chk_status_overlay_portrait": "Rotate the Status Overlay 90 degrees for portrait/cabinet screens.",
             "chk_status_overlay_ccw": "Rotate the Status Overlay counter-clockwise.",
             "btn_status_overlay_place": "Set and save the screen position for the Status Overlay.",
-            "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement."
+            "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement.",
+
+            # Appearance Tab - Switch All button
+            "btn_switch_all_orientation": "Toggle all overlay widgets between Portrait and Landscape mode at once.",
         }
         apply_tooltips(self, tips)
         
