@@ -407,6 +407,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._heat_bar_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_heat_bar_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -651,6 +652,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
         self._refresh_challenge_select_overlay()
+        self._update_switch_all_button_label()
 
     def _on_ch_ov_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -715,6 +717,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._toast_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_ach_toast_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -765,6 +768,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._mini_info_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_mini_info_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -843,6 +847,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._status_overlay_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_status_overlay_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -1075,6 +1080,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._flip_counter_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_ch_timer_ccw_toggle(self, state: int):
         is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -2160,10 +2166,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _update_switch_all_button_label(self):
         """Updates the Switch All button label to reflect current portrait checkbox state."""
-        if any(chk.isChecked() for chk in self._portrait_checkboxes()):
-            self.btn_switch_all_orientation.setText("🔄 Switch All → Landscape")
-        else:
-            self.btn_switch_all_orientation.setText("🔄 Switch All → Portrait")
+        try:
+            if any(chk.isChecked() for chk in self._portrait_checkboxes()):
+                self.btn_switch_all_orientation.setText("🔄 Switch All → Landscape")
+            else:
+                self.btn_switch_all_orientation.setText("🔄 Switch All → Portrait")
+        except AttributeError:
+            # During _build_tab_appearance() the checkboxes are created one by one;
+            # stateChanged may fire before all 7 checkboxes or the button exist yet.
+            pass
 
     def _on_switch_all_portrait_landscape(self):
         """Toggles all overlay portrait checkboxes between Portrait and Landscape at once."""
@@ -5409,6 +5420,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._overlay_picker.apply_portrait_from_cfg()
         except Exception:
             pass
+        self._update_switch_all_button_label()
 
     def _on_lines_per_category_changed(self, val: int):
         self.cfg.OVERLAY["lines_per_category"] = int(val)
