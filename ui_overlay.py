@@ -2243,11 +2243,28 @@ class MiniInfoPositionPicker(QWidget):
 
 
 class StatusOverlay(QWidget):
-    """Overlay for cloud / leaderboard / validation status messages.
+    """Compact persistent status badge reflecting tracking/cloud state.
+
+    Displays one of the agreed status states using traffic-light semantics:
+      - Green:  ``Online · Tracking``, ``Online · Verified``
+      - Yellow: ``Online · Pending``, ``Offline · Local``
+      - Red:    ``Cloud Off · Local``
+
+    Unlike MiniInfoOverlay (System Notifications), this overlay is a
+    persistent mini-badge that stays visible while in-game.  It has no
+    countdown timer and does not auto-dismiss; callers are responsible for
+    calling :meth:`show_badge` / :meth:`hide_badge` based on game state.
 
     Uses its own config keys (``status_overlay_*``) and is completely
     independent from MiniInfoOverlay / System Notifications.
     """
+
+    # Compact badge dimensions
+    _BADGE_FONT_PT = 13
+    _PAD_W = 22
+    _PAD_H = 14
+    _RADIUS = 12
+    _MAX_TEXT_WIDTH = 340
 
     def __init__(self, parent: "MainWindow"):
         super().__init__(None)
@@ -2263,26 +2280,18 @@ class StatusOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        self._body_pt = 20
         self._font_family = ov.get("font_family", "Segoe UI")
+        # Traffic-light color for the dot indicator
         self._color = "#00C853"
-        self._hint = "#DDDDDD"
-        self._bg_color = QColor(8, 12, 22, 245)
-        self._radius = 16
-        self._pad_w = 28
-        self._pad_h = 22
-        self._max_text_width = 520
+        # Status text (one of the 5 agreed states)
+        self._status_text = ""
+        self._bg_color = QColor(8, 12, 22, 230)
         self._portrait_mode = bool(ov.get("status_overlay_portrait", False))
         self._rotate_ccw = bool(ov.get("status_overlay_rotate_ccw", False))
-        self._remaining = 0
-        self._base_msg = ""
         self._last_center = (960, 540)
         self._snap_label = QLabel(self)
         self._snap_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._snap_label.setStyleSheet("background:transparent;")
-        self._timer = QTimer(self)
-        self._timer.setInterval(1000)
-        self._timer.timeout.connect(self._on_tick)
         self.hide()
         _start_topmost_timer(self)
 
@@ -2295,29 +2304,32 @@ class StatusOverlay(QWidget):
             return 640, 360
 
     def _compose_html(self) -> str:
-        pt = getattr(self, "_body_pt", 20)
+        """Build compact badge HTML: colored dot + status text."""
         fam = str(getattr(self, "_font_family", "Segoe UI")).replace("'", "").replace('"', "").replace(";", "").replace("<", "").replace(">", "")
+        pt = self._BADGE_FONT_PT
+        dot_color = self._color
+        text = str(self._status_text or "").strip()
         return (
-            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";'>"
-            f"<span style='color:{self._color};'>{self._base_msg}</span>"
-            f"<br><span style='color:{self._hint};'>closing in {self._remaining}…</span>"
-            f"</div>"
+            f"<span style='font-size:{pt}pt;font-family:\"{fam}\";'>"
+            f"<span style='color:{dot_color};'>&#9679;</span>"
+            f"&nbsp;<span style='color:#EEEEEE;'>{text}</span>"
+            f"</span>"
         )
 
-    def _render_message_image(self, html: str) -> QImage:
+    def _render_badge_image(self, html: str) -> QImage:
         tmp = QLabel()
         tmp.setTextFormat(Qt.TextFormat.RichText)
-        tmp.setStyleSheet(f"color:{self._color};background:transparent;")
-        tmp.setFont(QFont(self._font_family, self._body_pt))
-        tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tmp.setStyleSheet("color:#EEEEEE;background:transparent;")
+        tmp.setFont(QFont(self._font_family, self._BADGE_FONT_PT))
+        tmp.setWordWrap(False)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         tmp.setText(html)
-        tmp.setFixedWidth(self._max_text_width)
+        tmp.setFixedWidth(self._MAX_TEXT_WIDTH)
         tmp.adjustSize()
-        text_w = tmp.width()
+        text_w = min(tmp.sizeHint().width(), self._MAX_TEXT_WIDTH)
         text_h = tmp.sizeHint().height()
-        W = max(200, text_w + self._pad_w)
-        H = max(60,  text_h + self._pad_h)
+        W = max(120, text_w + self._PAD_W)
+        H = max(36, text_h + self._PAD_H)
         img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
         p = QPainter(img)
@@ -2325,8 +2337,9 @@ class StatusOverlay(QWidget):
             p.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing, True)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(self._bg_color)
-            p.drawRoundedRect(0, 0, W, H, self._radius, self._radius)
-            margin_left = (W - text_w) // 2
+            p.drawRoundedRect(0, 0, W, H, self._RADIUS, self._RADIUS)
+            # Left-align content with padding
+            margin_left = self._PAD_W // 2
             margin_top = (H - text_h) // 2
             tmp.render(p, QPoint(margin_left, margin_top))
         finally:
@@ -2339,7 +2352,7 @@ class StatusOverlay(QWidget):
         self._rotate_ccw = bool(ov.get("status_overlay_rotate_ccw", False))
 
         html = self._compose_html()
-        img = self._render_message_image(html)
+        img = self._render_badge_image(html)
 
         if self._portrait_mode:
             angle = -90 if self._rotate_ccw else 90
@@ -2373,33 +2386,39 @@ class StatusOverlay(QWidget):
         self.raise_()
         _force_topmost(self)
 
-    def _on_tick(self):
-        self._remaining -= 1
-        if self._remaining <= 0:
-            self._timer.stop()
-            self.hide()
-            return
-        self._refresh_view()
-
     def update_font(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
-        self._body_pt = 20
         self._font_family = str(ov.get("font_family", "Segoe UI"))
         if self.isVisible():
             self._refresh_view()
 
-    def show_status(self, message: str, seconds: int = 5, color_hex: str | None = None):
-        self._base_msg = str(message or "").strip()
-        self._remaining = max(1, int(seconds))
-        if color_hex:
-            try:
-                self._color = color_hex
-            except Exception:
-                pass
+    def update_status(self, status_text: str, color_hex: str = "#00C853"):
+        """Update the displayed status state and refresh the badge.
+
+        This is the primary method for changing the badge content.  The badge
+        remains visible after this call; use :meth:`hide_badge` to hide it.
+        """
+        self._status_text = str(status_text or "").strip()
+        self._color = str(color_hex or "#00C853").strip()
         self._last_center = self._primary_center()
-        self._timer.stop()
         self._refresh_view()
-        self._timer.start()
+
+    def show_badge(self):
+        """Make the badge visible (typically called on game start)."""
+        if self._status_text:
+            self._refresh_view()
+
+    def hide_badge(self):
+        """Hide the badge (typically called on game end)."""
+        self.hide()
+
+    def show_status(self, message: str, seconds: int = 5, color_hex: str | None = None):
+        """Compatibility shim: update the status badge persistently.
+
+        The ``seconds`` parameter is ignored; this overlay is persistent and
+        does not auto-dismiss.  Use :meth:`hide_badge` to hide it explicitly.
+        """
+        self.update_status(message, color_hex or "#00C853")
 
 
 class StatusOverlayPositionPicker(QWidget):
