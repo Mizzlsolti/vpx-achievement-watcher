@@ -77,7 +77,8 @@ begin
   if P2 = 0 then Exit;
   Raw := Copy(Raw, 1, P2 - 1);
   { Unescape JSON \\ -> \ }
-  Result := StringChange(Raw, '\\', '\');
+  StringChange(Raw, '\\', '\');
+  Result := Raw;
 end;
 
 { Try to load existing paths from config.json into the edit fields.
