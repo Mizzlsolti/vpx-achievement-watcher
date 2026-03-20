@@ -386,7 +386,7 @@ class VpsCardWidget(QFrame):
         self._selected = False
         self._img_url = _resolve_img_url(table, table_file)
 
-        self.setFixedHeight(_CARD_IMG_H + 16)
+        self.setMinimumHeight(_CARD_IMG_H + 16)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(self._STYLE_NORMAL)
 
@@ -438,6 +438,7 @@ class VpsCardWidget(QFrame):
         if authors_text:
             lbl_authors = QLabel(f"👤 {authors_text}")
             lbl_authors.setStyleSheet("color:#AAA; font-size:11px;")
+            lbl_authors.setWordWrap(True)
             meta.addWidget(lbl_authors)
 
         # Version · date
@@ -796,9 +797,13 @@ class VpsPickerDialog(QDialog):
         self._cb_timer.timeout.connect(_process_pending_image_callbacks)
         self._cb_timer.start(80)
 
-        # Pre-fill and populate
+        # Pre-fill and populate (block the textChanged signal so _on_search is
+        # not triggered; we call _populate_cards once explicitly below, keeping
+        # image-loading callbacks valid for the cards we actually display).
         clean_title = self._clean_table_title(table_title)
+        self.txt_search.blockSignals(True)
         self.txt_search.setText(clean_title)
+        self.txt_search.blockSignals(False)
         self._populate_cards(clean_title)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
