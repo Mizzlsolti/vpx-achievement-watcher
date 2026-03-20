@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import base64
-import json
 import os
 import platform
 import sys
-import threading
-import urllib.request
+import urllib.parse
+import webbrowser
 
-from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import (
     QComboBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QMessageBox, QPushButton, QFileDialog, QTextEdit,
@@ -17,71 +14,7 @@ from PyQt6.QtWidgets import (
 from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
 
 
-# ---------------------------------------------------------------------------
-# GitHub token for issue creation (public_repo / issues:write scope only).
-# This token is stored base64-encoded to discourage casual misuse – it is
-# NOT truly secret in an open-source app.  The repo owner must replace the
-# placeholder below with a real fine-grained PAT that has ONLY
-# "Issues: Write" permission on Mizzlsolti/vpx-achievement-watcher.
-# ---------------------------------------------------------------------------
-_TOKEN_B64 = b"Z2l0aHViX3BhdF8xMUJEU1JFUUEwTzZnZjVwVU1kWll1X2JDS0tjNmNoUWdIZXhJYUJueDVvZXM0Q21TNHg4ejBOOHZNZ1IxMVNHMmlLQ082RzRCQUJlekw0Z2F5" 
-
-
-def _gh_token() -> str:
-    return base64.b64decode(_TOKEN_B64).decode()
-
-
-class _SubmitWorker(QObject):
-    """Runs the GitHub API call on a background thread and emits result."""
-
-    finished = pyqtSignal(bool, str)  # (success, message)
-
-    def __init__(self, issue_type: str, title: str, body: str) -> None:
-        super().__init__()
-        self._issue_type = issue_type
-        self._title = title
-        self._body = body
-
-    def run(self) -> None:
-        try:
-            labels = ["from-app"]
-            if self._issue_type == "bug":
-                labels.append("bug")
-            else:
-                labels.append("enhancement")
-
-            payload = json.dumps({
-                "title": self._title,
-                "body": self._body,
-                "labels": labels,
-            }).encode("utf-8")
-
-            token = _gh_token()
-            req = urllib.request.Request(
-                "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/issues",
-                data=payload,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/vnd.github+json",
-                    "Content-Type": "application/json",
-                    "X-GitHub-Api-Version": "2022-11-28",
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                resp_body = resp.read().decode("utf-8")
-                data = json.loads(resp_body)
-                issue_url = data.get("html_url", "")
-                self.finished.emit(True, issue_url)
-        except urllib.request.HTTPError as exc:
-            try:
-                detail = exc.read().decode("utf-8")
-                msg = json.loads(detail).get("message", detail)
-            except Exception as parse_exc:
-                msg = f"{exc} (parse error: {parse_exc})"
-            self.finished.emit(False, f"HTTP {exc.code}: {msg}")
-        except Exception as exc:
-            self.finished.emit(False, str(exc))
+_REPO_ISSUES_URL = "https://github.com/Mizzlsolti/vpx-achievement-watcher/issues/new"
 
 
 class FeedbackDialog(QDialog):
@@ -108,7 +41,7 @@ class FeedbackDialog(QDialog):
 
         lbl_info = QLabel(
             "Found a bug or have a suggestion?\n"
-            "Fill in the details – the issue will be created directly in the GitHub repo."
+            "Fill in the details – your browser will open with a pre-filled GitHub issue."
         )
         lbl_info.setWordWrap(True)
         lbl_info.setStyleSheet("color: #00E5FF; font-size: 9pt;")
@@ -159,8 +92,6 @@ class FeedbackDialog(QDialog):
         btn_row.addWidget(self.btn_submit)
         main.addLayout(btn_row)
 
-        self._thread: threading.Thread | None = None
-
     def _submit(self) -> None:
         title = self.ed_title.text().strip()
         if not title:
@@ -179,38 +110,22 @@ class FeedbackDialog(QDialog):
         )
         full_body = (user_body + sysinfo) if user_body else sysinfo.lstrip()
 
-        self.btn_submit.setEnabled(False)
-        self.btn_cancel.setEnabled(False)
-        self.btn_submit.setText("Submitting …")
+        labels = "bug,from-app" if issue_type == "bug" else "enhancement,from-app"
+        url = (
+            f"{_REPO_ISSUES_URL}"
+            f"?title={urllib.parse.quote(title)}"
+            f"&body={urllib.parse.quote(full_body)}"
+            f"&labels={urllib.parse.quote(labels)}"
+        )
+        webbrowser.open(url)
 
-        worker = _SubmitWorker(issue_type, title, full_body)
-        worker.finished.connect(self._on_done)
-
-        # Keep a reference so Python doesn't GC the worker
-        self._worker = worker
-        t = threading.Thread(target=worker.run, daemon=False)
-        self._thread = t
-        t.start()
-
-    def _on_done(self, success: bool, message: str) -> None:
-        self.btn_submit.setEnabled(True)
-        self.btn_cancel.setEnabled(True)
-        self.btn_submit.setText("📤 Submit")
-        self._worker = None  # release reference
-
-        if success:
-            QMessageBox.information(
-                self,
-                "Issue Created ✅",
-                f"Thanks! The issue was created successfully:\n{message}",
-            )
-            self.accept()
-        else:
-            QMessageBox.critical(
-                self,
-                "Submission Error ❌",
-                f"The issue could not be created:\n\n{message}",
-            )
+        QMessageBox.information(
+            self,
+            "Browser Opened",
+            "Your browser has been opened with the pre-filled issue.\n"
+            "Please click 'Submit new issue' on GitHub to complete.",
+        )
+        self.accept()
 
 
 class SetupWizardDialog(QDialog):
