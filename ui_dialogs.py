@@ -24,7 +24,7 @@ from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
 # placeholder below with a real fine-grained PAT that has ONLY
 # "Issues: Write" permission on Mizzlsolti/vpx-achievement-watcher.
 # ---------------------------------------------------------------------------
-_TOKEN_B64 = b"Z2l0aHViX3BhdF8xMUJEU1JFUUEwR2xZdEpSSnRMNXBuX3A5cktYWHIxQWtzelFnS05KUHZHd2JpME9FVXVYMmlDSVdWWE82TndDU3BBRE03SlRKUU9OMmlSS0pG"  # base64("GITHUB_TOKEN_PLACEHOLDER")
+_TOKEN_B64 = b"Z2l0aHViX3BhdF8xMUJEU1JFUUEwcU5VZmVvWERGZXhkX2NSY2N0YkUyenNEeEpVVEtqaWVJejk4SkxUOVZWY0Nucno3OE1MM0kxemVZWUdSVEtFQlZDTkdIZGZl"  # base64("GITHUB_TOKEN_PLACEHOLDER")
 
 
 def _gh_token() -> str:
