@@ -1813,6 +1813,50 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         box.setIcon(QMessageBox.Icon.Information)
         box.exec()
 
+    def _show_cloud_rules(self):
+        """Displays the Cloud Leaderboard rules dialog."""
+        text = (
+            "<b>📜 Cloud Leaderboard – Rules</b><br><br>"
+            "The Cloud Leaderboards are a shared ranking of all players. "
+            "To keep them fair and reliable, the following rules apply:<br><br>"
+
+            "<b>1. Mapping Is Mandatory</b><br>"
+            "Only tables that are correctly mapped to a VPS-ID can upload scores to the cloud. "
+            "<b>No mapping → no upload → no leaderboard entry.</b> "
+            "Make sure your tables show a green checkmark (✅) in the Available Maps list.<br><br>"
+
+            "<b>2. Player Profile Required</b><br>"
+            "Your player name must not be empty or set to the default \"Player\". "
+            "You also need a valid 4-character Player ID. "
+            "Without these, all uploads will be blocked.<br><br>"
+
+            "<b>3. Cloud Sync Must Be Enabled</b><br>"
+            "Cloud Sync must be turned on in the System tab, otherwise no data will be transmitted.<br><br>"
+
+            "<b>4. Anti-Cheat &amp; Validation</b><br>"
+            "Every upload is validated server-side. Submissions can receive the following status:<br>"
+            "• 🟢 <b>Accepted</b> – All good, score counts on the leaderboard<br>"
+            "• 🟠 <b>Flagged</b> – Suspicious, held for manual review (not visible on the leaderboard until cleared)<br>"
+            "• 🔴 <b>Rejected</b> – Invalid (missing data, duplicate, outdated version, etc.)<br><br>"
+
+            "<b>5. Keep Your Watcher Version Up To Date</b><br>"
+            "Outdated Watcher versions will be rejected by the server. Always keep the app updated.<br><br>"
+
+            "<b>6. Fair Play</b><br>"
+            "Manipulated scores, impossible results, or spam uploads are automatically detected and blocked.<br><br>"
+
+            "<b>⚠️ In Summary:</b><br>"
+            "No Mapping + No Profile + No Cloud Sync = <b>No place on the Leaderboard.</b><br>"
+            "Keep your tables mapped, your profile complete, and the app up to date – "
+            "then nothing stands in the way of your participation! 🏆"
+        )
+        box = QMessageBox(self)
+        box.setWindowTitle("📜 Cloud Leaderboard Rules")
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(text)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.exec()
+
     # ==========================================
     # TAB 1: DASHBOARD
     # ==========================================
@@ -2543,7 +2587,33 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay.addWidget(self.maps_table)
 
         layout.addWidget(grp)
-        self._add_tab_help_button(layout, "available_maps")
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+
+        btn_rules = QPushButton("📜 Cloud Rules")
+        btn_rules.setFixedSize(140, 28)
+        btn_rules.setToolTip("Show Cloud Leaderboard rules")
+        btn_rules.setStyleSheet(
+            "QPushButton { background: #FF3B30; color: #FFFFFF; border: 1px solid #FF3B30; "
+            "border-radius: 14px; font-size: 10pt; font-weight: bold; padding: 0 8px; }"
+            "QPushButton:hover { background: #CC2F27; color: #FFF; }"
+        )
+        btn_rules.clicked.connect(self._show_cloud_rules)
+        row.addWidget(btn_rules)
+
+        btn_help = QPushButton("❓")
+        btn_help.setFixedSize(28, 28)
+        btn_help.setToolTip("Show help for this tab")
+        btn_help.setStyleSheet(
+            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background: #FF7F00; color: #000; }"
+        )
+        btn_help.clicked.connect(lambda: self._show_tab_help("available_maps"))
+        row.addWidget(btn_help)
+
+        layout.addLayout(row)
         self.main_tabs.addTab(tab, "📚 Available Maps")
         # Cache: list of dicts {rom, title, has_map, is_local, vps_id}
         self._all_maps_cache = []
