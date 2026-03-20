@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QTextBrowser, QSystemTrayIcon, QMenu, QFileDialog, QMessageBox, QTabWidget,
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
     QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
-    QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog,
+    QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea,
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
@@ -254,6 +254,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.level_up_show.connect(self._on_level_up)
         self.bridge.achievements_updated.connect(self._refresh_level_display)
         self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
+        self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -329,6 +330,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._flip_diff_select = None
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
+        # Transient state flags for the status badge
+        self._status_badge_state: str | None = None
+        self._status_badge_explicit: tuple[str, str] | None = None
+        # Poll timer: updates/hides the status badge based on game state (~2 s interval)
+        self._status_badge_timer = QTimer(self)
+        self._status_badge_timer.setInterval(2000)
+        self._status_badge_timer.timeout.connect(self._poll_status_badge)
+        self._status_badge_timer.start()
 
         self.watcher.start()
 
@@ -878,60 +887,105 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._status_overlay_picker = StatusOverlayPositionPicker(self, width_hint=420, height_hint=100)
         self.btn_status_overlay_place.setText("Save position")
 
+    # Agreed status states for the persistent status badge (traffic-light semantics)
     _STATUS_TEST_MESSAGES = [
-        ("☁️ Score submitted – accepted!", "#00C853"),
-        ("⏳ Score pending verification…", "#FFA500"),
-        ("🚩 Submission flagged for review.", "#FF3B30"),
-        ("❌ Submission rejected: invalid ROM.", "#FF3B30"),
-        ("📋 Score queued – waiting for cloud.", "#FFA500"),
+        ("Online · Tracking",  "#00C853"),   # Green
+        ("Online · Pending",   "#FFA500"),   # Yellow
+        ("Online · Verified",  "#00C853"),   # Green
+        ("Offline · Local",    "#FFA500"),   # Yellow
+        ("Cloud Off · Local",  "#FF3B30"),   # Red
     ]
 
     def _on_status_overlay_test(self):
+        """Cycle through the agreed status states for visual testing."""
         if not hasattr(self, "_status_overlay") or self._status_overlay is None:
             self._status_overlay = StatusOverlay(self)
         msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
         self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
-        self._status_overlay.show_status(msg, seconds=5, color_hex=color)
+        self._status_overlay.update_status(msg, color)
+
+    def _determine_status_state(self) -> tuple[str, str]:
+        """Return (status_text, color_hex) that reflects the current tracking state.
+
+        Traffic-light semantics:
+          Green:  Online · Tracking / Online · Verified
+          Yellow: Online · Pending  / Offline · Local
+          Red:    Cloud Off · Local
+        """
+        cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
+        cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        if not cloud_enabled or not cloud_url:
+            return ("Cloud Off · Local", "#FF3B30")
+        w = getattr(self, "watcher", None)
+        game_active = bool(w and getattr(w, "game_active", False))
+        if not game_active:
+            return ("Offline · Local", "#FFA500")
+        # Check for an externally set pending/verified flag (set by _on_status_overlay_show)
+        pending_state = getattr(self, "_status_badge_state", None)
+        if pending_state == "pending":
+            return ("Online · Pending", "#FFA500")
+        if pending_state == "verified":
+            return ("Online · Verified", "#00C853")
+        return ("Online · Tracking", "#00C853")
 
     def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
+        """Handle an externally-triggered status update.
+
+        The message is expected to be one of the agreed status texts.  When
+        cloud/leaderboard code submits a score it can emit status_overlay_show
+        with the relevant state.  The badge is kept persistent; callers must
+        not rely on auto-dismiss behavior.
+        """
         if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
             return
+        # Map message/color to our known state flags so _determine_status_state
+        # can pick them up during the next poll cycle.
+        lc = str(message or "").lower()
+        if "pending" in lc:
+            self._status_badge_state = "pending"
+        elif "verified" in lc or "accepted" in lc:
+            self._status_badge_state = "verified"
+        else:
+            self._status_badge_state = None
+        # Also pass the explicit color if provided
+        if color_hex:
+            txt = str(message or "").strip()
+            self._status_badge_explicit = (txt, color_hex)
+        else:
+            self._status_badge_explicit = None
+        # Force an immediate badge refresh via the poll timer mechanism
+        self._poll_status_badge()
 
-        def _player_visible() -> bool:
-            try:
-                w = getattr(self, "watcher", None)
-                return bool(w and w._vp_player_visible())
-            except Exception:
-                return False
+    def _poll_status_badge(self):
+        """Poll game state and show/update/hide the status badge accordingly.
 
-        def _show_now():
-            try:
-                if not hasattr(self, "_status_overlay") or self._status_overlay is None:
-                    self._status_overlay = StatusOverlay(self)
-                self._status_overlay.show_status(
-                    message,
-                    seconds=max(1, int(seconds)),
-                    color_hex=color_hex or None,
-                )
-            except Exception as e:
-                try:
-                    log(self.cfg, f"[UI] Status overlay show failed: {e}")
-                except Exception:
-                    pass
-
-        if _player_visible():
-            _show_now()
-            return
-        tries = {"n": 0}
-
-        def _retry():
-            if _player_visible():
-                _show_now()
+        Called every ~2 seconds by ``_status_badge_timer``.  Also called
+        directly from ``_on_status_overlay_show`` for immediate feedback.
+        """
+        try:
+            if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
+                if hasattr(self, "_status_overlay") and self._status_overlay:
+                    self._status_overlay.hide_badge()
                 return
-            tries["n"] += 1
-            if tries["n"] < 8:
-                QTimer.singleShot(250, _retry)
-        QTimer.singleShot(250, _retry)
+            in_game = self._in_game_now()
+            if not in_game:
+                if hasattr(self, "_status_overlay") and self._status_overlay:
+                    self._status_overlay.hide_badge()
+                # Reset transient state flags when leaving a game
+                self._status_badge_state = None
+                self._status_badge_explicit = None
+                return
+            # Determine what to show
+            explicit = getattr(self, "_status_badge_explicit", None)
+            if explicit:
+                txt, color = explicit
+            else:
+                txt, color = self._determine_status_state()
+            if not hasattr(self, "_status_overlay") or self._status_overlay is None:
+                self._status_overlay = StatusOverlay(self)
+            self._status_overlay.update_status(txt, color)
+        except Exception:
+            pass
 
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
@@ -1735,17 +1789,74 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl_info.setStyleSheet("color: #777;")
         layout.addWidget(lbl_info)
+
+        # ── Bottom: Last Run & Run Status cards ────────────────────────────
+        grp_run_cards = QGroupBox("Session Summary")
+        lay_run_cards = QHBoxLayout(grp_run_cards)
+
+        # Left card: Last Run
+        grp_last = QGroupBox("Last Run")
+        lay_last = QVBoxLayout(grp_last)
+        self.lbl_lr_table = QLabel("Table:  —")
+        self.lbl_lr_score = QLabel("Score:  —")
+        self.lbl_lr_achievements = QLabel("Achievements:  —")
+        self.lbl_lr_result = QLabel("Result:  —")
+        for lbl in (self.lbl_lr_table, self.lbl_lr_score, self.lbl_lr_achievements, self.lbl_lr_result):
+            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
+            lay_last.addWidget(lbl)
+        lay_last.addStretch(1)
+
+        # Right card: Run Status
+        grp_run_status = QGroupBox("Run Status")
+        lay_rs = QVBoxLayout(grp_run_status)
+        self.lbl_rs_table = QLabel("Table:  —")
+        self.lbl_rs_session = QLabel("Session:  —")
+        self.lbl_rs_cloud = QLabel("Cloud:  —")
+        self.lbl_rs_leaderboard = QLabel("Leaderboard:  —")
+        for lbl in (self.lbl_rs_table, self.lbl_rs_session, self.lbl_rs_cloud, self.lbl_rs_leaderboard):
+            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
+            lay_rs.addWidget(lbl)
+        lay_rs.addStretch(1)
+
+        lay_run_cards.addWidget(grp_last)
+        lay_run_cards.addWidget(grp_run_status)
+        layout.addWidget(grp_run_cards)
+
+        # Legend
+        lbl_legend = QLabel(
+            "<span style='color:#00C853;'>●</span> Green = online/verified"
+            "&nbsp;&nbsp;&nbsp;"
+            "<span style='color:#FFA500;'>●</span> Yellow = pending/local"
+            "&nbsp;&nbsp;&nbsp;"
+            "<span style='color:#FF3B30;'>●</span> Red = cloud off"
+        )
+        lbl_legend.setTextFormat(Qt.TextFormat.RichText)
+        lbl_legend.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_legend.setStyleSheet("color: #888; font-size: 9pt; padding: 4px;")
+        layout.addWidget(lbl_legend)
+
         layout.addStretch(1)
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
         QTimer.singleShot(1500, self._refresh_level_display)
+        QTimer.singleShot(1500, self._refresh_dashboard_cards)
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
     # ==========================================
     def _build_tab_appearance(self):
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        inner = QWidget()
+        layout = QVBoxLayout(inner)
+        scroll.setWidget(inner)
+        tab_layout.addWidget(scroll)
 
         grp_style = QGroupBox("Global Styling")
         lay_style = QGridLayout(grp_style)
@@ -4547,6 +4658,93 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
+    def _refresh_dashboard_cards(self):
+        """Populate the Last Run and Run Status cards in the Dashboard tab."""
+        import json as _json
+        try:
+            # ── Last Run card ────────────────────────────────────────────
+            summary_path = os.path.join(
+                self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
+            )
+            lr_table = "—"
+            lr_score = "—"
+            lr_achievements = "—"
+            lr_result = "—"
+            try:
+                if os.path.isfile(summary_path):
+                    with open(summary_path, "r", encoding="utf-8") as _f:
+                        _data = _json.load(_f)
+                    rom = str(_data.get("rom", "") or "")
+                    romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+                    table_title = romnames.get(rom, rom.upper() if rom else "")
+                    lr_table = table_title or "—"
+                    raw_score = _data.get("score", _data.get("best_score", None))
+                    if raw_score is not None:
+                        try:
+                            lr_score = f"{int(raw_score):,}"
+                        except Exception:
+                            lr_score = str(raw_score)
+                    ach_count = _data.get("achievements_unlocked", _data.get("unlocked", None))
+                    ach_total = _data.get("achievements_total", _data.get("total", None))
+                    if ach_count is not None and ach_total is not None:
+                        lr_achievements = f"{ach_count} / {ach_total}"
+                    elif ach_count is not None:
+                        lr_achievements = str(ach_count)
+                    result = str(_data.get("result", _data.get("outcome", "")) or "").strip()
+                    lr_result = result if result else "—"
+            except Exception:
+                pass
+            self.lbl_lr_table.setText(f"Table:  {lr_table}")
+            self.lbl_lr_score.setText(f"Score:  {lr_score}")
+            self.lbl_lr_achievements.setText(f"Achievements:  {lr_achievements}")
+            self.lbl_lr_result.setText(f"Result:  {lr_result}")
+        except Exception:
+            pass
+
+        try:
+            # ── Run Status card ──────────────────────────────────────────
+            w = getattr(self, "watcher", None)
+            game_active = bool(w and getattr(w, "game_active", False))
+            current_rom = str(getattr(w, "current_rom", "") or "").strip() if w else ""
+            romnames = getattr(w, "ROMNAMES", {}) or {}
+
+            rs_table = "—"
+            rs_session = "—"
+            rs_cloud = "—"
+            rs_lb = "—"
+
+            if game_active and current_rom:
+                table_title = romnames.get(current_rom, current_rom.upper())
+                rs_table = table_title or current_rom.upper()
+                try:
+                    state = w._ach_state_load()
+                    session_ach = state.get("session", {}).get(current_rom, [])
+                    rs_session = f"{len(session_ach)} achievement{'s' if len(session_ach) != 1 else ''}"
+                except Exception:
+                    rs_session = "—"
+                cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
+                cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+                if cloud_enabled and cloud_url:
+                    pending_state = getattr(self, "_status_badge_state", None)
+                    if pending_state == "pending":
+                        rs_cloud = "Pending"
+                    elif pending_state == "verified":
+                        rs_cloud = "Verified"
+                    else:
+                        rs_cloud = "Synced"
+                else:
+                    rs_cloud = "Disabled"
+                rs_lb = "Enabled" if (cloud_enabled and cloud_url) else "Disabled"
+            else:
+                rs_table = "(no active game)"
+
+            self.lbl_rs_table.setText(f"Table:  {rs_table}")
+            self.lbl_rs_session.setText(f"Session:  {rs_session}")
+            self.lbl_rs_cloud.setText(f"Cloud:  {rs_cloud}")
+            self.lbl_rs_leaderboard.setText(f"Leaderboard:  {rs_lb}")
+        except Exception:
+            pass
+
     def _hide_overlay(self):
         if self.overlay and self.overlay.isVisible():
             self.overlay.hide()
@@ -4561,7 +4759,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
         if self.overlay and self.overlay.isVisible():
             self.overlay.hide()
-            
+
     def _toggle_overlay(self):
         if self.watcher and self.watcher.game_active and self.watcher.current_rom:
             if bool(self.cfg.OVERLAY.get("live_updates", False)):
