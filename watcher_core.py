@@ -191,6 +191,13 @@ DEFAULT_OVERLAY.update({
 DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
 DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
 DEFAULT_OVERLAY.setdefault("low_performance_mode", False)
+DEFAULT_OVERLAY.setdefault("anim_main_transitions", True)
+DEFAULT_OVERLAY.setdefault("anim_main_glow", True)
+DEFAULT_OVERLAY.setdefault("anim_main_score_progress", True)
+DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
+DEFAULT_OVERLAY.setdefault("anim_toast", True)
+DEFAULT_OVERLAY.setdefault("anim_status", True)
+DEFAULT_OVERLAY.setdefault("anim_challenge", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_portrait", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
@@ -297,7 +304,9 @@ class AppConfig:
                 
                 "player_name", "player_id", "flip_counter_goal_total", 
                 "challenges_voice_volume", "challenges_voice_mute",
-                "low_performance_mode"
+                "low_performance_mode",
+                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
             ]
             
             for k in list(loaded_ov.keys()):
@@ -358,7 +367,9 @@ class AppConfig:
                 
                 "player_name", "player_id", "flip_counter_goal_total", 
                 "challenges_voice_volume", "challenges_voice_mute",
-                "low_performance_mode"
+                "low_performance_mode",
+                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
             ]
             
             for k in allowed_keys:
