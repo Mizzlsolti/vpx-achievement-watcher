@@ -85,7 +85,8 @@ end;
   Returns True if the file was found and at least BASE was read. }
 function LoadExistingConfig: Boolean;
 var
-  cfgPath, json: string;
+  cfgPath: string;
+  json: AnsiString;
   base, nvram, tables: string;
 begin
   Result := False;
