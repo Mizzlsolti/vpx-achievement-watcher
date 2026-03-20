@@ -1735,76 +1735,69 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     _TAB_HELP = {
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
-            "Der Dashboard-Tab zeigt dir auf einen Blick den aktuellen Status des Watchers, "
-            "dein Spieler-Level sowie die letzten Session-Informationen.<br><br>"
-            "• <b>System Status</b>: Zeigt an, ob der Watcher läuft und VPX aktiv ist.<br>"
-            "• <b>Spieler-Level</b>: Dein aktuelles Level und Fortschritts-Balken basierend "
-            "auf freigeschalteten Achievements.<br>"
-            "• <b>Session Summary</b>: Übersicht über den letzten und aktuellen Spieldurchlauf "
-            "inkl. Score, Achievements und Cloud-Status.<br>"
-            "• <b>Quick Actions</b>: Engine neustarten, Fenster minimieren oder Programm beenden."
+            "The Dashboard gives you a quick overview of the watcher status, your player level, "
+            "and the latest session information.<br><br>"
+            "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
+            "• <b>Player Level</b>: Your current level and progress bar based on unlocked achievements.<br>"
+            "• <b>Session Summary</b>: Overview of the last and current play session including "
+            "score, achievements, and cloud status.<br>"
+            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
         ),
         "progress": (
             "<b>📈 Progress</b><br><br>"
-            "Der Progress-Tab zeigt dir den lokalen Achievement-Fortschritt je Tisch.<br><br>"
-            "• Wähle oben eine ROM aus der Dropdown-Liste aus.<br>"
-            "• Die Ansicht zeigt alle verfügbaren Achievements mit ihrem Status "
-            "(freigeschaltet ✅ / gesperrt 🔒).<br>"
-            "• Klicke auf einen Achievement-Link für weitere Details.<br>"
-            "• Mit <b>🔄 Refresh</b> wird die Liste neu geladen."
+            "The Progress tab shows your local achievement progress for each table.<br><br>"
+            "• Select a ROM from the dropdown at the top.<br>"
+            "• The view lists all available achievements with their current status "
+            "(unlocked ✅ / locked 🔒).<br>"
+            "• Click an achievement link to see more details.<br>"
+            "• Use <b>🔄 Refresh</b> to reload the list."
         ),
         "appearance": (
             "<b>🎨 Appearance</b><br><br>"
-            "Im Appearance-Tab konfigurierst du das visuelle Erscheinungsbild aller Overlays.<br><br>"
-            "• <b>Style</b>: Wähle Schriftart und Basisgröße für die Overlays.<br>"
-            "• <b>Widget Placement</b>: Positioniere und rotiere die einzelnen Overlay-Fenster "
-            "(Main Overlay, Toast, Channel-Timer, Flip Counter, Mini Info, Heat Bar, Status).<br>"
-            "• Mit <b>Place</b> öffnest du ein Positionierfenster, mit <b>Test</b> kannst du "
-            "das Overlay probeweise anzeigen."
+            "The Appearance tab lets you configure the visual style of all overlays.<br><br>"
+            "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
+            "• <b>Widget Placement</b>: Position and rotate each overlay window "
+            "(Main Overlay, Toast, Channel Timer, Flip Counter, Mini Info, Heat Bar, Status).<br>"
+            "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
+            "the overlay."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
-            "Dieser Tab zeigt alle bekannten Tische aus dem Cloud-Index und der lokalen "
-            "VPX-Installation.<br><br>"
-            "• <b>Suche</b>: Filtere nach Tischname oder ROM-Namen.<br>"
-            "• <b>🎯 Only with NVRAM-Map</b>: Zeigt nur Tische mit vorhandenem NVRAM-Mapping.<br>"
-            "• <b>⚡ Auto-Match All</b>: Versucht alle lokalen ROMs automatisch VPS-IDs "
-            "zuzuordnen.<br>"
-            "• <b>Spalten</b>: Tischname, ROM, NVRAM Map (✅/❌), lokal vorhanden (🟠), "
-            "VPS-ID, Autor sowie ein Detail-Button (+)."
+            "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
+            "• <b>Search</b>: Filter by table name or ROM name.<br>"
+            "• <b>🎯 Only with NVRAM-Map</b>: Show only tables that have an NVRAM mapping.<br>"
+            "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs.<br>"
+            "• <b>Columns</b>: Table name, ROM, NVRAM Map (✅/❌), local .vpx found (🟠), "
+            "VPS-ID, author, and a detail button (+)."
         ),
         "system": (
             "<b>⚙️ System</b><br><br>"
-            "Im System-Tab verwaltest du dein Spielerprofil, Verzeichnisse und "
-            "Wartungsfunktionen.<br><br>"
-            "• <b>Player Profile</b>: Lege deinen Anzeigenamen und deine 4-stellige Spieler-ID "
-            "fest. Die Spieler-ID wird für Cloud-Sync und Wiederherstellung benötigt – "
-            "bitte sicher aufbewahren!<br>"
-            "• <b>Cloud Sync</b>: Aktiviere die Cloud-Synchronisation und das automatische "
-            "Backup deines Fortschritts.<br>"
-            "• <b>Directory Setup</b>: Pfade für BASE, NVRAM und Tische-Verzeichnis.<br>"
-            "• <b>Maintenance</b>: Datenordner reparieren, Maps-Cache erzwingen, Datenbanken "
-            "aktualisieren oder ein App-Update durchführen."
+            "The System tab is where you manage your player profile, directory paths, and "
+            "maintenance tools.<br><br>"
+            "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
+            "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
+            "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
+            "• <b>Directory Setup</b>: Configure paths for BASE, NVRAM, and tables directories.<br>"
+            "• <b>Maintenance</b>: Repair data folders, force the map cache, update databases, "
+            "or install an app update."
         ),
         "stats": (
             "<b>📊 Records &amp; Stats</b><br><br>"
-            "Der Records &amp; Stats-Tab gibt dir einen Überblick über Highscores und "
-            "Statistiken.<br><br>"
-            "• <b>🌍 Global NVRAM Dumps</b>: Zeigt alle gespeicherten NVRAM-Scores für den "
-            "ausgewählten Tisch (global über alle Spieler).<br>"
-            "• <b>👤 Player Session Deltas</b>: Deine persönlichen Score-Veränderungen je "
-            "Session.<br>"
-            "• <b>⚔️ Challenge Leaderboards</b>: Ranglisten der letzten Challenge-Ergebnisse."
+            "The Records &amp; Stats tab gives you an overview of high scores and statistics.<br><br>"
+            "• <b>🌍 Global NVRAM Dumps</b>: All saved NVRAM scores for the selected table "
+            "across all players.<br>"
+            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
+            "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest challenge results."
         ),
     }
 
     def _add_tab_help_button(self, layout, help_key: str):
-        """Fügt einen Hilfe-Button (❓) unten rechts in das angegebene Layout ein."""
+        """Adds a help button (❓) anchored to the bottom-right of the given layout."""
         row = QHBoxLayout()
         row.addStretch(1)
         btn = QPushButton("❓")
         btn.setFixedSize(28, 28)
-        btn.setToolTip("Hilfe zu diesem Tab anzeigen")
+        btn.setToolTip("Show help for this tab")
         btn.setStyleSheet(
             "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
             "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
@@ -1815,10 +1808,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         layout.addLayout(row)
 
     def _show_tab_help(self, help_key: str):
-        """Zeigt einen tab-spezifischen Hilfe-Dialog an."""
-        text = self._TAB_HELP.get(help_key, "Keine Hilfe verfügbar.")
+        """Displays a tab-specific help dialog."""
+        text = self._TAB_HELP.get(help_key, "No help available.")
         box = QMessageBox(self)
-        box.setWindowTitle("Hilfe")
+        box.setWindowTitle("Help")
         box.setTextFormat(Qt.TextFormat.RichText)
         box.setText(text)
         box.setIcon(QMessageBox.Icon.Information)
