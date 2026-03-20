@@ -260,21 +260,33 @@ class CloudStatsMixin:
         if url_str.startswith("vpsinfo://"):
             parsed = _urlparse.urlparse(url_str)
             params = _urlparse.parse_qs(parsed.query)
-            table_name = params.get("t", [""])[0]
-            author = params.get("a", [""])[0]
-            version = params.get("v", [""])[0]
             vps_id = params.get("id", [""])[0]
-            lines = []
-            if table_name:
-                lines.append(f"Table: {table_name}")
-            if author:
-                lines.append(f"Author: {author}")
-            if version:
-                lines.append(f"Version: {version}")
-            if vps_id:
-                lines.append(f"VPS ID: {vps_id}")
-            msg = "\n".join(lines) if lines else "No VPS information available."
-            QMessageBox.information(self, "Linked VPS Table", msg)
+            table_name = params.get("t", [""])[0]
+            breakdown_raw = params.get("breakdown", [""])[0]
+            breakdown = None
+            if breakdown_raw:
+                try:
+                    breakdown = json.loads(breakdown_raw)
+                except Exception:
+                    pass
+            try:
+                from ui_vps import CloudProgressVpsInfoDialog
+                dlg = CloudProgressVpsInfoDialog(
+                    cfg=self.cfg,
+                    vps_id=vps_id,
+                    table_name=table_name,
+                    breakdown=breakdown,
+                    parent=self,
+                )
+                dlg.exec()
+            except Exception:
+                lines = []
+                if table_name:
+                    lines.append(f"Table: {table_name}")
+                if vps_id:
+                    lines.append(f"VPS ID: {vps_id}")
+                msg = "\n".join(lines) if lines else "No VPS information available."
+                QMessageBox.information(self, "Linked VPS Table", msg)
         elif url_str.startswith("http://") or url_str.startswith("https://"):
             QDesktopServices.openUrl(QUrl(url_str))
 
@@ -403,6 +415,7 @@ class CloudStatsMixin:
             table_name = (r.get("table_name") or "").strip()
             author = (r.get("author") or "").strip()
             version = (r.get("version") or "").strip()
+            breakdown = r.get("vps_id_breakdown")
             parts = []
             if table_name:
                 parts.append(f"Table: {_html.escape(table_name)}")
@@ -422,6 +435,8 @@ class CloudStatsMixin:
                 params["v"] = version
             if vps_id:
                 params["id"] = vps_id
+            if breakdown and isinstance(breakdown, dict):
+                params["breakdown"] = json.dumps(breakdown, separators=(",", ":"))
             if params:
                 safe_url = _html.escape(
                     "vpsinfo://?" + _urlparse.urlencode(params, quote_via=_urlparse.quote),

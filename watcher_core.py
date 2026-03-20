@@ -1158,6 +1158,20 @@ class CloudSync:
                                 break
                 except Exception:
                     pass
+            # Build vps_id_breakdown: count of unlocked achievements per vps_id
+            try:
+                ach_state = secure_load_json(f_achievements_state(cfg), {"global": {}, "session": {}})
+                rom_achievements = ach_state.get("session", {}).get(rom, []) or []
+                breakdown: dict = {}
+                for ach in rom_achievements:
+                    if isinstance(ach, dict):
+                        vid = (ach.get("vps_id") or "").strip()
+                        if vid:
+                            breakdown[vid] = breakdown.get(vid, 0) + 1
+                if breakdown:
+                    payload["vps_id_breakdown"] = breakdown
+            except Exception:
+                pass
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
             try:

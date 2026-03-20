@@ -22,7 +22,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QWidget, QFrame, QScrollArea, QSizePolicy,
+    QPushButton, QWidget, QFrame, QScrollArea, QSizePolicy, QProgressBar,
 )
 
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
@@ -1074,3 +1074,186 @@ class VpsAchievementInfoDialog(QDialog):
         btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloud Progress VPS Info Dialog
+# ─────────────────────────────────────────────────────────────────────────────
+
+class CloudProgressVpsInfoDialog(QDialog):
+    """Show VPS table info for a cloud-progress entry.
+
+    When *breakdown* is provided (a ``{vps_id: unlock_count}`` dict) and
+    contains more than one entry, each contributing table is shown with its
+    percentage share.  For a single table the full :class:`VpsHeroPanel` is
+    used so the hero image, feature tags and all metadata are visible.
+    """
+
+    def __init__(
+        self,
+        cfg,
+        vps_id: str,
+        table_name: str = "",
+        breakdown: Optional[dict] = None,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.cfg = cfg
+        self.setWindowTitle("ℹ️  Cloud Progress — Table Info")
+        self.setMinimumWidth(640)
+        self.setStyleSheet("background:#111; color:#DDD;")
+
+        from watcher_core import p_vps_img
+        self._img_dir = p_vps_img(cfg)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
+
+        # Header
+        lbl_hdr = QLabel("<b style='font-size:14px; color:#00E5FF;'>🎰 Cloud Progress — Table Info</b>")
+        lbl_hdr.setWordWrap(True)
+        layout.addWidget(lbl_hdr)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color:#333;")
+        layout.addWidget(sep)
+
+        # Resolve all entries from vpsdb
+        tables = _load_vpsdb(cfg)
+        # Normalise breakdown: ensure the primary vps_id is represented
+        if breakdown and isinstance(breakdown, dict) and len(breakdown) > 0:
+            bd: dict = dict(breakdown)
+        elif vps_id:
+            bd = {vps_id: 1}
+        else:
+            bd = {}
+
+        resolved: list = []  # list of (table, table_file, count, pct)
+        if tables and bd:
+            total_count = max(sum(bd.values()), 1)
+            for vid, count in sorted(bd.items(), key=lambda x: -x[1]):
+                vps_entry = None
+                tf_entry = None
+                for t in tables:
+                    if t.get("id") == vid:
+                        vps_entry = t
+                        break
+                    for tf in (t.get("tableFiles") or []):
+                        if tf.get("id") == vid:
+                            vps_entry = t
+                            tf_entry = tf
+                            break
+                    if vps_entry:
+                        break
+                pct = round(count / total_count * 100, 1)
+                resolved.append((vps_entry, tf_entry, count, pct))
+        elif vps_id:
+            # vpsdb unavailable: show limited info from URL params
+            resolved = [(None, None, 1, 100.0)]
+
+        self._cb_timer = QTimer(self)
+        self._cb_timer.timeout.connect(_process_pending_image_callbacks)
+        self._cb_timer.start(80)
+
+        multi = len(resolved) > 1
+
+        if not resolved:
+            lbl_none = QLabel("<span style='color:#888;'>No VPS table information available.</span>")
+            layout.addWidget(lbl_none)
+        elif not multi:
+            # ── Single table: full hero panel ──────────────────────────────
+            vps_entry, tf_entry, _count, _pct = resolved[0]
+            if vps_entry:
+                hero = VpsHeroPanel(self._img_dir, parent=self)
+                hero.update_selection(vps_entry, tf_entry or {})
+                layout.addWidget(hero)
+            else:
+                self._add_unknown_table_info(layout, vps_id, table_name)
+        else:
+            # ── Multiple tables: scrollable list with percentage bars ───────
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setStyleSheet("QScrollArea{border:none;} QScrollBar:vertical{width:8px;}")
+            container = QWidget()
+            container.setStyleSheet("background:#111;")
+            vbox = QVBoxLayout(container)
+            vbox.setContentsMargins(0, 0, 0, 0)
+            vbox.setSpacing(10)
+
+            for vps_entry, tf_entry, _count, pct in resolved:
+                entry_widget = self._build_table_entry(vps_entry, tf_entry, pct)
+                vbox.addWidget(entry_widget)
+
+            vbox.addStretch()
+            scroll.setWidget(container)
+            layout.addWidget(scroll)
+
+        # Close button
+        btn_close = QPushButton("Close")
+        btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _add_unknown_table_info(self, layout: QVBoxLayout, vps_id: str, table_name: str) -> None:
+        """Fallback: show plain text when the vps_id is not in the local cache."""
+        if table_name:
+            lbl = QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{table_name}</b>")
+            lbl.setWordWrap(True)
+            layout.addWidget(lbl)
+        if vps_id:
+            lbl_id = QLabel(f"<span style='color:#888; font-size:11px;'>VPS-ID: {vps_id} (not in local cache)</span>")
+            lbl_id.setWordWrap(True)
+            layout.addWidget(lbl_id)
+        else:
+            lbl_no = QLabel("<span style='color:#888;'>No VPS table information available.</span>")
+            layout.addWidget(lbl_no)
+
+    def _build_table_entry(self, vps_entry: Optional[dict], tf_entry: Optional[dict], pct: float) -> QWidget:
+        """Build a compact widget showing one table + its percentage contribution."""
+        wrapper = QWidget()
+        wrapper.setStyleSheet("background:#1a1a1a; border-radius:6px;")
+        vbox = QVBoxLayout(wrapper)
+        vbox.setContentsMargins(8, 8, 8, 8)
+        vbox.setSpacing(6)
+
+        # Percentage row
+        pct_row = QHBoxLayout()
+        pct_label = QLabel(f"<b style='color:#00E5FF; font-size:13px;'>{pct:.1f}%</b>")
+        pct_row.addWidget(pct_label)
+        pct_row.addStretch()
+        vbox.addLayout(pct_row)
+
+        # Progress bar
+        bar = QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(int(round(pct)))
+        bar.setTextVisible(False)
+        bar.setFixedHeight(6)
+        bar.setStyleSheet(
+            "QProgressBar{background:#333; border-radius:3px; border:none;}"
+            "QProgressBar::chunk{background:#00E5FF; border-radius:3px;}"
+        )
+        vbox.addWidget(bar)
+
+        if vps_entry:
+            card = VpsCardWidget(
+                vps_entry,
+                tf_entry or {},
+                False,
+                self._img_dir,
+                parent=wrapper,
+            )
+            vbox.addWidget(card)
+        else:
+            lbl_no = QLabel("<span style='color:#888; font-size:11px;'>VPS ID not in local cache</span>")
+            vbox.addWidget(lbl_no)
+
+        return wrapper
+
+    def closeEvent(self, event):
+        self._cb_timer.stop()
+        super().closeEvent(event)
