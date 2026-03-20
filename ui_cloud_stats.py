@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextBrowser,
     QTabWidget, QGroupBox, QComboBox, QLineEdit, QPushButton,
 )
-from PyQt6.QtCore import Qt, QMetaObject, Q_ARG
+from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from watcher_core import CloudSync, secure_load_json
 
@@ -223,6 +224,8 @@ class CloudStatsMixin:
         layout.addWidget(grp_controls)
         
         self.cloud_view = QTextBrowser()
+        self.cloud_view.setOpenLinks(False)
+        self.cloud_view.anchorClicked.connect(self._on_cloud_view_anchor_clicked)
         self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM and click Fetch)</div>")
         layout.addWidget(self.cloud_view)
         
@@ -233,6 +236,12 @@ class CloudStatsMixin:
             self.cmb_cloud_diff.show()
         else:
             self.cmb_cloud_diff.hide()
+
+    def _on_cloud_view_anchor_clicked(self, url: QUrl):
+        """Open info badge links (https://...) in the system browser."""
+        url_str = url.toString() if isinstance(url, QUrl) else str(url)
+        if url_str.startswith("http://") or url_str.startswith("https://"):
+            QDesktopServices.openUrl(QUrl(url_str))
 
     def _fetch_cloud_leaderboard(self):
         cat_index = self.cmb_cloud_category.currentIndex()
@@ -317,7 +326,7 @@ class CloudStatsMixin:
             
         threading.Thread(target=_bg_fetch, daemon=True).start()
 
-    def _generate_cloud_html(self, data: list, category: str, rom: str, selected_diff: str = None) -> str:
+    def _generate_cloud_html(self, data: list, category: str, rom: str, selected_diff: str = None, include_info_badges: bool = True) -> str:
         css = """
         <style>
           table { border-collapse: collapse; width: 80%; margin: 10px auto; }
@@ -355,6 +364,8 @@ class CloudStatsMixin:
         vps_base = "https://virtualpinballspreadsheet.github.io/vps-db/vps/"
 
         def _cloud_info_badge(r: dict) -> str:
+            if not include_info_badges:
+                return ""
             vps_id = (r.get("vps_id") or "").strip()
             table_name = (r.get("table_name") or "").strip()
             author = (r.get("author") or "").strip()
