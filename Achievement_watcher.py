@@ -4807,7 +4807,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _on_level_up(self, level_name: str, level_number: int):
         try:
-            toast_title = f"⬆️ LEVEL UP!  {level_name}"
+            toast_title = f"LEVEL UP!  {level_name}"
             self._ach_toast_mgr.enqueue_level_up(toast_title, level_number, seconds=6)
         except Exception:
             pass
