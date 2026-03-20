@@ -63,6 +63,8 @@ from ui_vps import (
 from ui_overlay import (
     OverlayWindow,
     MiniInfoOverlay,
+    StatusOverlay,
+    StatusOverlayPositionPicker,
     read_active_players,
     FlipCounterOverlay,
     FlipCounterPositionPicker,
@@ -188,6 +190,7 @@ class Bridge(QObject):
     prefetch_progress = pyqtSignal(str)
     prefetch_finished = pyqtSignal(str)
     level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
+    status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -250,6 +253,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.prefetch_finished.connect(self._on_prefetch_finished)
         self.bridge.level_up_show.connect(self._on_level_up)
         self.bridge.achievements_updated.connect(self._refresh_level_display)
+        self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -324,6 +328,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._flip_diff_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100)]
         self._flip_diff_select = None
         self._mini_test_idx = 0
+        self._status_overlay_test_idx = 0
 
         self.watcher.start()
 
@@ -813,6 +818,120 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
         self._mini_test_idx = (self._mini_test_idx + 1) % len(self._MINI_TEST_MESSAGES)
         self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
+
+    # ------------------------------------------------------------------
+    # Status Overlay handlers
+    # ------------------------------------------------------------------
+
+    def _on_status_overlay_enabled_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["status_overlay_enabled"] = bool(is_checked)
+        self.cfg.save()
+
+    def _on_status_overlay_portrait_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["status_overlay_portrait"] = bool(is_checked)
+        self.cfg.save()
+        try:
+            if hasattr(self, "_status_overlay_picker") and isinstance(self._status_overlay_picker, StatusOverlayPositionPicker):
+                self._status_overlay_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+
+    def _on_status_overlay_ccw_toggle(self, state: int):
+        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["status_overlay_rotate_ccw"] = bool(is_ccw)
+        self.cfg.save()
+        try:
+            if hasattr(self, "_status_overlay_picker") and isinstance(self._status_overlay_picker, StatusOverlayPositionPicker):
+                self._status_overlay_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+
+    def _on_status_overlay_place_clicked(self):
+        picker = getattr(self, "_status_overlay_picker", None)
+        if picker and isinstance(picker, StatusOverlayPositionPicker):
+            try:
+                x, y = picker.current_top_left()
+            except Exception:
+                g = picker.geometry()
+                x, y = g.x(), g.y()
+            ov = self.cfg.OVERLAY or {}
+            portrait = bool(ov.get("status_overlay_portrait", False))
+            if portrait:
+                self.cfg.OVERLAY["status_overlay_x_portrait"] = int(x)
+                self.cfg.OVERLAY["status_overlay_y_portrait"] = int(y)
+            else:
+                self.cfg.OVERLAY["status_overlay_x_landscape"] = int(x)
+                self.cfg.OVERLAY["status_overlay_y_landscape"] = int(y)
+            self.cfg.OVERLAY["status_overlay_saved"] = True
+            self.cfg.save()
+            try:
+                picker.close()
+                picker.deleteLater()
+            except Exception:
+                pass
+            self._status_overlay_picker = None
+            self.btn_status_overlay_place.setText("Place / Save position")
+            return
+
+        self._status_overlay_picker = StatusOverlayPositionPicker(self, width_hint=420, height_hint=100)
+        self.btn_status_overlay_place.setText("Save position")
+
+    _STATUS_TEST_MESSAGES = [
+        ("☁️ Score submitted – accepted!", "#00C853"),
+        ("⏳ Score pending verification…", "#FFA500"),
+        ("🚩 Submission flagged for review.", "#FF3B30"),
+        ("❌ Submission rejected: invalid ROM.", "#FF3B30"),
+        ("📋 Score queued – waiting for cloud.", "#FFA500"),
+    ]
+
+    def _on_status_overlay_test(self):
+        if not hasattr(self, "_status_overlay") or self._status_overlay is None:
+            self._status_overlay = StatusOverlay(self)
+        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
+        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
+        self._status_overlay.show_status(msg, seconds=5, color_hex=color)
+
+    def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
+        if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
+            return
+
+        def _player_visible() -> bool:
+            try:
+                w = getattr(self, "watcher", None)
+                return bool(w and w._vp_player_visible())
+            except Exception:
+                return False
+
+        def _show_now():
+            try:
+                if not hasattr(self, "_status_overlay") or self._status_overlay is None:
+                    self._status_overlay = StatusOverlay(self)
+                self._status_overlay.show_status(
+                    message,
+                    seconds=max(1, int(seconds)),
+                    color_hex=color_hex or None,
+                )
+            except Exception as e:
+                try:
+                    log(self.cfg, f"[UI] Status overlay show failed: {e}")
+                except Exception:
+                    pass
+
+        if _player_visible():
+            _show_now()
+            return
+        tries = {"n": 0}
+
+        def _retry():
+            if _player_visible():
+                _show_now()
+                return
+            tries["n"] += 1
+            if tries["n"] < 8:
+                QTimer.singleShot(250, _retry)
+        QTimer.singleShot(250, _retry)
 
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
@@ -1724,9 +1843,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_heat_bar_test = QPushButton("Test"); self.btn_heat_bar_test.clicked.connect(self._on_heat_bar_test)
         box_heat_bar = create_overlay_box("Heat Bar (Heat Challenge)", self.chk_heat_bar_portrait, self.chk_heat_bar_ccw, self.btn_heat_bar_place, self.btn_heat_bar_test)
 
+        # 7) Status Overlay (cloud / leaderboard status messages)
+        self.chk_status_overlay_enabled = QCheckBox("Enabled"); self.chk_status_overlay_enabled.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_enabled", True))); self.chk_status_overlay_enabled.stateChanged.connect(self._on_status_overlay_enabled_toggle)
+        self.chk_status_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_status_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_portrait", False))); self.chk_status_overlay_portrait.stateChanged.connect(self._on_status_overlay_portrait_toggle)
+        self.chk_status_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_status_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_rotate_ccw", False))); self.chk_status_overlay_ccw.stateChanged.connect(self._on_status_overlay_ccw_toggle)
+        self.btn_status_overlay_place = QPushButton("Place"); self.btn_status_overlay_place.clicked.connect(self._on_status_overlay_place_clicked)
+        self.btn_status_overlay_test = QPushButton("Test"); self.btn_status_overlay_test.clicked.connect(self._on_status_overlay_test)
+        box_status_overlay = QVBoxLayout()
+        box_status_overlay.addWidget(QLabel("<b>Status Overlay</b>"))
+        box_status_overlay.addWidget(self.chk_status_overlay_enabled)
+        box_status_overlay.addWidget(self.chk_status_overlay_portrait)
+        box_status_overlay.addWidget(self.chk_status_overlay_ccw)
+        _btns_status = QHBoxLayout(); _btns_status.addWidget(self.btn_status_overlay_place); _btns_status.addWidget(self.btn_status_overlay_test)
+        box_status_overlay.addLayout(_btns_status)
+        box_status_overlay.addStretch(1)
+
         lay_pos.addLayout(box_main, 0, 0); lay_pos.addLayout(box_toast, 0, 1)
         lay_pos.addLayout(box_ch_sel, 1, 0); lay_pos.addLayout(box_tc, 1, 1)
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_heat_bar, 2, 1)
+        lay_pos.addLayout(box_status_overlay, 3, 0)
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)
@@ -3122,7 +3257,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "chk_mini_info_portrait": "Rotate system notifications (errors, warnings, info) for portrait screens.",
             "chk_mini_info_ccw": "Rotate system notifications counter-clockwise.",
             "btn_mini_info_place": "Set and save the screen position for system notifications.",
-            "btn_mini_info_test": "Trigger a test notification to check your placement."
+            "btn_mini_info_test": "Trigger a test notification to check your placement.",
+            
+            # Appearance Tab - Status Overlay (cloud / leaderboard status)
+            "chk_status_overlay_enabled": "Show or hide the Status Overlay for cloud and leaderboard submission feedback.",
+            "chk_status_overlay_portrait": "Rotate the Status Overlay 90 degrees for portrait/cabinet screens.",
+            "chk_status_overlay_ccw": "Rotate the Status Overlay counter-clockwise.",
+            "btn_status_overlay_place": "Set and save the screen position for the Status Overlay.",
+            "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement."
         }
         apply_tooltips(self, tips)
         

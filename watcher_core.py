@@ -39,6 +39,8 @@ def resource_path(rel: str) -> str:
             return p
     return os.path.join(APP_DIR, rel)
 
+WATCHER_VERSION = "2.6"
+
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
     ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
     if requests:
@@ -189,6 +191,14 @@ DEFAULT_OVERLAY.update({
 DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
 DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
 DEFAULT_OVERLAY.setdefault("low_performance_mode", False)
+DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
+DEFAULT_OVERLAY.setdefault("status_overlay_portrait", False)
+DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
+DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -281,6 +291,10 @@ class AppConfig:
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
                 
+                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
+                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
+                "status_overlay_x_portrait", "status_overlay_y_portrait",
+                
                 "player_name", "player_id", "flip_counter_goal_total", 
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode"
@@ -337,6 +351,10 @@ class AppConfig:
                 
                 "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
                 "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
+                
+                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
+                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
+                "status_overlay_x_portrait", "status_overlay_y_portrait",
                 
                 "player_name", "player_id", "flip_counter_goal_total", 
                 "challenges_voice_volume", "challenges_voice_mute",
@@ -1060,7 +1078,7 @@ class CloudSync:
             except Exception:
                 pass 
             
-            payload = {"name": pname, "score": score, "ts": datetime.now(timezone.utc).isoformat()}
+            payload = {"name": pname, "score": score, "ts": datetime.now(timezone.utc).isoformat(), "watcher_version": WATCHER_VERSION}
             if extra_data: payload.update(extra_data)
                 
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
@@ -1106,7 +1124,8 @@ class CloudSync:
                 "unlocked": unlocked,
                 "total": total,
                 "percentage": percentage,
-                "ts": datetime.now(timezone.utc).isoformat()
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "watcher_version": WATCHER_VERSION,
             }
             if _extra_vps_id:
                 payload["vps_id"] = _extra_vps_id
@@ -1303,6 +1322,7 @@ class CloudSync:
             payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
+                "watcher_version": WATCHER_VERSION,
                 "global": global_entries,
                 "session": session_entries,
                 "roms_played": roms_played,
