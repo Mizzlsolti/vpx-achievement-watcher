@@ -5716,14 +5716,56 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
 
     def _restart_watcher(self):
+        if getattr(self, "_restarting", False):
+            return
+        self._restarting = True
+        self.btn_restart.setEnabled(False)
+        self.status_label.setText("🔄 Watcher: RESTARTING...")
+        self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FFA500; padding: 10px;")
+
+        old_watcher = self.watcher
+
+        def _stop_old():
+            try:
+                if old_watcher:
+                    try:
+                        old_watcher.stop_timed_challenge()
+                    except Exception:
+                        pass
+                    try:
+                        old_watcher.stop_flip_challenge()
+                    except Exception:
+                        pass
+                    try:
+                        old_watcher.stop_heat_challenge()
+                    except Exception:
+                        pass
+                    try:
+                        old_watcher.stop()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            finally:
+                from PyQt6.QtCore import QMetaObject, Qt
+                QMetaObject.invokeMethod(self, "_finish_restart", Qt.ConnectionType.QueuedConnection)
+
+        threading.Thread(target=_stop_old, daemon=True, name="WatcherRestartThread").start()
+
+    @pyqtSlot()
+    def _finish_restart(self):
         try:
-            if self.watcher:
-                self.watcher.stop()
-        except Exception:
-            pass
-        self.watcher = Watcher(self.cfg, self.bridge)
-        self.watcher.start()
-        self._reset_status_label()
+            new_watcher = Watcher(self.cfg, self.bridge)
+            new_watcher.start()
+            self.watcher = new_watcher
+            self._reset_status_label()
+        except Exception as e:
+            log(self.cfg, f"[RESTART] Failed to start new watcher: {e}", "WARN")
+            self.status_label.setText("❌ Watcher: RESTART FAILED")
+            self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF3B30; padding: 10px;")
+        finally:
+            self._restarting = False
+            self.btn_restart.setEnabled(True)
 
     def _check_for_updates(self):
         
