@@ -159,8 +159,12 @@ end;
 procedure InitializeWizard;
 begin
   CreatePathsPage;
-  { On upgrade: pre-fill fields from existing config.json }
-  LoadExistingConfig;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (PathsPage <> nil) and (CurPageID = PathsPage.ID) then
+    LoadExistingConfig;
 end;
 
 { Skip the paths page when running silently (auto-update) }
