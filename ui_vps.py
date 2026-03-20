@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import functools
+import hashlib
 import json
 import os
+import queue
 import re
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -14,11 +18,11 @@ from typing import Optional, Any, List
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QWidget, QFrame,
-    QTableWidget, QTableWidgetItem, QHeaderView,
+    QPushButton, QWidget, QFrame, QScrollArea, QSizePolicy,
 )
 
 VPSDB_URL = "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
@@ -222,11 +226,463 @@ def _find_table_file_by_filename_and_authors(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VPS Picker Dialog — 2-column table view
+# Image caching helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+_IMG_MEM_CACHE: dict = {}           # url -> QPixmap (or None = failed)
+_IMG_LOADING: set = set()           # urls currently being fetched
+_IMG_LOCK = threading.Lock()
+_IMG_CALLBACK_QUEUE: queue.SimpleQueue = queue.SimpleQueue()
+
+# Card / hero dimensions
+_CARD_IMG_W = 140
+_CARD_IMG_H = 105
+_HERO_IMG_W = 230
+_HERO_IMG_H = 172
+
+# Font stack: Segoe UI on Windows, system sans-serif elsewhere
+_FONT_UI = "'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+
+
+def _table_sub_parts(table: dict) -> List[str]:
+    """Return [manufacturer, year, type] parts for display (non-empty only)."""
+    return [
+        p for p in [
+            table.get("manufacturer", ""),
+            str(table["year"]) if table.get("year") else "",
+            table.get("type", ""),
+        ] if p
+    ]
+
+
+def _format_authors(authors: list, max_count: int = 4) -> str:
+    """Join author names, truncating at *max_count* with an ellipsis."""
+    if not authors:
+        return ""
+    return ", ".join(authors[:max_count]) + ("…" if len(authors) > max_count else "")
+
+
+def _resolve_img_url(table: dict, table_file: dict) -> Optional[str]:
+    """Return the best available preview image URL for a table/tableFile."""
+    url = (table_file or {}).get("imgUrl") or (table or {}).get("imgUrl")
+    return url if isinstance(url, str) and url.startswith("http") else None
+
+
+def _img_disk_path(img_dir: str, url: str) -> str:
+    """Deterministic local cache path for a URL."""
+    ext = os.path.splitext(urllib.parse.urlparse(url).path)[-1] or ".webp"
+    name = hashlib.md5(url.encode()).hexdigest() + ext
+    return os.path.join(img_dir, name)
+
+
+def _load_image_async(url: str, img_dir: str, callback) -> None:
+    """Load or download a preview image asynchronously.
+
+    Queues *callback(QPixmap)* to run in the Qt main thread via
+    ``_process_pending_image_callbacks()``.  Does nothing when the URL is
+    empty or the image is already loading.
+    """
+    if not url:
+        return
+
+    with _IMG_LOCK:
+        if url in _IMG_MEM_CACHE:
+            pix = _IMG_MEM_CACHE[url]
+            if pix is not None:
+                _IMG_CALLBACK_QUEUE.put((callback, pix))
+            return
+        if url in _IMG_LOADING:
+            return
+        _IMG_LOADING.add(url)
+
+    cache_file = _img_disk_path(img_dir, url)
+
+    def _worker():
+        try:
+            if not os.path.isfile(cache_file):
+                try:
+                    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+                    req = urllib.request.Request(
+                        url, headers={"User-Agent": "vpx-achievement-watcher"}
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        data = resp.read()
+                    with open(cache_file, "wb") as fh:
+                        fh.write(data)
+                except Exception:
+                    with _IMG_LOCK:
+                        _IMG_MEM_CACHE[url] = None
+                        _IMG_LOADING.discard(url)
+                    return
+
+            pix = QPixmap(cache_file)
+            with _IMG_LOCK:
+                _IMG_MEM_CACHE[url] = pix if not pix.isNull() else None
+                _IMG_LOADING.discard(url)
+            if not pix.isNull():
+                _IMG_CALLBACK_QUEUE.put((callback, pix))
+        except Exception:
+            with _IMG_LOCK:
+                _IMG_MEM_CACHE[url] = None
+                _IMG_LOADING.discard(url)
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _process_pending_image_callbacks() -> None:
+    """Drain the callback queue — must be called from the Qt main thread."""
+    while not _IMG_CALLBACK_QUEUE.empty():
+        try:
+            cb, pix = _IMG_CALLBACK_QUEUE.get_nowait()
+            try:
+                cb(pix)
+            except RuntimeError:
+                pass  # underlying C++ widget already deleted
+        except Exception:
+            pass
+
+
+def _make_placeholder_pixmap(w: int, h: int) -> QPixmap:
+    """Create a simple dark placeholder with a pinball emoji."""
+    pix = QPixmap(w, h)
+    pix.fill(QColor("#1a1a1a"))
+    painter = QPainter(pix)
+    painter.setPen(QColor("#444"))
+    f = QFont("Segoe UI", max(10, h // 8))
+    painter.setFont(f)
+    painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "🎰")
+    painter.end()
+    return pix
+
+
+def _format_date(ts) -> str:
+    """Convert a millisecond timestamp to DD.MM.YYYY, or ''."""
+    if isinstance(ts, (int, float)) and ts > 0:
+        try:
+            return datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%d.%m.%Y")
+        except Exception:
+            pass
+    return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VpsCardWidget — one entry in the card list
+# ─────────────────────────────────────────────────────────────────────────────
+
+class VpsCardWidget(QFrame):
+    """Horizontal card showing thumbnail + metadata for a single VPS tableFile."""
+
+    card_clicked = pyqtSignal(object, object)         # (table, table_file)
+    card_double_clicked = pyqtSignal(object, object)  # (table, table_file)
+
+    _STYLE_NORMAL   = "VpsCardWidget{background:#1e1e1e;border:1px solid #333;border-radius:6px;}"
+    _STYLE_SELECTED = "VpsCardWidget{background:#0d2a33;border:2px solid #00E5FF;border-radius:6px;}"
+    _STYLE_HOVER    = "VpsCardWidget{background:#252525;border:1px solid #555;border-radius:6px;}"
+
+    def __init__(self, table: dict, table_file: dict, rom_match: bool, img_dir: str, parent=None):
+        super().__init__(parent)
+        self.table = table
+        self.table_file = table_file
+        self._selected = False
+        self._img_url = _resolve_img_url(table, table_file)
+
+        self.setFixedHeight(_CARD_IMG_H + 16)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(self._STYLE_NORMAL)
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(6, 6, 6, 6)
+        lay.setSpacing(10)
+
+        # ── Thumbnail ─────────────────────────────────────────────────────────
+        self.lbl_img = QLabel()
+        self.lbl_img.setFixedSize(_CARD_IMG_W, _CARD_IMG_H)
+        self.lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_img.setStyleSheet(
+            "background:#111; border:1px solid #2a2a2a; border-radius:3px;"
+        )
+        self.lbl_img.setPixmap(_make_placeholder_pixmap(_CARD_IMG_W, _CARD_IMG_H))
+        lay.addWidget(self.lbl_img)
+
+        # ── Metadata ──────────────────────────────────────────────────────────
+        meta = QVBoxLayout()
+        meta.setContentsMargins(0, 2, 0, 2)
+        meta.setSpacing(2)
+
+        # Title + ROM match badge
+        title_row = QHBoxLayout()
+        title_row.setSpacing(6)
+        raw_name = table.get("name", "Unknown")
+        clean_name = re.sub(r'\s*[\(\[].*?[\)\]]', '', raw_name).strip()
+        lbl_name = QLabel(clean_name)
+        lbl_name.setStyleSheet("color:#FFFFFF; font-size:13px; font-weight:bold;")
+        lbl_name.setWordWrap(False)
+        title_row.addWidget(lbl_name, stretch=1)
+        if rom_match:
+            lbl_rom = QLabel("✅ ROM")
+            lbl_rom.setStyleSheet(
+                "color:#00C800; font-size:10px; font-weight:bold; padding:0 4px;"
+            )
+            title_row.addWidget(lbl_rom)
+        meta.addLayout(title_row)
+
+        # Manufacturer · year · type
+        sub_parts = _table_sub_parts(table)
+        if sub_parts:
+            lbl_sub = QLabel("  ·  ".join(sub_parts))
+            lbl_sub.setStyleSheet("color:#888; font-size:11px;")
+            meta.addWidget(lbl_sub)
+
+        # Authors
+        authors_text = _format_authors(table_file.get("authors") or [])
+        if authors_text:
+            lbl_authors = QLabel(f"👤 {authors_text}")
+            lbl_authors.setStyleSheet("color:#AAA; font-size:11px;")
+            meta.addWidget(lbl_authors)
+
+        # Version · date
+        ver_parts = []
+        version = table_file.get("version", "")
+        if version:
+            ver_parts.append(f"v{version}")
+        date_s = _format_date(table_file.get("updatedAt"))
+        if date_s:
+            ver_parts.append(date_s)
+        if ver_parts:
+            lbl_ver = QLabel("  ·  ".join(ver_parts))
+            lbl_ver.setStyleSheet("color:#666; font-size:11px;")
+            meta.addWidget(lbl_ver)
+
+        # Feature tags
+        features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
+        if features:
+            feat_row = QHBoxLayout()
+            feat_row.setContentsMargins(0, 0, 0, 0)
+            feat_row.setSpacing(3)
+            for feat in features[:7]:
+                lbl_f = QLabel(feat)
+                lbl_f.setStyleSheet(
+                    "background:#1a3040; color:#00C8FF; font-size:9px;"
+                    " border:1px solid #00608F; border-radius:3px; padding:1px 4px;"
+                )
+                feat_row.addWidget(lbl_f)
+            feat_row.addStretch()
+            meta.addLayout(feat_row)
+
+        meta.addStretch()
+        lay.addLayout(meta, stretch=1)
+
+        # Kick off async image load
+        if self._img_url:
+            _load_image_async(self._img_url, img_dir, self._on_image_loaded)
+
+    # ── Image callback ────────────────────────────────────────────────────────
+
+    def _on_image_loaded(self, pixmap: QPixmap) -> None:
+        try:
+            if pixmap and not pixmap.isNull():
+                self.lbl_img.setPixmap(
+                    pixmap.scaled(
+                        _CARD_IMG_W, _CARD_IMG_H,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+        except RuntimeError:
+            pass
+
+    # ── Selection state ───────────────────────────────────────────────────────
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = selected
+        self.setStyleSheet(self._STYLE_SELECTED if selected else self._STYLE_NORMAL)
+
+    # ── Mouse events ──────────────────────────────────────────────────────────
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.card_clicked.emit(self.table, self.table_file)
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.card_double_clicked.emit(self.table, self.table_file)
+        super().mouseDoubleClickEvent(event)
+
+    def enterEvent(self, event):
+        if not self._selected:
+            self.setStyleSheet(self._STYLE_HOVER)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self._selected:
+            self.setStyleSheet(self._STYLE_NORMAL)
+        super().leaveEvent(event)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VpsHeroPanel — selected-table detail area at the top of the picker
+# ─────────────────────────────────────────────────────────────────────────────
+
+class VpsHeroPanel(QFrame):
+    """Detail/hero panel that updates whenever the user selects a card."""
+
+    def __init__(self, img_dir: str, parent=None):
+        super().__init__(parent)
+        self.img_dir = img_dir
+        self._current_url: Optional[str] = None
+
+        self.setFixedHeight(_HERO_IMG_H + 20)
+        self.setStyleSheet(
+            "VpsHeroPanel{background:#151515; border:1px solid #2a2a2a; border-radius:6px;}"
+        )
+
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(14)
+
+        # ── Image ─────────────────────────────────────────────────────────────
+        self.lbl_img = QLabel()
+        self.lbl_img.setFixedSize(_HERO_IMG_W, _HERO_IMG_H)
+        self.lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_img.setStyleSheet(
+            "background:#111; border:1px solid #2a2a2a; border-radius:4px;"
+        )
+        self.lbl_img.setPixmap(_make_placeholder_pixmap(_HERO_IMG_W, _HERO_IMG_H))
+        lay.addWidget(self.lbl_img)
+
+        # ── Details ───────────────────────────────────────────────────────────
+        details = QVBoxLayout()
+        details.setContentsMargins(0, 0, 0, 0)
+        details.setSpacing(4)
+
+        self.lbl_name = QLabel("— no selection —")
+        self.lbl_name.setStyleSheet(
+            "color:#FFFFFF; font-size:16px; font-weight:bold;"
+        )
+        self.lbl_name.setWordWrap(True)
+        details.addWidget(self.lbl_name)
+
+        self.lbl_sub = QLabel()
+        self.lbl_sub.setStyleSheet("color:#888; font-size:12px;")
+        details.addWidget(self.lbl_sub)
+
+        self.lbl_authors = QLabel()
+        self.lbl_authors.setStyleSheet("color:#AAA; font-size:12px;")
+        details.addWidget(self.lbl_authors)
+
+        self.lbl_ver = QLabel()
+        self.lbl_ver.setStyleSheet("color:#666; font-size:11px;")
+        details.addWidget(self.lbl_ver)
+
+        # Feature-tag row: use a dedicated container widget so we can clear it
+        self.feat_widget = QWidget()
+        self.feat_widget.setStyleSheet("background:transparent;")
+        self._feat_lay = QHBoxLayout(self.feat_widget)
+        self._feat_lay.setContentsMargins(0, 0, 0, 0)
+        self._feat_lay.setSpacing(4)
+        details.addWidget(self.feat_widget)
+
+        self.lbl_ids = QLabel()
+        self.lbl_ids.setStyleSheet("color:#3a3a3a; font-size:10px;")
+        details.addWidget(self.lbl_ids)
+
+        details.addStretch()
+        lay.addLayout(details, stretch=1)
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def update_selection(self, table: Optional[dict], table_file: Optional[dict]) -> None:
+        table = table or {}
+        table_file = table_file or {}
+
+        # Name
+        raw_name = table.get("name", "")
+        self.lbl_name.setText(
+            re.sub(r'\s*[\(\[].*?[\)\]]', '', raw_name).strip() if raw_name else "— no selection —"
+        )
+
+        # Manufacturer · year · type
+        self.lbl_sub.setText("  ·  ".join(_table_sub_parts(table)))
+
+        # Authors
+        authors_text = _format_authors(table_file.get("authors") or [], max_count=6)
+        self.lbl_authors.setText(f"👤 {authors_text}" if authors_text else "")
+
+        # Version · date
+        ver_parts = []
+        version = table_file.get("version", "")
+        if version:
+            ver_parts.append(f"v{version}")
+        date_s = _format_date(table_file.get("updatedAt"))
+        if date_s:
+            ver_parts.append(date_s)
+        self.lbl_ver.setText("  ·  ".join(ver_parts))
+
+        # Features
+        self._clear_features()
+        features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
+        for feat in features[:8]:
+            lbl_f = QLabel(feat)
+            lbl_f.setStyleSheet(
+                "background:#1a3040; color:#00C8FF; font-size:9px;"
+                " border:1px solid #00608F; border-radius:3px; padding:1px 5px;"
+            )
+            self._feat_lay.addWidget(lbl_f)
+        if features:
+            spacer = QWidget()
+            spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            spacer.setStyleSheet("background:transparent;")
+            self._feat_lay.addWidget(spacer)
+
+        # IDs
+        table_id = table.get("id", "")
+        tf_id = table_file.get("id", "")
+        id_parts = []
+        if table_id:
+            id_parts.append(f"table: {table_id}")
+        if tf_id and tf_id != table_id:
+            id_parts.append(f"file: {tf_id}")
+        self.lbl_ids.setText("  ·  ".join(id_parts))
+
+        # Image
+        img_url = _resolve_img_url(table, table_file)
+        if img_url and img_url != self._current_url:
+            self._current_url = img_url
+            self.lbl_img.setPixmap(_make_placeholder_pixmap(_HERO_IMG_W, _HERO_IMG_H))
+            _load_image_async(img_url, self.img_dir, self._on_image_loaded)
+        elif not img_url:
+            self._current_url = None
+            self.lbl_img.setPixmap(_make_placeholder_pixmap(_HERO_IMG_W, _HERO_IMG_H))
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _clear_features(self) -> None:
+        while self._feat_lay.count():
+            item = self._feat_lay.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+    def _on_image_loaded(self, pixmap: QPixmap) -> None:
+        try:
+            if pixmap and not pixmap.isNull():
+                self.lbl_img.setPixmap(
+                    pixmap.scaled(
+                        _HERO_IMG_W, _HERO_IMG_H,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+        except RuntimeError:
+            pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VPS Picker Dialog — image-driven card picker
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VpsPickerDialog(QDialog):
-    """2-column table VPS picker with per-version selection."""
+    """Visual card-grid VPS picker with hero panel and async image previews."""
 
     def __init__(self, cfg, tables: List[dict], rom: str, table_title: str, parent=None):
         super().__init__(parent)
@@ -236,20 +692,25 @@ class VpsPickerDialog(QDialog):
         self.table_title = table_title
         self.selected_table: Optional[dict] = None
         self.selected_table_file: Optional[dict] = None
-        self._row_data: List[tuple] = []  # (table, table_file) per row
+        self._card_entries: List[tuple] = []   # (table, table_file) per card
+        self._cards: List[VpsCardWidget] = []
+        self._selected_idx: int = -1
+
+        from watcher_core import p_vps_img
+        self._img_dir = p_vps_img(cfg)
 
         self.setWindowTitle(f"Select VPS Table — {table_title} [{rom}]")
-        self.setMinimumSize(900, 600)
-        self.resize(1000, 700)
-        self.setStyleSheet("background:#1a1a1a; color:#DDD;")
+        self.setMinimumSize(980, 680)
+        self.resize(1100, 760)
+        self.setStyleSheet("background:#141414; color:#DDD;")
 
         root = QVBoxLayout(self)
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
 
-        # ── Header ───────────────────────────────────────────────────────────
+        # ── Header: title + search ────────────────────────────────────────────
         hdr = QHBoxLayout()
-        lbl_hdr = QLabel("Tables 🛈")
+        lbl_hdr = QLabel("🎰  VPS Table Picker")
         lbl_hdr.setStyleSheet("color:#FFFFFF; font-size:18px; font-weight:bold;")
         hdr.addWidget(lbl_hdr)
         hdr.addStretch()
@@ -265,41 +726,32 @@ class VpsPickerDialog(QDialog):
         hdr.addWidget(self.txt_search)
         root.addLayout(hdr)
 
-        # ── Table widget ──────────────────────────────────────────────────────
-        self.table_widget = QTableWidget()
-        self.table_widget.setColumnCount(2)
-        self.table_widget.setHorizontalHeaderLabels(["Table / Type / Features", "Authors · Version · Date"])
-        self.table_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table_widget.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table_widget.setShowGrid(True)
-        self.table_widget.verticalHeader().setVisible(False)
-        # Both columns get equal stretch (50/50)
-        self.table_widget.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.table_widget.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.table_widget.setStyleSheet(
-            "QTableWidget {"
-            "  background:#1a1a1a; color:#DDD; gridline-color:#333;"
-            "  border:none; font-size:12px; outline:0;"
-            "}"
-            "QTableWidget::item { padding:6px 8px; }"
-            "QTableWidget::item:selected {"
-            "  background:#003344; color:#00E5FF;"
-            "  border-left:2px solid #00E5FF;"
-            "}"
-            "QTableWidget::item:hover { background:#2e2e2e; }"
-            "QHeaderView::section {"
-            "  background:#2a2a2a; color:#888; border:none;"
-            "  padding:4px 8px; font-size:11px;"
-            "}"
-            "QScrollBar:vertical { background:#222; width:10px; }"
-            "QScrollBar::handle:vertical { background:#555; border-radius:5px; }"
-        )
-        self.table_widget.itemSelectionChanged.connect(self._on_row_selected)
-        self.table_widget.cellDoubleClicked.connect(self._on_double_click)
-        root.addWidget(self.table_widget, stretch=1)
+        # ── Hero panel ────────────────────────────────────────────────────────
+        self.hero = VpsHeroPanel(self._img_dir, parent=self)
+        root.addWidget(self.hero)
 
-        # ── Footer buttons ────────────────────────────────────────────────────
+        # ── Card scroll area ──────────────────────────────────────────────────
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll.setStyleSheet(
+            "QScrollArea { background:#141414; border:none; }"
+            "QScrollBar:vertical { background:#1e1e1e; width:10px; }"
+            "QScrollBar::handle:vertical { background:#555; border-radius:5px; min-height:20px; }"
+            "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height:0; }"
+        )
+
+        self._card_container = QWidget()
+        self._card_container.setStyleSheet("background:#141414;")
+        self._card_layout = QVBoxLayout(self._card_container)
+        self._card_layout.setContentsMargins(4, 4, 4, 4)
+        self._card_layout.setSpacing(6)
+        self._card_layout.addStretch()
+
+        self.scroll.setWidget(self._card_container)
+        root.addWidget(self.scroll, stretch=1)
+
+        # ── Footer ────────────────────────────────────────────────────────────
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("color:#333;")
@@ -314,6 +766,10 @@ class VpsPickerDialog(QDialog):
         btn_remove.clicked.connect(self._remove_assignment)
         btn_row.addWidget(btn_remove)
         btn_row.addStretch()
+
+        self.lbl_count = QLabel()
+        self.lbl_count.setStyleSheet("color:#555; font-size:11px;")
+        btn_row.addWidget(self.lbl_count)
 
         btn_cancel = QPushButton("Cancel")
         btn_cancel.setStyleSheet(
@@ -332,10 +788,17 @@ class VpsPickerDialog(QDialog):
         btn_row.addWidget(btn_ok)
         root.addLayout(btn_row)
 
-        # Pre-fill search with clean table name and populate table
+        # Poll the image-callback queue every 80 ms.  Images are downloaded on
+        # daemon threads; results are posted to _IMG_CALLBACK_QUEUE (thread-safe)
+        # and consumed here, safely on the Qt main thread.
+        self._cb_timer = QTimer(self)
+        self._cb_timer.timeout.connect(_process_pending_image_callbacks)
+        self._cb_timer.start(80)
+
+        # Pre-fill and populate
         clean_title = self._clean_table_title(table_title)
         self.txt_search.setText(clean_title)
-        self._populate_table(clean_title)
+        self._populate_cards(clean_title)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -346,19 +809,28 @@ class VpsPickerDialog(QDialog):
         name = re.sub(r'\s*\(.*?\)', '', name)
         return name.strip()
 
-    # ── Table management ──────────────────────────────────────────────────────
+    # ── Card management ───────────────────────────────────────────────────────
 
-    def _populate_table(self, search_term: str):
-        self.table_widget.setRowCount(0)
-        self._row_data.clear()
+    def _populate_cards(self, search_term: str) -> None:
+        """Rebuild the card list from search results."""
+        # Deselect & clear
+        self._cards.clear()
+        self._card_entries.clear()
+        self._selected_idx = -1
         self.selected_table = None
         self.selected_table_file = None
 
+        # Remove old card widgets (keep the trailing stretch at position -1)
+        while self._card_layout.count() > 1:
+            item = self._card_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+
+        # Build entry list
         results = _vps_find(self.tables, search_term, self.rom)
         if not results:
             results = self.tables[:50]
 
-        # Flatten: one row per tableFile entry
         entries: List[tuple] = []
         for table in results:
             rom_match = _table_has_rom(table, self.rom)
@@ -373,95 +845,53 @@ class VpsPickerDialog(QDialog):
             if len(entries) >= MAX_PICKER_RESULTS:
                 break
 
-        self.table_widget.setRowCount(len(entries))
-        for row, (table, table_file, rom_match) in enumerate(entries):
-            # ── Column 0: name + type + features + tableFile-id ───────────────
-            raw_name = table.get("name", "Unknown")
-            name = re.sub(r'\s*\(.*?\)', '', raw_name)
-            name = re.sub(r'\s*\[.*?\]', '', name).strip()
+        # Create cards
+        for idx, (table, table_file, rom_match) in enumerate(entries):
+            card = VpsCardWidget(
+                table, table_file, rom_match, self._img_dir,
+                parent=self._card_container,
+            )
+            card.card_clicked.connect(
+                functools.partial(self._on_card_selected, idx)
+            )
+            card.card_double_clicked.connect(
+                functools.partial(self._on_card_activated, idx)
+            )
+            self._card_layout.insertWidget(self._card_layout.count() - 1, card)
+            self._cards.append(card)
+            self._card_entries.append((table, table_file))
 
-            ttype = table.get("type", "")
-            features = [f.upper() for f in (table_file.get("features") or []) if isinstance(f, str)]
-            tf_id = table_file.get("id", "")  # tableFile-level ID only
+        n = len(entries)
+        self.lbl_count.setText(f"{n} result{'s' if n != 1 else ''}")
 
-            parts = [name]
-            if ttype:
-                parts.append(f"[{ttype}]")
-            if features:
-                parts.append("  " + "  ".join(features[:8]))
-            # Show only the tableFile ID
-            if tf_id:
-                parts.append(f"  [{tf_id}]")
-            col0_text = "  ".join(parts)
+    # ── Event handlers ────────────────────────────────────────────────────────
 
-            item0 = QTableWidgetItem(col0_text)
-            # Left-align text in column 0
-            item0.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            item0.setToolTip(raw_name)
-            self.table_widget.setItem(row, 0, item0)
+    def _on_search(self, text: str) -> None:
+        self._populate_cards(text)
 
-            # ── Column 1: authors + version + date + ROM match ────────────────
-            authors = table_file.get("authors") or []
-            authors_text = ", ".join(authors[:4])
-            if len(authors) > 4:
-                authors_text += "…"
+    def _on_card_selected(self, idx: int, table: dict, table_file: dict) -> None:
+        if 0 <= self._selected_idx < len(self._cards):
+            self._cards[self._selected_idx].set_selected(False)
+        self._selected_idx = idx
+        if 0 <= idx < len(self._cards):
+            self._cards[idx].set_selected(True)
+        self.selected_table = table
+        self.selected_table_file = table_file
+        self.hero.update_selection(table, table_file)
 
-            tf_ver = table_file.get("version", "")
-            id_text = tf_ver or tf_id or ""
+    def _on_card_activated(self, idx: int, table: dict, table_file: dict) -> None:
+        self._on_card_selected(idx, table, table_file)
+        self._accept_selection()
 
-            date_str = ""
-            ts = table_file.get("updatedAt")
-            if isinstance(ts, (int, float)) and ts > 0:
-                try:
-                    dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
-                    date_str = dt.strftime("%d.%m.%Y")
-                except Exception:
-                    pass
-
-            col1_parts = []
-            if authors_text:
-                col1_parts.append(authors_text)
-            if id_text:
-                col1_parts.append(id_text)
-            if date_str:
-                col1_parts.append(date_str)
-            if rom_match:
-                col1_parts.append("✅")
-            col1_text = "  ·  ".join(col1_parts)
-
-            item1 = QTableWidgetItem(col1_text)
-            item1.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            self.table_widget.setItem(row, 1, item1)
-
-            self._row_data.append((table, table_file))
-
-        self.table_widget.resizeRowsToContents()
-
-    def _on_search(self, text: str):
-        self._populate_table(text)
-
-    def _on_row_selected(self):
-        rows = self.table_widget.selectedItems()
-        if not rows:
-            return
-        row = self.table_widget.currentRow()
-        if 0 <= row < len(self._row_data):
-            self.selected_table, self.selected_table_file = self._row_data[row]
-
-    def _on_double_click(self, row: int, _col: int):
-        if 0 <= row < len(self._row_data):
-            self.selected_table, self.selected_table_file = self._row_data[row]
-            self._accept_selection()
-
-    def _accept_selection(self):
+    def _accept_selection(self) -> None:
         if not self.selected_table:
             return
         self.accept()
 
-    def _remove_assignment(self):
+    def _remove_assignment(self) -> None:
         self.selected_table = None
         self.selected_table_file = None
-        self.done(2)  # special code for "remove"
+        self.done(2)  # special return code for "remove"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
