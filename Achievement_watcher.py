@@ -1840,6 +1840,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.main_tabs.addTab(tab, "🏠 Dashboard")
         QTimer.singleShot(1500, self._refresh_level_display)
         QTimer.singleShot(1500, self._refresh_dashboard_cards)
+        self._dashboard_refresh_timer = QTimer(self)
+        self._dashboard_refresh_timer.setInterval(10000)
+        self._dashboard_refresh_timer.timeout.connect(self._refresh_dashboard_cards)
+        self._dashboard_refresh_timer.start()
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
@@ -4666,7 +4670,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             summary_path = os.path.join(
                 self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
             )
-            lr_table = "—"
+            lr_table = "No previous run"
             lr_score = "—"
             lr_achievements = "—"
             lr_result = "—"
@@ -4677,7 +4681,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     rom = str(_data.get("rom", "") or "")
                     romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
                     table_title = romnames.get(rom, rom.upper() if rom else "")
-                    lr_table = table_title or "—"
+                    lr_table = table_title or rom.upper() or "Unknown table"
                     raw_score = _data.get("score", _data.get("best_score", None))
                     if raw_score is not None:
                         try:
@@ -4708,10 +4712,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             current_rom = str(getattr(w, "current_rom", "") or "").strip() if w else ""
             romnames = getattr(w, "ROMNAMES", {}) or {}
 
-            rs_table = "—"
-            rs_session = "—"
-            rs_cloud = "—"
-            rs_lb = "—"
+            cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
+            cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
 
             if game_active and current_rom:
                 table_title = romnames.get(current_rom, current_rom.upper())
@@ -4721,9 +4723,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     session_ach = state.get("session", {}).get(current_rom, [])
                     rs_session = f"{len(session_ach)} achievement{'s' if len(session_ach) != 1 else ''}"
                 except Exception:
-                    rs_session = "—"
-                cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
-                cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+                    rs_session = "Active"
                 if cloud_enabled and cloud_url:
                     pending_state = getattr(self, "_status_badge_state", None)
                     if pending_state == "pending":
@@ -4731,12 +4731,22 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     elif pending_state == "verified":
                         rs_cloud = "Verified"
                     else:
-                        rs_cloud = "Synced"
+                        rs_cloud = "Online"
                 else:
                     rs_cloud = "Disabled"
-                rs_lb = "Enabled" if (cloud_enabled and cloud_url) else "Disabled"
+                rs_lb = "Ready" if (cloud_enabled and cloud_url) else "Local only"
             else:
-                rs_table = "(no active game)"
+                rs_table = "No active game"
+                rs_session = "Idle"
+                if cloud_enabled and cloud_url:
+                    rs_cloud = "Online"
+                    rs_lb = "Ready"
+                elif cloud_enabled:
+                    rs_cloud = "Offline"
+                    rs_lb = "Pending"
+                else:
+                    rs_cloud = "Disabled"
+                    rs_lb = "Local only"
 
             self.lbl_rs_table.setText(f"Table:  {rs_table}")
             self.lbl_rs_session.setText(f"Session:  {rs_session}")
