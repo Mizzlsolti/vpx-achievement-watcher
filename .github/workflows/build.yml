@@ -38,7 +38,7 @@ jobs:
 
     - name: Build Installer with Inno Setup
       run: |
-        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "0.0.0-dev" }
+        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "2.6" }
         iscc /DMyAppVersion="$version" installer.iss
 
     - name: Upload Installer as Artifact
