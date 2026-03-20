@@ -247,6 +247,7 @@ class CloudStatsMixin:
         self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM and click Fetch)</div>")
         layout.addWidget(self.cloud_view)
         
+        self._add_tab_help_button(layout, "cloud")
         self.main_tabs.addTab(tab, "☁️ Cloud")
 
     def _on_cloud_cat_changed(self, idx: int):
