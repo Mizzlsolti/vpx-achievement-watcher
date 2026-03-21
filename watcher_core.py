@@ -1015,6 +1015,25 @@ def compute_player_level(state: dict) -> dict:
         "max_level": current_level == LEVEL_TABLE[-1][1],
     }
 
+# ─── Achievement Rarity ───────────────────────────────────────────────
+RARITY_TIERS = [
+    (50.0, "Common",    "#FFFFFF"),
+    (25.0, "Uncommon",  "#4CAF50"),
+    (10.0, "Rare",      "#2196F3"),
+    (5.0,  "Epic",      "#9C27B0"),
+    (0.0,  "Legendary", "#FF9800"),
+]
+
+def compute_rarity(unlocked_by: int, total_players: int) -> dict:
+    """Compute rarity tier for an achievement based on how many players unlocked it."""
+    if total_players <= 0:
+        return {"tier": "Unknown", "color": "#888888", "pct": 0.0}
+    pct = (unlocked_by / total_players) * 100
+    for threshold, name, color in RARITY_TIERS:
+        if pct >= threshold:
+            return {"tier": name, "color": color, "pct": round(pct, 1)}
+    return {"tier": "Legendary", "color": "#FF9800", "pct": round(pct, 1)}
+
 import urllib.request
 
 class CloudSync:
@@ -1410,6 +1429,45 @@ class CloudSync:
         except Exception as e:
             log(cfg, f"[CLOUD] set_node error for {endpoint}: {e}", "WARN")
             return False
+
+    @staticmethod
+    def fetch_rarity_for_rom(cfg: AppConfig, rom: str) -> tuple:
+        """
+        Fetch all players' achievement data from cloud and compute rarity for each
+        achievement title of the given ROM.
+
+        Returns: ({"achievement_title": {"tier": "Rare", "color": "#2196F3", "pct": 8.5}, ...}, total_players)
+        """
+        player_ids = CloudSync.fetch_player_ids(cfg)
+        if not player_ids:
+            return {}, 0
+
+        # Fetch all player achievement states in parallel
+        paths = [f"players/{pid}/achievements" for pid in player_ids]
+        batch = CloudSync.fetch_parallel(cfg, paths)
+
+        total_players = 0
+        title_counts: dict = {}  # {title: count_of_players_who_unlocked_it}
+
+        for path, data in batch.items():
+            if not data or not isinstance(data, dict):
+                continue
+            session = data.get("session", {})
+            rom_entries = session.get(rom, [])
+            if not rom_entries:
+                continue
+            total_players += 1
+            seen_titles: set = set()
+            for e in rom_entries:
+                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                if t and t not in seen_titles:
+                    seen_titles.add(t)
+                    title_counts[t] = title_counts.get(t, 0) + 1
+
+        result = {}
+        for title, count in title_counts.items():
+            result[title] = compute_rarity(count, total_players)
+        return result, total_players
 
     @staticmethod
     def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):

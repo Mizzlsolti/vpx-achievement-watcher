@@ -44,7 +44,7 @@ from watcher_core import (
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    compute_player_level, LEVEL_TABLE,
+    compute_player_level, LEVEL_TABLE, compute_rarity,
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
@@ -261,6 +261,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._prefetch_blink_timer.timeout.connect(self._on_prefetch_blink)
         self._prefetch_blink_state = False
         self._prefetch_msg = ""
+
+        self._rarity_cache: dict = {}  # {rom: {"data": {...}, "ts": float, "total_players": int}}
 
         self._build_tab_dashboard()
         self._build_tab_appearance()
@@ -2346,6 +2348,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return progress, installed_count
         return 0, 1
 
+    def _fetch_rarity_bg(self, rom: str):
+        """Fetch rarity data in background and refresh progress tab when done."""
+        def _worker():
+            try:
+                rarity_data, total_players = CloudSync.fetch_rarity_for_rom(self.cfg, rom)
+                self._rarity_cache[rom] = {"data": rarity_data, "ts": time.time(), "total_players": total_players}
+                # Upload rarity cache to cloud for this player
+                if rarity_data and self.cfg.CLOUD_ENABLED:
+                    pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+                    if pid and pid != "unknown":
+                        cache_payload = {
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "total_players": total_players,
+                            "data": rarity_data,
+                        }
+                        CloudSync.set_node(self.cfg, f"players/{pid}/rarity_cache/{rom}", cache_payload)
+                # Re-render progress tab on main thread
+                from PyQt6.QtCore import QMetaObject, Qt
+                QMetaObject.invokeMethod(self, "_on_progress_rom_changed", Qt.ConnectionType.QueuedConnection)
+            except Exception:
+                pass
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _on_progress_rom_changed(self):
         rom = self.cmb_progress_rom.currentData()
         if not rom:
@@ -2357,6 +2382,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if not rom:
             self.progress_view.setHtml("<div style='text-align:center; color:#888;'>(No data available)</div>")
             return
+
+        # ── Rarity cache logic (only for non-Global ROMs when cloud is enabled) ──
+        _RARITY_TTL = 300  # 5 minutes
+        rarity_data: dict = {}
+        if rom != "Global" and self.cfg.CLOUD_ENABLED:
+            cached = self._rarity_cache.get(rom)
+            if cached and (time.time() - cached.get("ts", 0)) < _RARITY_TTL:
+                rarity_data = cached.get("data", {})
+            else:
+                # Use stale data for immediate render, fetch fresh in background
+                if cached:
+                    rarity_data = cached.get("data", {})
+                self._fetch_rarity_bg(rom)
             
         state = self.watcher._ach_state_load()
         unlocked_titles = set()
@@ -2469,10 +2507,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             else:
                 info_link = ""
 
+            # Rarity lookup
+            r_info = rarity_data.get(clean_title) or rarity_data.get(title)
+            rarity_line = ""
+            if r_info:
+                rarity_line = (
+                    f"<br><span style='font-size:0.7em;color:{r_info['color']};'>"
+                    f"{r_info['tier']} ({r_info['pct']}%)</span>"
+                )
+
             if title in unlocked_titles or clean_title in unlocked_titles:
                 unlocked_count += 1
                 tooltip = _tooltip_for_rule(r, unlocked=True).replace("'", "&#39;")
-                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}{info_link}</td>")
+                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}{info_link}{rarity_line}</td>")
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
@@ -2487,22 +2534,33 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         progress = max(cached_progress, live_progress)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_line}</td>"
                         )
                     else:
                         progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_line}</td>"
                         )
                 else:
-                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}</td>")
+                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}{rarity_line}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
         rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
         html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
         html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+
+        if rarity_data:
+            html.append(
+                "<div style='text-align:center; margin-bottom:6px; font-size:0.8em;'>"
+                "<span style='color:#FFFFFF;'>● Common</span>&nbsp;&nbsp;"
+                "<span style='color:#4CAF50;'>● Uncommon</span>&nbsp;&nbsp;"
+                "<span style='color:#2196F3;'>● Rare</span>&nbsp;&nbsp;"
+                "<span style='color:#9C27B0;'>● Epic</span>&nbsp;&nbsp;"
+                "<span style='color:#FF9800;'>● Legendary</span>"
+                "</div>"
+            )
         
         html.append("<table align='center' width='100%'>")
         COLUMNS = 4
@@ -4604,11 +4662,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         for r in all_rules:
             title = str(r.get("title", "Unknown")).strip()
             clean = title.replace(" (Session)", "").replace(" (Global)", "")
+            # Rarity lookup from cache (overlay uses same cache as progress tab)
+            _r_cache = self._rarity_cache.get(rom, {})
+            _r_data = _r_cache.get("data", {}) if _r_cache else {}
+            r_info = _r_data.get(clean) or _r_data.get(title)
+            rarity_line = ""
+            if r_info:
+                rarity_line = (
+                    f"<br><span style='font-size:0.65em;color:{r_info['color']};'>"
+                    f"{r_info['tier']} ({r_info['pct']}%)</span>"
+                )
             if title in unlocked_titles or clean in unlocked_titles:
                 unlocked_count += 1
-                cells.append(f"<td class='unlocked'>✅ {esc(clean)}</td>")
+                cells.append(f"<td class='unlocked'>✅ {esc(clean)}{rarity_line}</td>")
             else:
-                cells.append(f"<td class='locked'>🔒 {esc(clean)}</td>")
+                cells.append(f"<td class='locked'>🔒 {esc(clean)}{rarity_line}</td>")
 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
         try:
