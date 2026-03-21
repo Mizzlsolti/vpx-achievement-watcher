@@ -960,6 +960,25 @@ LEVEL_TABLE = [
 PRESTIGE_THRESHOLD = 2000   # Achievements per prestige round
 MAX_PRESTIGE = 5            # Maximum prestige stars
 
+# ─── Achievement Rarity ───────────────────────────────────────────────
+RARITY_TIERS = [
+    (50.0, "Common",    "#FFFFFF"),
+    (25.0, "Uncommon",  "#4CAF50"),
+    (10.0, "Rare",      "#2196F3"),
+    (5.0,  "Epic",      "#9C27B0"),
+    (0.0,  "Legendary", "#FF9800"),
+]
+
+def compute_rarity(unlocked_by: int, total_players: int) -> dict:
+    """Compute rarity tier for an achievement based on how many players unlocked it."""
+    if total_players <= 0:
+        return {"tier": "Unknown", "color": "#888888", "pct": 0.0}
+    pct = (unlocked_by / total_players) * 100
+    for threshold, name, color in RARITY_TIERS:
+        if pct >= threshold:
+            return {"tier": name, "color": color, "pct": round(pct, 1)}
+    return {"tier": "Legendary", "color": "#FF9800", "pct": round(pct, 1)}
+
 def compute_player_level(state: dict) -> dict:
     """
     Compute the player level from the achievements state.
@@ -2009,6 +2028,60 @@ class CloudSync:
                 log(cfg, f"[CLOUD] upload_full_achievements failed: {e}", "WARN")
 
         threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def fetch_rarity_for_rom(cfg: AppConfig, rom: str) -> tuple:
+        """
+        Fetch all players' achievement data from cloud and compute rarity for each
+        achievement title of the given ROM.
+
+        Returns: ({achievement_title: {tier, color, pct}, ...}, total_players)
+        """
+        player_ids = CloudSync.fetch_player_ids(cfg)
+        if not player_ids:
+            return {}, 0
+
+        paths = [f"players/{pid}/achievements" for pid in player_ids]
+        batch = CloudSync.fetch_parallel(cfg, paths)
+
+        total_players = 0
+        title_counts: dict = {}
+
+        for path, data in batch.items():
+            if not data or not isinstance(data, dict):
+                continue
+            session = data.get("session", {})
+            rom_entries = session.get(rom, [])
+            if not rom_entries:
+                continue
+            total_players += 1
+            seen_titles: set = set()
+            for e in rom_entries:
+                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                if t and t not in seen_titles:
+                    seen_titles.add(t)
+                    title_counts[t] = title_counts.get(t, 0) + 1
+
+        result: dict = {}
+        for title, count in title_counts.items():
+            result[title] = compute_rarity(count, total_players)
+
+        # Cache rarity data back to cloud under players/{pid}/rarity_cache/{rom}
+        try:
+            if result and cfg.CLOUD_URL and cfg.CLOUD_ENABLED:
+                overlay = cfg.OVERLAY if isinstance(cfg.OVERLAY, dict) else {}
+                pid = str(overlay.get("player_id", "unknown")).strip()
+                safe_rom = rom.replace("/", "_").replace(".", "_")
+                CloudSync.set_node(
+                    cfg,
+                    f"players/{pid}/rarity_cache/{safe_rom}",
+                    {"data": result, "total_players": total_players,
+                     "ts": datetime.now(timezone.utc).isoformat()},
+                )
+        except Exception:
+            pass
+
+        return result, total_players
 
 
 class Watcher:

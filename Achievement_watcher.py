@@ -44,7 +44,7 @@ from watcher_core import (
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD,
+    compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
@@ -261,6 +261,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._prefetch_blink_timer.timeout.connect(self._on_prefetch_blink)
         self._prefetch_blink_state = False
         self._prefetch_msg = ""
+        self._rarity_cache: dict = {}  # {rom: {"data": {...}, "ts": float, "total_players": int}}
 
         self._build_tab_dashboard()
         self._build_tab_appearance()
@@ -2396,6 +2397,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return progress, installed_count
         return 0, 1
 
+    def _fetch_rarity_bg(self, rom):
+        """Fetch rarity data in background and refresh progress tab when done."""
+        def _worker():
+            try:
+                rarity_data, total = CloudSync.fetch_rarity_for_rom(self.cfg, rom)
+                self._rarity_cache[rom] = {"data": rarity_data, "ts": time.time(), "total_players": total}
+                from PyQt6.QtCore import QMetaObject, Qt as _Qt
+                QMetaObject.invokeMethod(self, "_on_progress_rom_changed", _Qt.ConnectionType.QueuedConnection)
+            except Exception:
+                pass
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _on_progress_rom_changed(self):
         rom = self.cmb_progress_rom.currentData()
         if not rom:
@@ -2407,7 +2420,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if not rom:
             self.progress_view.setHtml("<div style='text-align:center; color:#888;'>(No data available)</div>")
             return
-            
+
+        # ── Rarity: trigger background fetch when cloud is enabled ──────────
+        _RARITY_TTL = 300  # 5 minutes
+        if self.cfg.CLOUD_ENABLED and rom != "Global":
+            cached = self._rarity_cache.get(rom)
+            if cached is None or (time.time() - cached.get("ts", 0)) > _RARITY_TTL:
+                self._fetch_rarity_bg(rom)
+        rarity_map: dict = {}
+        if rom != "Global":
+            cached = self._rarity_cache.get(rom)
+            if cached:
+                rarity_map = cached.get("data", {})
+
         state = self.watcher._ach_state_load()
         unlocked_titles = set()
         all_rules = []
@@ -2519,10 +2544,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             else:
                 info_link = ""
 
+            # Rarity label (ROM-specific only, when cloud data is available)
+            rarity_label = ""
+            if rarity_map:
+                ri = rarity_map.get(title) or rarity_map.get(clean_title)
+                if ri:
+                    rarity_label = (
+                        f"<br><span style='font-size:0.7em;color:{ri['color']};'>"
+                        f"{ri['tier']} ({ri['pct']}%)</span>"
+                    )
+
             if title in unlocked_titles or clean_title in unlocked_titles:
                 unlocked_count += 1
                 tooltip = _tooltip_for_rule(r, unlocked=True).replace("'", "&#39;")
-                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}{info_link}</td>")
+                cells.append(f"<td class='unlocked' title='{tooltip}'>✅ {clean_title}{info_link}{rarity_label}</td>")
             else:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
@@ -2537,16 +2572,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         progress = max(cached_progress, live_progress)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_label}</td>"
                         )
                     else:
                         progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span></td>"
+                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_label}</td>"
                         )
                 else:
-                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}</td>")
+                    cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}{rarity_label}</td>")
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
@@ -2584,7 +2619,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 pass
 
         html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
-        
+
+        # ── Rarity legend ──────────────────────────────────────────────────────
+        if rarity_map:
+            legend_parts = "".join(
+                f"<span style='color:{color}; margin:0 6px;'>■ {name}</span>"
+                for _, name, color in RARITY_TIERS
+            )
+            html.append(
+                f"<div style='text-align:center; font-size:0.78em; margin-bottom:6px;'>"
+                f"Rarity: {legend_parts}</div>"
+            )
+
         html.append("<table align='center' width='100%'>")
         COLUMNS = 4
         for i in range(0, len(cells), COLUMNS):
@@ -4692,14 +4738,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         unlocked_count = 0
         cells = []
+        # Pull rarity data from cache for this ROM
+        _overlay_rarity: dict = {}
+        _cached_r = self._rarity_cache.get(rom)
+        if _cached_r:
+            _overlay_rarity = _cached_r.get("data", {})
         for r in all_rules:
             title = str(r.get("title", "Unknown")).strip()
             clean = title.replace(" (Session)", "").replace(" (Global)", "")
+            ri = _overlay_rarity.get(title) or _overlay_rarity.get(clean)
+            rarity_suffix = (
+                f"<br><span style='font-size:0.65em;color:{esc(ri['color'])};'>"
+                f"{esc(ri['tier'])} ({esc(str(ri['pct']))}%)</span>"
+                if ri else ""
+            )
             if title in unlocked_titles or clean in unlocked_titles:
                 unlocked_count += 1
-                cells.append(f"<td class='unlocked'>✅ {esc(clean)}</td>")
+                cells.append(f"<td class='unlocked'>✅ {esc(clean)}{rarity_suffix}</td>")
             else:
-                cells.append(f"<td class='locked'>🔒 {esc(clean)}</td>")
+                cells.append(f"<td class='locked'>🔒 {esc(clean)}{rarity_suffix}</td>")
 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
         try:
