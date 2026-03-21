@@ -2846,9 +2846,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tf = dlg.selected_table_file or {}
             mapping[rom] = tf.get("id", "") or dlg.selected_table.get("id", "")
             _save_vps_mapping(self.cfg, mapping)
+            self._cloud_upload_vps_mapping()
         elif result == 2:  # "Remove assignment"
             mapping.pop(rom, None)
             _save_vps_mapping(self.cfg, mapping)
+            self._cloud_upload_vps_mapping()
 
         # Update cache entry
         for entry in self._all_maps_cache:
@@ -2990,6 +2992,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         matched = matched_rom + matched_author_name + matched_name + matched_info_name
         progress.setValue(len(local_entries))
         _save_vps_mapping(self.cfg, mapping)
+        self._cloud_upload_vps_mapping()
 
         # Refresh cache vps_id entries
         for entry in self._all_maps_cache:
@@ -3418,8 +3421,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             from ui_vps import _load_vps_mapping
             mapping = _load_vps_mapping(self.cfg)
-            if not mapping:
-                return
             CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping)
             log(self.cfg, f"[CLOUD] VPS mapping uploaded: {len(mapping)} entries")
         except Exception as e:
