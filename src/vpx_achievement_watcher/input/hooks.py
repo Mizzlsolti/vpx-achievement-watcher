@@ -3,8 +3,10 @@ import sys
 import os
 
 # Add project root to path so we can import from root-level input_hook.py
-_THIS_FILE = os.path.abspath(__file__)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(_THIS_FILE))))
+# File lives at src/vpx_achievement_watcher/input/hooks.py → 3 parents up = src/
+# then one more = project root
+from pathlib import Path
+_PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
 sys.path.insert(0, _PROJECT_ROOT)
 
 from input_hook import *
