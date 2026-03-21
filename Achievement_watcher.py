@@ -83,6 +83,23 @@ from ui_overlay import (
     ChallengeStartCountdown,
 )
 
+# Table names returned by vpxtool that are placeholders and not useful for VPS search
+_IGNORE_TABLE_NAMES = {
+    "[not set]",
+    "visual pinball demo table",
+    "visual pinball table",
+    "new table",
+    "untitled",
+}
+
+# Regex to strip trailing mod-author suffixes before using a table name as a VPS search term
+# Matches patterns like "VPW Mod", "VPX Mod", "Skitso Detail mod", bare "Mod", etc.
+_MOD_SUFFIX_RE = re.compile(
+    r"\s*(?:VPW\s+Mod|VPX\s*\d*\s+(?:hybrid|mod)|Skitso\s+\w+\s*mod|\bMod\b)\s*$",
+    flags=re.IGNORECASE,
+)
+
+
 class _AvailableMapsWorker(QThread):
     """Background worker that scans TABLES_DIR and builds the available-maps list."""
     progress = pyqtSignal(int, int, str)   # (current_index, total, filename)
@@ -2954,6 +2971,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # Use table_name from vpxtool info show as primary search term if available
             info_table_name = (vpx_info.get("table_name") or "").strip()
             info_version = (vpx_info.get("version") or "").strip()
+            # Filter out placeholder/default table names that are not useful for VPS search
+            if info_table_name.lower() in _IGNORE_TABLE_NAMES:
+                info_table_name = ""
+            # Strip trailing mod indicators before VPS search
+            info_table_name = _MOD_SUFFIX_RE.sub("", info_table_name).strip()
             search_title = info_table_name if info_table_name else title
 
             if info_table_name and info_table_name != title:
