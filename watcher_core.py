@@ -254,7 +254,7 @@ class AppConfig:
     FIRST_RUN: bool = True
     LOG_CTRL: bool = False
     LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
-    CLOUD_ENABLED: bool = True
+    CLOUD_ENABLED: bool = False
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
 
@@ -315,14 +315,19 @@ class AppConfig:
                     
             ov.update(loaded_ov)
 
+            cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
+            cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
+            if not cloud_enabled:
+                cloud_backup_enabled = False
+
             return AppConfig(
                 BASE=data.get("BASE", AppConfig.BASE),
                 NVRAM_DIR=data.get("NVRAM_DIR", AppConfig.NVRAM_DIR),
                 TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
                 OVERLAY=ov,
                 FIRST_RUN=bool(data.get("FIRST_RUN", False)),
-                CLOUD_ENABLED=bool(data.get("CLOUD_ENABLED", True)),
-                CLOUD_BACKUP_ENABLED=bool(data.get("CLOUD_BACKUP_ENABLED", False)),
+                CLOUD_ENABLED=cloud_enabled,
+                CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             )
         except Exception as e:
             print(f"[LOAD ERROR] {e}")
@@ -376,12 +381,17 @@ class AppConfig:
                 if k in ov:
                     clean_overlay[k] = ov[k]
 
+            cloud_enabled_val = getattr(self, "CLOUD_ENABLED", False)
+            cloud_backup_val = getattr(self, "CLOUD_BACKUP_ENABLED", False)
+            if not cloud_enabled_val:
+                cloud_backup_val = False
+
             to_dump = {
                 "BASE": getattr(self, "BASE", r"C:\vPinball\VPX Achievement Watcher"),
                 "NVRAM_DIR": getattr(self, "NVRAM_DIR", r"C:\vPinball\VisualPinball\VPinMAME\nvram"),
                 "TABLES_DIR": getattr(self, "TABLES_DIR", r"C:\vPinball\VisualPinball\Tables"),
-                "CLOUD_ENABLED": getattr(self, "CLOUD_ENABLED", True),
-                "CLOUD_BACKUP_ENABLED": getattr(self, "CLOUD_BACKUP_ENABLED", False),
+                "CLOUD_ENABLED": cloud_enabled_val,
+                "CLOUD_BACKUP_ENABLED": cloud_backup_val,
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay
             }
