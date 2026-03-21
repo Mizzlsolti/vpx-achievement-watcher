@@ -18,11 +18,11 @@ from PyQt6.QtWidgets import (
     QTextEdit, QTextBrowser, QSystemTrayIcon, QMenu, QFileDialog, QMessageBox, QTabWidget,
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
     QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
-    QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea,
+    QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea, QCompleter,
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
-                          QThread, QUrl)
+                          QThread, QUrl, QStringListModel)
 from PyQt6.QtGui import (QIcon, QColor, QFont, QTransform, QPixmap,
                          QPainter, QImage, QPen)
 
@@ -2610,6 +2610,22 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.txt_map_search = QLineEdit()
         self.txt_map_search.setPlaceholderText("🔍 Search Table or ROM...")
         self.txt_map_search.textChanged.connect(self._filter_available_maps)
+        self._map_search_completer_model = QStringListModel([], self)
+        self._map_search_completer = QCompleter(self._map_search_completer_model, self)
+        self._map_search_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._map_search_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._map_search_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._map_search_completer.setMaxVisibleItems(12)
+        self._map_search_completer.popup().setStyleSheet(
+            "QListView {"
+            "  background: #222; color: #e0e0e0;"
+            "  border: 1px solid #FF7F00;"
+            "  selection-background-color: #FF7F00;"
+            "  selection-color: #000;"
+            "  font-size: 10pt;"
+            "}"
+        )
+        self.txt_map_search.setCompleter(self._map_search_completer)
         row.addWidget(self.txt_map_search)
 
         btn_refresh = QPushButton("🔄 Load List")
@@ -2702,6 +2718,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 if isinstance(_data, list):
                     self._all_maps_cache = _data
                     self._filter_available_maps()
+                    self._update_map_search_completer()
+                    self._update_cloud_rom_completer()
         except Exception:
             pass
 
@@ -2747,6 +2765,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             self._filter_available_maps()
+            self._update_map_search_completer()
+            self._update_cloud_rom_completer()
 
         self._maps_worker.progress.connect(_on_progress)
         self._maps_worker.finished.connect(_on_finished)
@@ -2866,6 +2886,38 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 break
 
         self._filter_available_maps()
+
+    def _update_map_search_completer(self):
+        """Update the Available Maps tab search autocomplete suggestions from the maps cache."""
+        cache = getattr(self, '_all_maps_cache', None) or []
+        suggestions = []
+        seen = set()
+        for entry in cache:
+            rom = entry.get("rom", "")
+            title = entry.get("title", "")
+            if rom and rom not in seen:
+                seen.add(rom)
+                suggestions.append(rom)
+            if title and title not in seen:
+                seen.add(title)
+                suggestions.append(title)
+        suggestions.sort(key=str.lower)
+        if hasattr(self, '_map_search_completer_model'):
+            self._map_search_completer_model.setStringList(suggestions)
+
+    def _update_cloud_rom_completer(self):
+        """Update the Cloud tab ROM search autocomplete suggestions from the maps cache."""
+        cache = getattr(self, '_all_maps_cache', None) or []
+        suggestions = []
+        seen = set()
+        for entry in cache:
+            rom = entry.get("rom", "")
+            if rom and rom not in seen:
+                seen.add(rom)
+                suggestions.append(rom)
+        suggestions.sort(key=str.lower)
+        if hasattr(self, '_cloud_rom_completer_model'):
+            self._cloud_rom_completer_model.setStringList(suggestions)
 
     def _on_vps_auto_match_all(self):
         """Attempt automatic VPS match for all local ROMs that have an NVRAM map."""
