@@ -31,7 +31,7 @@ jobs:
 
     - name: Build Achievement_Watcher.exe with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --paths="src" --name "Achievement_Watcher" "Achievement_watcher.py"
 
     - name: Install Inno Setup
       run: choco install innosetup -y
