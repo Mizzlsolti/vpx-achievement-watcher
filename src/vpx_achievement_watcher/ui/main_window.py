@@ -18,10 +18,11 @@ from PyQt6.QtWidgets import (
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
     QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
     QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea,
+    QCompleter,
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
-                          QThread, QUrl)
+                          QThread, QUrl, QStringListModel)
 from PyQt6.QtGui import (QIcon, QColor, QFont, QTransform, QPixmap,
                          QPainter, QImage, QPen)
 
@@ -2519,6 +2520,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.txt_map_search = QLineEdit()
         self.txt_map_search.setPlaceholderText("🔍 Search Table or ROM...")
         self.txt_map_search.textChanged.connect(self._filter_available_maps)
+
+        self._map_search_completer_model = QStringListModel([], self)
+        self._map_search_completer = QCompleter(self._map_search_completer_model, self)
+        self._map_search_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._map_search_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._map_search_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._map_search_completer.setMaxVisibleItems(12)
+        self._map_search_completer.popup().setStyleSheet(
+            "QListView {"
+            "  background: #222; color: #e0e0e0;"
+            "  border: 1px solid #FF7F00;"
+            "  selection-background-color: #FF7F00;"
+            "  selection-color: #000;"
+            "  font-size: 10pt;"
+            "}"
+        )
+        self.txt_map_search.setCompleter(self._map_search_completer)
+
         row.addWidget(self.txt_map_search)
 
         btn_refresh = QPushButton("🔄 Load List")
@@ -2610,6 +2629,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     _data = json.load(_f)
                 if isinstance(_data, list):
                     self._all_maps_cache = _data
+                    self._update_map_search_completer()
                     self._filter_available_maps()
         except Exception:
             pass
@@ -2655,11 +2675,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     json.dump(entries, _f)
             except Exception:
                 pass
+            self._update_map_search_completer()
             self._filter_available_maps()
 
         self._maps_worker.progress.connect(_on_progress)
         self._maps_worker.finished.connect(_on_finished)
         self._maps_worker.start()
+
+    def _update_map_search_completer(self):
+        suggestions = []
+        seen = set()
+        for entry in self._all_maps_cache:
+            for val in (entry.get("title", ""), entry.get("rom", "")):
+                if val and val not in seen:
+                    seen.add(val)
+                    suggestions.append(val)
+        suggestions.sort(key=str.lower)
+        self._map_search_completer_model.setStringList(suggestions)
 
     def _filter_available_maps(self):
         query = self.txt_map_search.text().lower()
