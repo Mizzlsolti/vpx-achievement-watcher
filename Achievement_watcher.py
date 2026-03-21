@@ -3039,28 +3039,44 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        grp_profile = QGroupBox("Player Profile & Cloud Setup")
+        # --- 👤 Player Profile ---
+        grp_profile = QGroupBox("👤 Player Profile")
         lay_profile = QGridLayout(grp_profile)
-        
+
         self.txt_player_name = QLineEdit()
         self.txt_player_name.setText(self.cfg.OVERLAY.get("player_name", "Player"))
-        self.txt_player_name.textChanged.connect(self._save_player_name) 
-        
+        self.txt_player_name.textChanged.connect(self._save_player_name)
+
         self.txt_player_id = QLineEdit()
         self.txt_player_id.setText(self.cfg.OVERLAY.get("player_id", "0000"))
         self.txt_player_id.setMaxLength(4)
         self.txt_player_id.setFixedWidth(60)
         self.txt_player_id.textChanged.connect(self._save_player_id)
-        
-        self.chk_cloud_enabled = QCheckBox("Enable Cloud Sync")
-        self.chk_cloud_enabled.setChecked(self.cfg.CLOUD_ENABLED)
-        self.chk_cloud_enabled.stateChanged.connect(self._save_cloud_settings)
-        
+
         lay_profile.addWidget(QLabel("Display Name:"), 0, 0)
         lay_profile.addWidget(self.txt_player_name, 0, 1)
         lay_profile.addWidget(QLabel("Player ID (Restore):"), 0, 2)
         lay_profile.addWidget(self.txt_player_id, 0, 3)
-        lay_profile.addWidget(self.chk_cloud_enabled, 1, 0, 1, 4)
+
+        lbl_id_warning = QLabel(
+            "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
+            "Do not share your 4-character Player ID with anyone. "
+            "Please write it down or save it somewhere safe!"
+        )
+        lbl_id_warning.setWordWrap(True)
+        lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
+        lay_profile.addWidget(lbl_id_warning, 1, 0, 1, 4)
+
+        layout.addWidget(grp_profile)
+
+        # --- ☁️ Cloud Sync & Backup ---
+        grp_cloud = QGroupBox("☁️ Cloud Sync & Backup")
+        lay_cloud = QVBoxLayout(grp_cloud)
+
+        self.chk_cloud_enabled = QCheckBox("Enable Cloud Sync")
+        self.chk_cloud_enabled.setChecked(self.cfg.CLOUD_ENABLED)
+        self.chk_cloud_enabled.stateChanged.connect(self._save_cloud_settings)
+        lay_cloud.addWidget(self.chk_cloud_enabled)
 
         self.chk_cloud_backup = QCheckBox("💾 Auto-Backup Progress to Cloud")
         self.chk_cloud_backup.setToolTip(
@@ -3071,11 +3087,34 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.chk_cloud_backup.setChecked(self.cfg.CLOUD_BACKUP_ENABLED)
         self.chk_cloud_backup.setVisible(self.cfg.CLOUD_ENABLED)
         self.chk_cloud_backup.stateChanged.connect(self._save_cloud_backup_settings)
-        lay_profile.addWidget(self.chk_cloud_backup, 2, 0, 1, 4)
-        
-        layout.addWidget(grp_profile)
+        lay_cloud.addWidget(self.chk_cloud_backup)
 
-        grp_paths = QGroupBox("Directory Setup")
+        lay_cloud_btns = QHBoxLayout()
+
+        self.btn_backup_cloud = QPushButton("☁️ Backup to Cloud")
+        self.btn_backup_cloud.setToolTip(
+            "Manually upload your full achievement data, VPS mapping, and ROM progress to the cloud. "
+            "Use this to create an immediate backup of your current data."
+        )
+        self.btn_backup_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        self.btn_backup_cloud.clicked.connect(self._manual_cloud_backup)
+        lay_cloud_btns.addWidget(self.btn_backup_cloud)
+
+        self.btn_restore_cloud = QPushButton("☁️ Restore from Cloud")
+        self.btn_restore_cloud.setToolTip(
+            "Downloads your full achievement progress from the cloud using your Player ID. "
+            "Use this to restore your achievements on a new PC. "
+            "Warning: This will overwrite your local achievement data."
+        )
+        self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
+        lay_cloud_btns.addWidget(self.btn_restore_cloud)
+
+        lay_cloud.addLayout(lay_cloud_btns)
+        layout.addWidget(grp_cloud)
+
+        # --- 📁 Directory Setup ---
+        grp_paths = QGroupBox("📁 Directory Setup")
         lay_paths = QGridLayout(grp_paths)
         self.base_label = QLabel(f"BASE: {self.cfg.BASE}")
         self.btn_base = QPushButton("Browse..."); self.btn_base.clicked.connect(self.change_base)
@@ -3088,7 +3127,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_paths.addWidget(self.btn_tables, 2, 0); lay_paths.addWidget(self.tables_label, 2, 1)
         lay_paths.setColumnStretch(1, 1); layout.addWidget(grp_paths)
 
-        grp_maint = QGroupBox("Maintenance Tools")
+        # --- 🔧 Maintenance & Updates ---
+        grp_maint = QGroupBox("🔧 Maintenance & Updates")
         lay_maint = QVBoxLayout(grp_maint)
         self.btn_repair = QPushButton("Repair Data Folders")
         self.btn_repair.clicked.connect(self._repair_data_folders)
@@ -3096,16 +3136,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
         lay_maint.addWidget(self.btn_repair)
         lay_maint.addWidget(self.btn_prefetch)
-
-        self.btn_restore_cloud = QPushButton("☁️ Restore from Cloud")
-        self.btn_restore_cloud.setToolTip(
-            "Downloads your full achievement progress from the cloud using your Player ID. "
-            "Use this to restore your achievements on a new PC. "
-            "Warning: This will overwrite your local achievement data."
-        )
-        self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
-        self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
-        lay_maint.addWidget(self.btn_restore_cloud)
 
         self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
         self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
@@ -3116,81 +3146,70 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
         self.btn_self_update.clicked.connect(self._check_for_app_update)
         lay_maint.addWidget(self.btn_self_update)
-        
-        lbl_id_warning = QLabel(
-            "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
-            "Do not share your 4-character Player ID with anyone. "
-            "Please write it down or save it somewhere safe!"
-        )
-        lbl_id_warning.setWordWrap(True)
-        lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 15px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
-        lay_maint.addWidget(lbl_id_warning)
-        
+
         layout.addWidget(grp_maint)
 
-        grp_perf = QGroupBox("Performance")
-        lay_perf = QVBoxLayout(grp_perf)
+        # --- ⚡ Performance & Animations ---
+        grp_perf_anim = QGroupBox("⚡ Performance & Animations")
+        lay_perf_anim = QVBoxLayout(grp_perf_anim)
+
         self.chk_low_perf_mode = QCheckBox("🔋 Low Performance Mode (disables all overlay animations)")
         self.chk_low_perf_mode.setChecked(bool(self.cfg.OVERLAY.get("low_performance_mode", False)))
         self.chk_low_perf_mode.stateChanged.connect(self._save_low_performance_mode)
-        lay_perf.addWidget(self.chk_low_perf_mode)
+        lay_perf_anim.addWidget(self.chk_low_perf_mode)
 
-        layout.addWidget(grp_perf)
-
-        grp_anim = QGroupBox("🎬 Animation Controls")
-        lay_anim = QVBoxLayout(grp_anim)
         lbl_anim_note = QLabel("Enable or disable individual animation groups. Low Performance Mode overrides all.")
         lbl_anim_note.setWordWrap(True)
-        lbl_anim_note.setStyleSheet("color:#AAA; font-size:9pt; margin-bottom:4px;")
-        lay_anim.addWidget(lbl_anim_note)
+        lbl_anim_note.setStyleSheet("color:#AAA; font-size:9pt; margin-top:6px; margin-bottom:4px;")
+        lay_perf_anim.addWidget(lbl_anim_note)
 
         lbl_main_anim = QLabel("Main / Large Overlay:")
         lbl_main_anim.setStyleSheet("font-weight:bold; margin-top:4px;")
-        lay_anim.addWidget(lbl_main_anim)
+        lay_perf_anim.addWidget(lbl_main_anim)
 
         self.chk_anim_main_transitions = QCheckBox("  ↔  Page / content transitions")
         self.chk_anim_main_transitions.setChecked(bool(self.cfg.OVERLAY.get("anim_main_transitions", True)))
         self.chk_anim_main_transitions.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_main_transitions)
+        lay_perf_anim.addWidget(self.chk_anim_main_transitions)
 
         self.chk_anim_main_glow = QCheckBox("  ✨  Glow border & floating particles")
         self.chk_anim_main_glow.setChecked(bool(self.cfg.OVERLAY.get("anim_main_glow", True)))
         self.chk_anim_main_glow.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_main_glow)
+        lay_perf_anim.addWidget(self.chk_anim_main_glow)
 
         self.chk_anim_main_score_progress = QCheckBox("  📊  Score counter & progress bar")
         self.chk_anim_main_score_progress.setChecked(bool(self.cfg.OVERLAY.get("anim_main_score_progress", True)))
         self.chk_anim_main_score_progress.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_main_score_progress)
+        lay_perf_anim.addWidget(self.chk_anim_main_score_progress)
 
         self.chk_anim_main_highlights = QCheckBox("  💡  Value update highlights & shine sweep")
         self.chk_anim_main_highlights.setChecked(bool(self.cfg.OVERLAY.get("anim_main_highlights", True)))
         self.chk_anim_main_highlights.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_main_highlights)
+        lay_perf_anim.addWidget(self.chk_anim_main_highlights)
 
         lbl_other_anim = QLabel("Other Overlays:")
         lbl_other_anim.setStyleSheet("font-weight:bold; margin-top:6px;")
-        lay_anim.addWidget(lbl_other_anim)
+        lay_perf_anim.addWidget(lbl_other_anim)
 
         self.chk_anim_toast = QCheckBox("  🏆  Achievement toast")
         self.chk_anim_toast.setChecked(bool(self.cfg.OVERLAY.get("anim_toast", True)))
         self.chk_anim_toast.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_toast)
+        lay_perf_anim.addWidget(self.chk_anim_toast)
 
         self.chk_anim_status = QCheckBox("  🔵  Status overlay")
         self.chk_anim_status.setChecked(bool(self.cfg.OVERLAY.get("anim_status", True)))
         self.chk_anim_status.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_status)
+        lay_perf_anim.addWidget(self.chk_anim_status)
 
         self.chk_anim_challenge = QCheckBox("  ⚡  Challenge overlays")
         self.chk_anim_challenge.setChecked(bool(self.cfg.OVERLAY.get("anim_challenge", True)))
         self.chk_anim_challenge.stateChanged.connect(self._save_anim_settings)
-        lay_anim.addWidget(self.chk_anim_challenge)
+        lay_perf_anim.addWidget(self.chk_anim_challenge)
 
-        layout.addWidget(grp_anim)
+        layout.addWidget(grp_perf_anim)
 
-        # --- Feedback & Bug Reports ---
-        grp_feedback = QGroupBox("Feedback & Bug Reports")
+        # --- 🐛 Feedback & Bug Reports ---
+        grp_feedback = QGroupBox("🐛 Feedback & Bug Reports")
         lay_feedback = QVBoxLayout(grp_feedback)
         lbl_feedback = QLabel(
             "Found a bug or have a suggestion? Report it directly here!"
@@ -3227,6 +3246,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.chk_cloud_enabled.setChecked(False)
                 self.chk_cloud_enabled.blockSignals(False)
                 self.cfg.CLOUD_ENABLED = False
+                if getattr(self, "btn_backup_cloud", None):
+                    self.btn_backup_cloud.setVisible(False)
                 if getattr(self, "btn_restore_cloud", None):
                     self.btn_restore_cloud.setVisible(False)
                 if getattr(self, "chk_cloud_backup", None):
@@ -3237,6 +3258,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 return
         self.cfg.CLOUD_ENABLED = self.chk_cloud_enabled.isChecked()
         self.cfg.save()
+        if getattr(self, "btn_backup_cloud", None):
+            self.btn_backup_cloud.setVisible(self.cfg.CLOUD_ENABLED)
         if getattr(self, "btn_restore_cloud", None):
             self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
         if getattr(self, "chk_cloud_backup", None):
@@ -3435,6 +3458,157 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         else:
             msg = "Achievement data successfully restored from the cloud!"
         self._msgbox_topmost("info", "Restore from Cloud", msg)
+
+    def _manual_cloud_backup(self):
+        """Perform a full manual backup of all local data to cloud."""
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            self._msgbox_topmost("warn", "Backup to Cloud", "Cloud sync is not enabled.")
+            return
+
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            self._msgbox_topmost("warn", "Backup to Cloud", "Please set a valid Player ID first.")
+            return
+
+        player_name = self.cfg.OVERLAY.get("player_name", "").strip()
+        if not player_name or player_name.lower() == "player":
+            self._msgbox_topmost("warn", "Backup to Cloud", "Please set a valid player name (not 'Player') first.")
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Backup to Cloud",
+            "This will upload your current data to the cloud. Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        self.btn_backup_cloud.setEnabled(False)
+        self.btn_backup_cloud.setText("⏳ Backing up...")
+
+        def _worker():
+            from datetime import datetime, timezone
+            from watcher_core import compute_player_level, WATCHER_VERSION
+            results = []
+            errors = []
+
+            state = self.watcher._ach_state_load()
+
+            # 1. Upload full achievements state
+            try:
+                lv = compute_player_level(state)
+                payload = {
+                    "name": player_name,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "watcher_version": WATCHER_VERSION,
+                    "global": list(state.get("global", {}).get("__global__", []) or []),
+                    "session": dict(state.get("session", {}) or {}),
+                    "roms_played": list(state.get("roms_played", []) or []),
+                    "player_level": lv["level"],
+                    "player_level_name": lv["name"],
+                }
+                if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
+                    results.append("✅ Achievements")
+                    log(self.cfg, f"[CLOUD] Manual backup: uploaded full achievements for player {pid}")
+                else:
+                    errors.append("❌ Achievements: upload failed")
+            except Exception as e:
+                errors.append(f"❌ Achievements: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: achievements upload failed: {e}", "WARN")
+
+            # 2. Upload VPS mapping
+            try:
+                from ui_vps import _load_vps_mapping
+                mapping = _load_vps_mapping(self.cfg)
+                if CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping):
+                    results.append(f"✅ VPS mapping ({len(mapping)} entries)")
+                    log(self.cfg, f"[CLOUD] Manual backup: VPS mapping uploaded: {len(mapping)} entries")
+                else:
+                    errors.append("❌ VPS mapping: upload failed")
+            except Exception as e:
+                errors.append(f"❌ VPS mapping: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: VPS mapping upload failed: {e}", "WARN")
+
+            # 3. Upload available maps cache
+            try:
+                cache = getattr(self, "_all_maps_cache", None)
+                if cache:
+                    if CloudSync.set_node(self.cfg, f"players/{pid}/available_maps_cache", cache):
+                        results.append(f"✅ Maps cache ({len(cache)} entries)")
+                        log(self.cfg, f"[CLOUD] Manual backup: available maps cache uploaded: {len(cache)} entries")
+                    else:
+                        errors.append("❌ Maps cache: upload failed")
+                else:
+                    results.append("⏭️ Maps cache (no data)")
+            except Exception as e:
+                errors.append(f"❌ Maps cache: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: maps cache upload failed: {e}", "WARN")
+
+            # 4. Upload progress for each ROM that has session data
+            def _entry_title(e):
+                return str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+
+            progress_uploaded = 0
+            progress_errors = 0
+            try:
+                session = state.get("session", {}) or {}
+                for rom, entries in session.items():
+                    if not entries:
+                        continue
+                    try:
+                        rules = self.watcher._collect_player_rules_for_rom(rom)
+                        total = len(rules)
+                        if total == 0:
+                            continue
+                        unlocked_titles = {_entry_title(e) for e in entries}
+                        unlocked = sum(
+                            1 for r in rules
+                            if str(r.get("title", "")).strip() in unlocked_titles
+                        )
+                        percentage = round((unlocked / total) * 100, 1)
+                        progress_payload = {
+                            "name": player_name,
+                            "unlocked": unlocked,
+                            "total": total,
+                            "percentage": percentage,
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "watcher_version": WATCHER_VERSION,
+                        }
+                        if CloudSync.set_node(self.cfg, f"players/{pid}/progress/{rom}", progress_payload):
+                            progress_uploaded += 1
+                        else:
+                            progress_errors += 1
+                    except Exception as _rom_err:
+                        progress_errors += 1
+                        log(self.cfg, f"[CLOUD] Manual backup: progress upload failed for {rom}: {_rom_err}", "WARN")
+                if progress_uploaded > 0:
+                    results.append(f"✅ Progress for {progress_uploaded} ROM(s)")
+                if progress_errors > 0:
+                    errors.append(f"❌ Progress: {progress_errors} ROM(s) failed")
+            except Exception as e:
+                errors.append(f"❌ Progress: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
+
+            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+            summary = "\n".join(results + errors)
+            QMetaObject.invokeMethod(self, "_on_manual_cloud_backup_done",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, summary),
+                Q_ARG(bool, len(errors) == 0))
+
+        import threading
+        threading.Thread(target=_worker, daemon=True, name="ManualCloudBackup").start()
+
+    @pyqtSlot(str, bool)
+    def _on_manual_cloud_backup_done(self, summary: str, success: bool):
+        self.btn_backup_cloud.setEnabled(True)
+        self.btn_backup_cloud.setText("☁️ Backup to Cloud")
+        if success:
+            self._msgbox_topmost("info", "Backup to Cloud", f"Backup completed successfully!\n\n{summary}")
+        else:
+            self._msgbox_topmost("warn", "Backup to Cloud", f"Backup completed with some issues:\n\n{summary}")
 
     def _cloud_upload_vps_mapping(self):
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""
