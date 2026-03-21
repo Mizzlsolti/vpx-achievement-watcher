@@ -44,7 +44,7 @@ from watcher_core import (
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips, f_achievements_state, f_global_ach,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    compute_player_level, LEVEL_TABLE,
+    compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD,
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
@@ -1891,6 +1891,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_level = QGroupBox("👑 Player Level")
         lay_level = QVBoxLayout(grp_level)
 
+        self.lbl_prestige_stars = QLabel("☆☆☆☆☆")
+        self.lbl_prestige_stars.setStyleSheet(
+            "font-size: 22pt; font-weight: bold; color: #FFD700; "
+            "padding: 4px 10px; letter-spacing: 8px;"
+        )
+        self.lbl_prestige_stars.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay_level.addWidget(self.lbl_prestige_stars)
+
         self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
         self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
         self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
@@ -3540,6 +3548,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "roms_played": list(state.get("roms_played", []) or []),
                     "player_level": lv["level"],
                     "player_level_name": lv["name"],
+                    "player_prestige": lv["prestige"],
+                    "player_prestige_display": lv["prestige_display"],
+                    "player_fully_maxed": lv["fully_maxed"],
                 }
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
                     results.append("✅ Achievements")
@@ -5266,20 +5277,45 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             state = self.watcher._ach_state_load()
             lv = compute_player_level(state)
-            self.lbl_level_icon_name.setText(f"{lv['icon']}  <b>{lv['label']}</b>   Level {lv['level']}")
+
+            # Prestige stars label
+            self.lbl_prestige_stars.setText(lv["prestige_display"])
+            if lv["fully_maxed"]:
+                self.lbl_prestige_stars.setStyleSheet(
+                    "font-size: 22pt; font-weight: bold; color: #FFD700; "
+                    "padding: 4px 10px; letter-spacing: 8px; "
+                    "background: qlineargradient(x1:0,y1:0,x2:1,y2:0, "
+                    "stop:0 #FF7F00, stop:0.5 #FFD700, stop:1 #FF7F00); "
+                    "border-radius: 6px;"
+                )
+            else:
+                self.lbl_prestige_stars.setStyleSheet(
+                    "font-size: 22pt; font-weight: bold; color: #FFD700; "
+                    "padding: 4px 10px; letter-spacing: 8px;"
+                )
+
+            prestige_txt = f"  •  Prestige {lv['prestige']}" if lv["prestige"] > 0 else ""
+            self.lbl_level_icon_name.setText(
+                f"{lv['icon']}  <b>{lv['label']}</b>   Level {lv['level']}{prestige_txt}"
+            )
             if lv["max_level"]:
                 self.lbl_level_next.setText("🌟 Max Level reached!")
                 self.bar_level.setValue(100)
             else:
                 self.lbl_level_next.setText(
-                    f"Next: {LEVEL_TABLE[lv['level']][2]}  (Level {lv['level']+1}) — {lv['next_at'] - lv['total']} more Achievements"
+                    f"Next: {LEVEL_TABLE[lv['level']][2]}  (Level {lv['level']+1}) — {lv['next_at'] - lv['effective']} more Achievements"
                 )
                 self.bar_level.setValue(int(lv["progress_pct"]))
-            self.lbl_level_count.setText(f"{lv['total']} Achievements unlocked")
+            self.lbl_level_count.setText(f"{lv['total']} Achievements total")
+            prestige_header = (
+                f"<div style='text-align:center; color:#FFD700; font-size:14pt; margin-bottom:8px;'>"
+                f"{lv['prestige_display']}  Prestige {lv['prestige']}  ({PRESTIGE_THRESHOLD} Achievements per Star)"
+                f"</div>"
+            )
             rows_html = ""
             for threshold, lvl, name in LEVEL_TABLE:
                 cls = ' class="current"' if lvl == lv["level"] else ""
-                marker = " ◀" if lvl == lv["level"] else ""
+                marker = " ◄ YOU" if lvl == lv["level"] else ""
                 rows_html += f"<tr{cls}><td>{lvl}</td><td>{name}{marker}</td><td>{threshold}</td></tr>"
             self.lv_table_browser.setHtml(
                 "<style>table{border-collapse:collapse;width:100%}"
@@ -5287,7 +5323,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 "td{padding:3px 8px;border-bottom:1px solid #2a2a2a;color:#CCC}"
                 ".current td{color:#00E5FF;font-weight:bold;background:#152015}"
                 "</style>"
-                "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
+                + prestige_header
+                + "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
                 + rows_html + "</table>"
             )
         except Exception:

@@ -957,12 +957,16 @@ LEVEL_TABLE = [
     (2000, 10, "🌟 VPX Elite"),
 ]
 
+PRESTIGE_THRESHOLD = 2000   # Achievements per prestige round
+MAX_PRESTIGE = 5            # Maximum prestige stars
+
 def compute_player_level(state: dict) -> dict:
     """
     Compute the player level from the achievements state.
     Counts all unique unlocked achievement titles across global + all session ROMs (deduped).
     Returns dict with keys: level (int), name (str), icon (str), label (str), total (int),
-    next_at (int), progress_pct (float), prev_at (int), max_level (bool)
+    next_at (int), progress_pct (float), prev_at (int), max_level (bool),
+    effective (int), prestige (int), prestige_display (str), fully_maxed (bool)
     """
     seen = set()
     # global
@@ -979,13 +983,21 @@ def compute_player_level(state: dict) -> dict:
                 seen.add(t)
     total = len(seen)
 
+    # Prestige calculation
+    prestige = min(total // PRESTIGE_THRESHOLD, MAX_PRESTIGE)
+    prestige_display = "★" * prestige + "☆" * (MAX_PRESTIGE - prestige)
+    if prestige < MAX_PRESTIGE:
+        effective = total - (prestige * PRESTIGE_THRESHOLD)
+    else:
+        effective = max(0, total - prestige * PRESTIGE_THRESHOLD)
+
     current_level = 1
     current_name = LEVEL_TABLE[0][2]
     prev_at = 0
-    next_at = LEVEL_TABLE[1][0] if len(LEVEL_TABLE) > 1 else total + 1
+    next_at = LEVEL_TABLE[1][0] if len(LEVEL_TABLE) > 1 else effective + 1
 
     for threshold, lvl, name in LEVEL_TABLE:
-        if total >= threshold:
+        if effective >= threshold:
             current_level = lvl
             current_name = name
             prev_at = threshold
@@ -999,9 +1011,12 @@ def compute_player_level(state: dict) -> dict:
     label = " ".join(current_name.split(" ")[1:])  # the name without emoji
 
     if next_at > prev_at:
-        progress_pct = round((total - prev_at) / (next_at - prev_at) * 100, 1)
+        progress_pct = round((effective - prev_at) / (next_at - prev_at) * 100, 1)
     else:
         progress_pct = 100.0  # max level
+
+    max_level = current_level == LEVEL_TABLE[-1][1]
+    fully_maxed = prestige >= MAX_PRESTIGE and max_level
 
     return {
         "level": current_level,
@@ -1012,7 +1027,11 @@ def compute_player_level(state: dict) -> dict:
         "next_at": next_at,
         "prev_at": prev_at,
         "progress_pct": progress_pct,
-        "max_level": current_level == LEVEL_TABLE[-1][1],
+        "max_level": max_level,
+        "effective": effective,
+        "prestige": prestige,
+        "prestige_display": prestige_display,
+        "fully_maxed": fully_maxed,
     }
 
 import urllib.request
@@ -1457,6 +1476,9 @@ class CloudSync:
                 "roms_played": roms_played,
                 "player_level": lv["level"],
                 "player_level_name": lv["name"],
+                "player_prestige": lv["prestige"],
+                "player_prestige_display": lv["prestige_display"],
+                "player_fully_maxed": lv["fully_maxed"],
             }
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
