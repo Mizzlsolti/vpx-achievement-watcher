@@ -2747,7 +2747,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             self._filter_available_maps()
-            self._cloud_upload_available_maps_cache()
 
         self._maps_worker.progress.connect(_on_progress)
         self._maps_worker.finished.connect(_on_finished)
@@ -3420,25 +3419,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception as _vps_err:
             log(self.cfg, f"[CLOUD] VPS mapping restore failed: {_vps_err}", "WARN")
 
-        # Restore Available Maps Cache from Cloud
-        maps_cache_restored = False
-        try:
-            maps_cache_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/available_maps_cache")
-            if maps_cache_data and isinstance(maps_cache_data, list):
-                cache_path = os.path.join(self.cfg.BASE, "tools", "available_maps_cache.json")
-                try:
-                    ensure_dir(os.path.dirname(cache_path))
-                    with open(cache_path, "w", encoding="utf-8") as _f:
-                        json.dump(maps_cache_data, _f)
-                except Exception as _write_err:
-                    log(self.cfg, f"[CLOUD] Available maps cache write failed: {_write_err}", "WARN")
-                self._all_maps_cache = maps_cache_data
-                self._filter_available_maps()
-                maps_cache_restored = True
-                log(self.cfg, f"[CLOUD] Available maps cache restored: {len(maps_cache_data)} entries")
-        except Exception as _cache_err:
-            log(self.cfg, f"[CLOUD] Available maps cache restore failed: {_cache_err}", "WARN")
-
         # Refresh level display and notify listeners
         try:
             self._refresh_level_display()
@@ -3531,22 +3511,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 errors.append(f"❌ VPS mapping: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: VPS mapping upload failed: {e}", "WARN")
 
-            # 3. Upload available maps cache
-            try:
-                cache = getattr(self, "_all_maps_cache", None)
-                if cache:
-                    if CloudSync.set_node(self.cfg, f"players/{pid}/available_maps_cache", cache):
-                        results.append(f"✅ Maps cache ({len(cache)} entries)")
-                        log(self.cfg, f"[CLOUD] Manual backup: available maps cache uploaded: {len(cache)} entries")
-                    else:
-                        errors.append("❌ Maps cache: upload failed")
-                else:
-                    results.append("⏭️ Maps cache (no data)")
-            except Exception as e:
-                errors.append(f"❌ Maps cache: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: maps cache upload failed: {e}", "WARN")
-
-            # 4. Upload progress for each ROM that has session data
+            # 3. Upload progress for each ROM that has session data
             def _entry_title(e):
                 return str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
 
@@ -3626,24 +3591,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             log(self.cfg, f"[CLOUD] VPS mapping uploaded: {len(mapping)} entries")
         except Exception as e:
             log(self.cfg, f"[CLOUD] VPS mapping upload failed: {e}", "WARN")
-
-    def _cloud_upload_available_maps_cache(self):
-        """Upload available_maps_cache.json to cloud under players/{pid}/available_maps_cache."""
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
-            return
-        if not self.cfg.CLOUD_BACKUP_ENABLED:
-            return
-        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
-        if not pid or pid == "unknown":
-            return
-        cache = getattr(self, "_all_maps_cache", None)
-        if not cache:
-            return
-        try:
-            CloudSync.set_node(self.cfg, f"players/{pid}/available_maps_cache", cache)
-            log(self.cfg, f"[CLOUD] Available maps cache uploaded: {len(cache)} entries")
-        except Exception as e:
-            log(self.cfg, f"[CLOUD] Available maps cache upload failed: {e}", "WARN")
 
     def _update_databases_now(self):
         import threading
