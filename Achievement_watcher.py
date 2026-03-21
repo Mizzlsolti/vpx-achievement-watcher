@@ -3208,6 +3208,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # CLEAN SAVE METHODS
     # ==========================================
     def _save_cloud_settings(self):
+        QTimer.singleShot(0, self._apply_cloud_settings)
+
+    def _apply_cloud_settings(self):
         if self.chk_cloud_enabled.isChecked():
             pname = self.txt_player_name.text().strip().lower()
             if not pname or pname == "player":
@@ -3215,6 +3218,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.chk_cloud_enabled.blockSignals(True)
                 self.chk_cloud_enabled.setChecked(False)
                 self.chk_cloud_enabled.blockSignals(False)
+                self.cfg.CLOUD_ENABLED = False
+                if getattr(self, "btn_restore_cloud", None):
+                    self.btn_restore_cloud.setVisible(False)
+                if getattr(self, "chk_cloud_backup", None):
+                    self.chk_cloud_backup.setVisible(False)
+                    self.chk_cloud_backup.setChecked(False)
+                    self.cfg.CLOUD_BACKUP_ENABLED = False
+                self.cfg.save()
                 return
         self.cfg.CLOUD_ENABLED = self.chk_cloud_enabled.isChecked()
         self.cfg.save()
