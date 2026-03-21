@@ -226,7 +226,7 @@ def _vps_find(tables: List[dict], search_term: str, rom: Optional[str] = None) -
     #    (e.g., "acd_170h" → "acd") to handle tables missing ROM file listings
     if not results and rom:
         prefix = re.split(r"[_\d]+", rom.lower())[0].strip()
-        if len(prefix) >= 3:
+        if len(prefix) >= 2:
             results = _find_internal(tables, prefix)
 
     # Sort ROM-matching entries first
