@@ -2257,30 +2257,34 @@ class Watcher:
             return
             
         try:
-            _awarded, _all_global, awarded_meta = self._evaluate_achievements(
+            _awarded, _all_global, awarded_meta, retriggered_meta = self._evaluate_achievements(
                 self.current_rom, self.start_audits, end_audits, duration_sec
             )
         except Exception as e:
             log(self.cfg, f"[ACH] eval failed: {e}", "WARN")
             awarded_meta = []
+            retriggered_meta = []
 
         try:
             from_ga = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-            if from_ga:
-                self._ach_record_unlocks("global", self.current_rom, from_ga)
+            from_ga_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
+            if from_ga or from_ga_rt:
+                self._ach_record_unlocks("global", self.current_rom, from_ga, retriggered=from_ga_rt)
                 try:
-                    self._emit_achievement_toasts(from_ga, seconds=5)
+                    if from_ga:
+                        self._emit_achievement_toasts(from_ga, seconds=5)
                 except Exception:
                     pass
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
 
         try:
-            sess_achs_p1 = self._evaluate_player_session_achievements(1, self.current_rom) or []
-            if sess_achs_p1:
-                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1))
+            sess_achs_p1, sess_rt_p1 = self._evaluate_player_session_achievements(1, self.current_rom)
+            if sess_achs_p1 or sess_rt_p1:
+                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1), retriggered=list(sess_rt_p1))
                 try:
-                    self._emit_achievement_toasts(sess_achs_p1, seconds=5)
+                    if sess_achs_p1:
+                        self._emit_achievement_toasts(sess_achs_p1, seconds=5)
                 except Exception:
                     pass
         except Exception as e:
@@ -4369,9 +4373,9 @@ class Watcher:
             out.append(r)
         return out
 
-    def _evaluate_player_session_achievements(self, pid: int, rom: str) -> list:
+    def _evaluate_player_session_achievements(self, pid: int, rom: str) -> tuple[list, list]:
         if pid not in self.players:
-            return []
+            return [], []
         player = self.players[pid]
         deltas = player.get("session_deltas", {}) or {}
         play_sec = int(player.get("active_play_seconds", 0.0))
@@ -4385,29 +4389,34 @@ class Watcher:
         already_unlocked = { _get_title(e) for e in unlocked_session if _get_title(e) }
 
         awarded = []
+        retriggered = []
         for rule in rules:
             title = rule.get("title") or "Achievement"
-            
-            if title.strip() in already_unlocked:
-                continue
 
             cond = rule.get("condition", {}) or {}
             rtype = cond.get("type")
             field = cond.get("field")
+            is_met = False
             try:
                 if rtype == "nvram_delta":
                     if not field or is_excluded_field(field):
                         continue
                     need = int(cond.get("min", 0))
                     if deltas.get(field, 0) >= need:
-                        awarded.append(title)
+                        is_met = True
 
                 elif rtype == "session_time":
                     min_s = int(cond.get("min_seconds", cond.get("min", 0)))
                     if play_sec >= min_s:
-                        awarded.append(title)
+                        is_met = True
             except Exception:
                 continue
+
+            if is_met:
+                if title.strip() in already_unlocked:
+                    retriggered.append(title)
+                else:
+                    awarded.append(title)
 
         best_per_field = {}
         non_field_titles = []
@@ -4426,7 +4435,7 @@ class Watcher:
             non_field_titles.append(title)
 
         out = non_field_titles + [t for _, t in sorted(best_per_field.values())]
-        return out
+        return out, retriggered
 
     def _augment_player_events_with_flags(self, score_abs: int, end_audits: dict, events: dict) -> dict:
         out = dict(events or {})
@@ -4560,25 +4569,29 @@ class Watcher:
             log(self.cfg, f"[ACH] roms_played update failed: {e}", "WARN")
 
         try:
-            _awarded, _all_global, awarded_meta = self._evaluate_achievements(
+            _awarded, _all_global, awarded_meta, retriggered_meta = self._evaluate_achievements(
                 self.current_rom, self.start_audits, end_audits, duration_sec
             )
         except Exception as e:
             log(self.cfg, f"[ACH] eval failed: {e}", "WARN")
             awarded_meta = []
+            retriggered_meta = []
 
         try:
             global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
+            global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
+            if global_hits or global_rt:
+                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
             if global_hits:
-                self._ach_record_unlocks("global", self.current_rom, global_hits)
                 self._emit_achievement_toasts(global_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
 
         try:
-            session_hits = self._evaluate_player_session_achievements(1, self.current_rom) or []
+            session_hits, session_rt = self._evaluate_player_session_achievements(1, self.current_rom)
+            if session_hits or session_rt:
+                self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
             if session_hits:
-                self._ach_record_unlocks("session", self.current_rom, list(session_hits))
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
@@ -4591,7 +4604,7 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[ACH] full achievements upload failed: {e}", "WARN")
 
-    def _evaluate_achievements(self, rom: str, start_audits: dict, end_audits: dict, duration_sec: int) -> tuple[list[str], list[str], list[dict]]:
+    def _evaluate_achievements(self, rom: str, start_audits: dict, end_audits: dict, duration_sec: int) -> tuple[list[str], list[str], list[dict], list[dict]]:
         global_rules = self._collect_global_rules_for_rom(rom)
 
         deltas_ci = {}
@@ -4607,9 +4620,11 @@ class Watcher:
             deltas_ci[str(k)] = d
         awarded = []
         awarded_meta = []
+        retriggered_meta = []
         all_titles = []
         seen_all = set()
         seen_aw = set()
+        seen_rt = set()
 
         # Pre-load state for rom_count / rom_complete_set / rom_multi_brand evaluation
         _rom_state_cache: dict | None = None
@@ -4692,9 +4707,14 @@ class Watcher:
                     need = int(cond.get("min", 1))
                     sv = int(self._nv_get_int_ci(start_audits, field, 0))
                     ev = int(self._nv_get_int_ci(end_audits, field, 0))
-                    if sv < need <= ev and title not in seen_aw:
-                        awarded.append(title); seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
+                    if sv < need <= ev:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title); seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_delta":
                     field = cond.get("field")
                     if not field or is_excluded_field(field):
@@ -4705,9 +4725,14 @@ class Watcher:
                     d = de - ds
                     if d < 0:
                         d = 0
-                    if d >= need and title not in seen_aw:
-                        awarded.append(title); seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
+                    if d >= need:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title); seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
                     field = cond.get("field")
                     if not field or is_excluded_field(field):
@@ -4720,8 +4745,6 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
 
                     delta = self._fuzzy_sum_deltas(deltas_ci, field)
                     roms_played = list(state.get("roms_played") or [])
@@ -4730,7 +4753,7 @@ class Watcher:
                     tally_bucket = state.setdefault("global_tally", {})
                     tally = tally_bucket.setdefault(title, {"progress": 0, "entries": []})
 
-                    if delta > 0:
+                    if not (title in already_global) and delta > 0:
                         now_iso = datetime.now(timezone.utc).isoformat()
                         tally["entries"].append({"rom": rom, "delta": delta, "ts": now_iso})
                         tally["progress"] += delta
@@ -4739,10 +4762,15 @@ class Watcher:
                     tally["progress"] = effective_progress
                     self._ach_state_save(state)
 
-                    if effective_progress >= need and title not in seen_aw:
-                        awarded.append(title)
-                        seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
+                    if effective_progress >= need:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
 
                 elif rtype == "rom_count":
                     state = _rom_state()
@@ -4751,8 +4779,6 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
                     roms_played = list(state.get("roms_played") or [])
                     manufacturer = cond.get("manufacturer", "")
                     if manufacturer == "__any__":
@@ -4777,11 +4803,16 @@ class Watcher:
                     # Update tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": progress}
                     _rom_state_dirty = True
-                    if progress >= need and title not in seen_aw:
-                        awarded.append(title)
-                        seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
-                        log(self.cfg, f"[GLOBAL_ACH] rom_count triggered: '{title}' ({progress}/{need} tables played)")
+                    if progress >= need:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
+                            log(self.cfg, f"[GLOBAL_ACH] rom_count triggered: '{title}' ({progress}/{need} tables played)")
 
                 elif rtype == "rom_complete_set":
                     state = _rom_state()
@@ -4790,8 +4821,6 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
                     manufacturer = cond.get("manufacturer", "")
                     roms_played = set(state.get("roms_played") or [])
                     installed = _installed_roms(manufacturer)
@@ -4802,11 +4831,16 @@ class Watcher:
                     # Store installed_count in global_tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": played_count, "installed_count": installed_count}
                     _rom_state_dirty = True
-                    if played_count >= installed_count and title not in seen_aw:
-                        awarded.append(title)
-                        seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
-                        log(self.cfg, f"[GLOBAL_ACH] rom_complete_set triggered: '{title}' ({played_count}/{installed_count} tables played)")
+                    if played_count >= installed_count:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
+                            log(self.cfg, f"[GLOBAL_ACH] rom_complete_set triggered: '{title}' ({played_count}/{installed_count} tables played)")
 
                 elif rtype == "rom_multi_brand":
                     state = _rom_state()
@@ -4815,8 +4849,6 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
                     manufacturers = cond.get("manufacturers") or []
                     roms_played = list(state.get("roms_played") or [])
                     # Pre-compute set of manufacturers represented in roms_played
@@ -4828,11 +4860,16 @@ class Watcher:
                     # Update tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": progress, "installed_count": need}
                     _rom_state_dirty = True
-                    if progress >= need and title not in seen_aw:
-                        awarded.append(title)
-                        seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
-                        log(self.cfg, f"[GLOBAL_ACH] rom_multi_brand triggered: '{title}' ({progress}/{need} brands played)")
+                    if progress >= need:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
+                            log(self.cfg, f"[GLOBAL_ACH] rom_multi_brand triggered: '{title}' ({progress}/{need} brands played)")
 
                 elif rtype == "challenge_count":
                     state = _rom_state()
@@ -4841,19 +4878,22 @@ class Watcher:
                         for entries in state.get("global", {}).values()
                         for e in entries
                     }
-                    if title in already_global:
-                        continue
                     challenge_type = str(cond.get("challenge_type") or "").lower()
                     need = int(cond.get("min", 1))
                     count = self._count_completed_challenges(challenge_type)
                     # Update tally for progress display (batched save at end)
                     state.setdefault("global_tally", {})[title] = {"progress": count}
                     _rom_state_dirty = True
-                    if count >= need and title not in seen_aw:
-                        awarded.append(title)
-                        seen_aw.add(title)
-                        awarded_meta.append({"title": title, "origin": origin})
-                        log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
+                    if count >= need:
+                        if title in already_global:
+                            if title not in seen_rt:
+                                retriggered_meta.append({"title": title, "origin": origin})
+                                seen_rt.add(title)
+                        elif title not in seen_aw:
+                            awarded.append(title)
+                            seen_aw.add(title)
+                            awarded_meta.append({"title": title, "origin": origin})
+                            log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
 
             except Exception:
                 continue
@@ -4865,7 +4905,7 @@ class Watcher:
             except Exception:
                 pass
 
-        return awarded, all_titles, awarded_meta
+        return awarded, all_titles, awarded_meta, retriggered_meta
         
     def _count_completed_challenges(self, challenge_type: str) -> int:
         """Count completed challenges of a given type from the challenge history folder."""
@@ -5420,8 +5460,8 @@ class Watcher:
 
             lines.append(f"{label:<30} {value_txt}")
 
-    def _ach_record_unlocks(self, kind: str, rom: str, titles: list):
-        if not rom or not titles:
+    def _ach_record_unlocks(self, kind: str, rom: str, titles: list, retriggered: list = None):
+        if not rom or (not titles and not retriggered):
             return
         from datetime import datetime, timezone
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -5483,6 +5523,21 @@ class Watcher:
             lst.append(entry)
             existing_by_title[title] = entry
             added += 1
+
+        # Process retriggered achievements: silently update vps_id if it changed
+        for t in (retriggered or []):
+            if isinstance(t, dict):
+                title = str(t.get("title", "")).strip()
+            else:
+                title = str(t).strip()
+            if not title:
+                continue
+            if title in existing_by_title:
+                existing_entry = existing_by_title[title]
+                stored_vps = (existing_entry.get("vps_id") or "").strip()
+                if _current_vps_id and _current_vps_id != stored_vps:
+                    existing_entry["vps_id"] = _current_vps_id
+                    updated += 1
 
         if added or updated:
             self._ach_state_save(state)
