@@ -2887,32 +2887,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         self._filter_available_maps()
 
-        # Sync: when a mapping is accepted, switch the Progress tab to this ROM
-        if result == QDialog.DialogCode.Accepted and dlg.selected_table:
-            self._navigate_to_progress_rom(rom)
-
-    def _navigate_to_progress_rom(self, rom: str):
-        """Switch to the Progress tab and select the given ROM in the combobox."""
-        # Find the Progress tab by its exact label text
-        progress_idx = -1
-        for i in range(self.main_tabs.count()):
-            if self.main_tabs.tabText(i) == "📈 Progress":
-                progress_idx = i
-                break
-        if progress_idx < 0:
-            return
-
-        self.main_tabs.setCurrentIndex(progress_idx)
-
-        # Ensure the combobox is populated before trying to select the ROM
-        self._refresh_progress_roms()
-
-        # Select the ROM in the combobox (match by user-data which holds the rom key)
-        for i in range(self.cmb_progress_rom.count()):
-            if self.cmb_progress_rom.itemData(i) == rom:
-                self.cmb_progress_rom.setCurrentIndex(i)
-                break
-
     def _update_map_search_completer(self):
         """Update the Available Maps tab search autocomplete suggestions from the maps cache."""
         cache = getattr(self, '_all_maps_cache', None) or []
