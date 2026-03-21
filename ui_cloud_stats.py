@@ -278,8 +278,7 @@ class CloudStatsMixin:
         """Handle info badge clicks: show VPS table info dialog instead of opening a browser."""
         url_str = url.toString() if isinstance(url, QUrl) else str(url)
         # Unescape HTML entities (e.g. &amp; -> &) that QTextBrowser retains for custom schemes
-        import html as _html_mod
-        url_str = _html_mod.unescape(url_str)
+        url_str = _html.unescape(url_str)
         if url_str.startswith("vpsinfo://"):
             parsed = _urlparse.urlparse(url_str)
             params = _urlparse.parse_qs(parsed.query)
