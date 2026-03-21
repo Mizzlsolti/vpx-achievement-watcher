@@ -52,6 +52,7 @@ from watcher_core import (
 from .dialogs import SetupWizardDialog, FeedbackDialog
 from .theme import pinball_arcade_style
 from .cloud_stats import CloudStatsMixin
+from ..utils.version import WATCHER_VERSION
 
 from .dialogs.vps import (
     VpsPickerDialog, VpsAchievementInfoDialog,
@@ -124,7 +125,7 @@ def _parse_version(v_str):
 
 
 class MainWindow(QMainWindow, CloudStatsMixin):
-    CURRENT_VERSION = "2.6"
+    CURRENT_VERSION = WATCHER_VERSION
 
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
         super().__init__()
