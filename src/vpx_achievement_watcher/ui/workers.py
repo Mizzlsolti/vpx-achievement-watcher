@@ -4,7 +4,7 @@ import os
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from watcher_core import run_vpxtool_get_rom, run_vpxtool_info_show
+from vpx_achievement_watcher.core.helpers import run_vpxtool_get_rom, run_vpxtool_info_show
 from .dialogs.vps import _load_vps_mapping
 
 

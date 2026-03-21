@@ -6,7 +6,9 @@ import sys
 
 from PyQt6.QtWidgets import QApplication, QDialog
 
-from watcher_core import AppConfig, Watcher, ensure_dir
+from vpx_achievement_watcher.core.config import AppConfig
+from vpx_achievement_watcher.core.watcher import Watcher
+from vpx_achievement_watcher.core.helpers import ensure_dir
 
 from vpx_achievement_watcher.ui.bridge import Bridge
 from vpx_achievement_watcher.ui.main_window import MainWindow

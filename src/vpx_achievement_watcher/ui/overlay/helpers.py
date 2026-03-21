@@ -16,7 +16,8 @@ from PyQt6.QtGui import (
     QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
-from watcher_core import APP_DIR, register_raw_input_for_window
+from vpx_achievement_watcher.core.helpers import APP_DIR
+from vpx_achievement_watcher.input.hooks import register_raw_input_for_window
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
                       radius: int = 18, color: QColor = None, layers: int = 3,

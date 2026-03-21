@@ -11,7 +11,9 @@ from PyQt6.QtWidgets import (
     QMessageBox, QPushButton, QFileDialog, QTextEdit,
 )
 
-from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
+from vpx_achievement_watcher.core.config import AppConfig
+from vpx_achievement_watcher.utils.version import WATCHER_VERSION
+from vpx_achievement_watcher.core.helpers import log, ensure_dir
 
 
 _REPO_ISSUES_URL = "https://github.com/Mizzlsolti/vpx-achievement-watcher/issues/new"
