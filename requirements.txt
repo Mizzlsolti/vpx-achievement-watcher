@@ -1,4 +1,0 @@
-PyQt6
-requests
-pywin32
-pyinstaller

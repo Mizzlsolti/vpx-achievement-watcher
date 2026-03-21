@@ -1,1 +1,0 @@
-"""VPX Achievement Watcher package."""

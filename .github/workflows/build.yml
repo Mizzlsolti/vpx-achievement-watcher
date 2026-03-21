@@ -31,21 +31,14 @@ jobs:
 
     - name: Build Achievement_Watcher.exe with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --paths="src" --name "Achievement_Watcher" "Achievement_watcher.py"
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
 
     - name: Install Inno Setup
       run: choco install innosetup -y
 
-    - name: Read version from source
-      id: version
-      shell: pwsh
-      run: |
-        $v = (Select-String -Path "src/vpx_achievement_watcher/utils/version.py" -Pattern 'WATCHER_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-        echo "APP_VERSION=$v" >> $env:GITHUB_OUTPUT
-
     - name: Build Installer with Inno Setup
       run: |
-        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "${{ steps.version.outputs.APP_VERSION }}" }
+        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "2.6" }
         iscc /DMyAppVersion="$version" installer.iss
 
     - name: Upload Installer as Artifact

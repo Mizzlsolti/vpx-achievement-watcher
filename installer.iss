@@ -9,8 +9,6 @@
 ; During silent/upgrade installs the paths page is skipped and any
 ; existing config.json is preserved.
 
-; MyAppVersion is overridden by the CI (via /DMyAppVersion= on the iscc command line).
-; This value is only used as a fallback for local builds without a CLI override.
 #ifndef MyAppVersion
   #define MyAppVersion "2.6"
 #endif
