@@ -5436,7 +5436,15 @@ class Watcher:
                 return str(e.get("title")).strip()
             except Exception:
                 return str(e).strip()
-        seen = { _entry_title(e) for e in lst if _entry_title(e) }
+
+        # Build a mapping of existing entries by title to easily find and update them
+        existing_by_title = {}
+        for e in lst:
+            if isinstance(e, dict):
+                t_val = _entry_title(e)
+                if t_val:
+                    existing_by_title[t_val] = e
+
         _current_vps_id = ""
         try:
             from ui_vps import _load_vps_mapping
@@ -5444,38 +5452,47 @@ class Watcher:
             _current_vps_id = (_vps_mapping.get(rom) or "").strip()
         except Exception:
             pass
+
         added = 0
+        updated = 0
         for t in titles:
             if isinstance(t, dict):
                 title = str(t.get("title", "")).strip()
-                if not title or title in seen:
-                    continue
-                entry = {"title": title, "ts": now_iso}
-                if t.get("origin"):
-                    entry["origin"] = str(t["origin"])
-                if _current_vps_id:
-                    entry["vps_id"] = _current_vps_id
-                lst.append(entry)
-                seen.add(title)
-                added += 1
+                origin = t.get("origin")
             else:
                 title = str(t).strip()
-                if not title or title in seen:
-                    continue
-                entry = {"title": title, "ts": now_iso}
-                if _current_vps_id:
-                    entry["vps_id"] = _current_vps_id
-                lst.append(entry)
-                seen.add(title)
-                added += 1
-        if added:
+                origin = None
+
+            if not title:
+                continue
+
+            if title in existing_by_title:
+                # Existing achievement: retroactively add vps_id if it is missing
+                existing_entry = existing_by_title[title]
+                if _current_vps_id and not (existing_entry.get("vps_id") or "").strip():
+                    existing_entry["vps_id"] = _current_vps_id
+                    updated += 1
+                continue
+
+            # New achievement
+            entry = {"title": title, "ts": now_iso}
+            if origin:
+                entry["origin"] = str(origin)
+            if _current_vps_id:
+                entry["vps_id"] = _current_vps_id
+            lst.append(entry)
+            existing_by_title[title] = entry
+            added += 1
+
+        if added or updated:
             self._ach_state_save(state)
-            new_level_info = compute_player_level(state)
-            if new_level_info["level"] > old_level_info["level"]:
-                try:
-                    self.bridge.level_up_show.emit(new_level_info["name"], new_level_info["level"])
-                except Exception:
-                    pass
+            if added:
+                new_level_info = compute_player_level(state)
+                if new_level_info["level"] > old_level_info["level"]:
+                    try:
+                        self.bridge.level_up_show.emit(new_level_info["name"], new_level_info["level"])
+                    except Exception:
+                        pass
             try:
                 if getattr(self, "bridge", None) and hasattr(self.bridge, "achievements_updated"):
                     self.bridge.achievements_updated.emit()
