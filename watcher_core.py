@@ -701,42 +701,59 @@ def _parse_authors_from_script(script: str) -> list:
     """
     Parse author names from a VBS script.
     Looks for comment lines containing author indicators.
-    Returns a deduplicated list of author name tokens.
+    Returns a deduplicated list of primary author name tokens.
 
-    Patterns searched (case-insensitive):
+    Primary author patterns searched (case-insensitive):
       ' Table by JPSalas
       ' Author: nFozzy, Fleep
       ' Authors: Brad1X, Sixtoe
       ' Created by Tom Tower
       ' VPX by Dozer
+      ' VPX recreation by g5k
       ' Original by George H
       ' Adapted by Flukemaster
+
+    Lines after a '  Thanks to:' / '  Credits:' marker are treated as
+    contributor credits and excluded from the primary author list.
     """
     authors = []
     seen = set()
+    in_credits_section = False
 
-    # Match comment lines with author-like patterns
-    patterns = [
-        # ' Author(s): Name1, Name2
-        r"^\s*'[^']*(?:author(?:s)?|created\s+by|table\s+by|vpx\s+by|original\s+by|adapted\s+by|remake\s+by|mod\s+by|script\s+by)\s*:?\s*(.+)",
-    ]
+    # Detect entry into a thanks/credits block
+    _credits_re = re.compile(r"^\s*'[^']*(?:thanks?\s+to|credits?)\s*:", re.IGNORECASE)
+
+    # Match comment lines with primary author-like patterns.
+    # vpx(?:\s+\w+)*\s+by handles "VPX by", "VPX recreation by", "VPX conversion by", etc.
+    _primary_re = re.compile(
+        r"^\s*'[^']*(?:author(?:s)?|created\s+by|table\s+by|vpx(?:\s+\w+)*\s+by"
+        r"|original\s+by|adapted\s+by|remake\s+by|mod\s+by|script\s+by"
+        r"|recreation\s+by|conversion\s+by|made\s+by)\s*:?\s*(.+)",
+        re.IGNORECASE,
+    )
 
     for line in script.splitlines():
-        for pat in patterns:
-            m = re.match(pat, line, re.IGNORECASE)
-            if m:
-                raw = m.group(1).strip().strip("'").strip()
-                # Split on common separators: comma, ampersand, " and ", " & "
-                tokens = re.split(r"\s*[,&]\s*|\s+and\s+", raw, flags=re.IGNORECASE)
-                for tok in tokens:
-                    tok = tok.strip().strip("'\"").strip()
-                    # Remove trailing version/year info like "(v1.0)" or "2024"
-                    tok = re.sub(r"\s*[\(\[].*", "", tok).strip()
-                    if tok and len(tok) >= 2:
-                        key = tok.lower()
-                        if key not in seen:
-                            seen.add(key)
-                            authors.append(tok)
+        # Entering a thanks/credits section — stop collecting primary authors
+        if _credits_re.match(line):
+            in_credits_section = True
+            continue
+        if in_credits_section:
+            continue
+
+        m = _primary_re.match(line)
+        if m:
+            raw = m.group(1).strip().strip("'").strip()
+            # Split on common separators: comma, ampersand, " and ", " & "
+            tokens = re.split(r"\s*[,&]\s*|\s+and\s+", raw, flags=re.IGNORECASE)
+            for tok in tokens:
+                tok = tok.strip().strip("'\"").strip()
+                # Remove trailing version/year info like "(v1.0)" or "2024"
+                tok = re.sub(r"\s*[\(\[].*", "", tok).strip()
+                if tok and len(tok) >= 2:
+                    key = tok.lower()
+                    if key not in seen:
+                        seen.add(key)
+                        authors.append(tok)
     return authors
 
 
