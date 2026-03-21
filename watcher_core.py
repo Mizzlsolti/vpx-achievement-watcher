@@ -994,6 +994,14 @@ class CloudSync:
     _upload_skip_warned: bool = False
     _upload_skip_warned_lock = threading.Lock()
 
+    # Client-side dedup: track (dedup_key -> timestamp) for recent competitive uploads.
+    # Keys expire implicitly after _DEDUP_WINDOW_SEC seconds.
+    _DEDUP_WINDOW_SEC: float = 60.0
+    _recent_score_uploads: dict = {}
+    _recent_score_uploads_lock = threading.Lock()
+    _recent_progress_uploads: dict = {}
+    _recent_progress_uploads_lock = threading.Lock()
+
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
         """Returns True if player name is missing/default and upload should be skipped.
@@ -1008,7 +1016,31 @@ class CloudSync:
         return False
 
     @staticmethod
-    def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None):
+    def _emit_submission_state(cfg: "AppConfig", resp_body: str, bridge: Optional["Bridge"]) -> None:
+        """Parse a server response body for submission_state and emit the status overlay signal.
+
+        Handles structured responses: ``{"submission_state": "accepted"|"flagged"|"rejected"}``.
+        Silently ignores empty bodies, plain-text, or legacy Firebase-style responses so that
+        backwards compatibility with servers that do not return structured state is preserved.
+        """
+        if not bridge:
+            return
+        try:
+            resp_data = json.loads(resp_body)
+            if not isinstance(resp_data, dict):
+                return
+            state = str(resp_data.get("submission_state", "") or "").lower().strip()
+            if state == "accepted":
+                bridge.status_overlay_show.emit("Online · Verified", 0, "#00C853")
+            elif state == "flagged":
+                bridge.status_overlay_show.emit("Online · Flagged", 0, "#FFA500")
+            elif state == "rejected":
+                bridge.status_overlay_show.emit("Online · Rejected", 0, "#FF3B30")
+        except Exception:
+            pass
+
+    @staticmethod
+    def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0:
             return
@@ -1065,7 +1097,10 @@ class CloudSync:
         
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
-        
+        if not pid or pid == "unknown":
+            log(cfg, f"[CLOUD] upload_score blocked for {rom}: no valid player_id", "WARN")
+            return
+
         rom_key = rom
         if extra_data:
             if category == "flip" and "target_flips" in extra_data:
@@ -1075,7 +1110,24 @@ class CloudSync:
             elif "difficulty" in extra_data:
                 clean_diff = str(extra_data["difficulty"]).replace(" ", "")
                 rom_key = f"{rom}_{clean_diff}"
-        
+
+        # Client-side dedup: skip if an identical (pid, category, rom_key, score) was already
+        # submitted within the dedup window to reduce accidental replay uploads.
+        _dedup_key = f"{pid}|{category}|{rom_key}|{score}"
+        _now = time.time()
+        with CloudSync._recent_score_uploads_lock:
+            # Prune expired entries to prevent unbounded growth over long sessions.
+            _cutoff = _now - CloudSync._DEDUP_WINDOW_SEC
+            CloudSync._recent_score_uploads = {
+                k: v for k, v in CloudSync._recent_score_uploads.items() if v > _cutoff
+            }
+            _last_ts = CloudSync._recent_score_uploads.get(_dedup_key, 0.0)
+            if _now - _last_ts < CloudSync._DEDUP_WINDOW_SEC:
+                log(cfg, f"[CLOUD] upload_score skipped: identical score {score} for {rom_key} "
+                         f"(duplicate within {CloudSync._DEDUP_WINDOW_SEC:.0f}s window)")
+                return
+            CloudSync._recent_score_uploads[_dedup_key] = _now
+
         endpoint = f"{url}/players/{pid}/scores/{category}/{rom_key}.json"
         
         def _task():
@@ -1096,14 +1148,16 @@ class CloudSync:
             put_req.add_header('Content-Type', 'application/json')
             try:
                 with urllib.request.urlopen(put_req, timeout=5) as resp:
+                    resp_body = resp.read().decode()
                     log(cfg, f"[CLOUD] Uploaded {category.upper()} Score for {rom}: {score}")
+                    CloudSync._emit_submission_state(cfg, resp_body, bridge)
             except Exception as e:
                 log(cfg, f"[CLOUD] Upload failed: {e}", "WARN")
                 
         threading.Thread(target=_task, daemon=True).start()
 
     @staticmethod
-    def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int):
+    def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
             return
@@ -1123,9 +1177,30 @@ class CloudSync:
         except Exception as e:
             log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: VPS mapping error: {e}", "WARN")
             return
-            
+
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+        if not pid or pid == "unknown":
+            log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: no valid player_id", "WARN")
+            return
+
+        # Client-side dedup: skip if the same (pid, rom, unlocked, total) was already submitted
+        # within the dedup window to avoid redundant repeated progress writes.
+        _dedup_key = f"{pid}|{rom}|{unlocked}|{total}"
+        _now = time.time()
+        with CloudSync._recent_progress_uploads_lock:
+            # Prune expired entries to prevent unbounded growth over long sessions.
+            _cutoff = _now - CloudSync._DEDUP_WINDOW_SEC
+            CloudSync._recent_progress_uploads = {
+                k: v for k, v in CloudSync._recent_progress_uploads.items() if v > _cutoff
+            }
+            _last_ts = CloudSync._recent_progress_uploads.get(_dedup_key, 0.0)
+            if _now - _last_ts < CloudSync._DEDUP_WINDOW_SEC:
+                log(cfg, f"[CLOUD] upload_achievement_progress skipped: same payload for {rom} "
+                         f"({unlocked}/{total}) (duplicate within {CloudSync._DEDUP_WINDOW_SEC:.0f}s window)")
+                return
+            CloudSync._recent_progress_uploads[_dedup_key] = _now
+
         endpoint = f"{url}/players/{pid}/progress/{rom}.json"
         
         def _task():
@@ -1187,7 +1262,9 @@ class CloudSync:
             put_req.add_header('Content-Type', 'application/json')
             try:
                 with urllib.request.urlopen(put_req, timeout=5) as resp:
+                    resp_body = resp.read().decode()
                     log(cfg, f"[CLOUD] Uploaded Achievement Progress for {rom}: {unlocked}/{total} ({percentage}%)")
+                    CloudSync._emit_submission_state(cfg, resp_body, bridge)
             except Exception as e:
                 log(cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
         threading.Thread(target=_task, daemon=True).start()
@@ -3803,7 +3880,7 @@ class Watcher:
             except Exception:
                 pass
 
-            CloudSync.upload_score(self.cfg, kind, rom, int(score), extra)
+            CloudSync.upload_score(self.cfg, kind, rom, int(score), extra, bridge=self.bridge)
             
             ch["result_recorded"] = True
             self.challenge = ch
@@ -5615,9 +5692,10 @@ class Watcher:
                             unlocked_total = len(unlocked_titles)
                             _rom = self.current_rom
                             _cfg = self.cfg
+                            _br = self.bridge
                             threading.Thread(
-                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs:
-                                    CloudSync.upload_achievement_progress(_c, _r, _ut, _ta),
+                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br:
+                                    CloudSync.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
                                 daemon=True,
                             ).start()
                             # Retroactive upload: if this ROM now has a VPS-ID but was previously
