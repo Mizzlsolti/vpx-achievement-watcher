@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QStringListModel, QUrl
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json
+from vpx_achievement_watcher.core.cloud_sync import CloudSync
+from vpx_achievement_watcher.utils.json_io import secure_load_json
 
 
 class _NoBrowseBrowser(QTextBrowser):

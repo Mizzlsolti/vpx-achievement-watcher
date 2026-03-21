@@ -36,19 +36,27 @@ from ctypes import wintypes
 import ssl
 from urllib.request import Request, urlopen
 
-from watcher_core import (
-    APP_DIR, AppConfig, CloudSync, Watcher,
+from vpx_achievement_watcher.core.config import AppConfig
+from vpx_achievement_watcher.core.watcher import Watcher
+from vpx_achievement_watcher.core.cloud_sync import CloudSync
+from vpx_achievement_watcher.core.helpers import (
+    APP_DIR, ensure_dir, log, resource_path, sanitize_filename,
+    apply_tooltips, compute_player_level, LEVEL_TABLE,
+    run_vpxtool_get_rom, run_vpxtool_get_script_authors, run_vpxtool_info_show,
+    VPXTOOL_PATH, ensure_vpxtool, _fetch_bytes_url, _fetch_json_url,
+)
+from vpx_achievement_watcher.core.paths import (
+    f_achievements_state, f_global_ach, f_vps_mapping, f_vpsdb_cache,
+    f_index, f_romnames,
+)
+from vpx_achievement_watcher.core.constants import INDEX_URL, ROMNAMES_URL
+from vpx_achievement_watcher.input.hooks import (
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
     KBDLLHOOKSTRUCT, GlobalKeyHook,
-    ensure_dir, log, resource_path, sanitize_filename,
-    apply_tooltips, f_achievements_state, f_global_ach,
-    register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    compute_player_level, LEVEL_TABLE,
-    f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
-    run_vpxtool_get_script_authors,
-    run_vpxtool_info_show,
+    register_raw_input_for_window, vk_to_name_en,
 )
+from vpx_achievement_watcher.utils.json_io import load_json, secure_load_json, secure_save_json
 
 from .dialogs import SetupWizardDialog, FeedbackDialog
 from .theme import pinball_arcade_style
@@ -56,7 +64,8 @@ from .cloud_stats import CloudStatsMixin
 from ..utils.version import WATCHER_VERSION
 
 from .dialogs.vps import (
-    VpsPickerDialog, VpsAchievementInfoDialog,
+    VpsPickerDialog, VpsAchievementInfoDialog, CloudProgressVpsInfoDialog,
+    VPSDB_URL,
     _load_vpsdb, _load_vps_mapping, _save_vps_mapping, _vps_find, _table_has_rom,
     _normalize_term, _find_table_file_by_filename_and_authors,
 )
@@ -3353,7 +3362,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             vps_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/vps_mapping")
             if vps_data and isinstance(vps_data, dict):
-                from ui_vps import _save_vps_mapping
                 _save_vps_mapping(self.cfg, vps_data)
                 vps_mapping_restored = True
                 log(self.cfg, f"[CLOUD] VPS mapping restored: {len(vps_data)} entries")
@@ -3418,7 +3426,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _worker():
             from datetime import datetime, timezone
-            from watcher_core import compute_player_level, WATCHER_VERSION
             results = []
             errors = []
 
@@ -3448,7 +3455,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             # 2. Upload VPS mapping
             try:
-                from ui_vps import _load_vps_mapping
                 mapping = _load_vps_mapping(self.cfg)
                 if CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping):
                     results.append(f"✅ VPS mapping ({len(mapping)} entries)")
@@ -3533,7 +3539,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if not pid or pid == "unknown":
             return
         try:
-            from ui_vps import _load_vps_mapping
             mapping = _load_vps_mapping(self.cfg)
             CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping)
             log(self.cfg, f"[CLOUD] VPS mapping uploaded: {len(mapping)} entries")
@@ -3547,12 +3552,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _worker():
             try:
-                from watcher_core import (
-                    f_index, f_romnames, f_vpsdb_cache,
-                    INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log,
-                    VPXTOOL_PATH, ensure_vpxtool
-                )
-                from ui_vps import VPSDB_URL
                 import os
 
                 cfg = self.cfg
@@ -3604,8 +3603,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _worker():
             try:
-                from watcher_core import _fetch_json_url, log
-
                 RELEASES_API = "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/releases/latest"
 
                 release = _fetch_json_url(RELEASES_API, timeout=15)
@@ -3747,8 +3744,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         def _download_and_install():
             try:
                 import os, tempfile, subprocess
-                from watcher_core import _fetch_bytes_url, log
-
                 log(self.cfg, f"[UPDATE] Downloading Setup from {download_url}")
                 data = _fetch_bytes_url(download_url, timeout=120)
 
@@ -3783,7 +3778,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 QMetaObject.invokeMethod(self, "_on_update_ready_quit", _Qt.ConnectionType.QueuedConnection)
 
             except Exception as e:
-                from watcher_core import log
                 log(self.cfg, f"[UPDATE] Download/install failed: {e}", "ERROR")
                 from PyQt6.QtCore import QMetaObject, Qt as _Qt, Q_ARG
                 QMetaObject.invokeMethod(self, "_on_update_download_failed",
@@ -4249,7 +4243,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._show_overlay_page(self._overlay_page)
         except Exception as e:
             try:
-                from watcher_core import log
                 log(self.cfg, f"[OVERLAY] page navigation failed: {e}", "WARN")
             except Exception:
                 pass
@@ -4341,7 +4334,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Determine what was last played: non-challenge session or a challenge, and return metadata."""
         import json as _json
         from datetime import datetime
-        from watcher_core import secure_load_json
 
         ctx = {"rom": "", "table_name": "", "is_challenge": False, "kind": "", "difficulty": ""}
 
@@ -4604,7 +4596,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return
 
         # Fetch cloud data in background
-        from watcher_core import CloudSync
 
         def _do_fetch():
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

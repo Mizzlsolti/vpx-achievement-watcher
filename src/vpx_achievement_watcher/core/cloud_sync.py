@@ -73,7 +73,7 @@ class CloudSync:
             return
         # Block upload if no VPS-ID assigned for this ROM
         try:
-            from ui_vps import _load_vps_mapping
+            from vpx_achievement_watcher.ui.dialogs.vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(cfg)
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
@@ -86,7 +86,7 @@ class CloudSync:
             extra_data.setdefault("vps_id", _vps_id)
             # Enrich extra_data with VPS table metadata (table_name, author, version)
             try:
-                from ui_vps import _load_vpsdb
+                from vpx_achievement_watcher.ui.dialogs.vps import _load_vpsdb
                 tables = _load_vpsdb(cfg)
                 if tables:
                     for t in tables:
@@ -190,7 +190,7 @@ class CloudSync:
             return
         # Block upload if no VPS-ID assigned for this ROM
         try:
-            from ui_vps import _load_vps_mapping
+            from vpx_achievement_watcher.ui.dialogs.vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(cfg)
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
@@ -239,7 +239,7 @@ class CloudSync:
             if _extra_vps_id:
                 payload["vps_id"] = _extra_vps_id
                 try:
-                    from ui_vps import _load_vpsdb
+                    from vpx_achievement_watcher.ui.dialogs.vps import _load_vpsdb
                     tables = _load_vpsdb(cfg)
                     if tables:
                         for t in tables:

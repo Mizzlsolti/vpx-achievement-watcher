@@ -16,7 +16,8 @@ from PyQt6.QtGui import (
     QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
-from watcher_core import APP_DIR, register_raw_input_for_window
+from vpx_achievement_watcher.core.helpers import APP_DIR
+from vpx_achievement_watcher.input.hooks import register_raw_input_for_window
 
 from .helpers import _ease_out_bounce, _ease_out_cubic, _start_topmost_timer
 

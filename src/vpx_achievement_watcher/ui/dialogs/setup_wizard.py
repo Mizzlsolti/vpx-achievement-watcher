@@ -7,7 +7,9 @@ from PyQt6.QtWidgets import (
     QPushButton, QFileDialog,
 )
 
-from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
+from vpx_achievement_watcher.core.config import AppConfig
+from vpx_achievement_watcher.utils.version import WATCHER_VERSION
+from vpx_achievement_watcher.core.helpers import log, ensure_dir
 
 
 class SetupWizardDialog(QDialog):
