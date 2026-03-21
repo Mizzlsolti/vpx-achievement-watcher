@@ -2935,20 +2935,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 except Exception:
                     vpx_info = {}
 
-            # Merge authors from info show as fallback
+            # Merge authors from info show as additional signal (canonical author field)
             info_author = (vpx_info.get("author") or "").strip()
-            if info_author and not script_authors:
+            if info_author:
                 info_author_tokens = [
                     t for t in re.split(r"\s+", info_author)
                     if t and "@" not in t and not re.match(r"https?://", t) and not re.search(r"\.\w{2,}$", t)
                 ]
-                if not info_author_tokens and info_author:
+                if not info_author_tokens:
                     parts = info_author.split()
                     info_author_tokens = [parts[0]] if parts else []
-                script_authors = info_author_tokens
+                # Add info_author tokens not already present in script_authors
+                script_set_lower = {a.lower() for a in script_authors}
+                for tok in info_author_tokens:
+                    if tok.lower() not in script_set_lower:
+                        script_authors.append(tok)
+                        script_set_lower.add(tok.lower())
 
             # Use table_name from vpxtool info show as primary search term if available
             info_table_name = (vpx_info.get("table_name") or "").strip()
+            info_version = (vpx_info.get("version") or "").strip()
             search_title = info_table_name if info_table_name else title
 
             if info_table_name and info_table_name != title:
@@ -2972,11 +2978,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 and _normalize_term(info_table_name) == _normalize_term(top.get("name", ""))
             )
 
-            # Try to find the exact tableFile via .vpx filename + script authors
+            # Try to find the exact tableFile via .vpx filename + script authors + version
             vpx_basename = os.path.basename(vpx_path) if vpx_path else ""
             best_table_file = None
             if vpx_basename:
-                best_table_file = _find_table_file_by_filename_and_authors(top, vpx_basename, script_authors)
+                best_table_file = _find_table_file_by_filename_and_authors(
+                    top, vpx_basename, script_authors, info_version
+                )
 
             if is_rom_match:
                 matched_rom += 1

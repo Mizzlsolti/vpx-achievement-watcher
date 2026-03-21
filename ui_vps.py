@@ -146,12 +146,56 @@ def _normalize_term(term: str) -> str:
     return term.lower().strip()
 
 
-def _find_internal(tables: List[dict], term: str) -> List[dict]:
+def _extract_manufacturer_year(term: str):
+    """Extract manufacturer and year from a table_name like 'Attack from Mars (Bally 1995)'.
+
+    Returns (manufacturer_lower, year_str) or (None, None) if the parenthetical
+    does not look like 'Manufacturer Year'.  Parentheticals that look like ROM
+    version strings (e.g. '1.13b / S1.1') are ignored.
+    """
+    m = re.search(r"\(([^)]+)\)\s*$", term)
+    if not m:
+        return None, None
+    content = m.group(1).strip()
+    year_m = re.search(r"\b(19\d{2}|20\d{2})\b", content)
+    year = year_m.group(1) if year_m else None
+    if year:
+        mfr = content[: year_m.start()].strip().rstrip("-,").strip()
+        if mfr and re.fullmatch(r"[A-Za-z][A-Za-z0-9 ]*", mfr):
+            return mfr.lower(), year
+        return None, year
+    # No 4-digit year found — don't treat the whole content as a manufacturer
+    return None, None
+
+
+def _find_internal(
+    tables: List[dict],
+    term: str,
+    manufacturer: Optional[str] = None,
+    year: Optional[str] = None,
+) -> List[dict]:
     results = []
     for table in tables:
         name = _normalize_term(table.get("name", ""))
         if term in name:
             results.append(table)
+
+    if len(results) <= 1 or (not manufacturer and not year):
+        return results
+
+    # Rank by relevance: exact name match scores highest, then manufacturer/year bonuses
+    def _score(table: dict) -> int:
+        name = _normalize_term(table.get("name", ""))
+        score = 0
+        if name == term:
+            score += 10
+        if manufacturer and (table.get("manufacturer") or "").lower() == manufacturer:
+            score += 3
+        if year and str(table.get("year") or "") == str(year):
+            score += 2
+        return score
+
+    results.sort(key=_score, reverse=True)
     return results
 
 
@@ -170,11 +214,13 @@ def _vps_find(tables: List[dict], search_term: str, rom: Optional[str] = None) -
                         return [table]
 
     # 2. Name-based search with progressive shortening fallback
+    # Extract manufacturer/year from parenthetical in search_term for ranking
+    manufacturer, year = _extract_manufacturer_year(search_term)
     term = _normalize_term(search_term)
-    results = _find_internal(tables, term)
+    results = _find_internal(tables, term, manufacturer, year)
     while not results and " " in term:
         term = term[:term.rfind(" ")].strip()
-        results = _find_internal(tables, term)
+        results = _find_internal(tables, term, manufacturer, year)
 
     # 3. If still no results, try using the ROM identifier prefix as a name search
     #    (e.g., "acd_170h" → "acd") to handle tables missing ROM file listings
@@ -213,16 +259,20 @@ def _find_table_file_by_filename_and_authors(
     table: dict,
     vpx_basename: str,
     script_authors: list,
+    info_version: Optional[str] = None,
 ) -> Optional[dict]:
     """Search table["tableFiles"] for the best match by .vpx filename and/or script authors.
 
     Match priority:
-      1. fileName match AND author match → best match
-      2. fileName match only → good
-      3. Author match only → fallback
+      1. fileName match AND author match AND version match → perfect match
+      2. fileName match AND author match → best match
+      3. fileName match only → good
+      4. Author match AND version match → good fallback
+      5. Author match only → fallback
 
     vpx_basename: e.g. "AC-DC_Premium_1_3_nFozzy_Roth.vpx" (filename without path)
     script_authors: list of author strings from the VPX script
+    info_version: version string from vpxtool info show (e.g. "1.1"), used as bonus signal
 
     Returns the matching tableFile dict, or None if no match.
     """
@@ -232,9 +282,11 @@ def _find_table_file_by_filename_and_authors(
     vpx_lower = vpx_basename.lower()
     vpx_stem = re.sub(r"\.vpx$", "", vpx_lower)
     script_set = {a.lower().strip() for a in (script_authors or [])}
+    info_ver_norm = info_version.strip().lstrip("v").lower() if info_version else None
 
     best_filename_and_author: Optional[dict] = None
     best_filename: Optional[dict] = None
+    best_author_version: Optional[dict] = None
     best_author: Optional[dict] = None
 
     for tf in (table.get("tableFiles") or []):
@@ -259,15 +311,26 @@ def _find_table_file_by_filename_and_authors(
                 if author_match:
                     break
 
-        if filename_match and author_match:
-            best_filename_and_author = tf
-            break  # can't do better
+        # version match: info_version matches or is contained in the tableFile version
+        version_match = False
+        if info_ver_norm:
+            tf_ver = (tf.get("version") or "").strip().lstrip("v").lower()
+            if tf_ver and (info_ver_norm in tf_ver or tf_ver in info_ver_norm):
+                version_match = True
+
+        if filename_match and author_match and version_match:
+            return tf  # perfect match — can't do better
+        elif filename_match and author_match:
+            if best_filename_and_author is None:
+                best_filename_and_author = tf
         elif filename_match and best_filename is None:
             best_filename = tf
+        elif author_match and version_match and best_author_version is None:
+            best_author_version = tf
         elif author_match and best_author is None:
             best_author = tf
 
-    return best_filename_and_author or best_filename or best_author
+    return best_filename_and_author or best_filename or best_author_version or best_author
 
 
 # ─────────────────────────────────────────────────────────────────────────────
