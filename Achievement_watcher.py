@@ -928,6 +928,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return ("Online · Pending", "#FFA500")
         if pending_state == "verified":
             return ("Online · Verified", "#00C853")
+        if pending_state == "flagged":
+            return ("Online · Flagged", "#FFA500")
+        if pending_state == "rejected":
+            return ("Online · Rejected", "#FF3B30")
         return ("Online · Tracking", "#00C853")
 
     def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
@@ -947,6 +951,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._status_badge_state = "pending"
         elif "verified" in lc or "accepted" in lc:
             self._status_badge_state = "verified"
+        elif "flagged" in lc:
+            self._status_badge_state = "flagged"
+        elif "rejected" in lc:
+            self._status_badge_state = "rejected"
         else:
             self._status_badge_state = None
         # Also pass the explicit color if provided
