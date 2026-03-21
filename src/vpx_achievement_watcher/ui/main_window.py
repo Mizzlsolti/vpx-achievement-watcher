@@ -2630,6 +2630,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 if isinstance(_data, list):
                     self._all_maps_cache = _data
                     self._update_map_search_completer()
+                    self._update_cloud_rom_completer()
                     self._filter_available_maps()
         except Exception:
             pass
@@ -2676,6 +2677,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             self._update_map_search_completer()
+            self._update_cloud_rom_completer()
             self._filter_available_maps()
 
         self._maps_worker.progress.connect(_on_progress)
