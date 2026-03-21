@@ -475,6 +475,18 @@ class CloudStatsMixin:
             name = row.get("name", "Unknown")
             ts = row.get("ts", "")[:10]
             medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
+
+            # Badge icon next to player name
+            selected_badge_id = str(row.get("selected_badge") or "").strip()
+            badge_icon = ""
+            if selected_badge_id:
+                try:
+                    from watcher_core import BADGE_LOOKUP
+                    bdef = BADGE_LOOKUP.get(selected_badge_id)
+                    if bdef:
+                        badge_icon = f" <span title='{_html.escape(bdef[2])}' style='font-size:1em;'>{bdef[1]}</span>"
+                except Exception:
+                    pass
             
             if category == "progress":
                 badge = _cloud_info_badge(row)
@@ -488,7 +500,7 @@ class CloudStatsMixin:
                     <div class='bar-text'>{unlocked} / {total} ({pct}%)</div>
                 </div>
                 """
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td>{bar}</td><td>{ts}</td></tr>")
+                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td>{bar}</td><td>{ts}</td></tr>")
             elif category == "flip":
                 badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
@@ -504,13 +516,13 @@ class CloudStatsMixin:
                             else: diff_str = f"{tf} Flips"
                         else:
                             diff_str = "-"
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td style='color:#AAAAAA; font-style:italic;'>{diff_str}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td style='color:#AAAAAA; font-style:italic;'>{diff_str}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
                 else:
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
             else:
                 badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
+                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
             
         html.append("</table>")
         return "".join(html)

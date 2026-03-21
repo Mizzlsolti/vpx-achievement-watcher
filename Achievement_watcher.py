@@ -1729,9 +1729,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status, your player level, "
-            "and the latest session information.<br><br>"
+            "badges, and the latest session information.<br><br>"
             "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
-            "• <b>Player Level</b>: Your current level and progress bar based on unlocked achievements.<br>"
+            "• <b>Player Level</b>: Your current level and progress bar based on unlocked achievements. "
+            "Reach Prestige 1–5 by unlocking 2000 achievements per star.<br>"
+            "• <b>Badges</b>: 37 collectible badges earned through gameplay milestones. "
+            "Earn badges by unlocking achievements, completing challenges, reaching levels, "
+            "accumulating playtime, and more. "
+            "Use the <b>Display Badge</b> dropdown to choose which badge icon appears next to "
+            "your name on cloud leaderboards.<br>"
             "• <b>Session Summary</b>: Overview of the last and current play session including "
             "score, achievements, and cloud status.<br>"
             "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
@@ -1742,6 +1748,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• Select a ROM from the dropdown at the top.<br>"
             "• The view lists all available achievements with their current status "
             "(unlocked ✅ / locked 🔒).<br>"
+            "• <b>Table Mastery</b>: For each ROM-specific view, a mastery score (0–100) is shown "
+            "above the achievement grid. The score is based on four components:<br>"
+            "&nbsp;&nbsp;&nbsp;– Achievement progress (max 40 pts)<br>"
+            "&nbsp;&nbsp;&nbsp;– Games played on that table (max 20 pts)<br>"
+            "&nbsp;&nbsp;&nbsp;– Total playtime on that table (max 20 pts)<br>"
+            "&nbsp;&nbsp;&nbsp;– Challenges completed for that table (max 20 pts)<br>"
+            "Mastery tiers: 🪙 Novice → 🎯 Apprentice → 🎖️ Skilled → 💎 Expert → 🏆 Master<br>"
             "• Click an achievement link to see more details.<br>"
             "• Use <b>🔄 Refresh</b> to reload the list."
         ),
@@ -1937,6 +1950,35 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         lay_level.addWidget(grp_level_table)
         layout.addWidget(grp_level)
+
+        # ── Badges ────────────────────────────────────────────────────────────
+        grp_badges = QGroupBox("🏅 Badges")
+        lay_badges = QVBoxLayout(grp_badges)
+
+        # Badge grid (flow of emoji icons)
+        self.wgt_badge_grid = QWidget()
+        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
+        self._badge_grid_layout.setSpacing(4)
+        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
+        lay_badges.addWidget(self.wgt_badge_grid)
+
+        # Badge count + selected badge display dropdown
+        row_badge_bottom = QHBoxLayout()
+        self.lbl_badge_count = QLabel("0 / 37 Badges")
+        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
+        row_badge_bottom.addWidget(self.lbl_badge_count)
+        row_badge_bottom.addStretch(1)
+        lbl_display_badge = QLabel("Display Badge:")
+        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
+        row_badge_bottom.addWidget(lbl_display_badge)
+        self.cmb_badge_select = QComboBox()
+        self.cmb_badge_select.setMinimumWidth(180)
+        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
+        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
+        row_badge_bottom.addWidget(self.cmb_badge_select)
+        lay_badges.addLayout(row_badge_bottom)
+
+        layout.addWidget(grp_badges)
 
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
@@ -2510,6 +2552,37 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         
         rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
         html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
+
+        # Mastery block for ROM-specific view
+        if rom != "Global":
+            try:
+                from watcher_core import compute_table_mastery, MASTERY_TIERS
+                mastery = compute_table_mastery(self.cfg, rom, state, watcher=self.watcher)
+                tier = mastery["mastery_tier"]
+                tier_color = mastery["tier_color"]
+                total_score = mastery["total"]
+                bd = mastery["breakdown"]
+                bar_filled = max(0, min(100, total_score))
+                mastery_html = (
+                    f"<div style='background:#1a1a1a; border:1px solid #333; border-radius:6px; "
+                    f"padding:6px 10px; margin-bottom:8px;'>"
+                    f"<div style='text-align:center; color:{tier_color}; font-weight:bold; font-size:1.05em;'>"
+                    f"Table Mastery: {tier} — {total_score}/100</div>"
+                    f"<div style='background:#222; border-radius:6px; height:12px; margin:4px 0; "
+                    f"border:1px solid #444; position:relative; overflow:hidden;'>"
+                    f"<div style='background:{tier_color}; width:{bar_filled}%; height:100%; "
+                    f"border-radius:5px;'></div></div>"
+                    f"<div style='color:#888; font-size:0.8em; text-align:center;'>"
+                    f"Achievements {bd['achievements']}/40 &nbsp;|&nbsp; "
+                    f"Games {bd['games_played']}/20 &nbsp;|&nbsp; "
+                    f"Playtime {bd['playtime']}/20 &nbsp;|&nbsp; "
+                    f"Challenges {bd['challenges']}/20"
+                    f"</div></div>"
+                )
+                html.append(mastery_html)
+            except Exception:
+                pass
+
         html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
         
         html.append("<table align='center' width='100%'>")
@@ -3397,6 +3470,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 "global": {"__global__": data.get("global", [])},
                 "session": data.get("session", {}),
                 "roms_played": data.get("roms_played", []),
+                "badges": data.get("badges", []),
+                "selected_badge": data.get("selected_badge", ""),
             }
             self.watcher._ach_state_save(state)
         except Exception as e:
@@ -3539,6 +3614,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # 1. Upload full achievements state
             try:
                 lv = compute_player_level(state)
+                badges = list(state.get("badges") or [])
+                selected_badge = state.get("selected_badge", "")
                 payload = {
                     "name": player_name,
                     "ts": datetime.now(timezone.utc).isoformat(),
@@ -3551,6 +3628,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "player_prestige": lv["prestige"],
                     "player_prestige_display": lv["prestige_display"],
                     "player_fully_maxed": lv["fully_maxed"],
+                    "badges": badges,
+                    "badge_count": len(badges),
+                    "selected_badge": selected_badge,
                 }
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
                     results.append("✅ Achievements")
@@ -4628,9 +4708,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             level_badge = f"{_lv['icon']} {_lv['label']} • Level {_lv['level']} • {_lv['total']} Achievements"
         except Exception:
             level_badge = ""
+
+        # Compact mastery line
+        mastery_line = ""
+        try:
+            from watcher_core import compute_table_mastery
+            mastery = compute_table_mastery(self.cfg, rom, state, watcher=self.watcher)
+            mastery_line = (
+                f"<div style='color:{mastery['tier_color']};font-size:0.8em;text-align:center;"
+                f"margin-bottom:2px;'>"
+                f"Mastery: {mastery['mastery_tier']} ({mastery['total']}/100)"
+                f"</div>"
+            )
+        except Exception:
+            pass
+
         header_html = (
             f"<div class='hdr'>{esc(header)}</div>"
             + (f"<div style='color:#FF7F00;font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
+            + mastery_line
             + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
         )
 
@@ -5274,6 +5370,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _refresh_level_display(self):
+        state = None
         try:
             state = self.watcher._ach_state_load()
             lv = compute_player_level(state)
@@ -5327,6 +5424,77 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 + "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
                 + rows_html + "</table>"
             )
+        except Exception:
+            pass
+
+        # Refresh badge display
+        try:
+            self._refresh_badge_display(state)
+        except Exception:
+            pass
+
+    def _refresh_badge_display(self, state: dict = None):
+        """Rebuild the badge grid and update count/dropdown in the Dashboard tab."""
+        try:
+            from watcher_core import BADGE_DEFINITIONS
+            if state is None:
+                state = self.watcher._ach_state_load()
+            earned_set = set(state.get("badges") or [])
+            selected = state.get("selected_badge", "")
+
+            # Clear existing grid
+            while self._badge_grid_layout.count():
+                item = self._badge_grid_layout.takeAt(0)
+                if item and item.widget():
+                    item.widget().deleteLater()
+
+            COLS = 8
+            for idx, (bid, icon, name, desc) in enumerate(BADGE_DEFINITIONS):
+                row, col = divmod(idx, COLS)
+                is_earned = bid in earned_set
+                lbl = QLabel(icon)
+                lbl.setFixedSize(36, 36)
+                lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                lbl.setToolTip(f"{'✅ ' if is_earned else '🔒 '}{name}: {desc}")
+                if is_earned:
+                    lbl.setStyleSheet(
+                        "font-size: 18pt; background: #1a1a1a; border: 1px solid #FF7F00; "
+                        "border-radius: 6px;"
+                    )
+                else:
+                    lbl.setStyleSheet(
+                        "font-size: 18pt; background: #111; border: 1px solid #333; "
+                        "border-radius: 6px; color: rgba(200,200,200,40);"
+                    )
+                self._badge_grid_layout.addWidget(lbl, row, col)
+
+            # Update count label
+            total_badges = len(BADGE_DEFINITIONS)
+            self.lbl_badge_count.setText(f"{len(earned_set)} / {total_badges} Badges")
+
+            # Rebuild dropdown
+            self.cmb_badge_select.blockSignals(True)
+            self.cmb_badge_select.clear()
+            self.cmb_badge_select.addItem("— None —", "")
+            for bid, icon, name, _desc in BADGE_DEFINITIONS:
+                if bid in earned_set:
+                    self.cmb_badge_select.addItem(f"{icon} {name}", bid)
+            # Restore selected value
+            for i in range(self.cmb_badge_select.count()):
+                if self.cmb_badge_select.itemData(i) == selected:
+                    self.cmb_badge_select.setCurrentIndex(i)
+                    break
+            self.cmb_badge_select.blockSignals(False)
+        except Exception:
+            pass
+
+    def _on_badge_select_changed(self, _index: int):
+        """Save the selected badge to state when the dropdown changes."""
+        try:
+            badge_id = self.cmb_badge_select.currentData() or ""
+            state = self.watcher._ach_state_load()
+            state["selected_badge"] = badge_id
+            self.watcher._ach_state_save(state)
         except Exception:
             pass
 
