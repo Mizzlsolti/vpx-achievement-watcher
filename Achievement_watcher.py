@@ -1950,7 +1950,38 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_level_table.addWidget(lv_browser)
         self.lv_table_browser = lv_browser
 
-        lay_level.addWidget(grp_level_table)
+        # ── Badges (inside Player Level, side by side with Level Table) ───────
+        grp_badges = QGroupBox("🏅 Badges")
+        lay_badges = QVBoxLayout(grp_badges)
+
+        # Badge grid (flow of emoji icons)
+        self.wgt_badge_grid = QWidget()
+        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
+        self._badge_grid_layout.setSpacing(4)
+        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
+        lay_badges.addWidget(self.wgt_badge_grid)
+
+        # Badge count + selected badge display dropdown
+        row_badge_bottom = QHBoxLayout()
+        self.lbl_badge_count = QLabel("0 / 37 Badges")
+        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
+        row_badge_bottom.addWidget(self.lbl_badge_count)
+        row_badge_bottom.addStretch(1)
+        lbl_display_badge = QLabel("Display Badge:")
+        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
+        row_badge_bottom.addWidget(lbl_display_badge)
+        self.cmb_badge_select = QComboBox()
+        self.cmb_badge_select.setMinimumWidth(180)
+        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
+        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
+        row_badge_bottom.addWidget(self.cmb_badge_select)
+        lay_badges.addLayout(row_badge_bottom)
+
+        # Level Table (~40%) + Badges (~60%) side by side
+        row_level_badges = QHBoxLayout()
+        row_level_badges.addWidget(grp_level_table, 40)
+        row_level_badges.addWidget(grp_badges, 60)
+        lay_level.addLayout(row_level_badges)
         layout.addWidget(grp_level)
 
         # ── Session Summary: Last Run & Run Status cards ────────────────────────────
@@ -1986,35 +2017,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_run_cards.addWidget(grp_run_status)
         layout.addWidget(grp_run_cards)
 
-        # ── Badges ────────────────────────────────────────────────────────────
-        grp_badges = QGroupBox("🏅 Badges")
-        lay_badges = QVBoxLayout(grp_badges)
-
-        # Badge grid (flow of emoji icons)
-        self.wgt_badge_grid = QWidget()
-        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
-        self._badge_grid_layout.setSpacing(4)
-        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
-        lay_badges.addWidget(self.wgt_badge_grid)
-
-        # Badge count + selected badge display dropdown
-        row_badge_bottom = QHBoxLayout()
-        self.lbl_badge_count = QLabel("0 / 37 Badges")
-        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
-        row_badge_bottom.addWidget(self.lbl_badge_count)
-        row_badge_bottom.addStretch(1)
-        lbl_display_badge = QLabel("Display Badge:")
-        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
-        row_badge_bottom.addWidget(lbl_display_badge)
-        self.cmb_badge_select = QComboBox()
-        self.cmb_badge_select.setMinimumWidth(180)
-        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
-        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
-        row_badge_bottom.addWidget(self.cmb_badge_select)
-        lay_badges.addLayout(row_badge_bottom)
-
-        layout.addWidget(grp_badges)
-
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
@@ -2031,7 +2033,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_actions.addStretch(1)
         lay_actions.addWidget(self.btn_minimize)
         lay_actions.addWidget(self.btn_quit)
-        layout.addWidget(grp_actions)
 
         # Legend
         lbl_legend = QLabel(
@@ -2045,6 +2046,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_legend.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl_legend.setStyleSheet("color: #888; font-size: 9pt; padding: 4px;")
         layout.addWidget(lbl_legend)
+
+        layout.addWidget(grp_actions)
 
         layout.addStretch(1)
         self._add_tab_help_button(layout, "dashboard")
@@ -2399,8 +2402,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             try:
                 rarity_data, total = CloudSync.fetch_rarity_for_rom(self.cfg, rom)
                 self._rarity_cache[rom] = {"data": rarity_data, "ts": time.time(), "total_players": total}
-                from PyQt6.QtCore import QMetaObject, Qt as _Qt
-                QMetaObject.invokeMethod(self, "_on_progress_rom_changed", _Qt.ConnectionType.QueuedConnection)
+                from PyQt6.QtCore import QTimer as _QTimer
+                _QTimer.singleShot(0, self._on_progress_rom_changed)
             except Exception:
                 pass
         threading.Thread(target=_worker, daemon=True).start()
@@ -3047,8 +3050,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 seen.add(rom)
                 suggestions.append(rom)
         suggestions.sort(key=str.lower)
+        # Also add ROMNAMES keys and table titles for full name search
+        try:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            extra = set(romnames.keys()) | set(romnames.values())
+            all_items = sorted(set(suggestions) | extra, key=str.lower)
+        except Exception:
+            all_items = suggestions
         if hasattr(self, '_cloud_rom_completer_model'):
-            self._cloud_rom_completer_model.setStringList(suggestions)
+            self._cloud_rom_completer_model.setStringList(all_items)
 
     def _on_vps_auto_match_all(self):
         """Attempt automatic VPS match for all local ROMs that have an NVRAM map."""
