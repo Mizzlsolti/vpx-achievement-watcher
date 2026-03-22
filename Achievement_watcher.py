@@ -2736,26 +2736,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-        # Ensure unlock_entry always carries a vps_id so the info dialog shows
-        # stable VPS info.  For newly-unlocked achievements the vps_id was
-        # already embedded in the entry by watcher_core.  For legacy entries
-        # (unlocked before vps_id was stored in the entry) we snapshot the
-        # current mapping value here so subsequent opens of the same achievement
-        # always show the same table — changing the mapping later no longer
-        # silently rewrites what was displayed.
-        if isinstance(unlock_entry, dict) and not unlock_entry.get("vps_id"):
-            try:
-                _snap_mapping = _load_vps_mapping(self.cfg)
-                _snap_id = (_snap_mapping.get(rom) or "").strip()
-                if _snap_id:
-                    # Work on a shallow copy so we don't mutate the live state
-                    unlock_entry = dict(unlock_entry)
-                    unlock_entry["vps_id"] = _snap_id
-            except Exception:
-                pass
-
         dlg = VpsAchievementInfoDialog(self.cfg, rom, title, rule, unlock_entry, parent=self)
+        dlg.navigate_to_available_maps.connect(lambda: setattr(dlg, "_navigate_requested", True))
         dlg.exec()
+        if getattr(dlg, "_navigate_requested", False):
+            for i in range(self.main_tabs.count()):
+                if "Available Maps" in self.main_tabs.tabText(i):
+                    self.main_tabs.setCurrentIndex(i)
+                    break
 
     def _build_tab_available_maps(self):
         tab = QWidget()
