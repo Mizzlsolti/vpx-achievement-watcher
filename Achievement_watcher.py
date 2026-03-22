@@ -5616,6 +5616,56 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         target=lambda: CloudSync.upload_full_achievements(self.cfg, _state_copy, pname),
                         daemon=True,
                     ).start()
+                # Also re-upload progress for each ROM so the badge appears on progress leaderboards
+                _cfg = self.cfg
+                _watcher = self.watcher
+                _state_copy2 = dict(state)
+
+                def _reupload_progress():
+                    try:
+                        session = _state_copy2.get("session", {})
+                        pid = str(_cfg.OVERLAY.get("player_id", "unknown")).strip()
+                        for rom, entries in session.items():
+                            if not rom or not entries:
+                                continue
+                            try:
+                                rules = _watcher._collect_player_rules_for_rom(rom)
+                            except Exception:
+                                continue
+                            if not rules:
+                                continue
+                            # Deduplicate rules by cleaned title
+                            seen_titles = set()
+                            unique_rules = []
+                            for r in rules:
+                                rt = str(r.get("title", "")).strip()
+                                clean_rt = rt.replace(" (Session)", "").replace(" (Global)", "")
+                                if clean_rt not in seen_titles:
+                                    seen_titles.add(clean_rt)
+                                    unique_rules.append(r)
+                            total_achs = len(unique_rules)
+                            if total_achs <= 0:
+                                continue
+                            unlocked_titles = set()
+                            for e in (entries or []):
+                                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                                if t:
+                                    unlocked_titles.add(t)
+                            unlocked_count = len(unlocked_titles)
+                            # Clear dedup cache for this ROM so the re-upload is not skipped
+                            if pid and pid != "unknown":
+                                with CloudSync._recent_progress_uploads_lock:
+                                    keys_to_remove = [
+                                        k for k in CloudSync._recent_progress_uploads
+                                        if k.startswith(f"{pid}|{rom}|")
+                                    ]
+                                    for k in keys_to_remove:
+                                        del CloudSync._recent_progress_uploads[k]
+                            CloudSync.upload_achievement_progress(_cfg, rom, unlocked_count, total_achs)
+                    except Exception:
+                        pass
+
+                threading.Thread(target=_reupload_progress, daemon=True).start()
         except Exception:
             pass
 
