@@ -330,7 +330,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._last_ch_event_src = None
         self._ch_pick_flip_diff = False
         self._ch_flip_diff_idx = 1  
-        self._flip_diff_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100)]
+        self._flip_diff_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100), ("← Back", -1)]
         self._flip_diff_select = None
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
@@ -1545,6 +1545,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 name, flips = self._flip_diff_select.selected_option()
             except Exception:
                 name, flips = ("Medium", 400)
+            if int(flips) == -1:
+                # Back/cancel: close flip difficulty overlay and re-show challenge select
+                self._close_flip_difficulty_overlay()
+                try:
+                    ovw = getattr(self, "_challenge_select", None)
+                    if ovw:
+                        ovw.show()
+                        ovw.raise_()
+                    else:
+                        self._open_challenge_select_overlay()
+                except Exception:
+                    pass
+                return
             self._close_flip_difficulty_overlay()
             self._close_challenge_select_overlay()
             try:

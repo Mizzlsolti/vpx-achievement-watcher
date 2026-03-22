@@ -4367,7 +4367,7 @@ class FlipDifficultyOverlay(QWidget):
         self.parent_gui = parent
 
         # default options expanded/reordered
-        default_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100)]
+        default_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100), ("← Back", -1)]
         self._options = list(options) if isinstance(options, list) and options else default_options
 
         # clamp selection to available options
@@ -4555,23 +4555,30 @@ class FlipDifficultyOverlay(QWidget):
                 name_h = fm_n.height()
                 p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
                 p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
-                p.drawText(QRect(x, y0 + inner_pad, box_w, name_h),
+                if int(flips) == -1:
+                    name_y = y0 + inner_pad + (box_h - name_h) // 2
+                else:
+                    name_y = y0 + inner_pad
+                p.drawText(QRect(x, name_y, box_w, name_h),
                            int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
 
-                flips_pt = scaled_body_pt
-                p.setFont(QFont(font_family, flips_pt))
-                fm_f = QFontMetrics(QFont(font_family, flips_pt))
-                p.drawText(QRect(x, y0 + inner_pad + name_h + max(4, int(round(6 * factor))), box_w, fm_f.height()),
-                           int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), f"{int(flips)} flips")
+                if int(flips) != -1:
+                    flips_pt = scaled_body_pt
+                    p.setFont(QFont(font_family, flips_pt))
+                    fm_f = QFontMetrics(QFont(font_family, flips_pt))
+                    p.drawText(QRect(x, y0 + inner_pad + name_h + max(4, int(round(6 * factor))), box_w, fm_f.height()),
+                               int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), f"{int(flips)} flips")
 
             for i, (nm, fl) in enumerate(self._options):
                 draw_option(i, nm, fl, i == self._selected)
 
+            sel_flips = self._options[self._selected][1] if 0 <= self._selected < len(self._options) else 0
+            hint_label = "Press Hotkey to go back" if int(sel_flips) == -1 else "Select with Left/Right, press Hotkey to start"
             p.setPen(QColor("#AAAAAA"))
             p.setFont(QFont(font_family, hint_pt))
             p.drawText(QRect(0, h - bottom_pad - hint_line_h, w, hint_line_h),
                        int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter),
-                       "Select with Left/Right, press Hotkey to start")
+                       hint_label)
         finally:
             try: p.end()
             except Exception: pass
