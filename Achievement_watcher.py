@@ -61,6 +61,8 @@ from ui_vps import (
     _normalize_term, _find_table_file_by_filename_and_authors,
 )
 
+import notifications as _notif
+
 from ui_overlay import (
     OverlayWindow,
     MiniInfoOverlay,
@@ -193,6 +195,7 @@ class Bridge(QObject):
     level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
     status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
     close_secondary_overlays = pyqtSignal()
+    session_ended = pyqtSignal(str)  # (rom)
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -219,6 +222,8 @@ def _parse_version(v_str):
 
 class MainWindow(QMainWindow, CloudStatsMixin):
     CURRENT_VERSION = "2.6"
+    _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
+    _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
 
     def __init__(self, cfg: AppConfig, watcher: Watcher, bridge: Bridge):
         super().__init__()
@@ -258,6 +263,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
+        self.bridge.session_ended.connect(self._on_session_ended)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -2066,6 +2072,46 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_run_cards.addWidget(grp_run_status)
         layout.addWidget(grp_run_cards)
 
+        # ── 📬 Notifications ────────────────────────────────────────────────────
+        grp_notif = QGroupBox("📬 Notifications")
+        lay_notif_outer = QVBoxLayout(grp_notif)
+        lay_notif_outer.setContentsMargins(6, 6, 6, 6)
+        lay_notif_outer.setSpacing(4)
+
+        # Top-right "Clear All" button
+        row_notif_header = QHBoxLayout()
+        row_notif_header.addStretch(1)
+        btn_notif_clear = QPushButton("🗑️ Clear All")
+        btn_notif_clear.setFixedHeight(22)
+        btn_notif_clear.setStyleSheet(
+            "QPushButton { background: #3a1a1a; color: #CC4444; border: 1px solid #5a2a2a; "
+            "border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
+            "QPushButton:hover { background: #5a2a2a; }"
+        )
+        btn_notif_clear.clicked.connect(self._on_notif_clear_all)
+        row_notif_header.addWidget(btn_notif_clear)
+        lay_notif_outer.addLayout(row_notif_header)
+
+        # Scroll area with notification rows
+        notif_scroll = QScrollArea()
+        notif_scroll.setWidgetResizable(True)
+        notif_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        notif_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        notif_scroll.setFixedHeight(180)
+        notif_scroll.setStyleSheet(
+            "QScrollArea { background: #0e0e0e; border: 1px solid #2a2a2a; border-radius: 4px; }"
+        )
+        self._notif_container = QWidget()
+        self._notif_container.setStyleSheet("background: transparent;")
+        self._notif_list_layout = QVBoxLayout(self._notif_container)
+        self._notif_list_layout.setContentsMargins(4, 4, 4, 4)
+        self._notif_list_layout.setSpacing(2)
+        self._notif_list_layout.addStretch(1)
+        notif_scroll.setWidget(self._notif_container)
+        lay_notif_outer.addWidget(notif_scroll)
+
+        layout.addWidget(grp_notif)
+
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
@@ -2108,6 +2154,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._dashboard_refresh_timer.setInterval(10000)
         self._dashboard_refresh_timer.timeout.connect(self._refresh_dashboard_cards)
         self._dashboard_refresh_timer.start()
+
+        # Highscore-beaten polling timer (5 min, only when cloud enabled)
+        self._highscore_poll_timer = QTimer(self)
+        self._highscore_poll_timer.setInterval(self._HIGHSCORE_POLL_INTERVAL_MS)
+        self._highscore_poll_timer.timeout.connect(self._poll_highscore_beaten)
+        if getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._highscore_poll_timer.start()
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
@@ -2914,6 +2967,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._filter_available_maps()
             self._update_map_search_completer()
             self._update_cloud_rom_completer()
+            # Notify about ROMs missing a VPS-ID
+            try:
+                missing = sum(
+                    1 for e in entries
+                    if e.get("is_local") and e.get("has_map") and not e.get("vps_id", "")
+                )
+                self._add_vps_missing_notification(missing)
+            except Exception:
+                pass
 
         self._maps_worker.progress.connect(_on_progress)
         self._maps_worker.finished.connect(_on_finished)
@@ -3472,6 +3534,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 return
         self.cfg.CLOUD_ENABLED = self.chk_cloud_enabled.isChecked()
         self.cfg.save()
+        # Start/stop the highscore polling timer based on cloud state
+        if hasattr(self, "_highscore_poll_timer"):
+            if self.cfg.CLOUD_ENABLED:
+                if not self._highscore_poll_timer.isActive():
+                    self._highscore_poll_timer.start()
+            else:
+                self._highscore_poll_timer.stop()
         if getattr(self, "btn_backup_cloud", None):
             self.btn_backup_cloud.setVisible(self.cfg.CLOUD_ENABLED)
         if getattr(self, "btn_restore_cloud", None):
@@ -3970,6 +4039,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._msgbox_topmost("warn", "Watcher Update", f"Could not check for updates:\n{status[6:]}")
             return
         if status == "available":
+            # Add update notification to Dashboard feed
+            try:
+                from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                QMetaObject.invokeMethod(
+                    self, "_add_update_notification",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, tag),
+                )
+            except Exception:
+                pass
             from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                           QLabel, QTextBrowser, QDialogButtonBox)
 
@@ -5820,6 +5899,333 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
+        # Refresh notification feed + tab badge
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    # ── Notification feed ────────────────────────────────────────────────────
+
+    def _refresh_notification_feed(self):
+        """Rebuild the notification list widget and update the Dashboard tab title."""
+        if not hasattr(self, "_notif_list_layout"):
+            return
+
+        items = _notif.load_notifications(self.cfg)
+        display = items[:_notif._DISPLAY_LIMIT]
+
+        lay = self._notif_list_layout
+        # Remove all existing rows (keep the trailing stretch)
+        while lay.count() > 1:
+            item = lay.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        # Tab indices (order matches addTab calls)
+        _TAB_MAP = {
+            "cloud": 7,
+            "system": 5,
+            "available_maps": 4,
+        }
+
+        if not display:
+            lbl_empty = QLabel("No notifications")
+            lbl_empty.setStyleSheet("color: #555; font-size: 9pt; padding: 6px;")
+            lbl_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lay.insertWidget(0, lbl_empty)
+        else:
+            for idx, notif in enumerate(display):
+                row_widget = self._make_notif_row(notif, _TAB_MAP)
+                lay.insertWidget(idx, row_widget)
+
+        # Update Dashboard tab badge
+        try:
+            unread = _notif.unread_count(self.cfg)
+            tab_idx = self.main_tabs.indexOf(
+                self.main_tabs.widget(0)
+            )
+            if unread > 0:
+                self.main_tabs.setTabText(0, f"🏠 Dashboard ({unread})")
+            else:
+                self.main_tabs.setTabText(0, "🏠 Dashboard")
+        except Exception:
+            pass
+
+    def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
+        """Create a single notification row widget."""
+        is_read = bool(notif.get("read", False))
+        bg_color = "#0e0e0e" if is_read else "#1a2a1a"
+        border_color = "#2a2a2a" if is_read else "#2a4a2a"
+
+        row = QWidget()
+        row.setStyleSheet(
+            f"QWidget {{ background: {bg_color}; border: 1px solid {border_color}; "
+            "border-radius: 3px; }}"
+        )
+        row.setFixedHeight(36)
+        row.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        h = QHBoxLayout(row)
+        h.setContentsMargins(6, 2, 6, 2)
+        h.setSpacing(6)
+
+        icon_text = notif.get("icon", "•")
+        lbl_icon = QLabel(icon_text)
+        lbl_icon.setFixedWidth(20)
+        lbl_icon.setStyleSheet("background: transparent; border: none; font-size: 11pt;")
+        h.addWidget(lbl_icon)
+
+        title_text = notif.get("title", "")
+        lbl_title = QLabel(title_text)
+        lbl_title.setStyleSheet(
+            "background: transparent; border: none; font-size: 9pt; "
+            + ("font-weight: bold; color: #EEE;" if not is_read else "color: #888;")
+        )
+        lbl_title.setWordWrap(False)
+        h.addWidget(lbl_title, 1)
+
+        # Timestamp (short relative)
+        ts_str = ""
+        try:
+            from datetime import datetime, timezone
+            ts = datetime.fromisoformat(notif.get("timestamp", ""))
+            now = datetime.now(timezone.utc)
+            delta = now - ts.astimezone(timezone.utc)
+            secs = int(delta.total_seconds())
+            if secs < 60:
+                ts_str = "just now"
+            elif secs < 3600:
+                ts_str = f"{secs // 60}m ago"
+            elif secs < 86400:
+                ts_str = f"{secs // 3600}h ago"
+            else:
+                ts_str = f"{secs // 86400}d ago"
+        except Exception:
+            pass
+        lbl_ts = QLabel(ts_str)
+        lbl_ts.setStyleSheet("background: transparent; border: none; color: #555; font-size: 8pt;")
+        lbl_ts.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        h.addWidget(lbl_ts)
+
+        notif_id = notif.get("id", "")
+        action_tab = notif.get("action_tab")
+
+        def _on_click(_event, _nid=notif_id, _tab=action_tab):
+            _notif.mark_read(self.cfg, _nid)
+            if _tab and _tab in tab_map:
+                try:
+                    self.main_tabs.setCurrentIndex(tab_map[_tab])
+                except Exception:
+                    pass
+            try:
+                self._refresh_notification_feed()
+            except Exception:
+                pass
+
+        row.mousePressEvent = _on_click
+        return row
+
+    @pyqtSlot()
+    def _on_notif_clear_all(self):
+        """Clear all notifications and refresh the feed."""
+        _notif.clear_all(self.cfg)
+        self._refresh_notification_feed()
+
+    @pyqtSlot(str)
+    def _on_session_ended(self, rom: str):
+        """Called when a game session ends; triggers leaderboard rank check."""
+        if rom and self.cfg.CLOUD_ENABLED:
+            self._check_leaderboard_rank_after_upload(rom)
+
+    # ── Notification generation ───────────────────────────────────────────────
+
+    @pyqtSlot(str)
+    def _add_update_notification(self, tag: str):
+        """Add an 'update available' notification (called from UI thread)."""
+        title = f"Neues Update verfügbar: v{tag}"
+        _notif.add_notification(
+            self.cfg,
+            type="update_available",
+            icon="🆕",
+            title=title,
+            detail="Klicke um die System-Tab zu öffnen",
+            action_tab="system",
+        )
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    @pyqtSlot(int)
+    def _add_vps_missing_notification(self, count: int):
+        """Add/update a 'vps_missing' notification (called from UI thread)."""
+        if count <= 0:
+            return
+        title = f"{count} ROM{'s' if count != 1 else ''} ohne VPS-ID – kein Cloud Upload möglich"
+        _notif.add_notification(
+            self.cfg,
+            type="vps_missing",
+            icon="⚠️",
+            title=title,
+            detail="Öffne Available Maps um VPS-IDs zuzuweisen",
+            action_tab="available_maps",
+        )
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    @pyqtSlot(str, int)
+    def _add_leaderboard_rank_notification(self, rom: str, rank: int):
+        """Add a 'leaderboard_rank' notification (called from UI thread)."""
+        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        display_name = _strip_version_from_name(romnames.get(rom, rom.upper()))
+        title = f"Du bist Top {rank} auf {display_name} Leaderboard!"
+        _notif.add_notification(
+            self.cfg,
+            type="leaderboard_rank",
+            icon="📊",
+            title=title,
+            detail=f"ROM: {rom}",
+            action_tab="cloud",
+        )
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    @pyqtSlot(str)
+    def _add_highscore_beaten_notification(self, rom: str):
+        """Add a 'highscore_beaten' notification (called from UI thread)."""
+        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        display_name = _strip_version_from_name(romnames.get(rom, rom.upper()))
+        title = f"Dein Highscore auf {display_name} wurde übertroffen!"
+        _notif.add_notification(
+            self.cfg,
+            type="highscore_beaten",
+            icon="⚔️",
+            title=title,
+            detail=f"ROM: {rom}",
+            action_tab="cloud",
+        )
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    def _check_leaderboard_rank_after_upload(self, rom: str):
+        """Background: fetch cloud scores for *rom*, find own rank, notify if Top 5."""
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            return
+        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip()
+        if not pid or pid == "unknown":
+            return
+
+        def _bg():
+            try:
+                player_ids = CloudSync.fetch_player_ids(self.cfg)
+                if not player_ids:
+                    return
+                paths = [f"players/{p}/progress/{rom}" for p in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+
+                scores = []
+                for path, entry in batch.items():
+                    if entry and isinstance(entry, dict):
+                        pct = float(entry.get("percentage", 0))
+                        p_id = path.split("/")[1] if "/" in path else ""
+                        scores.append((pct, p_id))
+                scores.sort(reverse=True)
+
+                rank = None
+                for i, (_, p_id) in enumerate(scores, start=1):
+                    if p_id == pid:
+                        rank = i
+                        break
+
+                if rank is not None and rank <= 5:
+                    from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                    QMetaObject.invokeMethod(
+                        self, "_add_leaderboard_rank_notification",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, rom),
+                        Q_ARG(int, rank),
+                    )
+            except Exception:
+                pass
+
+        threading.Thread(target=_bg, daemon=True, name="LeaderboardRankCheck").start()
+
+    def _poll_highscore_beaten(self):
+        """Periodic check (every 5 min): detect if own top scores have been beaten."""
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            return
+        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip()
+        if not pid or pid == "unknown":
+            return
+
+        def _bg():
+            try:
+                # Load ROMs where this player has uploaded scores
+                state = self.watcher._ach_state_load()
+                roms_played = list((state.get("session") or {}).keys())
+                if not roms_played:
+                    return
+
+                player_ids = CloudSync.fetch_player_ids(self.cfg)
+                if not player_ids:
+                    return
+
+                # Check last-notified timestamps to avoid spam (24 h cooldown per ROM)
+                notif_items = _notif.load_notifications(self.cfg)
+                from datetime import datetime, timezone, timedelta
+                now = datetime.now(timezone.utc)
+                recently_notified: set = set()
+                for n in notif_items:
+                    if n.get("type") == "highscore_beaten":
+                        try:
+                            ts = datetime.fromisoformat(n.get("timestamp", ""))
+                            if (now - ts.astimezone(timezone.utc)) < timedelta(hours=self._NOTIF_COOLDOWN_HOURS):
+                                detail = n.get("detail", "")
+                                if detail.startswith("ROM: "):
+                                    recently_notified.add(detail[5:])
+                        except Exception:
+                            pass
+
+                for rom in roms_played:
+                    if rom in recently_notified:
+                        continue
+                    paths = [f"players/{p}/progress/{rom}" for p in player_ids]
+                    batch = CloudSync.fetch_parallel(self.cfg, paths)
+
+                    scores = []
+                    for path, entry in batch.items():
+                        if entry and isinstance(entry, dict):
+                            pct = float(entry.get("percentage", 0))
+                            p_id = path.split("/")[1] if "/" in path else ""
+                            scores.append((pct, p_id))
+                    scores.sort(reverse=True)
+
+                    if not scores:
+                        continue
+                    top_pid = scores[0][1]
+                    if top_pid and top_pid != pid:
+                        # Check own score exists at all
+                        own_in = any(p_id == pid for _, p_id in scores)
+                        if own_in:
+                            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                            QMetaObject.invokeMethod(
+                                self, "_add_highscore_beaten_notification",
+                                Qt.ConnectionType.QueuedConnection,
+                                Q_ARG(str, rom),
+                            )
+            except Exception:
+                pass
+
+        threading.Thread(target=_bg, daemon=True, name="HighscorePolling").start()
+
     def _hide_overlay(self):
         if self.overlay and self.overlay.isVisible():
             self.overlay.hide()
@@ -6625,6 +7031,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                         msg = f"An important update is available!\n\nCurrent version: {self.CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
                         QMetaObject.invokeMethod(self, "_show_update_warning", Qt.ConnectionType.QueuedConnection, Q_ARG(str, msg))
+                        QMetaObject.invokeMethod(self, "_add_update_notification", Qt.ConnectionType.QueuedConnection, Q_ARG(str, latest))
             except Exception as e:
                 print(f"[UPDATE CHECK] failed: {e}")
                 
