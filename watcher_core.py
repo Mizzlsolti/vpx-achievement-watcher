@@ -2231,22 +2231,16 @@ class Watcher:
         """Non-blocking: spawns a background thread to wait for VPX window and show info."""
         import threading
         def _worker():
-            import os, time
+            import time
+            log(self.cfg, f"[OVERLAY] no-map worker start: rom={rom!r}")
             try:
                 import win32gui
             except ImportError:
                 return
-            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             try:
                 if not rom:
                     return
                 if self._has_any_map(rom):
-                    return
-
-                maps_dir = p_local_maps(self.cfg)
-                cand1 = os.path.join(maps_dir, f"{rom}.json")
-                cand2 = os.path.join(maps_dir, f"{rom}.map.json")
-                if os.path.isfile(cand1) or os.path.isfile(cand2):
                     return
 
                 shown = getattr(self, "_mini_info_shown_for_rom", None)
@@ -2285,14 +2279,7 @@ class Watcher:
                         msg = f"NVRAM map not found for {rom}."
                         dur = max(3, int(seconds))
                         try:
-                            QMetaObject.invokeMethod(
-                                self.bridge,
-                                "challenge_info_show",
-                                Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, msg),
-                                Q_ARG(int, dur),
-                                Q_ARG(str, "#FF3B30")
-                            )
+                            self.bridge.challenge_info_show.emit(msg, dur, "#FF3B30")
                             shown.add(rom)
                             self._mini_info_shown_for_rom = shown
                             log(self.cfg, f"[INFO] Mini overlay (no map) shown for {rom}")
@@ -2318,7 +2305,6 @@ class Watcher:
                 import win32gui
             except ImportError:
                 return
-            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             try:
                 if not rom:
                     return
@@ -2378,14 +2364,7 @@ class Watcher:
                         msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
                         dur = max(5, int(seconds))
                         try:
-                            QMetaObject.invokeMethod(
-                                self.bridge,
-                                "challenge_info_show",
-                                Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, msg),
-                                Q_ARG(int, dur),
-                                Q_ARG(str, "#FF7F00")
-                            )
+                            self.bridge.challenge_info_show.emit(msg, dur, "#FF7F00")
                             shown.add(rom)
                             self._mini_info_vps_shown_for_rom = shown
                             log(self.cfg, f"[INFO] Mini overlay (no VPS-ID) shown for {rom}")
