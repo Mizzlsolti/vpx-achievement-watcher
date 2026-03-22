@@ -4540,7 +4540,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "Session Overview",
                 )
                 QApplication.processEvents()
-                self.overlay.show(); self.overlay.raise_()
+                if self.overlay.portrait_mode:
+                    self.overlay._apply_rotation_snapshot(force=True)
+                else:
+                    self.overlay._show_live_unrotated()
+                self.overlay._ensuring = True
+                try:
+                    self.overlay.show(); self.overlay.raise_()
+                finally:
+                    self.overlay._ensuring = False
                 self._start_overlay_auto_close_timer()
                 try:
                     self.overlay.set_nav_arrows(True)
@@ -4552,7 +4560,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             css, header_html, rows = self._overlay_page2_html()
             self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
             QApplication.processEvents()
-            self.overlay.show(); self.overlay.raise_()
+            if self.overlay.portrait_mode:
+                self.overlay._apply_rotation_snapshot(force=True)
+            else:
+                self.overlay._show_live_unrotated()
+            self.overlay._ensuring = True
+            try:
+                self.overlay.show(); self.overlay.raise_()
+            finally:
+                self.overlay._ensuring = False
             self._start_overlay_auto_close_timer()
             try:
                 self.overlay.set_nav_arrows(True)
@@ -4564,7 +4580,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             html = self._overlay_page3_html()
             self.overlay.set_html(html, "Challenge Leaderboard")
             QApplication.processEvents()
-            self.overlay.show(); self.overlay.raise_()
+            if self.overlay.portrait_mode:
+                self.overlay._apply_rotation_snapshot(force=True)
+            else:
+                self.overlay._show_live_unrotated()
+            self.overlay._ensuring = True
+            try:
+                self.overlay.show(); self.overlay.raise_()
+            finally:
+                self.overlay._ensuring = False
             self._start_overlay_auto_close_timer()
             try:
                 self.overlay.set_nav_arrows(True)
@@ -4872,7 +4896,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.overlay.set_html(loading_html, "Cloud Leaderboard")
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
-        self.overlay.show(); self.overlay.raise_()
+        if self.overlay.portrait_mode:
+            self.overlay._apply_rotation_snapshot(force=True)
+        else:
+            self.overlay._show_live_unrotated()
+        self.overlay._ensuring = True
+        try:
+            self.overlay.show(); self.overlay.raise_()
+        finally:
+            self.overlay._ensuring = False
         self._start_overlay_auto_close_timer()
         try:
             self.overlay.set_nav_arrows(True)
@@ -5069,8 +5101,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.overlay.set_html_fullsize(final_html, "VPC Weekly")
             from PyQt6.QtWidgets import QApplication
             QApplication.processEvents()
-            self.overlay.show()
-            self.overlay.raise_()
+            if self.overlay.portrait_mode:
+                self.overlay._apply_rotation_snapshot(force=True)
+            else:
+                self.overlay._show_live_unrotated()
+            self.overlay._ensuring = True
+            try:
+                self.overlay.show()
+                self.overlay.raise_()
+            finally:
+                self.overlay._ensuring = False
             self._start_overlay_auto_close_timer()
             try:
                 self.overlay.set_nav_arrows(True)
@@ -5092,8 +5132,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
         self.overlay.set_html_fullsize(loading_html, "VPC Weekly")
-        self.overlay.show()
-        self.overlay.raise_()
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+        if self.overlay.portrait_mode:
+            self.overlay._apply_rotation_snapshot(force=True)
+        else:
+            self.overlay._show_live_unrotated()
+        self.overlay._ensuring = True
+        try:
+            self.overlay.show()
+            self.overlay.raise_()
+        finally:
+            self.overlay._ensuring = False
         self._start_overlay_auto_close_timer()
 
         try:
@@ -5371,6 +5421,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _do_show():
             try:
+                # Don't auto-open the main overlay when a challenge is active or
+                # being started (suppress_big_overlay_once is set at challenge start
+                # before the first challenge notification fires).
+                try:
+                    _w = getattr(self, "watcher", None)
+                    ch = getattr(_w, "challenge", {}) if _w is not None else {}
+                    if (ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once"):
+                        return
+                except Exception:
+                    pass
                 self._prepare_overlay_sections()
                 secs = self._overlay_cycle.get("sections", [])
                 if not secs:
@@ -5851,9 +5911,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         
         try:
             self.overlay.set_combined(dummy_data, session_title="Test Highlights")
-            self.overlay.show()
-            self.overlay.raise_()
-            
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+            if self.overlay.portrait_mode:
+                self.overlay._apply_rotation_snapshot(force=True)
+            else:
+                self.overlay._show_live_unrotated()
+            self.overlay._ensuring = True
+            try:
+                self.overlay.show()
+                self.overlay.raise_()
+            finally:
+                self.overlay._ensuring = False
+
             QTimer.singleShot(10000, self._hide_overlay)
         finally:
             self.watcher.current_rom = old_rom
