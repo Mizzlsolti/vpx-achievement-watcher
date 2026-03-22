@@ -1539,20 +1539,6 @@ class OverlayWindow(QWidget):
             new_content_callback()
             return
 
-        # Portrait mode: the rotation snapshot is built asynchronously via
-        # QTimer.singleShot and competes with the slide+fade animation.
-        # _apply_rotation_snapshot raises rotated_label above _transition_label
-        # before _transition_state is set, so the animation runs invisibly behind
-        # the rotated content label.  In the worst case new_img is stale (still
-        # the old content) because the rotation didn't finish in time, causing
-        # the transition to animate nothing and leave the overlay blank until the
-        # deferred rotation fires.  Skip the slide animation entirely in portrait
-        # mode so the rotation snapshot path can update content without Z-order
-        # interference — correctness and stable visibility take priority here.
-        if getattr(self, 'portrait_mode', False):
-            new_content_callback()
-            return
-
         old_img = self._snapshot_current()
         if old_img is None or old_img.isNull():
             new_content_callback()
@@ -1572,6 +1558,10 @@ class OverlayWindow(QWidget):
         if hasattr(self, '_p2_timer'):
             self._p2_timer.stop()
 
+        # Stop any in-progress transition timer before entering the pending state so
+        # _transition_tick cannot fire with an incomplete state dict during processEvents.
+        self._transition_timer.stop()
+
         # Ensure transition label exists
         if self._transition_label is None:
             self._transition_label = QLabel(self)
@@ -1584,11 +1574,25 @@ class OverlayWindow(QWidget):
         self._transition_label.show()
         self._transition_label.raise_()
 
+        # Set a non-None sentinel state BEFORE calling new_content_callback().
+        # In portrait mode, new_content_callback() triggers request_rotation() which
+        # schedules _apply_rotation_snapshot via QTimer.singleShot(0,...).  That method
+        # raises rotated_label and then, when _transition_state is not None, re-raises
+        # _transition_label on top.  Without this sentinel the check in
+        # _apply_rotation_snapshot fails and the animation plays invisibly behind
+        # rotated_label.
+        self._transition_state = {'phase': 'pending'}
+
         # Apply new content immediately.
         new_content_callback()
 
-        # Flush any remaining paint events so the snapshot is up-to-date.
-        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 20)
+        # Flush pending events — in portrait mode this allows the QTimer.singleShot(0,...)
+        # rotation snapshot to fire synchronously so new_img is fresh and _transition_label
+        # has already been re-raised above rotated_label by _apply_rotation_snapshot.
+        # singleShot(interval=0) fires on the first event-loop iteration so the 50ms
+        # ceiling is a safe upper bound rather than a fixed delay; in landscape mode
+        # there are no deferred snapshots so processEvents returns immediately.
+        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 50)
 
         new_img = self._snapshot_current()
 
@@ -1609,6 +1613,13 @@ class OverlayWindow(QWidget):
             self._transition_timer.stop()
             if self._transition_label:
                 self._transition_label.hide()
+            return
+
+        # 'pending' is a setup sentinel set in transition_to() before
+        # new_content_callback() is called; the timer should not normally fire
+        # while in this state, but guard here in case it does (e.g. a showEvent
+        # restarts the timer during processEvents).
+        if state.get('phase') == 'pending':
             return
 
         dt = 16.0
