@@ -365,20 +365,48 @@ class _OverlayShineWidget(QWidget):
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
-        bar_top  = int(H * self._BAR_TOP_FRAC)
-        bar_h    = int(H * self._BAR_H_FRAC)
-        stripe_w = int(W * self._STRIPE_W_FRAC)
-        x = int(-stripe_w + self._t * (W + stripe_w * 2))
+
+        # Detect portrait mode from parent OverlayWindow so the sweep runs
+        # along the correct visual axis.  In portrait mode the widget is
+        # physically rotated 90°, so the X-axis of the widget maps to the
+        # vertical visual direction; we must sweep along Y instead.
+        portrait = False
+        try:
+            portrait = bool(self.parent().portrait_mode)
+        except Exception:
+            pass
+
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         try:
-            grad = QLinearGradient(float(x), float(bar_top),
-                                   float(x + stripe_w), float(bar_top))
-            grad.setColorAt(0.0, QColor(255, 255, 255, 0))
-            grad.setColorAt(0.35, QColor(255, 255, 255, 55))
-            grad.setColorAt(0.65, QColor(255, 255, 255, 55))
-            grad.setColorAt(1.0, QColor(255, 255, 255, 0))
-            p.fillRect(x, bar_top, stripe_w, bar_h, QBrush(grad))
+            if portrait:
+                # In portrait mode the physical dimensions are swapped relative
+                # to the visual overlay: W is the visual height, H is the visual
+                # width.  Apply bar-area fractions to W (visual height), and
+                # sweep the stripe vertically along H (visual width → Y-axis).
+                bar_top  = int(W * self._BAR_TOP_FRAC)
+                bar_h    = int(W * self._BAR_H_FRAC)
+                stripe_w = int(H * self._STRIPE_W_FRAC)
+                y = int(-stripe_w + self._t * (H + stripe_w * 2))
+                grad = QLinearGradient(float(bar_top), float(y),
+                                       float(bar_top), float(y + stripe_w))
+                grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
+                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
+                grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+                p.fillRect(bar_top, y, bar_h, stripe_w, QBrush(grad))
+            else:
+                bar_top  = int(H * self._BAR_TOP_FRAC)
+                bar_h    = int(H * self._BAR_H_FRAC)
+                stripe_w = int(W * self._STRIPE_W_FRAC)
+                x = int(-stripe_w + self._t * (W + stripe_w * 2))
+                grad = QLinearGradient(float(x), float(bar_top),
+                                       float(x + stripe_w), float(bar_top))
+                grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
+                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
+                grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+                p.fillRect(x, bar_top, stripe_w, bar_h, QBrush(grad))
         finally:
             try:
                 p.end()
@@ -1924,7 +1952,7 @@ class FlipCounterOverlay(QWidget):
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(50)
         self._anim_timer.timeout.connect(self._on_anim_tick)
-        if not self._low_perf:
+        if not self._check_low_perf():
             self._anim_timer.start()
 
         self._render_and_place()
@@ -1944,6 +1972,14 @@ class FlipCounterOverlay(QWidget):
     def _on_anim_tick(self):
         self._pulse_t = (self._pulse_t + 0.05) % 1.0
         self._render_and_place()
+
+    def _check_low_perf(self) -> bool:
+        """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("anim_challenge", True))
+        except Exception:
+            return self._low_perf
 
     def closeEvent(self, e):
         try:
@@ -1999,7 +2035,7 @@ class FlipCounterOverlay(QWidget):
             # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
             # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
             # oscillation (40→220) is visible against the dark background.
-            if not getattr(self, '_low_perf', False):
+            if not self._check_low_perf():
                 amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
                 pulse_alpha = 40 + int(180 * amp)
                 pulse_pen = QPen(QColor(0, 229, 255, pulse_alpha))
@@ -2812,6 +2848,14 @@ class StatusOverlay(QWidget):
         except Exception:
             return 640, 360
 
+    def _check_low_perf(self) -> bool:
+        """Read low-performance / anim-status config live so toggle takes effect immediately."""
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("anim_status", True))
+        except Exception:
+            return self._low_perf
+
     def _compose_html(self) -> str:
         """Build compact badge HTML: colored dot + status text."""
         fam = str(getattr(self, "_font_family", "Segoe UI")).replace("'", "").replace('"', "").replace(";", "").replace("<", "").replace(">", "")
@@ -2859,7 +2903,7 @@ class StatusOverlay(QWidget):
             margin_top = (H - text_h) // 2
             tmp.render(p, QPoint(margin_left, margin_top))
             # Glow sweep animation (horizontal sweep line)
-            if not getattr(self, '_low_perf', False) and getattr(self, '_sweep_active', False):
+            if not self._check_low_perf() and getattr(self, '_sweep_active', False):
                 sweep_t = min(1.0, getattr(self, '_sweep_elapsed', 0.0) / max(1.0, getattr(self, '_sweep_duration', 350.0)))
                 sweep_x = int(sweep_t * (W + 60)) - 30
                 sweep_alpha = int(160 * max(0.0, 1.0 - abs(sweep_t - 0.5) * 3.0))
@@ -2911,7 +2955,7 @@ class StatusOverlay(QWidget):
         # Apply scan-in x offset
         scan_offset = 0
         opacity = 1.0
-        if not self._low_perf and getattr(self, '_scan_active', False):
+        if not self._check_low_perf() and getattr(self, '_scan_active', False):
             scan_t = min(1.0, getattr(self, '_scan_elapsed', 0.0) / max(1.0, self._scan_duration))
             eased = _ease_out_cubic(scan_t)
             scan_offset = int(30 * (1.0 - eased))
@@ -2937,7 +2981,7 @@ class StatusOverlay(QWidget):
                 self._scan_active = False
                 self._scan_elapsed = self._scan_duration
                 # Trigger glow sweep after scan-in
-                if not self._low_perf:
+                if not self._check_low_perf():
                     self._sweep_active = True
                     self._sweep_elapsed = 0.0
             needs_render = True
@@ -2999,7 +3043,7 @@ class StatusOverlay(QWidget):
         new_color = str(color_hex or "#00C853").strip()
         self._last_center = self._primary_center()
 
-        if self._low_perf:
+        if self._check_low_perf():
             # Low performance: instant switch, no animation
             self._status_text = new_text
             self._color = new_color
@@ -4110,7 +4154,7 @@ class ChallengeSelectOverlay(QWidget):
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
-        if not self._low_perf:
+        if not self._check_low_perf():
             self._pulse_timer.start()
         self._pix = None
         self._render_and_place()
@@ -4140,6 +4184,14 @@ class ChallengeSelectOverlay(QWidget):
             pass
         super().closeEvent(e)
 
+    def _check_low_perf(self) -> bool:
+        """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("anim_challenge", True))
+        except Exception:
+            return self._low_perf
+
     def _on_pulse_tick(self):
         self._pulse_t = (self._pulse_t + 0.08) % 1.0
         self._render_and_place()
@@ -4154,7 +4206,7 @@ class ChallengeSelectOverlay(QWidget):
 
     def set_selected(self, idx: int):
         new_idx = int(idx) % 4
-        if new_idx != self._selected and not getattr(self, '_low_perf', False):
+        if new_idx != self._selected and not self._check_low_perf():
             # Determine slide direction: going "right" in list = slide left
             self._slide_dir = 1 if new_idx > self._selected else -1
             self._prev_selected = self._selected
@@ -4254,7 +4306,7 @@ class ChallengeSelectOverlay(QWidget):
             content_top = top_pad + max(0, (max_content_h - block_h) // 2)
 
             # Carousel slide: blend between previous and current content
-            slide_active = not getattr(self, '_low_perf', False) and getattr(self, '_slide_active', False)
+            slide_active = not self._check_low_perf() and getattr(self, '_slide_active', False)
             if slide_active:
                 slide_t = getattr(self, '_slide_t', 0.0)
                 eased = _ease_out_cubic(slide_t)

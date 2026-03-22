@@ -3384,22 +3384,22 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_main_anim.setStyleSheet("font-weight:bold; margin-top:4px;")
         lay_perf_anim.addWidget(lbl_main_anim)
 
-        self.chk_anim_main_transitions = QCheckBox("  ↔  Page / content transitions")
+        self.chk_anim_main_transitions = QCheckBox("  ↔  Page / content transitions (Main Overlay)")
         self.chk_anim_main_transitions.setChecked(bool(self.cfg.OVERLAY.get("anim_main_transitions", True)))
         self.chk_anim_main_transitions.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_main_transitions)
 
-        self.chk_anim_main_glow = QCheckBox("  ✨  Glow border & floating particles")
+        self.chk_anim_main_glow = QCheckBox("  ✨  Glow border & floating particles (Main Overlay)")
         self.chk_anim_main_glow.setChecked(bool(self.cfg.OVERLAY.get("anim_main_glow", True)))
         self.chk_anim_main_glow.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_main_glow)
 
-        self.chk_anim_main_score_progress = QCheckBox("  📊  Score counter & progress bar")
+        self.chk_anim_main_score_progress = QCheckBox("  📊  Score counter & progress bar (Main Overlay)")
         self.chk_anim_main_score_progress.setChecked(bool(self.cfg.OVERLAY.get("anim_main_score_progress", True)))
         self.chk_anim_main_score_progress.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_main_score_progress)
 
-        self.chk_anim_main_highlights = QCheckBox("  💡  Value update highlights & shine sweep")
+        self.chk_anim_main_highlights = QCheckBox("  💡  Value update highlights & shine sweep (Main Overlay)")
         self.chk_anim_main_highlights.setChecked(bool(self.cfg.OVERLAY.get("anim_main_highlights", True)))
         self.chk_anim_main_highlights.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_main_highlights)
@@ -3408,20 +3408,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_other_anim.setStyleSheet("font-weight:bold; margin-top:6px;")
         lay_perf_anim.addWidget(lbl_other_anim)
 
-        self.chk_anim_toast = QCheckBox("  🏆  Achievement toast")
+        self.chk_anim_toast = QCheckBox("  🏆  Achievement toast (Toast Overlay)")
         self.chk_anim_toast.setChecked(bool(self.cfg.OVERLAY.get("anim_toast", True)))
         self.chk_anim_toast.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_toast)
 
-        self.chk_anim_status = QCheckBox("  🔵  Status overlay")
+        self.chk_anim_status = QCheckBox("  🔵  Status overlay (Status Badge)")
         self.chk_anim_status.setChecked(bool(self.cfg.OVERLAY.get("anim_status", True)))
         self.chk_anim_status.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_status)
 
-        self.chk_anim_challenge = QCheckBox("  ⚡  Challenge overlays")
+        self.chk_anim_challenge = QCheckBox("  ⚡  Challenge overlays (Challenge Select / Timer / Flip Counter)")
         self.chk_anim_challenge.setChecked(bool(self.cfg.OVERLAY.get("anim_challenge", True)))
         self.chk_anim_challenge.stateChanged.connect(self._save_anim_settings)
         lay_perf_anim.addWidget(self.chk_anim_challenge)
+
+        # Disable individual animation checkboxes if Low Performance Mode is already on
+        if bool(self.cfg.OVERLAY.get("low_performance_mode", False)):
+            for _chk in [
+                self.chk_anim_main_transitions, self.chk_anim_main_glow,
+                self.chk_anim_main_score_progress, self.chk_anim_main_highlights,
+                self.chk_anim_toast, self.chk_anim_status, self.chk_anim_challenge,
+            ]:
+                _chk.setEnabled(False)
 
         layout.addWidget(grp_perf_anim)
 
@@ -3493,6 +3502,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _save_low_performance_mode(self, state: int):
         self.cfg.OVERLAY["low_performance_mode"] = bool(state)
         self.cfg.save()
+        _anim_chks = [
+            "chk_anim_main_transitions", "chk_anim_main_glow",
+            "chk_anim_main_score_progress", "chk_anim_main_highlights",
+            "chk_anim_toast", "chk_anim_status", "chk_anim_challenge",
+        ]
+        enabled = not bool(state)
+        for name in _anim_chks:
+            chk = getattr(self, name, None)
+            if chk is not None:
+                chk.setEnabled(enabled)
 
     def _save_anim_settings(self):
         self.cfg.OVERLAY["anim_main_transitions"] = bool(getattr(self, "chk_anim_main_transitions", None) and self.chk_anim_main_transitions.isChecked())
