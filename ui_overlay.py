@@ -506,8 +506,14 @@ class OverlayWindow(QWidget):
             else:
                 QTimer.singleShot(0, self._show_live_unrotated)
         W, H = self.width(), self.height()
-        # Start effects overlay (glow border + floating particles)
-        if hasattr(self, '_effects_widget'):
+        # Start effects overlay (glow border + floating particles).
+        # In portrait mode when not in the controlled _ensuring path the rotation
+        # snapshot is built asynchronously — starting the effects widget here would
+        # show the glow animation on a blank/transparent window (dark background and
+        # text not visible yet).  Defer to _apply_rotation_snapshot in that case; it
+        # will raise the effects widget once the snapshot has been applied.
+        _defer_effects = self.portrait_mode and not self._ensuring
+        if hasattr(self, '_effects_widget') and not _defer_effects:
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
             anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True))
             if not low_perf and anim_glow:
@@ -1880,6 +1886,18 @@ class FlipCounterOverlay(QWidget):
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setStyleSheet("background:transparent;")
 
+        # Breathing glow animation (same cadence as ChallengeSelectOverlay pulse)
+        self._pulse_t: float = 0.0
+        ov = parent.cfg.OVERLAY or {}
+        _low_perf = bool(ov.get("low_performance_mode", False))
+        _anim = bool(ov.get("anim_challenge", True))
+        self._low_perf = _low_perf or not _anim
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(50)
+        self._anim_timer.timeout.connect(self._on_anim_tick)
+        if not self._low_perf:
+            self._anim_timer.start()
+
         self._render_and_place()
         self.show()
         self.raise_()
@@ -1894,7 +1912,20 @@ class FlipCounterOverlay(QWidget):
             pass
         _start_topmost_timer(self)
 
+    def _on_anim_tick(self):
+        self._pulse_t = (self._pulse_t + 0.05) % 1.0
+        self._render_and_place()
+
+    def closeEvent(self, e):
+        try:
+            if getattr(self, "_anim_timer", None):
+                self._anim_timer.stop()
+        except Exception:
+            pass
+        super().closeEvent(e)
+
     def _compose_image(self) -> QImage:
+        from math import sin, pi
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         body_pt = 15
@@ -1934,6 +1965,16 @@ class FlipCounterOverlay(QWidget):
 
             _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
                               low_perf=bool(ov.get("low_performance_mode", False)))
+
+            # Breathing glow ring: pulsates with _pulse_t when animation is enabled
+            if not getattr(self, '_low_perf', False):
+                amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
+                pulse_alpha = 80 + int(140 * amp)
+                pulse_pen = QPen(QColor(0, 229, 255, pulse_alpha))
+                pulse_pen.setWidth(3)
+                p.setPen(pulse_pen)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawRoundedRect(2, 2, content_w - 4, content_h - 4, radius - 2, radius - 2)
 
             p.setPen(title_color); p.setFont(f_title)
             p.drawText(QRect(0, pad, content_w, fm_title.height()),
@@ -4220,7 +4261,9 @@ class ChallengeSelectOverlay(QWidget):
                 p.setOpacity(1.0)
                 p.setClipping(False)
             else:
-                # Static (no slide)
+                # Static (no slide) — clip content area so text can never overflow the
+                # overlay bounds if the shrink loop exhausted both minimum font sizes.
+                p.setClipRect(pad_lr, content_top, avail_w, max_content_h)
                 p.setPen(hi_color)
                 p.setFont(QFont(font_family, title_pt, QFont.Weight.Bold))
                 title_rect = QRect(pad_lr, content_top, avail_w, t_h)
@@ -4228,8 +4271,9 @@ class ChallengeSelectOverlay(QWidget):
 
                 p.setPen(text_color)
                 p.setFont(QFont(font_family, desc_pt))
-                desc_rect = QRect(pad_lr, title_rect.bottom() + 6, avail_w, d_h)
+                desc_rect = QRect(pad_lr, title_rect.bottom() + 1 + 6, avail_w, d_h)
                 p.drawText(desc_rect, flags_wrap_center, desc_text)
+                p.setClipping(False)
 
             p.setPen(QColor("#AAAAAA"))
             p.setFont(QFont(font_family, hint_pt))

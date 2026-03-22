@@ -2354,6 +2354,13 @@ class Watcher:
                             return
                     except Exception:
                         return
+                    # Don't show while a challenge is active; the challenge start
+                    # message would appear before this notification otherwise.
+                    try:
+                        if getattr(self, "challenge", {}).get("active", False):
+                            return
+                    except Exception:
+                        pass
                     if _vpx_window_visible():
                         msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
                         dur = max(5, int(seconds))
