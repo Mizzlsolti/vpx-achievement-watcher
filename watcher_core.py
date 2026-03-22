@@ -1447,6 +1447,9 @@ class CloudSync:
     _recent_full_ach_uploads: dict = {}
     _recent_full_ach_uploads_lock = threading.Lock()
 
+    # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
+    _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
+
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
         """Returns True if player name is missing/default and upload should be skipped.
@@ -1485,6 +1488,21 @@ class CloudSync:
             pass
 
     @staticmethod
+    def _notify_cloud_blocked(bridge: Optional["Bridge"], message: str) -> None:
+        """Emit a status overlay badge when a cloud upload is locally blocked.
+
+        Uses the same status_overlay_show signal as _emit_submission_state so the
+        in-game badge reflects the blocked state with a consistent visual style.
+        Silently no-ops when bridge is None (e.g. headless / test contexts).
+        """
+        if not bridge:
+            return
+        try:
+            bridge.status_overlay_show.emit(message, 0, "#FFA500")
+        except Exception:
+            pass
+
+    @staticmethod
     def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or score <= 0:
@@ -1500,6 +1518,7 @@ class CloudSync:
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
                 log(cfg, f"[CLOUD] upload_score blocked for {rom}: no VPS-ID assigned", "WARN")
+                CloudSync._notify_cloud_blocked(bridge, CloudSync._BLOCKED_NO_VPS_MESSAGE)
                 return
             # Inject vps_id into extra_data so it gets included in the payload
             if extra_data is None:
@@ -1623,6 +1642,7 @@ class CloudSync:
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
                 log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: no VPS-ID assigned", "WARN")
+                CloudSync._notify_cloud_blocked(bridge, CloudSync._BLOCKED_NO_VPS_MESSAGE)
                 return
             _extra_vps_id = _vps_id
         except Exception as e:
