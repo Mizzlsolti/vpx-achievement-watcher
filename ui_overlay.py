@@ -4544,14 +4544,33 @@ class FlipDifficultyOverlay(QWidget):
         hi_color = QColor("#FF7F00")
 
         factor = scaled_body_pt / 20.0
-        w = max(300, int(round(560 * factor)))
         pad_lr = max(12, int(round(24 * factor)))
         top_pad = max(13, int(round(26 * factor)))
         bottom_pad = max(9, int(round(18 * factor)))
         gap_title_desc = max(4, int(round(8 * factor)))
-        spacing = max(8, int(round(15 * factor)))
+        spacing = max(10, int(round(18 * factor)))
         hint_line_h = max(10, int(round(18 * factor)))
         hint_gap = max(4, int(round(8 * factor)))
+        inner_pad = max(6, int(round(12 * factor)))
+
+        # Measure the actual text widths of every option (name + "N flips") so
+        # box_w is guaranteed to be wide enough to show all labels without clipping.
+        n = max(1, len(self._options))
+        flips_pt = scaled_body_pt
+        name_pt_check = scaled_body_pt + 2  # selected boxes use the +2 variant
+        fm_name_check = QFontMetrics(QFont(font_family, name_pt_check, QFont.Weight.Bold))
+        fm_flips_check = QFontMetrics(QFont(font_family, flips_pt))
+        max_text_w = 60
+        for _nm, _fl in self._options:
+            _fl_int = int(_fl)
+            max_text_w = max(max_text_w, fm_name_check.horizontalAdvance(_nm))
+            if _fl_int != -1:
+                max_text_w = max(max_text_w, fm_flips_check.horizontalAdvance(f"{_fl_int} flips"))
+        box_w = max_text_w + 2 * inner_pad
+
+        # Derive the canvas width from the measured box_w so every box fits.
+        total_spacing = spacing * (n - 1)
+        w = max(300, n * box_w + total_spacing + 2 * pad_lr)
         avail_w = w - 2 * pad_lr
 
         # Measure title height with word-wrap before creating the image so the
@@ -4585,10 +4604,6 @@ class FlipDifficultyOverlay(QWidget):
             p.drawText(QRect(pad_lr, top_pad, avail_w, t_h), flags_center_wrap, title)
 
             y0 = top_pad + t_h + gap_title_desc
-            n = max(1, len(self._options))
-            total_spacing = spacing * (n - 1)
-            box_w = max(60, int((avail_w - total_spacing) / n))
-            inner_pad = max(5, int(round(10 * factor)))
 
             def draw_option(ix: int, name: str, flips: int, selected: bool):
                 x = pad_lr + ix * (box_w + spacing)
