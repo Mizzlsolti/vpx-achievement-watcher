@@ -3139,7 +3139,6 @@ class Watcher:
                     log(self.cfg, f"[MAP] no nvram map found for ROM '{rom}' (after family fallback)", "WARN")
                     no_map_set.add(key)
             else:
-                log(self.cfg, f"[MAP] direct map found for ROM '{rom}' (source: {src})")
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
