@@ -1010,6 +1010,16 @@ class OverlayWindow(QWidget):
             if not low_perf:
                 self._effects_widget.setGeometry(0, 0, self.width(), self.height())
                 self._effects_widget.raise_()
+        if hasattr(self, '_shine_widget') and self._shine_widget.isVisible():
+            self._shine_widget.setGeometry(0, 0, self.width(), self.height())
+            self._shine_widget.raise_()
+        if hasattr(self, '_highlight_widget') and self._highlight_widget.isVisible():
+            self._highlight_widget.setGeometry(0, 0, self.width(), self.height())
+            self._highlight_widget.raise_()
+        if (getattr(self, '_transition_label', None) is not None
+                and self._transition_label.isVisible()):
+            self._transition_label.setGeometry(0, 0, self.width(), self.height())
+            self._transition_label.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._fullsize_mode = False
