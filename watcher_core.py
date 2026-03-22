@@ -1448,8 +1448,25 @@ def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None)
             t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
             if t:
                 unlocked.add(t)
+                # Also add cleaned version (strip " (Session)" / " (Global)" suffixes)
+                unlocked.add(t.replace(" (Session)", "").replace(" (Global)", ""))
+        # Deduplicate rules by cleaned title (same as progress tab seen_rule_titles logic)
+        seen_rule_titles = set()
+        unique_rules = []
+        for r in rules:
+            rt = str(r.get("title", "")).strip()
+            clean_rt = rt.replace(" (Session)", "").replace(" (Global)", "")
+            if clean_rt not in seen_rule_titles:
+                seen_rule_titles.add(clean_rt)
+                unique_rules.append(r)
+        rules = unique_rules
         if rules:
-            pct = len(unlocked) / len(rules)
+            matched = sum(
+                1 for r in rules
+                if str(r.get("title", "")).strip() in unlocked
+                or str(r.get("title", "")).strip().replace(" (Session)", "").replace(" (Global)", "") in unlocked
+            )
+            pct = matched / len(rules)
             breakdown["achievements"] = min(50, round(pct * 50))
         else:
             breakdown["achievements"] = 0
