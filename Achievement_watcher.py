@@ -49,6 +49,7 @@ from watcher_core import (
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
     _strip_version_from_name,
+    _clean_table_name,
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
@@ -2404,7 +2405,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if valid_roms:
             romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
             for r in valid_roms:
-                title = _strip_version_from_name(romnames.get(r, r))
+                title = _clean_table_name(romnames.get(r, r))
                 self.cmb_progress_rom.addItem(title, r)
             
         self.cmb_progress_rom.blockSignals(False)
@@ -2627,7 +2628,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
-        rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
+        if rom == "Global":
+            rom_label = "Global Achievements"
+        else:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            clean_rom = _clean_table_name(romnames.get(rom, "")) or romnames.get(rom, "") or rom
+            rom_label = clean_rom
         html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
 
         # Mastery block for ROM-specific view

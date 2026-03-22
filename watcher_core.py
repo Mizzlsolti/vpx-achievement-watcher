@@ -47,6 +47,25 @@ def _strip_version_from_name(name: str) -> str:
     return re.sub(r"\s*\(v?[\d.]+[a-z]?\)\s*$", "", name, flags=re.IGNORECASE).strip()
 
 
+def _clean_table_name(name: str) -> str:
+    """Remove all trailing parenthesized or bracketed suffixes from a table name.
+
+    For example: "Addams Family (VPX 1.0) [night]" → "Addams Family"
+    """
+    if not name:
+        return name
+    result = name.strip()
+    while True:
+        stripped = _CLEAN_TABLE_SUFFIX.sub("", result).strip()
+        if stripped == result:
+            break
+        result = stripped
+    return result
+
+
+_CLEAN_TABLE_SUFFIX = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]\s*$")
+
+
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
     ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
     if requests:

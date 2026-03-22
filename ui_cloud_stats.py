@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json, _strip_version_from_name
+from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, _clean_table_name
 
 
 class _NoBrowseBrowser(QTextBrowser):
@@ -618,7 +618,7 @@ class CloudStatsMixin:
             rom = "Unknown"
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-        table_title = _strip_version_from_name(romnames.get(rom, ""))
+        table_title = _clean_table_name(romnames.get(rom, ""))
 
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
 
@@ -702,7 +702,7 @@ class CloudStatsMixin:
             rom = "Unknown"
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-        table_title = _strip_version_from_name(romnames.get(rom, ""))
+        table_title = _clean_table_name(romnames.get(rom, ""))
 
         active_deltas = {}
         playtime_str = ""

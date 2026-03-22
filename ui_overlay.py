@@ -910,6 +910,15 @@ class OverlayWindow(QWidget):
                     self._effects_widget.setGeometry(0, 0, W, H)
                     self._effects_widget.show()
                     self._effects_widget.raise_()
+            # Restore shine, highlight and transition overlays above the rotated snapshot.
+            # Each call to raise_() on rotated_label would push these widgets behind it, so
+            # they must be re-raised here every time the snapshot is rebuilt.
+            if hasattr(self, '_shine_widget'):
+                self._shine_widget.raise_()
+            if hasattr(self, '_highlight_widget'):
+                self._highlight_widget.raise_()
+            if getattr(self, '_transition_label', None) is not None:
+                self._transition_label.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()
@@ -994,6 +1003,12 @@ class OverlayWindow(QWidget):
             if not low_perf:
                 self._effects_widget.setGeometry(0, 0, self.width(), self.height())
                 self._effects_widget.raise_()
+        if hasattr(self, '_shine_widget') and self._shine_widget.isVisible():
+            self._shine_widget.raise_()
+        if hasattr(self, '_highlight_widget') and self._highlight_widget.isVisible():
+            self._highlight_widget.raise_()
+        if getattr(self, '_transition_label', None) is not None and self._transition_label.isVisible():
+            self._transition_label.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._fullsize_mode = False
