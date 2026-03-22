@@ -795,8 +795,11 @@ DEFAULT_LOG_SUPPRESS = [
     "[HOOK] Global keyboard hook installed",
     "[HOOK] toggle fired",
     "[HOTKEY] Registered WM_HOTKEY",
-    "[CTRL] map miss for candidate",         
-    "[CTRL] base-map miss for candidate",    
+    "[CTRL] map miss for candidate",
+    "[CTRL] base-map miss for candidate",
+    "[ROM] VPXTOOL:",
+    "[ROM] candidates for",
+    "[EXPORT] session-only activePlayers written",
 ]
 quiet_prefixes: tuple[str, ...] = ()
 
@@ -1909,7 +1912,7 @@ class CloudSync:
             put_req.add_header('Content-Type', 'application/json')
             try:
                 with urllib.request.urlopen(put_req, timeout=10) as resp:
-                    log(cfg, f"[CLOUD] Uploaded full achievements for player {pid}")
+                    log(cfg, "[CLOUD] Full achievements backup uploaded")
             except Exception as e:
                 log(cfg, f"[CLOUD] upload_full_achievements failed: {e}", "WARN")
 
@@ -6429,14 +6432,14 @@ class Watcher:
         return {"table": clean_table, "rom": rom, "vpx_file": vpx_path or ""}
     
     def _thread_main(self):
-        log(self.cfg, ">>> watcher thread running")
         # Lower thread priority so VPX always gets CPU scheduler priority
         try:
             THREAD_PRIORITY_BELOW_NORMAL = -1
             handle = ctypes.windll.kernel32.GetCurrentThread()
             ctypes.windll.kernel32.SetThreadPriority(handle, THREAD_PRIORITY_BELOW_NORMAL)
-            log(self.cfg, "[WATCHER] thread priority set to BELOW_NORMAL")
+            log(self.cfg, "[WATCHER] started (priority: BELOW_NORMAL)")
         except Exception as e:
+            log(self.cfg, "[WATCHER] started")
             log(self.cfg, f"[WATCHER] could not set thread priority: {e}", "WARN")
         active_rom = None
         if not hasattr(self, "_last_live_export_ts"):

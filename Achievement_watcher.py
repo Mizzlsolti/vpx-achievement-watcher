@@ -3719,7 +3719,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 }
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
                     results.append("✅ Achievements")
-                    log(self.cfg, f"[CLOUD] Manual backup: uploaded full achievements for player {pid}")
+                    log(self.cfg, "[CLOUD] Manual backup: full achievements uploaded")
                 else:
                     errors.append("❌ Achievements: upload failed")
             except Exception as e:
