@@ -1518,8 +1518,18 @@ class OverlayWindow(QWidget):
             self._highlight_timer.stop()
             self._highlight_widget.hide()
 
+    def _restart_p2_timer_if_needed(self):
+        """Restart the page-2 scroll timer after a transition completes, if applicable."""
+        if not (hasattr(self, '_p2_rows') and self._p2_rows):
+            return
+        # _p2_visible is set dynamically in set_html_scrollable(); fall back to 10
+        # (same default used throughout the overlay) if it hasn't been set yet.
+        visible = getattr(self, '_p2_visible', 10)
+        if len(self._p2_rows) > visible and hasattr(self, '_p2_timer') and not self._p2_timer.isActive():
+            self._p2_timer.start()
+
     def transition_to(self, new_content_callback, direction: str = 'left'):
-        """Perform a slide+fade page transition (with a brief glitch pre-effect).
+        """Perform a slide+fade page transition.
 
         Call this instead of set_html/set_combined when changing pages.  The method
         captures the current display, runs the callback to update content, then animates
@@ -1543,6 +1553,11 @@ class OverlayWindow(QWidget):
         if hasattr(self, '_effects_widget'):
             self._effects_widget.set_accent(_OVERLAY_PAGE_ACCENTS[self._page_index])
 
+        # Pause the page-2 scroll timer for the duration of the transition so it
+        # cannot update content mid-animation and cause flicker.
+        if hasattr(self, '_p2_timer'):
+            self._p2_timer.stop()
+
         # Ensure transition label exists
         if self._transition_label is None:
             self._transition_label = QLabel(self)
@@ -1550,37 +1565,37 @@ class OverlayWindow(QWidget):
             self._transition_label.setStyleSheet("background:transparent;")
         W, H = self.width(), self.height()
         self._transition_label.setGeometry(0, 0, W, H)
+        # Show old content as the starting frame — no blank flash, no glitch stripes.
+        self._transition_label.setPixmap(QPixmap.fromImage(old_img))
         self._transition_label.show()
         self._transition_label.raise_()
 
-        # Initialise state in glitch phase
+        # Apply new content immediately.
+        new_content_callback()
+
+        # For portrait mode the callback schedules a rotation snapshot via
+        # QTimer.singleShot(0, ...).  Process events long enough for the
+        # rotation callback to complete so _snapshot_current() below captures
+        # the fully rendered rotated content rather than stale data.
+        if getattr(self, 'portrait_mode', False):
+            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 50)
+        # Flush any remaining paint events so the snapshot is up-to-date.
+        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 20)
+
+        new_img = self._snapshot_current()
+
+        # Begin slide phase immediately — no glitch/stripe pre-effect.
         self._transition_state = {
-            'phase': 'glitch',
+            'phase': 'slide',
             'direction': direction,
             'old_img': old_img,
-            'new_img': None,
+            'new_img': new_img,
             'elapsed': 0.0,
-            'glitch_elapsed': 0.0,
         }
-
-        # Draw first glitch frame immediately
-        self._draw_glitch_frame(old_img, self._transition_label)
-
-        # After 120 ms of glitch frames, apply callback and switch to slide
-        def _switch_to_slide():
-            new_content_callback()
-            QApplication.processEvents()
-            new_img = self._snapshot_current()
-            if self._transition_state:
-                self._transition_state['new_img'] = new_img
-                self._transition_state['phase'] = 'slide'
-                self._transition_state['elapsed'] = 0.0
-
-        QTimer.singleShot(120, _switch_to_slide)
         self._transition_timer.start()
 
     def _transition_tick(self):
-        """Animate the current slide/glitch transition frame."""
+        """Animate the current slide+fade transition frame."""
         state = self._transition_state
         if state is None:
             self._transition_timer.stop()
@@ -1589,13 +1604,6 @@ class OverlayWindow(QWidget):
             return
 
         dt = 16.0
-
-        if state['phase'] == 'glitch':
-            state['glitch_elapsed'] += dt
-            old_img = state['old_img']
-            if old_img and self._transition_label:
-                self._draw_glitch_frame(old_img, self._transition_label)
-            return
 
         if state['phase'] == 'zoom':
             # Zoom-settle phase: new content eases in from 0.97x → 1.0x
@@ -1628,6 +1636,7 @@ class OverlayWindow(QWidget):
                 if self._transition_label:
                     self._transition_label.hide()
                 self._transition_state = None
+                self._restart_p2_timer_if_needed()
             return
 
         # Slide + fade phase
@@ -1673,6 +1682,7 @@ class OverlayWindow(QWidget):
                 if self._transition_label:
                     self._transition_label.hide()
                 self._transition_state = None
+                self._restart_p2_timer_if_needed()
 
 
 class MiniInfoOverlay(QWidget):
