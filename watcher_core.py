@@ -630,16 +630,12 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = Fal
             if re.fullmatch(r"[A-Za-z0-9_]+", rom or ""):
                 if key in warned:
                     warned.discard(key)
-                if not suppress_warn:
-                    log(cfg, f"[VPXTOOL] romname found: {rom} (from {vpx_path})")
                 return rom
 
         m = re.search(r"\b([A-Za-z0-9_]{2,})\b", out)
         if m:
             if key in warned:
                 warned.discard(key)
-            if not suppress_warn:
-                log(cfg, f"[VPXTOOL] romname found: {m.group(1)} (from {vpx_path})")
             return m.group(1)
 
         if key not in warned:
@@ -801,9 +797,6 @@ DEFAULT_LOG_SUPPRESS = [
     "[HOTKEY] Registered WM_HOTKEY",
     "[CTRL] map miss for candidate",
     "[CTRL] base-map miss for candidate",
-    "[ROM] VPXTOOL:",
-    "[ROM] candidates for",
-    "[EXPORT] session-only activePlayers written",
 ]
 quiet_prefixes: tuple[str, ...] = ()
 
@@ -3142,6 +3135,7 @@ class Watcher:
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
+                log(self.cfg, f"[MAP] direct map found for ROM '{rom}' (source: {src})")
         except Exception:
             pass
 
@@ -6150,15 +6144,6 @@ class Watcher:
         except Exception:
             pass
 
-        try:
-            _fields, _src, _matched = self._resolve_map_from_index_then_family(self.current_rom or "")
-            _rom_lower = (self.current_rom or "").lower()
-            _map_src = _src if _src else "none"
-            _fallback = _matched if (_matched and _matched.lower() != _rom_lower) else "none"
-            log(self.cfg, f"[SESSION] ROM resolved: {self.current_rom}, map source: {_map_src}, fallback: {_fallback}")
-        except Exception:
-            pass
-
         self.start_time = time.time()
         self.game_active = True
         self.players.clear()
@@ -6445,14 +6430,14 @@ class Watcher:
         return {"table": clean_table, "rom": rom, "vpx_file": vpx_path or ""}
     
     def _thread_main(self):
+        log(self.cfg, ">>> watcher thread running")
         # Lower thread priority so VPX always gets CPU scheduler priority
         try:
             THREAD_PRIORITY_BELOW_NORMAL = -1
             handle = ctypes.windll.kernel32.GetCurrentThread()
             ctypes.windll.kernel32.SetThreadPriority(handle, THREAD_PRIORITY_BELOW_NORMAL)
-            log(self.cfg, "[WATCHER] started (priority: BELOW_NORMAL)")
+            log(self.cfg, "[WATCHER] thread priority set to BELOW_NORMAL")
         except Exception as e:
-            log(self.cfg, "[WATCHER] started")
             log(self.cfg, f"[WATCHER] could not set thread priority: {e}", "WARN")
         active_rom = None
         if not hasattr(self, "_last_live_export_ts"):
