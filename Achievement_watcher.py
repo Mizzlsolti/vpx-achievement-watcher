@@ -4521,6 +4521,36 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
 
+    def _show_page_with_transition(self, content_cb):
+        """Show/update the overlay using *content_cb*.
+
+        When the overlay is already visible a slide+fade transition is used so
+        the page change is animated without flickering.  On the first open the
+        normal full-show sequence is used (layout, rotation, show/raise).
+        Always restarts the auto-close timer and shows navigation arrows.
+        """
+        from PyQt6.QtWidgets import QApplication
+        if self.overlay.isVisible():
+            self.overlay.transition_to(content_cb)
+        else:
+            content_cb()
+            QApplication.processEvents()
+            if self.overlay.portrait_mode:
+                self.overlay._apply_rotation_snapshot(force=True)
+            else:
+                self.overlay._show_live_unrotated()
+            self.overlay._ensuring = True
+            try:
+                self.overlay.show()
+                self.overlay.raise_()
+            finally:
+                self.overlay._ensuring = False
+        self._start_overlay_auto_close_timer()
+        try:
+            self.overlay.set_nav_arrows(True)
+        except Exception:
+            pass
+
     def _show_overlay_page(self, page_idx: int):
         """Show one of the 5 overlay pages."""
         from PyQt6.QtWidgets import QApplication
@@ -4535,65 +4565,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if secs:
                 self._show_overlay_section(secs[0])
             else:
-                self.overlay.set_html(
-                    "<div style='text-align:center; color:#888; padding:20px;'>(No session data available)</div>",
-                    "Session Overview",
+                self._show_page_with_transition(
+                    lambda: self.overlay.set_html(
+                        "<div style='text-align:center; color:#888; padding:20px;'>(No session data available)</div>",
+                        "Session Overview",
+                    )
                 )
-                QApplication.processEvents()
-                if self.overlay.portrait_mode:
-                    self.overlay._apply_rotation_snapshot(force=True)
-                else:
-                    self.overlay._show_live_unrotated()
-                self.overlay._ensuring = True
-                try:
-                    self.overlay.show(); self.overlay.raise_()
-                finally:
-                    self.overlay._ensuring = False
-                self._start_overlay_auto_close_timer()
-                try:
-                    self.overlay.set_nav_arrows(True)
-                except Exception:
-                    pass
         elif page_idx == 1:
             self._vpc_page5_data = None
             # Page 2: Local Achievement Progress for last played ROM
             css, header_html, rows = self._overlay_page2_html()
-            self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
-            QApplication.processEvents()
-            if self.overlay.portrait_mode:
-                self.overlay._apply_rotation_snapshot(force=True)
-            else:
-                self.overlay._show_live_unrotated()
-            self.overlay._ensuring = True
-            try:
-                self.overlay.show(); self.overlay.raise_()
-            finally:
-                self.overlay._ensuring = False
-            self._start_overlay_auto_close_timer()
-            try:
-                self.overlay.set_nav_arrows(True)
-            except Exception:
-                pass
+            self._show_page_with_transition(
+                lambda: self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
+            )
         elif page_idx == 2:
             self._vpc_page5_data = None
             # Page 3: Local Challenge Leaderboard (1:1 mirror of GUI)
             html = self._overlay_page3_html()
-            self.overlay.set_html(html, "Challenge Leaderboard")
-            QApplication.processEvents()
-            if self.overlay.portrait_mode:
-                self.overlay._apply_rotation_snapshot(force=True)
-            else:
-                self.overlay._show_live_unrotated()
-            self.overlay._ensuring = True
-            try:
-                self.overlay.show(); self.overlay.raise_()
-            finally:
-                self.overlay._ensuring = False
-            self._start_overlay_auto_close_timer()
-            try:
-                self.overlay.set_nav_arrows(True)
-            except Exception:
-                pass
+            self._show_page_with_transition(
+                lambda: self.overlay.set_html(html, "Challenge Leaderboard")
+            )
         elif page_idx == 3:
             self._vpc_page5_data = None
             # Page 4: Cloud Leaderboard (dynamic)
@@ -4893,23 +4884,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 if not rom else ""
             )
 
-        self.overlay.set_html(loading_html, "Cloud Leaderboard")
-        from PyQt6.QtWidgets import QApplication
-        QApplication.processEvents()
-        if self.overlay.portrait_mode:
-            self.overlay._apply_rotation_snapshot(force=True)
-        else:
-            self.overlay._show_live_unrotated()
-        self.overlay._ensuring = True
-        try:
-            self.overlay.show(); self.overlay.raise_()
-        finally:
-            self.overlay._ensuring = False
-        self._start_overlay_auto_close_timer()
-        try:
-            self.overlay.set_nav_arrows(True)
-        except Exception:
-            pass
+        self._show_page_with_transition(lambda: self.overlay.set_html(loading_html, "Cloud Leaderboard"))
 
         if not (self.cfg.CLOUD_ENABLED and rom):
             return
@@ -5098,24 +5073,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 'table_name': table_name,
                 'is_portrait': is_portrait,
             }
-            self.overlay.set_html_fullsize(final_html, "VPC Weekly")
-            from PyQt6.QtWidgets import QApplication
-            QApplication.processEvents()
-            if self.overlay.portrait_mode:
-                self.overlay._apply_rotation_snapshot(force=True)
-            else:
-                self.overlay._show_live_unrotated()
-            self.overlay._ensuring = True
-            try:
-                self.overlay.show()
-                self.overlay.raise_()
-            finally:
-                self.overlay._ensuring = False
-            self._start_overlay_auto_close_timer()
-            try:
-                self.overlay.set_nav_arrows(True)
-            except Exception:
-                pass
+            self._show_page_with_transition(lambda: self.overlay.set_html_fullsize(final_html, "VPC Weekly"))
             return
 
         # Recommended PyQt6 pattern for cross-thread UI updates
@@ -5131,25 +5089,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             f"VPC Weekly Challenge</div>"
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
-        self.overlay.set_html_fullsize(loading_html, "VPC Weekly")
-        from PyQt6.QtWidgets import QApplication
-        QApplication.processEvents()
-        if self.overlay.portrait_mode:
-            self.overlay._apply_rotation_snapshot(force=True)
-        else:
-            self.overlay._show_live_unrotated()
-        self.overlay._ensuring = True
-        try:
-            self.overlay.show()
-            self.overlay.raise_()
-        finally:
-            self.overlay._ensuring = False
-        self._start_overlay_auto_close_timer()
-
-        try:
-            self.overlay.set_nav_arrows(True)
-        except Exception:
-            pass
+        self._show_page_with_transition(lambda: self.overlay.set_html_fullsize(loading_html, "VPC Weekly"))
 
         def _fetch_vpc_challenge():
             try:
