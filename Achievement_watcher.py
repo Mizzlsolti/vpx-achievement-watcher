@@ -2738,6 +2738,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         dlg = VpsAchievementInfoDialog(self.cfg, rom, title, rule, unlock_entry, parent=self)
         dlg.navigate_to_available_maps.connect(lambda: setattr(dlg, "_navigate_requested", True))
+        dlg.vps_id_backfilled.connect(self._refresh_level_display)
+        dlg.vps_id_backfilled.connect(self._refresh_dashboard_cards)
         dlg.exec()
         if getattr(dlg, "_navigate_requested", False):
             for i in range(self.main_tabs.count()):
@@ -2828,6 +2830,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         row = QHBoxLayout()
         row.addStretch(1)
+
+        btn_backfill = QPushButton("🔁 Backfill VPS-IDs")
+        btn_backfill.setToolTip(
+            "Retroactively apply the current VPS mapping to all previously unlocked\n"
+            "achievements that were recorded without a VPS-ID.\n"
+            "No new unlock events or achievement toasts will be triggered."
+        )
+        btn_backfill.setStyleSheet(
+            "QPushButton { background: #002233; color: #00E5FF; border: 1px solid #00E5FF; "
+            "border-radius: 14px; font-size: 10pt; font-weight: bold; padding: 0 8px; }"
+            "QPushButton:hover { background: #003344; color: #00E5FF; }"
+        )
+        btn_backfill.clicked.connect(self._on_backfill_vps_ids)
+        row.addWidget(btn_backfill)
 
         btn_rules = QPushButton("📜 Cloud Rules")
         btn_rules.setFixedSize(140, 28)
@@ -3072,6 +3088,66 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             all_items = suggestions
         if hasattr(self, '_cloud_rom_completer_model'):
             self._cloud_rom_completer_model.setStringList(all_items)
+
+    def _on_backfill_vps_ids(self):
+        """Retroactively apply the current VPS mapping to previously unlocked achievements without a VPS-ID."""
+        from watcher_core import Watcher
+        from ui_vps import _load_vps_mapping
+
+        # Find all ROMs that have a mapping so we can give a meaningful description.
+        mapping = _load_vps_mapping(self.cfg)
+        if not mapping:
+            QMessageBox.information(
+                self,
+                "Backfill VPS-IDs",
+                "No VPS mappings found.\n"
+                "Assign at least one ROM in the 'Available Maps' tab first.",
+            )
+            return
+
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Backfill VPS-IDs")
+        confirm.setIcon(QMessageBox.Icon.Question)
+        confirm.setText(
+            "Apply the current VPS mapping to all previously unlocked achievements\n"
+            "that were recorded without a VPS-ID?"
+        )
+        confirm.setInformativeText(
+            f"• Affects all ROMs that already have a VPS mapping ({len(mapping)} mapped).\n"
+            "• Only achievements already unlocked without a VPS-ID will be updated.\n"
+            "• No new unlock events will be created and no achievement toasts will appear.\n"
+            "• The VPS-ID field will be set to the current mapping value for each ROM.\n"
+            "• Running this again later will not change anything (idempotent)."
+        )
+        confirm.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        if confirm.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            result = Watcher.backfill_vps_ids(self.cfg)
+        except Exception as exc:
+            QMessageBox.critical(self, "Backfill Failed", f"An error occurred during backfill:\n{exc}")
+            return
+
+        updated = result.get("updated", 0)
+        roms = result.get("roms", [])
+        if updated:
+            roms_str = ", ".join(roms) if roms else "—"
+            QMessageBox.information(
+                self,
+                "Backfill Complete",
+                f"✅  {updated} achievement entr{'y' if updated == 1 else 'ies'} updated "
+                f"across {len(roms)} ROM{'s' if len(roms) != 1 else ''}.\n\n"
+                f"ROMs affected: {roms_str}",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Nothing to Update",
+                "No unlocked achievements without a VPS-ID were found.\n"
+                "Everything is already up-to-date.",
+            )
 
     def _on_vps_auto_match_all(self):
         """Attempt automatic VPS match for all local ROMs that have an NVRAM map."""

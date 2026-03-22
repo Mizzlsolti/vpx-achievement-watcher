@@ -1016,10 +1016,14 @@ class VpsAchievementInfoDialog(QDialog):
 
     # Emitted when the user clicks the "Assign in Available Maps" link.
     navigate_to_available_maps = pyqtSignal()
+    # Emitted after a successful retroactive VPS-ID backfill for this achievement.
+    vps_id_backfilled = pyqtSignal()
 
     def __init__(self, cfg, rom: str, title: str, rule: Optional[dict], unlock_entry: Any, parent=None):
         super().__init__(parent)
         self.cfg = cfg
+        self._rom = rom
+        self._title = title
         self.setWindowTitle(f"ℹ️  {title}")
         self.setMinimumSize(500, 320)
         self.setStyleSheet("background:#111; color:#DDD;")
@@ -1093,6 +1097,31 @@ class VpsAchievementInfoDialog(QDialog):
             lbl_hint.linkActivated.connect(lambda _href: (self.navigate_to_available_maps.emit(), self.accept()))
             right_lay.addWidget(lbl_hint)
 
+            # If this achievement is already unlocked and the current mapping now
+            # has a VPS-ID for this ROM, offer a one-click retroactive backfill.
+            if unlock_entry is not None:
+                _cur_vps_id = ""
+                try:
+                    _cur_mapping = _load_vps_mapping(cfg)
+                    _cur_vps_id = (_cur_mapping.get(rom) or "").strip()
+                except Exception:
+                    pass
+                if _cur_vps_id:
+                    btn_backfill = QPushButton("🔁 Apply current VPS mapping to this achievement")
+                    btn_backfill.setToolTip(
+                        "Retroactively fill in the missing VPS-ID for this previously unlocked\n"
+                        "achievement using the current mapping.\n"
+                        "No unlock toast will be shown – only the VPS-ID field is updated."
+                    )
+                    btn_backfill.setStyleSheet(
+                        "QPushButton { background:#002233; color:#00E5FF; border:1px solid #00E5FF; "
+                        "border-radius:4px; padding:4px 8px; font-size:10pt; }"
+                        "QPushButton:hover { background:#003344; }"
+                    )
+                    btn_backfill.clicked.connect(lambda: self._on_backfill_clicked())
+                    right_lay.addSpacing(6)
+                    right_lay.addWidget(btn_backfill)
+
         right_lay.addSpacing(8)
 
         # Achievement details
@@ -1139,6 +1168,67 @@ class VpsAchievementInfoDialog(QDialog):
         btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
+
+    def _on_backfill_clicked(self):
+        """Retroactively fill missing VPS-ID for previously unlocked achievements of this ROM."""
+        from PyQt6.QtWidgets import QMessageBox
+        try:
+            _cur_mapping = _load_vps_mapping(self.cfg)
+            _cur_vps_id = (_cur_mapping.get(self._rom) or "").strip()
+        except Exception:
+            _cur_vps_id = ""
+
+        if not _cur_vps_id:
+            QMessageBox.warning(
+                self,
+                "No VPS Mapping",
+                f"No VPS mapping is currently assigned for ROM '{self._rom}'.\n"
+                "Assign a mapping first in the 'Available Maps' tab.",
+            )
+            return
+
+        confirm = QMessageBox(self)
+        confirm.setWindowTitle("Backfill VPS-ID")
+        confirm.setIcon(QMessageBox.Icon.Question)
+        confirm.setText(
+            f"Apply the current VPS mapping to all previously unlocked achievements\n"
+            f"for ROM <b>{self._rom}</b> that were recorded without a VPS-ID?"
+        )
+        confirm.setInformativeText(
+            "• Only achievements already unlocked without a VPS-ID will be updated.\n"
+            "• No new unlock events will be created and no achievement toasts will appear.\n"
+            "• The VPS-ID field will be set to the current mapping value.\n"
+            "• Running this again later will not change anything (idempotent)."
+        )
+        confirm.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        if confirm.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            from watcher_core import Watcher
+            result = Watcher.backfill_vps_ids(self.cfg, rom=self._rom)
+        except Exception as exc:
+            QMessageBox.critical(self, "Backfill Failed", f"An error occurred during backfill:\n{exc}")
+            return
+
+        updated = result.get("updated", 0)
+        if updated:
+            self.vps_id_backfilled.emit()
+            QMessageBox.information(
+                self,
+                "Backfill Complete",
+                f"✅  {updated} achievement entr{'y' if updated == 1 else 'ies'} updated for ROM '{self._rom}'.\n\n"
+                f"VPS-ID applied: {_cur_vps_id}",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Nothing to Update",
+                f"No unlocked achievements without a VPS-ID were found for ROM '{self._rom}'.\n"
+                "Everything is already up-to-date.",
+            )
+        self.accept()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

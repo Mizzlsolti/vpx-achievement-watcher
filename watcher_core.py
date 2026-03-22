@@ -5713,6 +5713,88 @@ class Watcher:
         p = f_achievements_state(self.cfg)
         secure_save_json(p, state)
 
+    @staticmethod
+    def backfill_vps_ids(cfg, rom: str = None) -> dict:
+        """Retroactively fill missing vps_id on already-unlocked achievement entries.
+
+        For each unlock entry that was recorded without a vps_id, look up the
+        current VPS mapping and write the mapped id into the entry.  Only
+        entries that are *already* unlocked (i.e. present in the state) are
+        touched – no new unlocks are created and no achievement toasts are
+        emitted.
+
+        Parameters
+        ----------
+        cfg:
+            App configuration object.
+        rom:
+            When given, only entries for this specific ROM are updated.
+            When ``None``, all ROMs that have a current VPS mapping are
+            processed.
+
+        Returns
+        -------
+        dict with keys:
+            ``updated``  – total number of entries whose vps_id was filled in.
+            ``roms``     – list of ROM names that had at least one entry updated.
+
+        Notes
+        -----
+        In all-ROMs mode only entries in the per-ROM ``session`` bucket are
+        processed.  Entries in the ``global/__global__`` bucket cannot be
+        attributed to a single ROM without explicit context, so they are
+        skipped.  Use single-ROM mode (pass *rom*) to also backfill global
+        entries for a specific ROM.
+        """
+        try:
+            from ui_vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(cfg)
+        except Exception:
+            vps_mapping = {}
+
+        state_path = f_achievements_state(cfg)
+        state = secure_load_json(state_path, {"global": {}, "session": {}})
+
+        total_updated = 0
+        roms_updated: list[str] = []
+
+        def _process_bucket(bucket_name: str, storage_key: str, target_rom: str):
+            nonlocal total_updated
+            vps_id = (vps_mapping.get(target_rom) or "").strip()
+            if not vps_id:
+                return
+            lst = state.get(bucket_name, {}).get(storage_key, [])
+            count = 0
+            for entry in lst:
+                if not isinstance(entry, dict):
+                    continue
+                if (entry.get("vps_id") or "").strip():
+                    # Already has a vps_id – do not overwrite (idempotent).
+                    continue
+                entry["vps_id"] = vps_id
+                count += 1
+            if count:
+                total_updated += count
+                if target_rom not in roms_updated:
+                    roms_updated.append(target_rom)
+
+        if rom:
+            # Single-ROM mode: check both session bucket and global bucket.
+            _process_bucket("session", rom, rom)
+            _process_bucket("global", "__global__", rom)
+        else:
+            # All-ROMs mode: iterate every ROM that appears in the session bucket.
+            for rom_key in list(state.get("session", {}).keys()):
+                _process_bucket("session", rom_key, rom_key)
+            # Global bucket uses "__global__" as key but achievements belong to
+            # all ROMs; we can't attribute them to a specific ROM here, so
+            # global entries are only backfilled in single-ROM mode above.
+
+        if total_updated:
+            secure_save_json(state_path, state)
+
+        return {"updated": total_updated, "roms": roms_updated}
+
     # Maps known ROM prefixes to their manufacturer names.
     # Prefix matching is used: exact ROM name, then progressively shorter underscore-split segments,
     # then just the leading alphabetic characters.
