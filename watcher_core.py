@@ -6188,6 +6188,140 @@ class Watcher:
         except Exception:
             pass
   
+    # ------------------------------------------------------------------
+    # AW_hook.ini support  (WatcherInjector / live player-switching)
+    # ------------------------------------------------------------------
+
+    def _get_hook_fields_for_rom(self, rom: str) -> list:
+        """Return plugin-compatible field dicts for AW_hook.ini.
+
+        The list includes the live-switch-critical control fields
+        (current_player, player_count, current_ball, Balls Played) that are
+        normally filtered out by parse_map(), followed by all regular audit
+        fields resolved for *rom*.
+
+        Each entry is a plain dict with keys:
+            label, offset, size, mask, value_offset
+        """
+        result: list = []
+        seen_labels: set = set()
+
+        def _add(label: str, node: dict) -> None:
+            if not isinstance(node, dict):
+                return
+            if "start" not in node and "offset" not in node:
+                return
+            ll = label.strip().lower()
+            if ll in seen_labels:
+                return
+            seen_labels.add(ll)
+            result.append({
+                "label": label,
+                "offset": self._to_int(node.get("start", node.get("offset", 0)), 0),
+                "size": self._to_int(node.get("length", node.get("size", 1)), 1),
+                "mask": self._to_int(node.get("mask", 0), 0),
+                "value_offset": self._to_int(
+                    node.get("value_offset",
+                             node.get("offset_adjust",
+                                      node.get("valueoffset", 0))), 0),
+            })
+
+        # 1. Control fields from game_state (skipped by parse_map on purpose)
+        try:
+            _, src, _ = self._resolve_map_from_index_then_family(rom)
+            if src:
+                mj = load_json(src, {}) or {}
+                gs_raw = mj.get("game_state")
+                gs = gs_raw if isinstance(gs_raw, dict) else {}
+                for name_in, label_out in [
+                    ("current_player", "current_player"),
+                    ("player_count",   "player_count"),
+                    ("current_ball",   "current_ball"),
+                    ("ball_count",     "Balls Played"),
+                ]:
+                    node = gs.get(name_in)
+                    if isinstance(node, dict):
+                        _add(label_out, node)
+        except Exception as e:
+            log(self.cfg, f"[HOOK] control-field extraction failed for '{rom}': {e}", "WARN")
+
+        # 2. Regular audit / adjustment fields from parse_map
+        try:
+            fields, _ = self.load_map_for_rom(rom)
+            for f in (fields or []):
+                label = str(f.get("label") or f.get("name") or "").strip()
+                if not label:
+                    continue
+                ll = label.lower()
+                if ll in seen_labels:
+                    continue
+                seen_labels.add(ll)
+                result.append({
+                    "label": label,
+                    "offset": int(f.get("offset", 0) or 0),
+                    "size": int(f.get("size", 1) or 1),
+                    "mask": int(f.get("mask", 0) or 0),
+                    "value_offset": int(f.get("value_offset", 0) or 0),
+                })
+        except Exception as e:
+            log(self.cfg, f"[HOOK] regular-field extraction failed for '{rom}': {e}", "WARN")
+
+        return result
+
+    def write_aw_hook(self, rom: str) -> bool:
+        """Write AW_hook.ini to cfg.BASE for *rom*.
+
+        Uses an atomic write (temp-file + os.replace) so the WatcherInjector
+        hot-reload loop never sees a partially written file.
+        Returns True on success, False when skipped or failed.
+        """
+        if not rom:
+            return False
+        hook_fields = self._get_hook_fields_for_rom(rom)
+        if not hook_fields:
+            log(self.cfg, f"[HOOK] write_aw_hook: no fields for ROM '{rom}' – skipping", "WARN")
+            return False
+        nv_path = os.path.join(self.cfg.NVRAM_DIR, rom + ".nv")
+        lines = [
+            f"base={self.cfg.BASE}",
+            f"rom={rom}",
+            f"nvram={nv_path}",
+        ]
+        for f in hook_fields:
+            lines.append(
+                f"field=label={f['label']},"
+                f"offset={f['offset']},"
+                f"size={f['size']},"
+                f"mask={f['mask']},"
+                f"value_offset={f['value_offset']}"
+            )
+        hook_path = os.path.join(self.cfg.BASE, "AW_hook.ini")
+        tmp_path = os.path.join(self.cfg.BASE, "AW_hook.ini.tmp")
+        try:
+            ensure_dir(os.path.dirname(hook_path))
+            with open(tmp_path, "w", encoding="utf-8") as fp:
+                fp.write("\n".join(lines) + "\n")
+            os.replace(tmp_path, hook_path)
+            log(self.cfg, f"[HOOK] AW_hook.ini written for ROM '{rom}' ({len(hook_fields)} fields)")
+            return True
+        except Exception as e:
+            log(self.cfg, f"[HOOK] write_aw_hook failed for '{rom}': {e}", "WARN")
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+            return False
+
+    def clear_aw_hook(self) -> None:
+        """Remove AW_hook.ini so the WatcherInjector knows no session is active."""
+        hook_path = os.path.join(self.cfg.BASE, "AW_hook.ini")
+        try:
+            if os.path.exists(hook_path):
+                os.remove(hook_path)
+                log(self.cfg, "[HOOK] AW_hook.ini cleared (session ended)")
+        except Exception as e:
+            log(self.cfg, f"[HOOK] clear_aw_hook failed: {e}", "WARN")
+
     def on_session_start(self, table_or_rom: str, is_rom: bool = False):
         if is_rom:
             self.current_rom = table_or_rom
@@ -6220,6 +6354,11 @@ class Watcher:
             self._ball_reset(self.start_audits)
         except Exception as e:
             log(self.cfg, f"[BALL] reset failed: {e}", "WARN")
+
+        try:
+            self.write_aw_hook(self.current_rom or "")
+        except Exception as e:
+            log(self.cfg, f"[HOOK] write_aw_hook in on_session_start failed: {e}", "WARN")
 
     def _ensure_singleplayer_min_playtime(self, nplayers: int, duration_sec: int) -> None:
         try:
@@ -6429,6 +6568,10 @@ class Watcher:
             except Exception:
                 pass
             self._session_rom_for_notif = None
+            try:
+                self.clear_aw_hook()
+            except Exception as e:
+                log(self.cfg, f"[HOOK] clear_aw_hook in on_session_end failed: {e}", "WARN")
                 
     def monitor_table(self) -> Optional[Dict[str, str]]:
         if not win32gui:

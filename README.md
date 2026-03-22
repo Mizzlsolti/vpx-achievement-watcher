@@ -25,6 +25,42 @@ VPC Weekly Challenge view. Discords Weekly Challenge on Overlay (Only view)
 
 The achievement watcher uses nvram-maps, vpc-data, vps and vpxtool for Visual Pinball
 
+## WatcherInjector / Live Player Switching
+
+When a table with a valid NVRAM map becomes active, the watcher automatically
+writes **`AW_hook.ini`** into the watcher base directory (`BASE\AW_hook.ini`).
+
+The companion plugin [WatcherInjector](https://github.com/Mizzlsolti/WatcherInjector)
+reads this file and writes `BASE\session_stats\live.session.json` every ~100 ms,
+enabling live overlays that update on every player change.
+
+### VPinballX.ini configuration
+
+In `VPinballX.ini`, point the plugin to the same `BasePath`:
+
+```ini
+[Plugin.Watcher]
+BasePath=C:\vPinball\VPX Achievement Watcher
+IniName=AW_hook.ini
+```
+
+### What the watcher writes
+
+`AW_hook.ini` is created/updated whenever a new ROM session starts and removed
+when the session ends.  A typical file looks like:
+
+```ini
+base=C:\vPinball\VPX Achievement Watcher
+rom=afm_113b
+nvram=C:\Visual Pinball\VPinMAME\nvram\afm_113b.nv
+field=label=current_player,offset=123,size=1,mask=3,value_offset=1
+field=label=player_count,offset=55,size=1,mask=0,value_offset=0
+field=label=current_ball,offset=56,size=1,mask=0,value_offset=0
+field=label=Balls Played,offset=200,size=1,mask=0,value_offset=0
+```
+
+Table switches update the file automatically without restarting VPX.
+
 Many thanks 
 
 to tomlogic    https://github.com/tomlogic/pinmame-nvram-maps 
