@@ -7007,34 +7007,34 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.btn_restart.setEnabled(True)
 
     def _check_for_updates(self):
-        
+        """Startup update check: uses GitHub Releases API, adds Dashboard notification only (no popup)."""
+
         def _task():
             try:
-                import urllib.request
-                import json
-                import ssl
-                
-                url = f"{self.cfg.CLOUD_URL.rstrip('/')}/app_info.json"
-                
-                req = urllib.request.Request(url, headers={"User-Agent": "AchievementWatcher/2.0"})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                
-                with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                    
-                if data and isinstance(data, dict):
-                    latest = str(data.get("latest_version", self.CURRENT_VERSION))
-                    
-                    if _parse_version(latest) > _parse_version(self.CURRENT_VERSION):
-                        from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
-                        msg = f"An important update is available!\n\nCurrent version: {self.CURRENT_VERSION}\nNew version: {latest}\n\nPlease download the latest version to ensure that cloud sync and achievements work properly."
-                        QMetaObject.invokeMethod(self, "_show_update_warning", Qt.ConnectionType.QueuedConnection, Q_ARG(str, msg))
-                        QMetaObject.invokeMethod(self, "_add_update_notification", Qt.ConnectionType.QueuedConnection, Q_ARG(str, latest))
+                from watcher_core import _fetch_json_url
+
+                RELEASES_API = "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/releases/latest"
+                release = _fetch_json_url(RELEASES_API, timeout=5)
+
+                if not release or not isinstance(release, dict):
+                    return
+                if release.get("draft"):
+                    return
+
+                tag = str(release.get("tag_name", "")).strip().lstrip("v")
+                if not tag:
+                    return
+
+                if _parse_version(tag) > _parse_version(self.CURRENT_VERSION):
+                    from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                    QMetaObject.invokeMethod(
+                        self, "_add_update_notification",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, tag),
+                    )
             except Exception as e:
                 print(f"[UPDATE CHECK] failed: {e}")
-                
+
         threading.Thread(target=_task, daemon=True).start()
 
     @pyqtSlot(str)
@@ -7054,10 +7054,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-    @pyqtSlot(str)
-    def _show_update_warning(self, msg: str):
-        QMessageBox.warning(self, "Update available!", msg)
-     
 def main():
     cfg = AppConfig.load()
     app = QApplication(sys.argv)
