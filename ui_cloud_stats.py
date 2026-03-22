@@ -895,12 +895,25 @@ class CloudStatsMixin:
         if not rom:
             return style + "<div align='center'>(Global Snapshot: ROM unknown)</div>"
 
+        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        table_title = _strip_version_from_name(romnames.get(rom, ""))
+
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
 
         if not audits:
             return style + f"<div align='center'>(Global Snapshot: No readable NVRAM data found for ROM <b>{rom}</b>)</div>"
 
-        meta = f"<div class='meta'><b>ROM:</b> {rom} &nbsp;&nbsp; <b>All NVRAM values</b></div>"
+        title_line = ""
+        if table_title:
+            title_line = (
+                f"<div style='font-size:1.4em; font-weight:bold; color:#FFFFFF; "
+                f"text-align:center; margin-bottom:3px; text-transform:uppercase;'>"
+                f"{_html.escape(table_title)}</div>"
+            )
+        meta = (
+            f"{title_line}"
+            f"<div class='meta'><b>ROM:</b> {rom} &nbsp;&nbsp; <b>All NVRAM values</b></div>"
+        )
         
         COLUMNS = 5
         

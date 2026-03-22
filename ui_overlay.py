@@ -910,6 +910,22 @@ class OverlayWindow(QWidget):
                     self._effects_widget.setGeometry(0, 0, W, H)
                     self._effects_widget.show()
                     self._effects_widget.raise_()
+            # Re-raise animation overlay widgets that must stay on top of the snapshot.
+            # These widgets draw themselves transparently over the rotated content; if
+            # rotated_label was just raised they would be buried underneath without this.
+            # The geometry is reset to full-window size in case it changed since the last
+            # render (e.g. a resize event occurred while the overlay was hidden).
+            if hasattr(self, '_shine_widget') and self._shine_widget.isVisible():
+                self._shine_widget.setGeometry(0, 0, W, H)
+                self._shine_widget.raise_()
+            if hasattr(self, '_highlight_widget') and self._highlight_widget.isVisible():
+                self._highlight_widget.setGeometry(0, 0, W, H)
+                self._highlight_widget.raise_()
+            if (self._transition_label is not None
+                    and self._transition_label.isVisible()
+                    and self._transition_state is not None):
+                self._transition_label.setGeometry(0, 0, W, H)
+                self._transition_label.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()

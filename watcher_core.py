@@ -43,8 +43,24 @@ WATCHER_VERSION = "2.6"
 
 
 def _strip_version_from_name(name: str) -> str:
-    """Remove trailing version suffixes like '(V1.13b)' or '(2.0)' from table names."""
-    return re.sub(r"\s*\(v?[\d.]+[a-z]?\)\s*$", "", name, flags=re.IGNORECASE).strip()
+    """Remove all trailing parenthesised/bracketed suffixes from table names.
+
+    Examples:
+        "Medieval Madness (Williams)"        -> "Medieval Madness"
+        "AC/DC (Premium) (V1.13b)"           -> "AC/DC"
+        "Theatre of Magic [VPX]"             -> "Theatre of Magic"
+        "Attack from Mars (Remake) (2.0)"    -> "Attack from Mars"
+    """
+    result = name
+    while True:
+        # Use separate patterns for each delimiter type to avoid matching
+        # unbalanced pairs such as "(Name]".
+        stripped = re.sub(r"\s*\([^\)]*\)\s*$", "", result, flags=re.IGNORECASE).strip()
+        stripped = re.sub(r"\s*\[[^\]]*\]\s*$", "", stripped, flags=re.IGNORECASE).strip()
+        if stripped == result:
+            break
+        result = stripped
+    return result
 
 
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
