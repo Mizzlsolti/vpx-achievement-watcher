@@ -4259,7 +4259,7 @@ class ChallengeSelectOverlay(QWidget):
         hint_gap = max(5, int(round(10 * factor)))
         avail_w = w - 2 * pad_lr
 
-        img = QImage(w, h, QImage.Format.Format_ARGB32)
+        img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
         p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -4386,8 +4386,8 @@ class ChallengeSelectOverlay(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
 
-            p.drawPolygon(*[QPoint(left_cx - aw // 2, cy), QPoint(left_cx + aw // 2, cy - ah // 2), QPoint(left_cx + aw // 2, cy + ah // 2)])
-            p.drawPolygon(*[QPoint(right_cx + aw // 2, cy), QPoint(right_cx - aw // 2, cy - ah // 2), QPoint(right_cx - aw // 2, cy + ah // 2)])
+            p.drawPolygon([QPoint(left_cx - aw // 2, cy), QPoint(left_cx + aw // 2, cy - ah // 2), QPoint(left_cx + aw // 2, cy + ah // 2)])
+            p.drawPolygon([QPoint(right_cx + aw // 2, cy), QPoint(right_cx - aw // 2, cy - ah // 2), QPoint(right_cx - aw // 2, cy + ah // 2)])
 
         finally:
             try: p.end()
@@ -4446,6 +4446,7 @@ class FlipDifficultyOverlay(QWidget):
 
         # clamp selection to available options
         self._selected = max(0, min(int(selected_idx or 0), len(self._options) - 1))
+        self._prev_selected = self._selected
 
         self._pulse_t = 0.0
         self._pulse_timer = QTimer(self)
@@ -4515,6 +4516,7 @@ class FlipDifficultyOverlay(QWidget):
     def set_selected(self, idx: int):
         new_idx = max(0, min(int(idx or 0), len(self._options) - 1))
         if new_idx != self._selected and not getattr(self, '_low_perf', False):
+            self._prev_selected = self._selected
             self._snap_active = True
             self._snap_elapsed = 0.0
             self._snap_timer.start()
@@ -4565,7 +4567,7 @@ class FlipDifficultyOverlay(QWidget):
         h_needed = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
         h = max(130, max(int(round(240 * factor)), h_needed))
 
-        img = QImage(w, h, QImage.Format.Format_ARGB32)
+        img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
         p = QPainter(img)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -4592,14 +4594,19 @@ class FlipDifficultyOverlay(QWidget):
                 x = pad_lr + ix * (box_w + spacing)
                 rect = QRect(x, y0, box_w, box_h)
 
-                # Snap pulse: brief scale + flash on selection change
+                # Snap pulse: brief scale + flash on selection change; fade-out on prev selection
                 snap_scale = 1.0
                 snap_flash_alpha = 0
-                if selected and not getattr(self, '_low_perf', False) and getattr(self, '_snap_active', False):
+                prev_fade_alpha = 0
+                if not getattr(self, '_low_perf', False) and getattr(self, '_snap_active', False):
                     snap_t = min(1.0, getattr(self, '_snap_elapsed', 0.0) / max(1.0, self._snap_duration))
-                    # Scale: 1.0 → 1.07 → 1.0 (peak at t=0.3)
-                    snap_scale = 1.0 + 0.07 * max(0.0, 1.0 - abs(snap_t - 0.3) / 0.3)
-                    snap_flash_alpha = int(120 * max(0.0, 1.0 - snap_t * 2.0))
+                    if selected:
+                        # Scale: 1.0 → 1.07 → 1.0 (peak at t=0.3)
+                        snap_scale = 1.0 + 0.07 * max(0.0, 1.0 - abs(snap_t - 0.3) / 0.3)
+                        snap_flash_alpha = int(120 * max(0.0, 1.0 - snap_t * 2.0))
+                    elif ix == getattr(self, '_prev_selected', -1):
+                        # Fade out previously selected box over the first half of the animation
+                        prev_fade_alpha = int(80 * max(0.0, 1.0 - snap_t * 2.0))
 
                 if snap_scale != 1.0:
                     expand = int((snap_scale - 1.0) * box_w / 2)
@@ -4616,6 +4623,8 @@ class FlipDifficultyOverlay(QWidget):
                         p.fillRect(draw_rect, QColor(255, 255, 255, snap_flash_alpha))
                 else:
                     p.setPen(QPen(QColor(255, 255, 255, 80), 1))
+                    if prev_fade_alpha > 0:
+                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(0, 229, 255, prev_fade_alpha))
 
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRoundedRect(draw_rect, 10, 10)
