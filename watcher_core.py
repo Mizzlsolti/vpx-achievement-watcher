@@ -41,6 +41,12 @@ def resource_path(rel: str) -> str:
 
 WATCHER_VERSION = "2.6"
 
+
+def _strip_version_from_name(name: str) -> str:
+    """Remove trailing version suffixes like '(V1.13b)' or '(2.0)' from table names."""
+    return re.sub(r"\s*\(v?[\d.]+[a-z]?\)\s*$", "", name, flags=re.IGNORECASE).strip()
+
+
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
     ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
     if requests:
@@ -1418,21 +1424,19 @@ def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None)
     """Compute a 0-100 mastery score for a specific ROM.
 
     Components:
-    - Achievement progress  (max 40 pts)
-    - Games played          (max 20 pts)
-    - Playtime              (max 20 pts)
-    - Challenges completed  (max 20 pts)
+    - Achievement progress  (max 50 pts)
+    - Games played          (max 25 pts)
+    - Challenges completed  (max 25 pts)
 
     Returns dict with keys: total, breakdown, mastery_tier, tier_color.
     """
     breakdown = {
         "achievements": 0,
         "games_played": 0,
-        "playtime": 0,
         "challenges": 0,
     }
     try:
-        # 1. Achievement progress (max 40 pts)
+        # 1. Achievement progress (max 50 pts)
         rules = []
         if watcher is not None and hasattr(watcher, "_collect_player_rules_for_rom"):
             try:
@@ -1446,14 +1450,14 @@ def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None)
                 unlocked.add(t)
         if rules:
             pct = len(unlocked) / len(rules)
-            breakdown["achievements"] = min(40, round(pct * 40))
+            breakdown["achievements"] = min(50, round(pct * 50))
         else:
             breakdown["achievements"] = 0
     except Exception:
         pass
 
     try:
-        # 2. Games played (max 20 pts): count summary files for this ROM
+        # 2. Games played (max 25 pts): count summary files for this ROM
         games = 0
         highlights_dir = os.path.join(cfg.BASE, "session_stats", "Highlights")
         if os.path.isdir(highlights_dir):
@@ -1466,51 +1470,23 @@ def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None)
                             games += 1
                     except Exception:
                         continue
-        # Scale: 1 game→2pts, 2→4pts, 3→6pts, 4→8pts, 5→10pts, 10→15pts, 20+→20pts
+        # Scale: 1→2pts, 5→10pts, 10→18pts, 20+→25pts
         if games >= 20:
-            breakdown["games_played"] = 20
+            breakdown["games_played"] = 25
         elif games >= 10:
-            breakdown["games_played"] = 15
+            breakdown["games_played"] = 18
         elif games >= 5:
-            breakdown["games_played"] = 10
+            breakdown["games_played"] = 12
         elif games >= 1:
-            breakdown["games_played"] = min(8, games * 2)
+            breakdown["games_played"] = min(10, games * 2)
         else:
             breakdown["games_played"] = 0
-        breakdown["games_played"] = min(20, breakdown["games_played"])
+        breakdown["games_played"] = min(25, breakdown["games_played"])
     except Exception:
         pass
 
     try:
-        # 3. Playtime (max 20 pts): total seconds for this ROM
-        playtime_sec = 0
-        highlights_dir = os.path.join(cfg.BASE, "session_stats", "Highlights")
-        if os.path.isdir(highlights_dir):
-            for fname in os.listdir(highlights_dir):
-                if fname.endswith(".summary.json"):
-                    fpath = os.path.join(highlights_dir, fname)
-                    try:
-                        data = secure_load_json(fpath, {}) or {}
-                        if str(data.get("rom") or "").lower() == rom.lower():
-                            playtime_sec += int(data.get("duration_sec") or data.get("playtime_sec") or 0)
-                    except Exception:
-                        continue
-        # Scale: 30min→5pts, 2h→10pts, 5h→15pts, 10h+→20pts
-        if playtime_sec >= 36000:    # 10 hours
-            breakdown["playtime"] = 20
-        elif playtime_sec >= 18000:  # 5 hours
-            breakdown["playtime"] = 15
-        elif playtime_sec >= 7200:   # 2 hours
-            breakdown["playtime"] = 10
-        elif playtime_sec >= 1800:   # 30 min
-            breakdown["playtime"] = 5
-        else:
-            breakdown["playtime"] = 0
-    except Exception:
-        pass
-
-    try:
-        # 4. Challenges completed (max 20 pts)
+        # 3. Challenges completed (max 25 pts)
         history_dir = os.path.join(cfg.BASE, "session_stats", "challenges", "history")
         ch_count = 0
         if os.path.isdir(history_dir):
@@ -1518,15 +1494,15 @@ def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None)
             if os.path.isfile(fpath):
                 hist = secure_load_json(fpath, {}) or {}
                 ch_count = len(hist.get("results") or [])
-        # Scale: 1→5pts, 5→10pts, 15→15pts, 30+→20pts
+        # Scale: 1→6pts, 5→12pts, 15→18pts, 30+→25pts
         if ch_count >= 30:
-            breakdown["challenges"] = 20
+            breakdown["challenges"] = 25
         elif ch_count >= 15:
-            breakdown["challenges"] = 15
+            breakdown["challenges"] = 18
         elif ch_count >= 5:
-            breakdown["challenges"] = 10
+            breakdown["challenges"] = 12
         elif ch_count >= 1:
-            breakdown["challenges"] = 5
+            breakdown["challenges"] = 6
         else:
             breakdown["challenges"] = 0
     except Exception:

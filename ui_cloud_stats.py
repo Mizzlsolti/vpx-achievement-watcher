@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json
+from watcher_core import CloudSync, secure_load_json, _strip_version_from_name
 
 
 class _NoBrowseBrowser(QTextBrowser):
@@ -267,6 +267,17 @@ class CloudStatsMixin:
         
         self._add_tab_help_button(layout, "cloud")
         self.main_tabs.addTab(tab, "☁️ Cloud")
+        from PyQt6.QtCore import QTimer as _QTimer
+        _QTimer.singleShot(0, self._refresh_cloud_rom_completer)
+
+    def _refresh_cloud_rom_completer(self):
+        """Populate the ROM autocomplete model with all known ROM keys and table names."""
+        try:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            items = sorted(set(list(romnames.keys()) + list(romnames.values())))
+            self._cloud_rom_completer_model.setStringList(items)
+        except Exception:
+            pass
 
     def _on_cloud_cat_changed(self, idx: int):
         if idx == 2:
@@ -598,10 +609,10 @@ class CloudStatsMixin:
             rom = "Unknown"
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-        table_title = romnames.get(rom, "")
+        table_title = _strip_version_from_name(romnames.get(rom, ""))
 
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
-        
+
         if not audits and os.path.exists(summary_path):
             try:
                 with open(summary_path, "r", encoding="utf-8") as f:
@@ -682,7 +693,7 @@ class CloudStatsMixin:
             rom = "Unknown"
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-        table_title = romnames.get(rom, "")
+        table_title = _strip_version_from_name(romnames.get(rom, ""))
 
         active_deltas = {}
         playtime_str = ""
