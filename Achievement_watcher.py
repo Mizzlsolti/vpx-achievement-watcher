@@ -1793,13 +1793,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• Select a ROM from the dropdown at the top.<br>"
             "• The view lists all available achievements with their current status "
             "(unlocked ✅ / locked 🔒).<br>"
-            "• <b>Table Mastery</b>: For each ROM-specific view, a mastery score (0–100) is shown "
-            "above the achievement grid. The score is based on four components:<br>"
-            "&nbsp;&nbsp;&nbsp;– Achievement progress (max 40 pts)<br>"
-            "&nbsp;&nbsp;&nbsp;– Games played on that table (max 20 pts)<br>"
-            "&nbsp;&nbsp;&nbsp;– Total playtime on that table (max 20 pts)<br>"
-            "&nbsp;&nbsp;&nbsp;– Challenges completed for that table (max 20 pts)<br>"
-            "Mastery tiers: 🪙 Novice → 🎯 Apprentice → 🎖️ Skilled → 💎 Expert → 🏆 Master<br>"
             "• Click an achievement link to see more details.<br>"
             "• Use <b>🔄 Refresh</b> to reload the list."
         ),
@@ -2627,37 +2620,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 
         pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0
         
-        rom_label = "Global Achievements" if rom == "Global" else f"ROM: {rom.upper()}"
+        if rom == "Global":
+            rom_label = "Global Achievements"
+        else:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            clean_rom = _strip_version_from_name(romnames.get(rom, "")) or romnames.get(rom, "") or rom
+            rom_label = clean_rom
         html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
-
-        # Mastery block for ROM-specific view
-        if rom != "Global":
-            try:
-                from watcher_core import compute_table_mastery, MASTERY_TIERS
-                mastery = compute_table_mastery(self.cfg, rom, state, watcher=self.watcher)
-                tier = mastery["mastery_tier"]
-                tier_color = mastery["tier_color"]
-                total_score = mastery["total"]
-                bd = mastery["breakdown"]
-                bar_filled = max(0, min(100, total_score))
-                mastery_html = (
-                    f"<div style='background:#1a1a1a; border:1px solid #333; border-radius:6px; "
-                    f"padding:6px 10px; margin-bottom:8px;'>"
-                    f"<div style='text-align:center; color:{tier_color}; font-weight:bold; font-size:1.05em;'>"
-                    f"Table Mastery: {tier} — {total_score}/100</div>"
-                    f"<div style='background:#222; border-radius:6px; height:12px; margin:4px 0; "
-                    f"border:1px solid #444; position:relative; overflow:hidden;'>"
-                    f"<div style='background:{tier_color}; width:{bar_filled}%; height:100%; "
-                    f"border-radius:5px;'></div></div>"
-                    f"<div style='color:#888; font-size:0.8em; text-align:center;'>"
-                    f"Achievements {bd['achievements']}/50 &nbsp;|&nbsp; "
-                    f"Games {bd['games_played']}/25 &nbsp;|&nbsp; "
-                    f"Challenges {bd['challenges']}/25"
-                    f"</div></div>"
-                )
-                html.append(mastery_html)
-            except Exception:
-                pass
 
         html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
 
@@ -4823,24 +4792,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             level_badge = ""
 
-        # Compact mastery line
-        mastery_line = ""
-        try:
-            from watcher_core import compute_table_mastery
-            mastery = compute_table_mastery(self.cfg, rom, state, watcher=self.watcher)
-            mastery_line = (
-                f"<div style='color:{mastery['tier_color']};font-size:0.8em;text-align:center;"
-                f"margin-bottom:2px;'>"
-                f"Mastery: {mastery['mastery_tier']} ({mastery['total']}/100)"
-                f"</div>"
-            )
-        except Exception:
-            pass
-
         header_html = (
             f"<div class='hdr'>{esc(header)}</div>"
             + (f"<div style='color:#FF7F00;font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
-            + mastery_line
             + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
         )
 

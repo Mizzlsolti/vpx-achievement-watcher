@@ -63,6 +63,10 @@ def _strip_version_from_name(name: str) -> str:
     return result
 
 
+# Alias used by callers that want to strip all parenthesised/bracketed suffixes.
+_clean_table_name = _strip_version_from_name
+
+
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
     ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
     if requests:
@@ -1422,145 +1426,6 @@ def evaluate_badges(state: dict, cfg: "AppConfig", watcher=None, rarity_cache: d
     except Exception:
         return list(state.get("badges") or []), []
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TABLE MASTERY
-# ──────────────────────────────────────────────────────────────────────────────
-
-MASTERY_TIERS = [
-    (90, "🏆 Master",     "#FFD700"),
-    (70, "💎 Expert",     "#00E5FF"),
-    (50, "🎖️ Skilled",    "#4CAF50"),
-    (25, "🎯 Apprentice", "#FF9800"),
-    (0,  "🪙 Novice",     "#888888"),
-]
-
-
-def compute_table_mastery(cfg: "AppConfig", rom: str, state: dict, watcher=None) -> dict:
-    """Compute a 0-100 mastery score for a specific ROM.
-
-    Components:
-    - Achievement progress  (max 50 pts)
-    - Games played          (max 25 pts)
-    - Challenges completed  (max 25 pts)
-
-    Returns dict with keys: total, breakdown, mastery_tier, tier_color.
-    """
-    breakdown = {
-        "achievements": 0,
-        "games_played": 0,
-        "challenges": 0,
-    }
-    try:
-        # 1. Achievement progress (max 50 pts)
-        rules = []
-        if watcher is not None and hasattr(watcher, "_collect_player_rules_for_rom"):
-            try:
-                rules = watcher._collect_player_rules_for_rom(rom)
-            except Exception:
-                pass
-        unlocked = set()
-        for e in state.get("session", {}).get(rom, []):
-            t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-            if t:
-                unlocked.add(t)
-                # Also add cleaned version (strip " (Session)" / " (Global)" suffixes)
-                unlocked.add(t.replace(" (Session)", "").replace(" (Global)", ""))
-        # Deduplicate rules by cleaned title (same as progress tab seen_rule_titles logic)
-        seen_rule_titles = set()
-        unique_rules = []
-        for r in rules:
-            rt = str(r.get("title", "")).strip()
-            clean_rt = rt.replace(" (Session)", "").replace(" (Global)", "")
-            if clean_rt not in seen_rule_titles:
-                seen_rule_titles.add(clean_rt)
-                unique_rules.append(r)
-        rules = unique_rules
-        if rules:
-            matched = sum(
-                1 for r in rules
-                if str(r.get("title", "")).strip() in unlocked
-                or str(r.get("title", "")).strip().replace(" (Session)", "").replace(" (Global)", "") in unlocked
-            )
-            pct = matched / len(rules)
-            breakdown["achievements"] = min(50, round(pct * 50))
-        else:
-            breakdown["achievements"] = 0
-    except Exception:
-        pass
-
-    try:
-        # 2. Games played (max 25 pts): count summary files for this ROM
-        games = 0
-        highlights_dir = os.path.join(cfg.BASE, "session_stats", "Highlights")
-        if os.path.isdir(highlights_dir):
-            for fname in os.listdir(highlights_dir):
-                if fname.endswith(".summary.json"):
-                    fpath = os.path.join(highlights_dir, fname)
-                    try:
-                        data = secure_load_json(fpath, {}) or {}
-                        if str(data.get("rom") or "").lower() == rom.lower():
-                            games += 1
-                    except Exception:
-                        continue
-        # Scale: 1→2pts, 5→10pts, 10→18pts, 20+→25pts
-        if games >= 20:
-            breakdown["games_played"] = 25
-        elif games >= 10:
-            breakdown["games_played"] = 18
-        elif games >= 5:
-            breakdown["games_played"] = 12
-        elif games >= 1:
-            breakdown["games_played"] = min(10, games * 2)
-        else:
-            breakdown["games_played"] = 0
-        breakdown["games_played"] = min(25, breakdown["games_played"])
-    except Exception:
-        pass
-
-    try:
-        # 3. Challenges completed (max 25 pts)
-        history_dir = os.path.join(cfg.BASE, "session_stats", "challenges", "history")
-        ch_count = 0
-        if os.path.isdir(history_dir):
-            fpath = os.path.join(history_dir, sanitize_filename(rom) + ".json")
-            if os.path.isfile(fpath):
-                hist = secure_load_json(fpath, {}) or {}
-                ch_count = len(hist.get("results") or [])
-        # Scale: 1→6pts, 5→12pts, 15→18pts, 30+→25pts
-        if ch_count >= 30:
-            breakdown["challenges"] = 25
-        elif ch_count >= 15:
-            breakdown["challenges"] = 18
-        elif ch_count >= 5:
-            breakdown["challenges"] = 12
-        elif ch_count >= 1:
-            breakdown["challenges"] = 6
-        else:
-            breakdown["challenges"] = 0
-    except Exception:
-        pass
-
-    total = sum(breakdown.values())
-    total = max(0, min(100, total))
-
-    # Determine tier
-    mastery_tier = MASTERY_TIERS[-1][1]
-    tier_color = MASTERY_TIERS[-1][2]
-    for threshold, tier_name, color in MASTERY_TIERS:
-        if total >= threshold:
-            mastery_tier = tier_name
-            tier_color = color
-            break
-
-    return {
-        "total": total,
-        "breakdown": breakdown,
-        "mastery_tier": mastery_tier,
-        "tier_color": tier_color,
-    }
-
-
 import urllib.request
 
 class CloudSync:
@@ -1794,19 +1659,11 @@ class CloudSync:
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "watcher_version": WATCHER_VERSION,
             }
-            # Include selected badge + mastery data for leaderboard display
+            # Include selected badge for leaderboard display
             try:
                 _ach_state = secure_load_json(f_achievements_state(cfg), {})
                 _sel_badge = str(_ach_state.get("selected_badge") or "").strip()
                 payload["selected_badge"] = _sel_badge  # Always include, even if empty
-                try:
-                    mastery = compute_table_mastery(cfg, rom, _ach_state, watcher=None)
-                    payload["mastery_total"] = mastery["total"]
-                    payload["mastery_tier"] = mastery["mastery_tier"]
-                    payload["mastery_tier_color"] = mastery["tier_color"]
-                    payload["mastery_breakdown"] = mastery["breakdown"]
-                except Exception:
-                    pass
             except Exception:
                 pass
             if _extra_vps_id:
@@ -5256,27 +5113,6 @@ class Watcher:
                 log(self.cfg, f"[BADGES] Newly earned: {newly_earned}")
         except Exception as e:
             log(self.cfg, f"[BADGES] evaluate_badges failed: {e}", "WARN")
-
-        # Upload table mastery to cloud
-        try:
-            if self.cfg.CLOUD_ENABLED and self.current_rom:
-                state = self._ach_state_load()
-                mastery = compute_table_mastery(self.cfg, self.current_rom, state, watcher=self)
-                pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip()
-                if pid and pid != "unknown":
-                    CloudSync.set_node(
-                        self.cfg,
-                        f"players/{pid}/mastery/{self.current_rom}",
-                        {
-                            "rom": self.current_rom,
-                            "total": mastery["total"],
-                            "breakdown": mastery["breakdown"],
-                            "mastery_tier": mastery["mastery_tier"],
-                            "ts": datetime.now(timezone.utc).isoformat(),
-                        },
-                    )
-        except Exception as e:
-            log(self.cfg, f"[MASTERY] upload failed: {e}", "WARN")
 
     def _evaluate_achievements(self, rom: str, start_audits: dict, end_audits: dict, duration_sec: int) -> tuple[list[str], list[str], list[dict], list[dict]]:
         global_rules = self._collect_global_rules_for_rom(rom)

@@ -511,16 +511,7 @@ class CloudStatsMixin:
                     <div class='bar-text'>{unlocked} / {total} ({pct}%)</div>
                 </div>
                 """
-                mastery_tier = str(row.get("mastery_tier") or "").strip()
-                mastery_total = row.get("mastery_total")
-                mastery_color = str(row.get("mastery_tier_color") or "#888").strip()
-                mastery_html = ""
-                if mastery_tier and mastery_total is not None:
-                    mastery_html = (
-                        f"<div style='font-size:0.8em; color:{_html.escape(mastery_color)};'>"
-                        f"Mastery: {_html.escape(mastery_tier)} ({mastery_total}/100)</div>"
-                    )
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td>{bar}{mastery_html}</td><td>{ts}</td></tr>")
+                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td>{bar}</td><td>{ts}</td></tr>")
             elif category == "flip":
                 badge = _cloud_info_badge(row)
                 score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
