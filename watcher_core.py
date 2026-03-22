@@ -1778,12 +1778,19 @@ class CloudSync:
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "watcher_version": WATCHER_VERSION,
             }
-            # Include selected badge for leaderboard display
+            # Include selected badge + mastery data for leaderboard display
             try:
                 _ach_state = secure_load_json(f_achievements_state(cfg), {})
                 _sel_badge = str(_ach_state.get("selected_badge") or "").strip()
-                if _sel_badge:
-                    payload["selected_badge"] = _sel_badge
+                payload["selected_badge"] = _sel_badge  # Always include, even if empty
+                try:
+                    mastery = compute_table_mastery(cfg, rom, _ach_state, watcher=None)
+                    payload["mastery_total"] = mastery["total"]
+                    payload["mastery_tier"] = mastery["mastery_tier"]
+                    payload["mastery_tier_color"] = mastery["tier_color"]
+                    payload["mastery_breakdown"] = mastery["breakdown"]
+                except Exception:
+                    pass
             except Exception:
                 pass
             if _extra_vps_id:
