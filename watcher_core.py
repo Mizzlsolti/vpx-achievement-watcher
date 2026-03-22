@@ -6249,6 +6249,7 @@ class Watcher:
             duration_sec = int(end_ts - (self.start_time or end_ts))
             duration_str = str(timedelta(seconds=duration_sec))
             pre = ch.get("prekill_end") if isinstance(ch.get("prekill_end", None), dict) else None
+            self._session_rom_for_notif = self.current_rom
 
             if is_challenge:
                 try:
@@ -6388,6 +6389,13 @@ class Watcher:
                     self.bridge.close_secondary_overlays.emit()
             except Exception:
                 pass
+            try:
+                _ended_rom = getattr(self, "_session_rom_for_notif", None)
+                if _ended_rom and hasattr(self.bridge, "session_ended"):
+                    self.bridge.session_ended.emit(_ended_rom)
+            except Exception:
+                pass
+            self._session_rom_for_notif = None
                 
     def monitor_table(self) -> Optional[Dict[str, str]]:
         if not win32gui:
