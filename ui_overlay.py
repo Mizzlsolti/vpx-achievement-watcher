@@ -1101,7 +1101,8 @@ class OverlayWindow(QWidget):
         table_title = ""
         try:
             romnames = getattr(self.parent_gui.watcher, "ROMNAMES", {}) or {}
-            table_title = romnames.get(rom_name, "")
+            from watcher_core import _strip_version_from_name
+            table_title = _strip_version_from_name(romnames.get(rom_name, ""))
         except Exception:
             pass
 
@@ -3420,13 +3421,10 @@ class AchToastWindow(QWidget):
                 watcher = getattr(self.parent_gui, "watcher", None)
                 if watcher:
                     romnames = getattr(watcher, "ROMNAMES", {}) or {}
-                    table_name = romnames.get(rom, "")
+                    from watcher_core import _strip_version_from_name
+                    table_name = _strip_version_from_name(romnames.get(rom, ""))
             except Exception:
                 pass
-
-            if table_name:
-                # Strip everything from the first " (" onwards, e.g. "AC/DC Limited Edition (V1.5)" → "AC/DC Limited Edition"
-                table_name = table_name.split(" (")[0].strip()
 
             line2 = table_name if table_name else rom
 

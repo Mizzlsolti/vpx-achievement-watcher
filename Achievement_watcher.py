@@ -48,6 +48,7 @@ from watcher_core import (
     f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
+    _strip_version_from_name,
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
@@ -1952,6 +1953,39 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_level.addWidget(grp_level_table)
         layout.addWidget(grp_level)
 
+        # ── Session Summary: Last Run & Run Status cards ────────────────────────────
+        grp_run_cards = QGroupBox("Session Summary")
+        lay_run_cards = QHBoxLayout(grp_run_cards)
+
+        # Left card: Last Run
+        grp_last = QGroupBox("Last Run")
+        lay_last = QVBoxLayout(grp_last)
+        self.lbl_lr_table = QLabel("Table:  —")
+        self.lbl_lr_score = QLabel("Score:  —")
+        self.lbl_lr_achievements = QLabel("Achievements:  —")
+        self.lbl_lr_result = QLabel("Last run:  —")
+        for lbl in (self.lbl_lr_table, self.lbl_lr_score, self.lbl_lr_achievements, self.lbl_lr_result):
+            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
+            lay_last.addWidget(lbl)
+        lay_last.addStretch(1)
+
+        # Right card: Run Status
+        grp_run_status = QGroupBox("Run Status")
+        lay_rs = QVBoxLayout(grp_run_status)
+        self.lbl_rs_table = QLabel("Table:  —")
+        self.lbl_rs_session = QLabel("Session:  —")
+        self.lbl_rs_cloud = QLabel("Cloud:  —")
+        self.lbl_rs_leaderboard = QLabel("Leaderboard:  —")
+        for lbl in (self.lbl_rs_table, self.lbl_rs_session, self.lbl_rs_cloud, self.lbl_rs_leaderboard):
+            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
+            lbl.setTextFormat(Qt.TextFormat.RichText)
+            lay_rs.addWidget(lbl)
+        lay_rs.addStretch(1)
+
+        lay_run_cards.addWidget(grp_last)
+        lay_run_cards.addWidget(grp_run_status)
+        layout.addWidget(grp_run_cards)
+
         # ── Badges ────────────────────────────────────────────────────────────
         grp_badges = QGroupBox("🏅 Badges")
         lay_badges = QVBoxLayout(grp_badges)
@@ -1992,50 +2026,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_quit = QPushButton("Quit GUI")
         self.btn_quit.setStyleSheet("background:#8a2525; border:none;")
         self.btn_quit.clicked.connect(self.quit_all)
-        
+
         lay_actions.addWidget(self.btn_restart)
         lay_actions.addStretch(1)
         lay_actions.addWidget(self.btn_minimize)
         lay_actions.addWidget(self.btn_quit)
         layout.addWidget(grp_actions)
-        
-        lbl_info = QLabel("\n(Play a game of VPX to see stats and highlights...)")
-        lbl_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_info.setStyleSheet("color: #777;")
-        layout.addWidget(lbl_info)
-
-        # ── Bottom: Last Run & Run Status cards ────────────────────────────
-        grp_run_cards = QGroupBox("Session Summary")
-        lay_run_cards = QHBoxLayout(grp_run_cards)
-
-        # Left card: Last Run
-        grp_last = QGroupBox("Last Run")
-        lay_last = QVBoxLayout(grp_last)
-        self.lbl_lr_table = QLabel("Table:  —")
-        self.lbl_lr_score = QLabel("Score:  —")
-        self.lbl_lr_achievements = QLabel("Achievements:  —")
-        self.lbl_lr_result = QLabel("Last run:  —")
-        for lbl in (self.lbl_lr_table, self.lbl_lr_score, self.lbl_lr_achievements, self.lbl_lr_result):
-            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
-            lay_last.addWidget(lbl)
-        lay_last.addStretch(1)
-
-        # Right card: Run Status
-        grp_run_status = QGroupBox("Run Status")
-        lay_rs = QVBoxLayout(grp_run_status)
-        self.lbl_rs_table = QLabel("Table:  —")
-        self.lbl_rs_session = QLabel("Session:  —")
-        self.lbl_rs_cloud = QLabel("Cloud:  —")
-        self.lbl_rs_leaderboard = QLabel("Leaderboard:  —")
-        for lbl in (self.lbl_rs_table, self.lbl_rs_session, self.lbl_rs_cloud, self.lbl_rs_leaderboard):
-            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
-            lbl.setTextFormat(Qt.TextFormat.RichText)
-            lay_rs.addWidget(lbl)
-        lay_rs.addStretch(1)
-
-        lay_run_cards.addWidget(grp_last)
-        lay_run_cards.addWidget(grp_run_status)
-        layout.addWidget(grp_run_cards)
 
         # Legend
         lbl_legend = QLabel(
@@ -2362,7 +2358,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if valid_roms:
             romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
             for r in valid_roms:
-                title = romnames.get(r, r)
+                title = _strip_version_from_name(romnames.get(r, r))
                 self.cmb_progress_rom.addItem(title, r)
             
         self.cmb_progress_rom.blockSignals(False)
@@ -2608,10 +2604,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"<div style='background:{tier_color}; width:{bar_filled}%; height:100%; "
                     f"border-radius:5px;'></div></div>"
                     f"<div style='color:#888; font-size:0.8em; text-align:center;'>"
-                    f"Achievements {bd['achievements']}/40 &nbsp;|&nbsp; "
-                    f"Games {bd['games_played']}/20 &nbsp;|&nbsp; "
-                    f"Playtime {bd['playtime']}/20 &nbsp;|&nbsp; "
-                    f"Challenges {bd['challenges']}/20"
+                    f"Achievements {bd['achievements']}/50 &nbsp;|&nbsp; "
+                    f"Games {bd['games_played']}/25 &nbsp;|&nbsp; "
+                    f"Challenges {bd['challenges']}/25"
                     f"</div></div>"
                 )
                 html.append(mastery_html)
@@ -4678,12 +4673,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if rom:
             try:
                 romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-                table_name = romnames.get(rom, "")
+                table_name = _strip_version_from_name(romnames.get(rom, ""))
             except Exception:
                 pass
 
         if rom:
-            header = f"Last Played: {table_name} ({rom})" if table_name else f"Last Played: {rom}"
+            header = f"Last Played: {table_name}" if table_name else f"Last Played: {rom}"
         else:
             header = "No recent play data available"
 
@@ -5448,6 +5443,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "padding: 4px 10px; letter-spacing: 8px;"
                 )
 
+            self.lbl_prestige_stars.setToolTip(
+                f"Prestige {lv['prestige']} · {PRESTIGE_THRESHOLD} achievements per star"
+            )
+
             prestige_txt = f"  •  Prestige {lv['prestige']}" if lv["prestige"] > 0 else ""
             self.lbl_level_icon_name.setText(
                 f"{lv['icon']}  <b>{lv['label']}</b>   Level {lv['level']}{prestige_txt}"
@@ -5461,11 +5460,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 )
                 self.bar_level.setValue(int(lv["progress_pct"]))
             self.lbl_level_count.setText(f"{lv['total']} Achievements total")
-            prestige_header = (
-                f"<div style='text-align:center; color:#FFD700; font-size:14pt; margin-bottom:8px;'>"
-                f"{lv['prestige_display']}  Prestige {lv['prestige']}  ({PRESTIGE_THRESHOLD} Achievements per Star)"
-                f"</div>"
-            )
             rows_html = ""
             for threshold, lvl, name in LEVEL_TABLE:
                 cls = ' class="current"' if lvl == lv["level"] else ""
@@ -5477,7 +5471,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 "td{padding:3px 8px;border-bottom:1px solid #2a2a2a;color:#CCC}"
                 ".current td{color:#00E5FF;font-weight:bold;background:#152015}"
                 "</style>"
-                + prestige_header
                 + "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
                 + rows_html + "</table>"
             )
@@ -5581,7 +5574,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         _data = _json.load(_f)
                     rom = str(_data.get("rom", "") or "")
                     romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-                    table_title = romnames.get(rom, rom.upper() if rom else "")
+                    table_title = _strip_version_from_name(romnames.get(rom, rom.upper() if rom else ""))
                     lr_table = table_title or rom.upper() or "Unknown table"
 
                     # Score: try top-level "score" (added by newer exports),
@@ -5679,7 +5672,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
 
             if game_active and current_rom:
-                table_title = romnames.get(current_rom, current_rom.upper())
+                table_title = _strip_version_from_name(romnames.get(current_rom, current_rom.upper()))
                 rs_table = table_title or current_rom.upper()
                 try:
                     state = w._ach_state_load()
