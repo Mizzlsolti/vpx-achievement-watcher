@@ -1014,6 +1014,9 @@ class VpsPickerDialog(QDialog):
 class VpsAchievementInfoDialog(QDialog):
     """Show achievement details with VPS table info."""
 
+    # Emitted when the user clicks the "Assign in Available Maps" link.
+    navigate_to_available_maps = pyqtSignal()
+
     def __init__(self, cfg, rom: str, title: str, rule: Optional[dict], unlock_entry: Any, parent=None):
         super().__init__(parent)
         self.cfg = cfg
@@ -1039,13 +1042,9 @@ class VpsAchievementInfoDialog(QDialog):
         right_lay.setContentsMargins(0, 0, 0, 0)
 
         # VPS table info
-        # Prefer the VPS-ID that was recorded at unlock time (immutable snapshot).
-        # Fall back to the current mapping only for legacy entries without vps_id.
-        if isinstance(unlock_entry, dict) and unlock_entry.get("vps_id"):
-            vps_id = unlock_entry["vps_id"]
-        else:
-            mapping = _load_vps_mapping(cfg)
-            vps_id = mapping.get(rom)
+        # Use only the VPS-ID that was recorded at unlock time (immutable snapshot).
+        # Do not fall back to the current mapping so historical context is preserved.
+        vps_id = unlock_entry.get("vps_id") if isinstance(unlock_entry, dict) else None
 
         if vps_id:
             tables = _load_vpsdb(cfg)
@@ -1087,8 +1086,11 @@ class VpsAchievementInfoDialog(QDialog):
             lbl_no = QLabel("🎰 No VPS mapping set")
             lbl_no.setStyleSheet("color:#666;")
             right_lay.addWidget(lbl_no)
-            lbl_hint = QLabel("<a href='#' style='color:#00E5FF;'>→ Assign in 'Available Maps' tab</a>")
+            lbl_hint = QLabel("<a href='#available_maps' style='color:#00E5FF;'>→ Assign in 'Available Maps' tab</a>")
             lbl_hint.setStyleSheet("color:#00E5FF;")
+            lbl_hint.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+            lbl_hint.setOpenExternalLinks(False)
+            lbl_hint.linkActivated.connect(lambda _href: (self.navigate_to_available_maps.emit(), self.accept()))
             right_lay.addWidget(lbl_hint)
 
         right_lay.addSpacing(8)
