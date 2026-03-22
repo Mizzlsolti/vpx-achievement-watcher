@@ -194,7 +194,7 @@ class OverlayEffectsWidget(QWidget):
     over the main overlay window. Works for both portrait and landscape modes since it
     paints in physical screen coordinates."""
 
-    _PARTICLE_COUNT = 12
+    _PARTICLE_COUNT = 18
 
     def __init__(self, parent: "OverlayWindow"):
         super().__init__(parent)
@@ -228,11 +228,15 @@ class OverlayEffectsWidget(QWidget):
     def _make_particle(self, W: int, H: int, spawn_anywhere: bool = False) -> dict:
         return {
             'x': random.uniform(0, W),
-            'y': random.uniform(0, H) if spawn_anywhere else H + random.uniform(0, 20),
-            'vx': random.uniform(-8, 8),
-            'vy': random.uniform(-30, -10),
-            'size': random.uniform(2, 4),
-            'alpha': random.randint(30, 80),
+            'y': random.uniform(0, H) if spawn_anywhere else random.choice([
+                random.uniform(-10, 0),        # spawn at top
+                random.uniform(H, H + 20),     # spawn at bottom
+            ]),
+            'vx': random.uniform(-15, 15),
+            'vy': random.uniform(-25, 25) if spawn_anywhere else random.uniform(-30, -10),
+            'size': random.uniform(2, 6),
+            'alpha': random.randint(30, 100),
+            'alpha_dir': random.choice([-1, 1]),
         }
 
     def showEvent(self, event):
@@ -275,9 +279,17 @@ class OverlayEffectsWidget(QWidget):
         for pt in self._particles:
             pt['x'] += pt['vx'] * dt
             pt['y'] += pt['vy'] * dt
-            # Respawn at bottom if out of bounds
-            if pt['y'] < -10 or pt['x'] < -10 or pt['x'] > W + 10:
-                pt.update(self._make_particle(W, H, spawn_anywhere=False))
+            # Shimmer alpha
+            pt['alpha'] += pt['alpha_dir'] * 2
+            if pt['alpha'] >= 100:
+                pt['alpha'] = 100
+                pt['alpha_dir'] = -1
+            elif pt['alpha'] <= 20:
+                pt['alpha'] = 20
+                pt['alpha_dir'] = 1
+            # Respawn if out of bounds on any edge
+            if pt['y'] < -10 or pt['y'] > H + 10 or pt['x'] < -10 or pt['x'] > W + 10:
+                pt.update(self._make_particle(W, H, spawn_anywhere=True))
         self.update()
 
     def set_accent(self, color: QColor):
@@ -484,6 +496,19 @@ class OverlayWindow(QWidget):
             self._shine_widget.setGeometry(0, 0, W, H)
         if hasattr(self, '_highlight_widget'):
             self._highlight_widget.setGeometry(0, 0, W, H)
+        # Resume animation timers that were interrupted by hideEvent
+        if hasattr(self, '_score_spin_timer') and hasattr(self, '_score_display') and hasattr(self, '_score_target'):
+            if self._score_display != self._score_target:
+                if not self._score_spin_timer.isActive():
+                    self._score_spin_timer.start()
+        if hasattr(self, '_progress_bar_timer') and hasattr(self, '_progress_pct_current') and hasattr(self, '_progress_pct_target'):
+            if abs(self._progress_pct_current - self._progress_pct_target) > 0.01:
+                if not self._progress_bar_timer.isActive():
+                    self._progress_bar_timer.start()
+        if hasattr(self, '_transition_timer') and hasattr(self, '_transition_state'):
+            if self._transition_state is not None:
+                if not self._transition_timer.isActive():
+                    self._transition_timer.start()
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -808,6 +833,9 @@ class OverlayWindow(QWidget):
                 QTimer.singleShot(50, self._deferred_rotation)
             return
         self._rot_in_progress = True
+        # Hide effects widget before snapshot so it isn't baked into the static pixmap
+        if hasattr(self, '_effects_widget'):
+            self._effects_widget.hide()
         try:
             W, H = self.width(), self.height()
             if W <= 0 or H <= 0:
@@ -873,11 +901,14 @@ class OverlayWindow(QWidget):
                 self._nav_arrows.setGeometry(0, 0, W, H)
                 self._nav_arrows.show()
                 self._nav_arrows.raise_()
-            # Keep effects widget (glow + particles) on top
-            if hasattr(self, '_effects_widget') and self._effects_widget.isVisible():
-                low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-                if not low_perf:
+            # Re-show effects widget on top so it animates live over the rotated content
+            if hasattr(self, '_effects_widget'):
+                ov = self.parent_gui.cfg.OVERLAY
+                low_perf = bool(ov.get("low_performance_mode", False))
+                anim_glow = bool(ov.get("anim_main_glow", True))
+                if not low_perf and anim_glow:
                     self._effects_widget.setGeometry(0, 0, W, H)
+                    self._effects_widget.show()
                     self._effects_widget.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
