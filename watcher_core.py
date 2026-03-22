@@ -1440,6 +1440,13 @@ class CloudSync:
     _recent_progress_uploads: dict = {}
     _recent_progress_uploads_lock = threading.Lock()
 
+    # Short-window dedup for full-achievements uploads to suppress burst duplicates that
+    # arise when multiple callers (e.g. _ach_record_unlocks + _persist_and_toast) fire
+    # upload_full_achievements for the same player within the same session-end cycle.
+    _FULL_ACH_DEDUP_WINDOW_SEC: float = 5.0
+    _recent_full_ach_uploads: dict = {}
+    _recent_full_ach_uploads_lock = threading.Lock()
+
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
         """Returns True if player name is missing/default and upload should be skipped.
@@ -1561,8 +1568,6 @@ class CloudSync:
             }
             _last_ts = CloudSync._recent_score_uploads.get(_dedup_key, 0.0)
             if _now - _last_ts < CloudSync._DEDUP_WINDOW_SEC:
-                log(cfg, f"[CLOUD] upload_score skipped: identical score {score} for {rom_key} "
-                         f"(duplicate within {CloudSync._DEDUP_WINDOW_SEC:.0f}s window)")
                 return
             CloudSync._recent_score_uploads[_dedup_key] = _now
 
@@ -1642,8 +1647,6 @@ class CloudSync:
             }
             _last_ts = CloudSync._recent_progress_uploads.get(_dedup_key, 0.0)
             if _now - _last_ts < CloudSync._DEDUP_WINDOW_SEC:
-                log(cfg, f"[CLOUD] upload_achievement_progress skipped: same payload for {rom} "
-                         f"({unlocked}/{total}) (duplicate within {CloudSync._DEDUP_WINDOW_SEC:.0f}s window)")
                 return
             CloudSync._recent_progress_uploads[_dedup_key] = _now
 
@@ -1855,6 +1858,16 @@ class CloudSync:
             return
         url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+
+        # Dedup: suppress burst duplicates when multiple callers fire within the same
+        # session-end cycle (e.g. _ach_record_unlocks + _persist_and_toast).
+        _now = time.time()
+        with CloudSync._recent_full_ach_uploads_lock:
+            _last_ts = CloudSync._recent_full_ach_uploads.get(pid, 0.0)
+            if _now - _last_ts < CloudSync._FULL_ACH_DEDUP_WINDOW_SEC:
+                return
+            CloudSync._recent_full_ach_uploads[pid] = _now
+
         endpoint = f"{url}/players/{pid}/achievements.json"
 
         def _task():
@@ -5057,9 +5070,6 @@ class Watcher:
                 self._ach_state_save(rom_state)
                 mfr = self._get_manufacturer_from_rom(self.current_rom)
                 log(self.cfg, f"[GLOBAL_ACH] roms_played updated: {self.current_rom} (manufacturer: {mfr})")
-            else:
-                mfr = self._get_manufacturer_from_rom(self.current_rom)
-                log(self.cfg, f"[GLOBAL_ACH] roms_played already contains: {self.current_rom} (manufacturer: {mfr}, total: {len(roms_played)})")
         except Exception as e:
             log(self.cfg, f"[ACH] roms_played update failed: {e}", "WARN")
 
