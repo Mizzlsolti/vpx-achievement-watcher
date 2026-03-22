@@ -1196,6 +1196,12 @@ class CloudProgressVpsInfoDialog(QDialog):
         resolved: list = []  # list of (table, table_file, count, pct)
         if tables and bd:
             total_count = max(sum(bd.values()), 1)
+
+            # First pass: resolve each vps_id to (vps_entry, tf_entry, count).
+            # A vps_id may be a top-level game ID *or* a tableFile ID.  Both can
+            # legitimately appear in the breakdown when the VPS mapping was updated
+            # mid-session, causing duplicate entries for the same physical table.
+            raw: list = []  # (vps_entry, tf_entry, count)
             for vid, count in sorted(bd.items(), key=lambda x: -x[1]):
                 vps_entry = None
                 tf_entry = None
@@ -1210,8 +1216,39 @@ class CloudProgressVpsInfoDialog(QDialog):
                             break
                     if vps_entry:
                         break
+                raw.append((vps_entry, tf_entry, count))
+
+            # Second pass: deduplicate entries that resolve to the same top-level
+            # game table.  Merge counts and prefer the entry that has a specific
+            # tableFile (tf_entry) over a bare top-level match, so the richer
+            # metadata is always shown.  Unresolved (None) entries are only kept
+            # when no valid table entries were found at all.
+            dedup: dict = {}  # game_id -> [vps_entry, tf_entry, merged_count]
+            none_count = 0
+            for vps_entry, tf_entry, count in raw:
+                if vps_entry is None:
+                    none_count += count
+                    continue
+                # Use a per-object fallback so entries without an 'id' are never
+                # accidentally merged with each other.
+                game_id = vps_entry.get("id") or id(vps_entry)
+                if game_id not in dedup:
+                    dedup[game_id] = [vps_entry, tf_entry, count]
+                else:
+                    slot = dedup[game_id]
+                    slot[2] += count  # accumulate count
+                    # Prefer the entry that carries tableFile metadata
+                    if tf_entry is not None and slot[1] is None:
+                        slot[0] = vps_entry
+                        slot[1] = tf_entry
+
+            for vps_entry, tf_entry, count in sorted(dedup.values(), key=lambda item: -item[2]):  # descending by count
                 pct = round(count / total_count * 100, 1)
                 resolved.append((vps_entry, tf_entry, count, pct))
+
+            # Include unresolved entries only when there are no valid table matches
+            if not resolved and none_count > 0:
+                resolved = [(None, None, none_count, 100.0)]
         elif vps_id:
             # vpsdb unavailable: show limited info from URL params
             resolved = [(None, None, 1, 100.0)]
