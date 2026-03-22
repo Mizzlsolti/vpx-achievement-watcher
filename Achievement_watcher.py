@@ -2617,12 +2617,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # ── Rarity legend ──────────────────────────────────────────────────────
         if rarity_map:
+            rarity_tooltips = {
+                "Common": "Unlocked by more than 50% of players",
+                "Uncommon": "Unlocked by 20–50% of players",
+                "Rare": "Unlocked by 5–20% of players",
+                "Epic": "Unlocked by 1–5% of players",
+                "Legendary": "Unlocked by less than 1% of players",
+            }
             legend_parts = "".join(
-                f"<span style='color:{color}; margin:0 6px;'>■ {name}</span>"
+                f"<span style='color:{color}; margin:0 6px; cursor:help;' "
+                f"title='{rarity_tooltips.get(name, '')}'>"
+                f"■ {name}</span>"
                 for _, name, color in RARITY_TIERS
             )
             html.append(
-                f"<div style='text-align:center; font-size:0.78em; margin-bottom:6px;'>"
+                f"<div style='text-align:center; font-size:0.78em; margin-bottom:18px;'>"
                 f"Rarity: {legend_parts}</div>"
             )
 
@@ -5539,12 +5548,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _on_badge_select_changed(self, _index: int):
-        """Save the selected badge to state when the dropdown changes."""
+        """Save the selected badge to state and trigger a cloud re-upload."""
         try:
             badge_id = self.cmb_badge_select.currentData() or ""
             state = self.watcher._ach_state_load()
             state["selected_badge"] = badge_id
             self.watcher._ach_state_save(state)
+            # Re-upload full achievements to cloud so the new badge appears on leaderboards
+            if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_BACKUP_ENABLED:
+                pname = self.cfg.OVERLAY.get("player_name", "Player").strip()
+                if pname:
+                    _state_copy = dict(state)
+                    threading.Thread(
+                        target=lambda: CloudSync.upload_full_achievements(self.cfg, _state_copy, pname),
+                        daemon=True,
+                    ).start()
         except Exception:
             pass
 
