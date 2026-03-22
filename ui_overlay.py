@@ -1995,15 +1995,18 @@ class FlipCounterOverlay(QWidget):
             _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
-            # Breathing glow ring: pulsates with _pulse_t when animation is enabled
+            # Breathing glow ring: pulsates with _pulse_t when animation is enabled.
+            # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
+            # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
+            # oscillation (40→220) is visible against the dark background.
             if not getattr(self, '_low_perf', False):
                 amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
-                pulse_alpha = 80 + int(140 * amp)
+                pulse_alpha = 40 + int(180 * amp)
                 pulse_pen = QPen(QColor(0, 229, 255, pulse_alpha))
-                pulse_pen.setWidth(3)
+                pulse_pen.setWidth(5)
                 p.setPen(pulse_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawRoundedRect(2, 2, content_w - 4, content_h - 4, radius - 2, radius - 2)
+                p.drawRoundedRect(5, 5, content_w - 10, content_h - 10, radius - 3, radius - 3)
 
             p.setPen(title_color); p.setFont(f_title)
             p.drawText(QRect(0, pad, content_w, fm_title.height()),
