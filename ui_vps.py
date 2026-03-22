@@ -1083,7 +1083,7 @@ class VpsAchievementInfoDialog(QDialog):
             else:
                 right_lay.addWidget(QLabel(f"<span style='color:#888;'>VPS-ID: {vps_id} (not in local cache)</span>"))
         else:
-            lbl_no = QLabel("🎰 No VPS mapping set")
+            lbl_no = QLabel("No VPS-ID at unlock time")
             lbl_no.setStyleSheet("color:#666;")
             right_lay.addWidget(lbl_no)
             lbl_hint = QLabel("<a href='#available_maps' style='color:#00E5FF;'>→ Assign in 'Available Maps' tab</a>")

@@ -6064,11 +6064,7 @@ class Watcher:
                 continue
 
             if title in existing_by_title:
-                # Existing achievement: retroactively add vps_id if it is missing
-                existing_entry = existing_by_title[title]
-                if _current_vps_id and not (existing_entry.get("vps_id") or "").strip():
-                    existing_entry["vps_id"] = _current_vps_id
-                    updated += 1
+                # Already unlocked – skip; backfill only happens on re-trigger (see below)
                 continue
 
             # New achievement
@@ -6081,7 +6077,7 @@ class Watcher:
             existing_by_title[title] = entry
             added += 1
 
-        # Process retriggered achievements: silently update vps_id if it changed
+        # Process retriggered achievements: backfill vps_id only if the entry has none (freeze semantics)
         for t in (retriggered or []):
             if isinstance(t, dict):
                 title = str(t.get("title", "")).strip()
@@ -6092,7 +6088,7 @@ class Watcher:
             if title in existing_by_title:
                 existing_entry = existing_by_title[title]
                 stored_vps = (existing_entry.get("vps_id") or "").strip()
-                if _current_vps_id and _current_vps_id != stored_vps:
+                if _current_vps_id and not stored_vps:
                     existing_entry["vps_id"] = _current_vps_id
                     updated += 1
 
