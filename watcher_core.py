@@ -2234,7 +2234,6 @@ class Watcher:
         import threading
         def _worker():
             import time
-            log(self.cfg, f"[OVERLAY] no-map worker start: rom={rom!r}")
             try:
                 import win32gui
             except ImportError:
@@ -2244,6 +2243,7 @@ class Watcher:
                     return
                 if self._has_any_map(rom):
                     return
+                log(self.cfg, f"[OVERLAY] no-map worker start: rom={rom!r}")
 
                 shown = getattr(self, "_mini_info_shown_for_rom", None)
                 if not isinstance(shown, set):
@@ -5914,8 +5914,15 @@ class Watcher:
                 collected = self._rom_spec_batch or []
                 self._rom_spec_batch = None
                 if collected:
-                    summary = ", ".join(f"{r} ({n})" for r, n in collected)
-                    log(self.cfg, f"[ROM_SPEC] Batch-generated achievement rules for {len(collected)} ROM(s): {summary}")
+                    seen: set[str] = set()
+                    unique = []
+                    for r, n in collected:
+                        if r not in seen:
+                            seen.add(r)
+                            unique.append((r, n))
+                    if unique:
+                        summary = ", ".join(f"{r} ({n})" for r, n in unique)
+                        log(self.cfg, f"[ROM_SPEC] Batch-generated achievement rules for {len(unique)} ROM(s): {summary}")
         return total
 
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
