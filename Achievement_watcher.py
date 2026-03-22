@@ -192,6 +192,7 @@ class Bridge(QObject):
     prefetch_finished = pyqtSignal(str)
     level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
     status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
+    close_secondary_overlays = pyqtSignal()
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -256,6 +257,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.achievements_updated.connect(self._refresh_level_display)
         self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
+        self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -1066,6 +1068,47 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._ch_ov_opened_at = 0.0
         except Exception:
             pass
+
+    def _close_secondary_overlays(self):
+        """Close all secondary overlay windows (NOT the main overlay) when VPX exits."""
+        for attr in ('_challenge_timer', '_challenge_select', '_flip_diff_select',
+                     '_flip_total_win', '_heat_bar_win'):
+            win = getattr(self, attr, None)
+            if win is not None:
+                try:
+                    win.close()
+                    win.deleteLater()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+        if getattr(self, '_status_overlay', None) is not None:
+            try:
+                self._status_overlay.close()
+                self._status_overlay.deleteLater()
+            except Exception:
+                pass
+            self._status_overlay = None
+        if getattr(self, '_mini_overlay', None) is not None:
+            try:
+                self._mini_overlay.close()
+                self._mini_overlay.deleteLater()
+            except Exception:
+                pass
+            self._mini_overlay = None
+        if hasattr(self, '_ach_toast_mgr'):
+            try:
+                mgr = self._ach_toast_mgr
+                mgr._queue.clear()
+                if mgr._active_window is not None:
+                    try:
+                        mgr._active_window.close()
+                        mgr._active_window.deleteLater()
+                    except Exception:
+                        pass
+                    mgr._active_window = None
+                mgr._active = False
+            except Exception:
+                pass
 
     def _refresh_challenge_select_overlay(self):
         ovw = getattr(self, "_challenge_select", None)

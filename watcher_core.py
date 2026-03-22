@@ -6481,6 +6481,11 @@ class Watcher:
             self.field_stats.clear()
             self.bootstrap_phase = False
             self.current_segment_provisional_diff = {}
+            try:
+                if hasattr(self.bridge, 'close_secondary_overlays'):
+                    self.bridge.close_secondary_overlays.emit()
+            except Exception:
+                pass
                 
     def monitor_table(self) -> Optional[Dict[str, str]]:
         if not win32gui:
