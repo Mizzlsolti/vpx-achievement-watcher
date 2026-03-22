@@ -1981,6 +1981,8 @@ class Watcher:
         self._flush_lock = threading.Lock()
         self.thread: Optional[threading.Thread] = None
         self._last_logged_rom = None
+        self._map_found_logged_roms: set = set()
+        self._rom_spec_batch: Optional[list] = None
 
         self.current_table: Optional[str] = None
         self.current_rom: Optional[str] = None
@@ -2758,7 +2760,11 @@ class Watcher:
                 remaining_session -= 1
 
         if save_json(path, {"rules": rules}):
-            log(self.cfg, f"[ROM_SPEC] created {path} with {len(rules)} session-only rules (included priority fields)")
+            batch = getattr(self, "_rom_spec_batch", None)
+            if isinstance(batch, list):
+                batch.append((rom, len(rules)))
+            else:
+                log(self.cfg, f"[ROM_SPEC] created {path} with {len(rules)} session-only rules (included priority fields)")
 
     def _ach_persist_after_session(self, end_audits: dict, duration_sec: int, nplayers: int):
         if not self.current_rom or not self._has_any_map(self.current_rom):
@@ -3135,7 +3141,13 @@ class Watcher:
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
-                log(self.cfg, f"[MAP] direct map found for ROM '{rom}' (source: {src})")
+                logged = getattr(self, "_map_found_logged_roms", None)
+                if not isinstance(logged, set):
+                    logged = set()
+                    self._map_found_logged_roms = logged
+                if rom not in logged and self.current_rom and rom == self.current_rom:
+                    log(self.cfg, f"[MAP] direct map found for ROM '{rom}' (source: {src})")
+                    logged.add(rom)
         except Exception:
             pass
 
@@ -5898,20 +5910,33 @@ class Watcher:
         *_audits_cache* is an optional dict keyed by ROM name that is populated on
         first use so repeated calls during one evaluation pass avoid re-reading files.
         """
+        # Activate batch-logging mode so _ensure_rom_specific collects ROM_SPEC
+        # creation events instead of logging them individually.
+        batch_not_active = not isinstance(getattr(self, "_rom_spec_batch", None), list)
+        if batch_not_active:
+            self._rom_spec_batch = []
         total = 0
-        for r in roms_played:
-            try:
-                if _audits_cache is not None:
-                    if r not in _audits_cache:
+        try:
+            for r in roms_played:
+                try:
+                    if _audits_cache is not None:
+                        if r not in _audits_cache:
+                            audits, _, _ = self.read_nvram_audits_with_autofix(r)
+                            _audits_cache[r] = audits
+                        audits = _audits_cache[r]
+                    else:
                         audits, _, _ = self.read_nvram_audits_with_autofix(r)
-                        _audits_cache[r] = audits
-                    audits = _audits_cache[r]
-                else:
-                    audits, _, _ = self.read_nvram_audits_with_autofix(r)
-                if audits:
-                    total += self._fuzzy_sum_field(audits, field)
-            except Exception:
-                continue
+                    if audits:
+                        total += self._fuzzy_sum_field(audits, field)
+                except Exception:
+                    continue
+        finally:
+            if batch_not_active:
+                collected = self._rom_spec_batch or []
+                self._rom_spec_batch = None
+                if collected:
+                    summary = ", ".join(f"{r} ({n})" for r, n in collected)
+                    log(self.cfg, f"[ROM_SPEC] Batch-generated achievement rules for {len(collected)} ROM(s): {summary}")
         return total
 
     def _scan_installed_roms_by_manufacturer(self, manufacturer: str) -> set:
@@ -6414,7 +6439,9 @@ class Watcher:
                 if rom:
                     self._rom_detect_cache = {"vpx_path": vpx_path, "rom": rom, "ts": now}
                     try:
-                        log(self.cfg, f"[ROM] VPXTOOL: {rom}")
+                        if rom != self._last_logged_rom:
+                            log(self.cfg, f"[ROM] VPXTOOL: {rom}")
+                            self._last_logged_rom = rom
                     except Exception:
                         pass
 
