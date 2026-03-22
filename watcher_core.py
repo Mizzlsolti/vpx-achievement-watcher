@@ -1998,16 +1998,23 @@ class CloudSync:
         for title, count in title_counts.items():
             result[title] = compute_rarity(count, total_players)
 
-        # Cache rarity data back to cloud under players/{pid}/rarity_cache/{rom}
+        # Cache rarity data back to cloud under players/{pid}/rarity_cache/{rom}.
+        # Store as a list of {title, tier, color, pct} entries instead of a dict
+        # keyed by achievement title: Firebase Realtime Database forbids certain
+        # characters (. $ # [ ] /) in key names and achievement titles can contain
+        # them (e.g. "Dr. Dude").  The in-memory `result` dict returned below is
+        # always computed locally from player data and is never read back from this
+        # Firebase node, so no reverse transformation is needed on the read path.
         try:
             if result and cfg.CLOUD_URL and cfg.CLOUD_ENABLED:
                 overlay = cfg.OVERLAY if isinstance(cfg.OVERLAY, dict) else {}
                 pid = str(overlay.get("player_id", "unknown")).strip()
                 safe_rom = rom.replace("/", "_").replace(".", "_")
+                result_list = [{"title": t, **info} for t, info in result.items()]
                 CloudSync.set_node(
                     cfg,
                     f"players/{pid}/rarity_cache/{safe_rom}",
-                    {"data": result, "total_players": total_players,
+                    {"data": result_list, "total_players": total_players,
                      "ts": datetime.now(timezone.utc).isoformat()},
                 )
         except Exception:
