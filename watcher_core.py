@@ -630,12 +630,16 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = Fal
             if re.fullmatch(r"[A-Za-z0-9_]+", rom or ""):
                 if key in warned:
                     warned.discard(key)
+                if not suppress_warn:
+                    log(cfg, f"[VPXTOOL] romname found: {rom} (from {vpx_path})")
                 return rom
 
         m = re.search(r"\b([A-Za-z0-9_]{2,})\b", out)
         if m:
             if key in warned:
                 warned.discard(key)
+            if not suppress_warn:
+                log(cfg, f"[VPXTOOL] romname found: {m.group(1)} (from {vpx_path})")
             return m.group(1)
 
         if key not in warned:
@@ -3135,6 +3139,7 @@ class Watcher:
                     log(self.cfg, f"[MAP] no nvram map found for ROM '{rom}' (after family fallback)", "WARN")
                     no_map_set.add(key)
             else:
+                log(self.cfg, f"[MAP] direct map found for ROM '{rom}' (source: {src})")
                 no_map_set = getattr(self, "_no_map_logged_for_roms", None)
                 if isinstance(no_map_set, set):
                     no_map_set.discard(str(rom).lower())
@@ -6143,6 +6148,15 @@ class Watcher:
         try:
             cands = self._all_rom_candidates(self.current_rom or "")
             log(self.cfg, f"[ROM] candidates for {self.current_rom}: {cands[:12]}")
+        except Exception:
+            pass
+
+        try:
+            _fields, _src, _matched = self._resolve_map_from_index_then_family(self.current_rom or "")
+            _rom_lower = (self.current_rom or "").lower()
+            _map_src = _src if _src else "none"
+            _fallback = _matched if (_matched and _matched.lower() != _rom_lower) else "none"
+            log(self.cfg, f"[SESSION] ROM resolved: {self.current_rom}, map source: {_map_src}, fallback: {_fallback}")
         except Exception:
             pass
 
