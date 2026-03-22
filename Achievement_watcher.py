@@ -5923,11 +5923,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if w:
                 w.deleteLater()
 
-        # Tab indices (order matches addTab calls)
+        # Tab indices (order matches addTab calls in __init__:
+        #   0=Dashboard, 1=Appearance, 2=Controls, 3=Records&Stats,
+        #   4=Progress, 5=Available Maps, 6=Cloud, 7=System)
         _TAB_MAP = {
-            "cloud": 7,
-            "system": 5,
-            "available_maps": 4,
+            "cloud": 6,
+            "system": 7,
+            "available_maps": 5,
         }
 
         if not display:
@@ -5962,7 +5964,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         row = QWidget()
         row.setStyleSheet(
             f"QWidget {{ background: {bg_color}; border: 1px solid {border_color}; "
-            "border-radius: 3px; }}"
+            "border-radius: 3px; }"
         )
         row.setFixedHeight(36)
         row.setCursor(Qt.CursorShape.PointingHandCursor)
