@@ -5390,6 +5390,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     return
                 self._ensure_overlay()
                 self._overlay_cycle["idx"] = 0
+                self._overlay_page = 0
                 self._show_overlay_section(secs[0])
                 try:
                     self._overlay_last_action = _time.monotonic()
