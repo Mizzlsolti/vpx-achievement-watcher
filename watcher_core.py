@@ -2350,11 +2350,9 @@ class Watcher:
                 for _ in range(40):  # max 20s warten
                     if self._stop.is_set():
                         return
-                    try:
-                        if not self.game_active:
-                            return
-                    except Exception:
-                        return
+                    # Don't abort on game_active=False – short sessions would never see the
+                    # notification because game_active can become False before the VPX window
+                    # is detected by the poll.  Only _stop (watcher shutdown) should abort.
                     # Don't show while a challenge is active; the challenge start
                     # message would appear before this notification otherwise.
                     try:
