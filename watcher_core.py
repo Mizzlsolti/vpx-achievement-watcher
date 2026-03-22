@@ -872,18 +872,43 @@ def _generate_signature(data: dict) -> str:
     return hashlib.sha256((s + dynamic_salt).encode('utf-8')).hexdigest()
 
 def _is_secure_path(path: str) -> bool:
-    """Prüft, ob eine Datei durch Anti-Cheat geschützt werden soll."""
-    if not path: return False
+    """Determines whether a file should be protected by anti-tamper signature.
+
+    Uses a whitelist approach: only gameplay-relevant local state files that
+    can directly affect achievements, scores, or progress are protected.
+    Non-critical files (config, caches, tool data, reference/definition files)
+    are intentionally left unsigned.
+
+    Protected categories:
+    - Achievement state (achievements_state.json)
+    - Challenge result history (session_stats/challenges/history/*.json)
+    - Session summary data (session_stats/Highlights/*.summary.json)
+    - Active player session state (session_stats/Highlights/activePlayers/*.json)
+    """
+    if not path:
+        return False
     p = path.lower().replace("\\", "/")
 
-    if p.endswith("config.json"): return False
-    if "nvram_maps" in p: return False
-    if "custom_achievements" in p: return False
-    if p.endswith("index.json") or p.endswith("romnames.json"): return False
-    
-    if not p.endswith(".json"): return False
-    
-    return True
+    if not p.endswith(".json"):
+        return False
+
+    # Achievement state – the main persisted achievement/progress store
+    if p.endswith("achievements_state.json"):
+        return True
+
+    # Challenge result history – local score/result records per ROM
+    if "/session_stats/challenges/history/" in p:
+        return True
+
+    # Session summary files – per-session result snapshots used for display and uploads
+    if "/session_stats/highlights/" in p and p.endswith(".summary.json"):
+        return True
+
+    # Active player session state – in-progress session data
+    if "/session_stats/highlights/activeplayers/" in p:
+        return True
+
+    return False
 
 def load_json(path, default=None):
     data = _raw_load_json(path, None)
@@ -893,9 +918,10 @@ def load_json(path, default=None):
     if _is_secure_path(path) and isinstance(data, dict):
         sig = data.pop("_signature", None)
         if not sig:
-            print(f"\n[SECURITY] NO SIGNATURE FOUND IN: {path}")
-            print("[SECURITY] The file has been blocked and will not be loaded!\n")
-            return default
+            # Unsigned legacy file (e.g. from v2.5) – do not block; migrate to v2.6 protection now.
+            print(f"[SECURITY] Unsigned legacy file detected: {path}. Upgrading to v2.6 protection now.")
+            save_json(path, data)
+            return data
             
         expected_new = _generate_signature(data)
         expected_legacy = _generate_legacy_signature(data)
