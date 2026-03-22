@@ -453,6 +453,29 @@ class OverlayWindow(QWidget):
             pass
         if self._nav_arrows_active:
             self._nav_arrows.raise_()
+        # Ensure all animation overlay widgets are raised above the live content in
+        # landscape mode. In landscape the container/text_container are live widgets
+        # stacked inside OverlayWindow; animation widgets must be on top of them.
+        W, H = self.width(), self.height()
+        if hasattr(self, '_effects_widget'):
+            try:
+                _ov = self.parent_gui.cfg.OVERLAY
+                _low_perf = bool(_ov.get("low_performance_mode", False))
+                _anim_glow = bool(_ov.get("anim_main_glow", True))
+                if not _low_perf and _anim_glow:
+                    self._effects_widget.setGeometry(0, 0, W, H)
+                    if not self._effects_widget.isVisible():
+                        self._effects_widget.show()
+                    self._effects_widget.raise_()
+            except Exception:
+                pass
+        if hasattr(self, '_shine_widget') and self._shine_widget.isVisible():
+            self._shine_widget.raise_()
+        if hasattr(self, '_highlight_widget') and self._highlight_widget.isVisible():
+            self._highlight_widget.raise_()
+        if (getattr(self, '_transition_label', None) is not None
+                and self._transition_label.isVisible()):
+            self._transition_label.raise_()
 
     def _icon_local(self, key: str) -> str:
         use_emojis = not bool(self.parent_gui.cfg.OVERLAY.get("prefer_ascii_icons", False))
@@ -509,6 +532,11 @@ class OverlayWindow(QWidget):
             if self._transition_state is not None:
                 if not self._transition_timer.isActive():
                     self._transition_timer.start()
+        # Restart the scrollable-list timer if there's more content than visible
+        if hasattr(self, '_p2_timer') and hasattr(self, '_p2_rows') and self._p2_rows:
+            visible = getattr(self, '_p2_visible', 10)
+            if len(self._p2_rows) > visible and not self._p2_timer.isActive():
+                self._p2_timer.start()
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -524,6 +552,8 @@ class OverlayWindow(QWidget):
             self._shine_timer.stop()
         if hasattr(self, '_highlight_timer'):
             self._highlight_timer.stop()
+        if hasattr(self, '_p2_timer'):
+            self._p2_timer.stop()
 
 
     def _alpha_bbox(self, img: QImage, min_alpha: int = 8) -> QRect:
@@ -819,12 +849,9 @@ class OverlayWindow(QWidget):
 
     def _apply_rotation_snapshot(self, force: bool = False):
         if not self.portrait_mode:
-            self.rotated_label.hide()
-            self.container.show()
-            self.text_container.show()
-            if not getattr(self, '_fullsize_mode', False):
-                self.title.show()
-            self.body.show()
+            # Delegate to _show_live_unrotated which handles all z-ordering for
+            # animation overlay widgets in landscape mode.
+            self._show_live_unrotated()
             return
         if getattr(self, "_rot_in_progress", False):
             # Queue a deferred re-render so the final state is always correct
@@ -833,9 +860,11 @@ class OverlayWindow(QWidget):
                 QTimer.singleShot(50, self._deferred_rotation)
             return
         self._rot_in_progress = True
-        # Hide effects widget before snapshot so it isn't baked into the static pixmap
-        if hasattr(self, '_effects_widget'):
-            self._effects_widget.hide()
+        # NOTE: _effects_widget is a sibling of text_container (not its child), so
+        # text_container.render() will never capture it. Do NOT hide/show it here —
+        # that would stop/restart its animation timer on every portrait refresh cycle,
+        # causing visible flicker and jitter. Instead, simply re-raise it after the
+        # snapshot label is raised so z-order is preserved.
         try:
             W, H = self.width(), self.height()
             if W <= 0 or H <= 0:
@@ -885,8 +914,13 @@ class OverlayWindow(QWidget):
                 dy = (H - content_rot.height()) // 2
                 p_final.drawImage(dx, dy, content_rot)
 
+                _snap_low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+                _snap_anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True))
+                # When the animated effects widget will be drawn on top, bake only the thin
+                # sharp inner border into the snapshot so the two borders don't stack visually.
+                # When animations are off, bake the full multi-layer glow into the snapshot.
                 _draw_glow_border(p_final, 0, 0, W, H, radius=18,
-                                   low_perf=bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False)))
+                                   low_perf=(_snap_low_perf or _snap_anim_glow))
             finally:
                 p_final.end()
             self.text_container.setGeometry(old_geom)
@@ -901,20 +935,22 @@ class OverlayWindow(QWidget):
                 self._nav_arrows.setGeometry(0, 0, W, H)
                 self._nav_arrows.show()
                 self._nav_arrows.raise_()
-            # Re-show effects widget on top so it animates live over the rotated content
-            if hasattr(self, '_effects_widget'):
-                ov = self.parent_gui.cfg.OVERLAY
-                low_perf = bool(ov.get("low_performance_mode", False))
-                anim_glow = bool(ov.get("anim_main_glow", True))
-                if not low_perf and anim_glow:
-                    self._effects_widget.setGeometry(0, 0, W, H)
-                    self._effects_widget.show()
-                    self._effects_widget.raise_()
             # Re-raise animation overlay widgets that must stay on top of the snapshot.
             # These widgets draw themselves transparently over the rotated content; if
             # rotated_label was just raised they would be buried underneath without this.
             # The geometry is reset to full-window size in case it changed since the last
             # render (e.g. a resize event occurred while the overlay was hidden).
+            # Effects widget: re-raise without hide/show to avoid stopping its animation timer.
+            if hasattr(self, '_effects_widget'):
+                _ov = self.parent_gui.cfg.OVERLAY
+                _low_perf = bool(_ov.get("low_performance_mode", False))
+                _anim_glow = bool(_ov.get("anim_main_glow", True))
+                if not _low_perf and _anim_glow:
+                    self._effects_widget.setGeometry(0, 0, W, H)
+                    if not self._effects_widget.isVisible():
+                        # Not yet visible — start it (showEvent will start the timer)
+                        self._effects_widget.show()
+                    self._effects_widget.raise_()
             if hasattr(self, '_shine_widget') and self._shine_widget.isVisible():
                 self._shine_widget.setGeometry(0, 0, W, H)
                 self._shine_widget.raise_()
@@ -3589,49 +3625,50 @@ class AchToastWindow(QWidget):
 
         portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
 
-        # Draw burst particles and neon ring in landscape only (portrait adds complexity)
-        if not portrait:
-            burst_active = getattr(self, '_burst_active', False)
-            ring_active = getattr(self, '_ring_active', False)
-            burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
-            if burst_margin > 0:
-                EW = W + 2 * burst_margin
-                EH = H + 2 * burst_margin
-                expanded = QImage(EW, EH, QImage.Format.Format_ARGB32_Premultiplied)
-                expanded.fill(Qt.GlobalColor.transparent)
-                ep = QPainter(expanded)
-                ep.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # Draw burst particles and neon ring — works in both landscape and portrait.
+        # The expanded image is built before rotation so particle positions remain
+        # consistent; rotating the whole expanded image produces correct portrait output.
+        burst_active = getattr(self, '_burst_active', False)
+        ring_active = getattr(self, '_ring_active', False)
+        burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
+        if burst_margin > 0:
+            EW = W + 2 * burst_margin
+            EH = H + 2 * burst_margin
+            expanded = QImage(EW, EH, QImage.Format.Format_ARGB32_Premultiplied)
+            expanded.fill(Qt.GlobalColor.transparent)
+            ep = QPainter(expanded)
+            ep.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            try:
+                ep.drawImage(burst_margin, burst_margin, img)
+                cx = EW // 2
+                cy = EH // 2
+                # Burst particles
+                ep.setPen(Qt.PenStyle.NoPen)
+                for pt in getattr(self, '_burst_particles', []):
+                    if pt['alpha'] > 0:
+                        c = QColor(pt['color'])
+                        c.setAlpha(int(max(0, min(255, pt['alpha']))))
+                        ep.setBrush(c)
+                        sz = max(1, int(pt['size']))
+                        ep.drawEllipse(cx + int(pt['x']) - sz // 2,
+                                       cy + int(pt['y']) - sz // 2, sz, sz)
+                # Neon rings (level-up)
+                for ring in getattr(self, '_ring_rings', []):
+                    r = int(ring['r'])
+                    alp = int(max(0, min(255, ring['alpha'])))
+                    if r > 0 and alp > 0:
+                        rc = QColor(0, 229, 255, alp)
+                        pen = QPen(rc)
+                        pen.setWidth(3)
+                        ep.setPen(pen)
+                        ep.setBrush(Qt.BrushStyle.NoBrush)
+                        ep.drawEllipse(cx - r, cy - r, 2 * r, 2 * r)
+            finally:
                 try:
-                    ep.drawImage(burst_margin, burst_margin, img)
-                    cx = EW // 2
-                    cy = EH // 2
-                    # Burst particles
-                    ep.setPen(Qt.PenStyle.NoPen)
-                    for pt in getattr(self, '_burst_particles', []):
-                        if pt['alpha'] > 0:
-                            c = QColor(pt['color'])
-                            c.setAlpha(int(max(0, min(255, pt['alpha']))))
-                            ep.setBrush(c)
-                            sz = max(1, int(pt['size']))
-                            ep.drawEllipse(cx + int(pt['x']) - sz // 2,
-                                           cy + int(pt['y']) - sz // 2, sz, sz)
-                    # Neon rings (level-up)
-                    for ring in getattr(self, '_ring_rings', []):
-                        r = int(ring['r'])
-                        alp = int(max(0, min(255, ring['alpha'])))
-                        if r > 0 and alp > 0:
-                            rc = QColor(0, 229, 255, alp)
-                            pen = QPen(rc)
-                            pen.setWidth(3)
-                            ep.setPen(pen)
-                            ep.setBrush(Qt.BrushStyle.NoBrush)
-                            ep.drawEllipse(cx - r, cy - r, 2 * r, 2 * r)
-                finally:
-                    try:
-                        ep.end()
-                    except Exception:
-                        pass
-                img = expanded
+                    ep.end()
+                except Exception:
+                    pass
+            img = expanded
 
         if portrait:
             ccw = bool(ov.get("ach_toast_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
@@ -3645,10 +3682,10 @@ class AchToastWindow(QWidget):
             EW, EH = img.width(), img.height()
             ov = self.parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
-            # Determine the burst margin embedded in the image (landscape only)
+            # Determine the burst margin embedded in the image (both landscape and portrait)
             burst_active = getattr(self, '_burst_active', False)
             ring_active = getattr(self, '_ring_active', False)
-            burst_margin = getattr(self, '_burst_img_margin', 0) if (not portrait and (burst_active or ring_active)) else 0
+            burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
