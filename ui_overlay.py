@@ -1539,6 +1539,20 @@ class OverlayWindow(QWidget):
             new_content_callback()
             return
 
+        # Portrait mode: the rotation snapshot is built asynchronously via
+        # QTimer.singleShot and competes with the slide+fade animation.
+        # _apply_rotation_snapshot raises rotated_label above _transition_label
+        # before _transition_state is set, so the animation runs invisibly behind
+        # the rotated content label.  In the worst case new_img is stale (still
+        # the old content) because the rotation didn't finish in time, causing
+        # the transition to animate nothing and leave the overlay blank until the
+        # deferred rotation fires.  Skip the slide animation entirely in portrait
+        # mode so the rotation snapshot path can update content without Z-order
+        # interference — correctness and stable visibility take priority here.
+        if getattr(self, 'portrait_mode', False):
+            new_content_callback()
+            return
+
         old_img = self._snapshot_current()
         if old_img is None or old_img.isNull():
             new_content_callback()
@@ -1573,12 +1587,6 @@ class OverlayWindow(QWidget):
         # Apply new content immediately.
         new_content_callback()
 
-        # For portrait mode the callback schedules a rotation snapshot via
-        # QTimer.singleShot(0, ...).  Process events long enough for the
-        # rotation callback to complete so _snapshot_current() below captures
-        # the fully rendered rotated content rather than stale data.
-        if getattr(self, 'portrait_mode', False):
-            QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 50)
         # Flush any remaining paint events so the snapshot is up-to-date.
         QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 20)
 
