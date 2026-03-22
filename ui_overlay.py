@@ -4459,14 +4459,27 @@ class FlipDifficultyOverlay(QWidget):
 
         factor = scaled_body_pt / 20.0
         w = max(300, int(round(560 * factor)))
-        h = max(130, int(round(240 * factor)))
         pad_lr = max(12, int(round(24 * factor)))
         top_pad = max(13, int(round(26 * factor)))
         bottom_pad = max(9, int(round(18 * factor)))
         gap_title_desc = max(4, int(round(8 * factor)))
         spacing = max(8, int(round(15 * factor)))
         hint_line_h = max(10, int(round(18 * factor)))
+        hint_gap = max(4, int(round(8 * factor)))
         avail_w = w - 2 * pad_lr
+
+        # Measure title height with word-wrap before creating the image so the
+        # image can be sized to fit the content rather than using a fixed height.
+        title = "Flip Challenge – Choose difficulty"
+        title_font_pt = scaled_body_pt + 6
+        flags_center_wrap = int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap)
+        _fm_title_pre = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
+        t_h = _fm_title_pre.boundingRect(QRect(0, 0, avail_w, 10000), flags_center_wrap, title).height()
+
+        # box_h is also used when rendering the individual difficulty boxes below.
+        box_h = max(50, int(round(100 * factor)))
+        h_needed = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
+        h = max(130, max(int(round(240 * factor)), h_needed))
 
         img = QImage(w, h, QImage.Format.Format_ARGB32)
         img.fill(Qt.GlobalColor.transparent)
@@ -4481,20 +4494,14 @@ class FlipDifficultyOverlay(QWidget):
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
-            title = "Flip Challenge – Choose difficulty"
-            title_font_pt = scaled_body_pt + 6
             p.setPen(hi_color)
             p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
-            fm_t = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
-            t_h = fm_t.height()
-            p.drawText(QRect(pad_lr, top_pad, avail_w, t_h),
-                       int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), title)
+            p.drawText(QRect(pad_lr, top_pad, avail_w, t_h), flags_center_wrap, title)
 
             y0 = top_pad + t_h + gap_title_desc
             n = max(1, len(self._options))
             total_spacing = spacing * (n - 1)
             box_w = max(60, int((avail_w - total_spacing) / n))
-            box_h = max(50, int(round(100 * factor)))
             inner_pad = max(5, int(round(10 * factor)))
 
             def draw_option(ix: int, name: str, flips: int, selected: bool):
@@ -4529,14 +4536,18 @@ class FlipDifficultyOverlay(QWidget):
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRoundedRect(draw_rect, 10, 10)
 
+                # Shrink the name font until it fits within the box width.
                 name_pt = scaled_body_pt + (2 if selected else 0)
+                fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
+                while fm_n.horizontalAdvance(name) > box_w - 4 and name_pt > 10:
+                    name_pt -= 1
+                    fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
+                name_h = fm_n.height()
                 p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
                 p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
-                fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
-                name_h = fm_n.height()
                 p.drawText(QRect(x, y0 + inner_pad, box_w, name_h),
                            int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
-                
+
                 flips_pt = scaled_body_pt
                 p.setFont(QFont(font_family, flips_pt))
                 fm_f = QFontMetrics(QFont(font_family, flips_pt))
