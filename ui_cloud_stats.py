@@ -378,32 +378,39 @@ class CloudStatsMixin:
         style = f"""
         <style>
           body {{ background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
-                  margin: 8px; padding: 0; }}
-          h2 {{ color:#FFF; margin: 0 0 2px 0; }}
-          .meta {{ color:#888; font-size:0.9em; margin: 0 0 10px 0; }}
+                  margin: 10px 12px; padding: 0; }}
+          h2 {{ color:#FFF; margin: 0 0 2px 0; font-size: 1.3em; }}
+          .meta {{ color:#888; font-size:0.9em; margin: 0 0 14px 0; }}
+          .cards-grid {{
+            display: block;
+          }}
           .trend-card {{
-            background: rgba(255,255,255,0.04);
-            border: 1px solid {_border_card};
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin: 10px 0;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid {_border_card};
+            border-radius: 12px;
+            padding: 18px 22px 14px 22px;
+            margin: 0 0 16px 0;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.35);
           }}
           .trend-card h3 {{
             color: {_primary};
-            margin: 0 0 10px 0;
-            font-size: 1.1em;
+            margin: 0 0 12px 0;
+            font-size: 1.05em;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 8px;
           }}
           table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
-          th, td {{ padding:0.25em 0.5em; border-bottom:1px solid #333;
+          th, td {{ padding:0.28em 0.5em; border-bottom:1px solid rgba(255,255,255,0.07);
                     white-space:nowrap; color:#E0E0E0; }}
-          th {{ text-align:left; background:rgba(0,0,0,0.3); font-weight:bold;
-                color:{_primary}; }}
+          th {{ text-align:left; background:rgba(0,0,0,0.35); font-weight:bold;
+                color:{_primary}; border-radius: 4px 4px 0 0; }}
           td.val {{ text-align:right; font-weight:bold; color:{_accent}; }}
-          td.up {{ color:#00E676; }}
-          td.down {{ color:#FF5252; }}
-          .spark {{ font-family:monospace; font-size:16pt; color:{_accent};
-                    letter-spacing:2px; display:block; margin-bottom:8px; }}
-          .card-footer {{ margin-top:10px; color:#ccc; font-size:0.92em; }}
+          td.up {{ color:#00E676; font-weight:bold; }}
+          td.down {{ color:#FF5252; font-weight:bold; }}
+          .spark {{ font-family:monospace; font-size:15pt; color:{_accent};
+                    letter-spacing:3px; display:block; margin-bottom:10px; }}
+          .card-footer {{ margin-top:12px; color:#bbb; font-size:0.93em;
+                          border-top: 1px solid rgba(255,255,255,0.07); padding-top: 8px; }}
           .card-footer b {{ color:{_accent}; }}
           .no-data {{ color:#888; font-style:italic; }}
         </style>

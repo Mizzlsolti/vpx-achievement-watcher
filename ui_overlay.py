@@ -2085,7 +2085,8 @@ class FlipCounterOverlay(QWidget):
             if not self._check_low_perf():
                 amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
                 pulse_alpha = 40 + int(180 * amp)
-                pulse_pen = QPen(QColor(0, 229, 255, pulse_alpha))
+                _bc = QColor(_CURRENT_THEME_BORDER)
+                pulse_pen = QPen(QColor(_bc.red(), _bc.green(), _bc.blue(), pulse_alpha))
                 pulse_pen.setWidth(5)
                 p.setPen(pulse_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
@@ -3653,11 +3654,11 @@ class AchToastWindow(QWidget):
 
         is_level_up = (self._rom == "__levelup__")
         if is_level_up:
-            border_color = QColor(ov.get("theme_border", "#00E5FF"))
+            border_color = QColor(_CURRENT_THEME_BORDER)
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
         else:
-            border_color = QColor("#555555")
+            border_color = QColor(_CURRENT_THEME_BORDER)
             raw_title = self._title or "Achievement unlocked"
             rom = self._rom or ""
 
