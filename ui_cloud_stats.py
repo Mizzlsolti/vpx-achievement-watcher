@@ -366,7 +366,7 @@ class CloudStatsMixin:
         return "".join(blocks[min(7, int((v - mn) / rng * 7))] for v in values)
 
     def _build_trends_html(self, rom: str, sessions: list) -> str:
-        """Generate the full trends HTML for a ROM using dashboard card layout."""
+        """Generate the full trends HTML for a ROM using a 3-column horizontal layout."""
         esc = _html.escape
         _primary = get_theme_color(self.cfg, "primary")
         _accent = get_theme_color(self.cfg, "accent")
@@ -377,46 +377,46 @@ class CloudStatsMixin:
           body {{ background:#111318; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
                   margin: 10px 12px; padding: 0; }}
           h2 {{ color:#FFF; margin: 0 0 2px 0; font-size: 1.3em; }}
-          .meta {{ color:#888; font-size:0.9em; margin: 0 0 16px 0; }}
-          .section-sep {{
-            border: none;
-            border-top: 2px solid {_border};
-            opacity: 0.25;
-            margin: 4px 0 18px 0;
-          }}
-          .trend-card {{
+          .meta {{ color:#888; font-size:0.9em; margin: 0 0 14px 0; }}
+          .cols-outer {{ width:100%; border-collapse:separate; border-spacing:0; }}
+          .col-panel {{
+            width:33%;
+            vertical-align:top;
             background: rgba(255,255,255,0.04);
             border: 2px solid {_border};
             border-left: 5px solid {_accent};
             border-radius: 10px;
-            padding: 16px 20px 12px 20px;
-            margin: 0 0 22px 0;
+            padding: 16px 18px 14px 18px;
           }}
-          .trend-card h3 {{
+          .col-sep {{ width:12px; }}
+          .col-panel h3 {{
             color: {_primary};
             margin: 0 0 10px 0;
-            font-size: 1.05em;
+            font-size: 1.0em;
             border-bottom: 1px solid rgba(255,255,255,0.10);
             padding-bottom: 8px;
           }}
-          table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
-          th, td {{ padding:0.28em 0.5em; border-bottom:1px solid rgba(255,255,255,0.07);
-                    white-space:nowrap; color:#E0E0E0; }}
-          th {{ text-align:left; background:rgba(0,0,0,0.40); font-weight:bold;
+          .inner-table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
+          .inner-table th, .inner-table td {{
+            padding:0.25em 0.4em;
+            border-bottom:1px solid rgba(255,255,255,0.07);
+            white-space:nowrap; color:#E0E0E0;
+          }}
+          .inner-table th {{ text-align:left; background:rgba(0,0,0,0.40); font-weight:bold;
                 color:{_primary}; }}
           td.val {{ text-align:right; font-weight:bold; color:{_accent}; }}
           td.up {{ color:#00E676; font-weight:bold; }}
           td.down {{ color:#FF5252; font-weight:bold; }}
-          .spark {{ font-family:monospace; font-size:15pt; color:{_accent};
-                    letter-spacing:3px; display:block; margin-bottom:10px; }}
-          .card-footer {{ margin-top:12px; color:#bbb; font-size:0.93em;
+          .spark {{ font-family:monospace; font-size:14pt; color:{_accent};
+                    letter-spacing:2px; display:block; margin-bottom:10px; }}
+          .card-footer {{ margin-top:10px; color:#bbb; font-size:0.90em;
                           border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; }}
           .card-footer b {{ color:{_accent}; }}
           .no-data {{ color:#888; font-style:italic; }}
           .card-badge {{
             display:inline-block; background:{_border}; color:#000;
-            font-size:0.72em; font-weight:bold; border-radius:4px;
-            padding:1px 6px; margin-right:6px; vertical-align:middle;
+            font-size:0.70em; font-weight:bold; border-radius:4px;
+            padding:1px 5px; margin-right:5px; vertical-align:middle;
           }}
         </style>
         """
@@ -442,7 +442,7 @@ class CloudStatsMixin:
             m = rem // 60
             return f"{h}h {m:02d}m"
 
-        # ── Card 1: Score Trend ─────────────────────────────────────────────
+        # ── Compute metrics ─────────────────────────────────────────────────
         scores = [s["score"] for s in recent]
         avg_score = sum(scores) / len(scores) if scores else 0
         last_score = scores[-1] if scores else 0
@@ -450,23 +450,6 @@ class CloudStatsMixin:
         trend_icon = "↑" if score_trend_pct >= 0 else "↓"
         fire = " 🔥" if score_trend_pct > 50 else ""
 
-        lines.append("<div class='trend-card'>")
-        lines.append("<h3><span class='card-badge'>1 / 3</span>📈 Score Trend (Last 10 Sessions)</h3>")
-        lines.append(f"<span class='spark'>{self._sparkline(scores)}</span>")
-        lines.append("<table>")
-        lines.append("<tr><th>Date</th><th style='text-align:right'>Score</th></tr>")
-        for s in recent:
-            score_str = f"{s['score']:,}".replace(",", ".")
-            lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{score_str}</td></tr>")
-        lines.append("</table>")
-        avg_score_str = f"{int(avg_score):,}".replace(",", ".")
-        lines.append(
-            f"<p class='card-footer'>Average: <b>{avg_score_str}</b> &nbsp;|&nbsp; "
-            f"Trend: <b>{trend_icon} {score_trend_pct:+.0f}%{fire}</b></p>"
-        )
-        lines.append("</div>")
-
-        # ── Card 2: Playtime Trend ──────────────────────────────────────────
         playtimes = [s["playtime_sec"] for s in recent]
         avg_play = sum(playtimes) / len(playtimes) if playtimes else 0
         last_play = playtimes[-1] if playtimes else 0
@@ -474,10 +457,33 @@ class CloudStatsMixin:
         play_trend_icon = "↑" if play_trend_pct >= 0 else "↓"
         play_fire = " 🔥" if play_trend_pct > 50 else ""
 
-        lines.append("<div class='trend-card'>")
-        lines.append("<h3><span class='card-badge'>2 / 3</span>⏱️ Playtime Trend (per session)</h3>")
+        # ── Start 3-column table ────────────────────────────────────────────
+        lines.append("<table class='cols-outer'><tr>")
+
+        # ── Column 1: Score Trend ───────────────────────────────────────────
+        lines.append("<td class='col-panel'>")
+        lines.append("<h3><span class='card-badge'>1 / 3</span>📈 Score Trend</h3>")
+        lines.append(f"<span class='spark'>{self._sparkline(scores)}</span>")
+        lines.append("<table class='inner-table'>")
+        lines.append("<tr><th>Date</th><th style='text-align:right'>Score</th></tr>")
+        for s in recent:
+            score_str = f"{s['score']:,}".replace(",", ".")
+            lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{score_str}</td></tr>")
+        lines.append("</table>")
+        avg_score_str = f"{int(avg_score):,}".replace(",", ".")
+        lines.append(
+            f"<p class='card-footer'>Average: <b>{avg_score_str}</b><br>"
+            f"Trend: <b>{trend_icon} {score_trend_pct:+.0f}%{fire}</b></p>"
+        )
+        lines.append("</td>")
+
+        lines.append("<td class='col-sep'></td>")
+
+        # ── Column 2: Playtime Trend ────────────────────────────────────────
+        lines.append("<td class='col-panel'>")
+        lines.append("<h3><span class='card-badge'>2 / 3</span>⏱️ Playtime Trend</h3>")
         lines.append(f"<span class='spark'>{self._sparkline(playtimes)}</span>")
-        lines.append("<table>")
+        lines.append("<table class='inner-table'>")
         lines.append("<tr><th>Date</th><th style='text-align:right'>Playtime</th></tr>")
         for s in recent:
             lines.append(
@@ -486,19 +492,21 @@ class CloudStatsMixin:
             )
         lines.append("</table>")
         lines.append(
-            f"<p class='card-footer'>Average: <b>{_fmt_playtime(int(avg_play))}</b> &nbsp;|&nbsp; "
+            f"<p class='card-footer'>Average: <b>{_fmt_playtime(int(avg_play))}</b><br>"
             f"Trend: <b>{play_trend_icon} {play_trend_pct:+.0f}%{play_fire}</b></p>"
         )
-        lines.append("</div>")
+        lines.append("</td>")
 
-        # ── Card 3: Last vs Average ─────────────────────────────────────────
-        lines.append("<div class='trend-card'>")
-        lines.append("<h3><span class='card-badge'>3 / 3</span>📊 Last vs. Average Comparison</h3>")
-        lines.append("<table>")
+        lines.append("<td class='col-sep'></td>")
+
+        # ── Column 3: Last vs Average ───────────────────────────────────────
+        lines.append("<td class='col-panel'>")
+        lines.append("<h3><span class='card-badge'>3 / 3</span>📊 Last vs. Average</h3>")
+        lines.append("<table class='inner-table'>")
         lines.append(
             "<tr><th>Metric</th>"
             "<th style='text-align:right'>Last</th>"
-            "<th style='text-align:right'>Average</th>"
+            "<th style='text-align:right'>Avg</th>"
             "<th>Trend</th></tr>"
         )
 
@@ -546,7 +554,9 @@ class CloudStatsMixin:
             pass
 
         lines.append("</table>")
-        lines.append("</div>")
+        lines.append("</td>")
+
+        lines.append("</tr></table>")
 
         return "".join(lines)
 
@@ -570,7 +580,7 @@ class CloudStatsMixin:
         self.cmb_cloud_diff.hide() 
         
         self.txt_cloud_rom = QLineEdit()
-        self.txt_cloud_rom.setPlaceholderText("Enter ROM Name (e.g. afm_113b)")
+        self.txt_cloud_rom.setPlaceholderText("Enter Table or ROM Name")
         self.txt_cloud_rom.returnPressed.connect(self._fetch_cloud_leaderboard)
 
         self._cloud_rom_completer_model = QStringListModel([], self)
@@ -597,7 +607,7 @@ class CloudStatsMixin:
         lay_ctrl.addWidget(QLabel("Category:"))
         lay_ctrl.addWidget(self.cmb_cloud_category)
         lay_ctrl.addWidget(self.cmb_cloud_diff)
-        lay_ctrl.addWidget(QLabel("ROM:"))
+        lay_ctrl.addWidget(QLabel("Table/ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
         layout.addWidget(grp_controls)
