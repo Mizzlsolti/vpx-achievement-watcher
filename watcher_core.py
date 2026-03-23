@@ -337,6 +337,7 @@ class AppConfig:
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
 
                 "total_playtime_sec",
+                "last_export_ts",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -409,6 +410,7 @@ class AppConfig:
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
 
                 "total_playtime_sec",
+                "last_export_ts",
             ]
             
             for k in allowed_keys:
