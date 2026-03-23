@@ -372,47 +372,52 @@ class CloudStatsMixin:
         _accent = get_theme_color(self.cfg, "accent")
         _border = get_theme_color(self.cfg, "border")
 
-        # Build semi-transparent border color for cards (30% opacity = ~77/255 ≈ 4D hex)
-        _border_card = _border  # used in rgba below
-
         style = f"""
         <style>
-          body {{ background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
+          body {{ background:#111318; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
                   margin: 10px 12px; padding: 0; }}
           h2 {{ color:#FFF; margin: 0 0 2px 0; font-size: 1.3em; }}
-          .meta {{ color:#888; font-size:0.9em; margin: 0 0 14px 0; }}
-          .cards-grid {{
-            display: block;
+          .meta {{ color:#888; font-size:0.9em; margin: 0 0 16px 0; }}
+          .section-sep {{
+            border: none;
+            border-top: 2px solid {_border};
+            opacity: 0.25;
+            margin: 4px 0 18px 0;
           }}
           .trend-card {{
-            background: rgba(255,255,255,0.05);
-            border: 2px solid {_border_card};
-            border-radius: 12px;
-            padding: 18px 22px 14px 22px;
-            margin: 0 0 16px 0;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+            background: rgba(255,255,255,0.04);
+            border: 2px solid {_border};
+            border-left: 5px solid {_accent};
+            border-radius: 10px;
+            padding: 16px 20px 12px 20px;
+            margin: 0 0 22px 0;
           }}
           .trend-card h3 {{
             color: {_primary};
-            margin: 0 0 12px 0;
+            margin: 0 0 10px 0;
             font-size: 1.05em;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+            border-bottom: 1px solid rgba(255,255,255,0.10);
             padding-bottom: 8px;
           }}
           table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
           th, td {{ padding:0.28em 0.5em; border-bottom:1px solid rgba(255,255,255,0.07);
                     white-space:nowrap; color:#E0E0E0; }}
-          th {{ text-align:left; background:rgba(0,0,0,0.35); font-weight:bold;
-                color:{_primary}; border-radius: 4px 4px 0 0; }}
+          th {{ text-align:left; background:rgba(0,0,0,0.40); font-weight:bold;
+                color:{_primary}; }}
           td.val {{ text-align:right; font-weight:bold; color:{_accent}; }}
           td.up {{ color:#00E676; font-weight:bold; }}
           td.down {{ color:#FF5252; font-weight:bold; }}
           .spark {{ font-family:monospace; font-size:15pt; color:{_accent};
                     letter-spacing:3px; display:block; margin-bottom:10px; }}
           .card-footer {{ margin-top:12px; color:#bbb; font-size:0.93em;
-                          border-top: 1px solid rgba(255,255,255,0.07); padding-top: 8px; }}
+                          border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; }}
           .card-footer b {{ color:{_accent}; }}
           .no-data {{ color:#888; font-style:italic; }}
+          .card-badge {{
+            display:inline-block; background:{_border}; color:#000;
+            font-size:0.72em; font-weight:bold; border-radius:4px;
+            padding:1px 6px; margin-right:6px; vertical-align:middle;
+          }}
         </style>
         """
 
@@ -446,7 +451,7 @@ class CloudStatsMixin:
         fire = " 🔥" if score_trend_pct > 50 else ""
 
         lines.append("<div class='trend-card'>")
-        lines.append("<h3>📈 Score Trend (Last 10 Sessions)</h3>")
+        lines.append("<h3><span class='card-badge'>1 / 3</span>📈 Score Trend (Last 10 Sessions)</h3>")
         lines.append(f"<span class='spark'>{self._sparkline(scores)}</span>")
         lines.append("<table>")
         lines.append("<tr><th>Date</th><th style='text-align:right'>Score</th></tr>")
@@ -470,7 +475,7 @@ class CloudStatsMixin:
         play_fire = " 🔥" if play_trend_pct > 50 else ""
 
         lines.append("<div class='trend-card'>")
-        lines.append("<h3>⏱️ Playtime Trend (per session)</h3>")
+        lines.append("<h3><span class='card-badge'>2 / 3</span>⏱️ Playtime Trend (per session)</h3>")
         lines.append(f"<span class='spark'>{self._sparkline(playtimes)}</span>")
         lines.append("<table>")
         lines.append("<tr><th>Date</th><th style='text-align:right'>Playtime</th></tr>")
@@ -488,7 +493,7 @@ class CloudStatsMixin:
 
         # ── Card 3: Last vs Average ─────────────────────────────────────────
         lines.append("<div class='trend-card'>")
-        lines.append("<h3>📊 Last vs. Average Comparison</h3>")
+        lines.append("<h3><span class='card-badge'>3 / 3</span>📊 Last vs. Average Comparison</h3>")
         lines.append("<table>")
         lines.append(
             "<tr><th>Metric</th>"
