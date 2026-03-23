@@ -273,6 +273,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._rarity_cache: dict = {}  # {rom: {"data": {...}, "ts": float, "total_players": int}}
 
         self._build_tab_dashboard()
+        self._build_tab_player()      # NEW – insert after dashboard
         self._build_tab_appearance()
         self._build_tab_controls()
         self._build_tab_stats()
@@ -1958,87 +1959,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_status.addWidget(self.status_label)
         layout.addWidget(grp_status)
 
-        grp_level = QGroupBox("👑 Player Level")
-        lay_level = QVBoxLayout(grp_level)
-
-        self.lbl_prestige_stars = QLabel("☆☆☆☆☆")
-        self.lbl_prestige_stars.setStyleSheet(
-            "font-size: 22pt; font-weight: bold; color: #FFD700; "
-            "padding: 4px 10px; letter-spacing: 8px;"
-        )
-        self.lbl_prestige_stars.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay_level.addWidget(self.lbl_prestige_stars)
-
-        self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
-        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
-        self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
-
-        self.bar_level = QProgressBar()
-        self.bar_level.setRange(0, 100)
-        self.bar_level.setValue(0)
-        self.bar_level.setTextVisible(False)
-        self.bar_level.setFixedHeight(18)
-        self.bar_level.setStyleSheet(
-            "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
-            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
-        )
-
-        row_level_info = QHBoxLayout()
-        self.lbl_level_count = QLabel("0 Achievements unlocked")
-        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
-        self.lbl_level_next = QLabel("")
-        self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
-        self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
-        row_level_info.addWidget(self.lbl_level_count)
-        row_level_info.addStretch(1)
-        row_level_info.addWidget(self.lbl_level_next)
-
-        lay_level.addWidget(self.lbl_level_icon_name)
-        lay_level.addWidget(self.bar_level)
-        lay_level.addLayout(row_level_info)
-
-        grp_level_table = QGroupBox("Level Table")
-        lay_level_table = QVBoxLayout(grp_level_table)
-        lv_browser = QTextBrowser()
-        lv_browser.setMinimumHeight(280)
-        lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
-        lay_level_table.addWidget(lv_browser)
-        self.lv_table_browser = lv_browser
-
-        # ── Badges (inside Player Level, side by side with Level Table) ───────
-        grp_badges = QGroupBox("🏅 Badges")
-        lay_badges = QVBoxLayout(grp_badges)
-
-        # Badge grid (flow of emoji icons)
-        self.wgt_badge_grid = QWidget()
-        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
-        self._badge_grid_layout.setSpacing(4)
-        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
-        lay_badges.addWidget(self.wgt_badge_grid)
-
-        # Badge count + selected badge display dropdown
-        row_badge_bottom = QHBoxLayout()
-        self.lbl_badge_count = QLabel("0 / 37 Badges")
-        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
-        row_badge_bottom.addWidget(self.lbl_badge_count)
-        row_badge_bottom.addStretch(1)
-        lbl_display_badge = QLabel("Display Badge:")
-        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
-        row_badge_bottom.addWidget(lbl_display_badge)
-        self.cmb_badge_select = QComboBox()
-        self.cmb_badge_select.setMinimumWidth(180)
-        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
-        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
-        row_badge_bottom.addWidget(self.cmb_badge_select)
-        lay_badges.addLayout(row_badge_bottom)
-
-        # Level Table (~40%) + Badges (~60%) side by side
-        row_level_badges = QHBoxLayout()
-        row_level_badges.addWidget(grp_level_table, 40)
-        row_level_badges.addWidget(grp_badges, 60)
-        lay_level.addLayout(row_level_badges)
-        layout.addWidget(grp_level)
-
         # ── Session Summary: Last Run & Run Status cards ────────────────────────────
         grp_run_cards = QGroupBox("Session Summary")
         lay_run_cards = QHBoxLayout(grp_run_cards)
@@ -2148,7 +2068,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._add_tab_help_button(layout, "dashboard")
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
-        QTimer.singleShot(1500, self._refresh_level_display)
         QTimer.singleShot(1500, self._refresh_dashboard_cards)
         self._dashboard_refresh_timer = QTimer(self)
         self._dashboard_refresh_timer.setInterval(10000)
@@ -2161,6 +2080,100 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._highscore_poll_timer.timeout.connect(self._poll_highscore_beaten)
         if getattr(self.cfg, "CLOUD_ENABLED", False):
             self._highscore_poll_timer.start()
+
+    # ==========================================
+    # TAB: PLAYER
+    # ==========================================
+    def _build_tab_player(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        grp_level = QGroupBox("👑 Player Level")
+        lay_level = QVBoxLayout(grp_level)
+
+        self.lbl_prestige_stars = QLabel("☆☆☆☆☆")
+        self.lbl_prestige_stars.setStyleSheet(
+            "font-size: 22pt; font-weight: bold; color: #FFD700; "
+            "padding: 4px 10px; letter-spacing: 8px;"
+        )
+        self.lbl_prestige_stars.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay_level.addWidget(self.lbl_prestige_stars)
+
+        self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
+        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
+        self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
+
+        self.bar_level = QProgressBar()
+        self.bar_level.setRange(0, 100)
+        self.bar_level.setValue(0)
+        self.bar_level.setTextVisible(False)
+        self.bar_level.setFixedHeight(18)
+        self.bar_level.setStyleSheet(
+            "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
+            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
+        )
+
+        row_level_info = QHBoxLayout()
+        self.lbl_level_count = QLabel("0 Achievements unlocked")
+        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
+        self.lbl_level_next = QLabel("")
+        self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
+        self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
+        row_level_info.addWidget(self.lbl_level_count)
+        row_level_info.addStretch(1)
+        row_level_info.addWidget(self.lbl_level_next)
+
+        lay_level.addWidget(self.lbl_level_icon_name)
+        lay_level.addWidget(self.bar_level)
+        lay_level.addLayout(row_level_info)
+
+        grp_level_table = QGroupBox("Level Table")
+        lay_level_table = QVBoxLayout(grp_level_table)
+        lv_browser = QTextBrowser()
+        lv_browser.setMinimumHeight(280)
+        lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
+        lay_level_table.addWidget(lv_browser)
+        self.lv_table_browser = lv_browser
+
+        # ── Badges (inside Player Level, side by side with Level Table) ───────
+        grp_badges = QGroupBox("🏅 Badges")
+        lay_badges = QVBoxLayout(grp_badges)
+
+        # Badge grid (flow of emoji icons)
+        self.wgt_badge_grid = QWidget()
+        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
+        self._badge_grid_layout.setSpacing(4)
+        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
+        lay_badges.addWidget(self.wgt_badge_grid)
+
+        # Badge count + selected badge display dropdown
+        row_badge_bottom = QHBoxLayout()
+        self.lbl_badge_count = QLabel("0 / 37 Badges")
+        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
+        row_badge_bottom.addWidget(self.lbl_badge_count)
+        row_badge_bottom.addStretch(1)
+        lbl_display_badge = QLabel("Display Badge:")
+        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
+        row_badge_bottom.addWidget(lbl_display_badge)
+        self.cmb_badge_select = QComboBox()
+        self.cmb_badge_select.setMinimumWidth(180)
+        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
+        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
+        row_badge_bottom.addWidget(self.cmb_badge_select)
+        lay_badges.addLayout(row_badge_bottom)
+
+        # Level Table (~40%) + Badges (~60%) side by side
+        row_level_badges = QHBoxLayout()
+        row_level_badges.addWidget(grp_level_table, 40)
+        row_level_badges.addWidget(grp_badges, 60)
+        lay_level.addLayout(row_level_badges)
+        layout.addWidget(grp_level)
+
+        layout.addStretch(1)
+        self._add_tab_help_button(layout, "player")
+
+        self.main_tabs.addTab(tab, "👤 Player")
+        QTimer.singleShot(1500, self._refresh_level_display)
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
