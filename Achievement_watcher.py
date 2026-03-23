@@ -2105,7 +2105,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "Use <b>Place</b> to drag the overlay to its position, and <b>Test</b> to preview it with sample data.<br>"
             "• Overlays: Main Stats Overlay, Achievement Toast, Challenge Menu, Timers &amp; Counters, "
             "System Notifications, Heat Bar, and Status Overlay.<br>"
-            "• <b>Switch All Portrait ↔ Landscape</b>: Toggle all overlay orientations at once with the orange button.<br><br>"
+            "• <b>Switch All Portrait ↔ Landscape</b>: Toggle all overlay orientations at once with the orange button.<br>"
+            "• <b>📄 Overlay Pages</b>: Choose which pages are shown when cycling through the Main Stats Overlay. "
+            "Page 1 (Highlights &amp; Score) is always active. Pages 2–5 can be enabled or disabled individually:<br>"
+            "&nbsp;&nbsp;– <b>Page 2</b>: Achievement Progress — scrollable list of unlocked/locked achievements.<br>"
+            "&nbsp;&nbsp;– <b>Page 3</b>: Challenge Leaderboard — local challenge results (Timed, Flip, Heat).<br>"
+            "&nbsp;&nbsp;– <b>Page 4</b>: Cloud Leaderboard — cloud leaderboard and VPS table info.<br>"
+            "&nbsp;&nbsp;– <b>Page 5</b>: VPC Leaderboard — Visual Pinball Community weekly leaderboard.<br><br>"
             "<b>🎨 Theme sub-tab:</b><br>"
             "• Pick a colour theme from the dropdown (Neon Blue, Amber Arcade, Crimson Night, etc.) "
             "and click <b>Apply Theme</b> to apply it to the GUI and all overlays immediately.<br>"
@@ -2647,6 +2653,42 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_pos.addLayout(box_status_overlay, 4, 0)
 
         layout.addWidget(grp_pos)
+
+        # --- Page Toggles GroupBox ---
+        grp_pages = QGroupBox("📄 Overlay Pages")
+        lay_pages = QVBoxLayout(grp_pages)
+        lay_pages.setSpacing(4)
+
+        lbl_pages_hint = QLabel("Page 1 (Highlights &amp; Score) is always active.")
+        lbl_pages_hint.setStyleSheet("color: #888; font-size: 8pt;")
+        lay_pages.addWidget(lbl_pages_hint)
+
+        self.chk_page2 = QCheckBox("Page 2: Achievement Progress")
+        self.chk_page2.setToolTip("Scrollable list of all unlocked/locked achievements for the current ROM")
+        self.chk_page2.setChecked(bool(self.cfg.OVERLAY.get("page_2_enabled", True)))
+        self.chk_page2.stateChanged.connect(lambda state: self._on_page_toggle("page_2_enabled", state))
+
+        self.chk_page3 = QCheckBox("Page 3: Challenge Leaderboard")
+        self.chk_page3.setToolTip("Local challenge results (Timed, Flip, Heat)")
+        self.chk_page3.setChecked(bool(self.cfg.OVERLAY.get("page_3_enabled", True)))
+        self.chk_page3.stateChanged.connect(lambda state: self._on_page_toggle("page_3_enabled", state))
+
+        self.chk_page4 = QCheckBox("Page 4: Cloud Leaderboard")
+        self.chk_page4.setToolTip("Cloud leaderboard and VPS table information")
+        self.chk_page4.setChecked(bool(self.cfg.OVERLAY.get("page_4_enabled", True)))
+        self.chk_page4.stateChanged.connect(lambda state: self._on_page_toggle("page_4_enabled", state))
+
+        self.chk_page5 = QCheckBox("Page 5: VPC Leaderboard")
+        self.chk_page5.setToolTip("Visual Pinball Community weekly challenge leaderboard")
+        self.chk_page5.setChecked(bool(self.cfg.OVERLAY.get("page_5_enabled", True)))
+        self.chk_page5.stateChanged.connect(lambda state: self._on_page_toggle("page_5_enabled", state))
+
+        lay_pages.addWidget(self.chk_page2)
+        lay_pages.addWidget(self.chk_page3)
+        lay_pages.addWidget(self.chk_page4)
+        lay_pages.addWidget(self.chk_page5)
+        layout.addWidget(grp_pages)
+
         layout.addStretch(1)
         self._update_switch_all_button_label()
         appearance_tabs.addTab(overlay_tab, "🖼️ Overlay")
@@ -5274,8 +5316,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _navigate_overlay_page(self, direction: int):
-        """Cycle to the next/previous overlay page (endless loop, 5 pages)."""
-        self._overlay_page = (int(getattr(self, "_overlay_page", 0)) + direction) % 5
+        """Cycle to the next/previous overlay page, skipping disabled pages."""
+        ov = self.cfg.OVERLAY
+        enabled_pages = [0]
+        if ov.get("page_2_enabled", True):
+            enabled_pages.append(1)
+        if ov.get("page_3_enabled", True):
+            enabled_pages.append(2)
+        if ov.get("page_4_enabled", True):
+            enabled_pages.append(3)
+        if ov.get("page_5_enabled", True):
+            enabled_pages.append(4)
+
+        if len(enabled_pages) <= 1:
+            return
+
+        current = int(getattr(self, "_overlay_page", 0))
+        if current not in enabled_pages:
+            current = enabled_pages[0]
+
+        idx = enabled_pages.index(current)
+        idx = (idx + direction) % len(enabled_pages)
+        self._overlay_page = enabled_pages[idx]
         try:
             self._show_overlay_page(self._overlay_page)
         except Exception as e:
@@ -7455,6 +7517,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
         self._update_switch_all_button_label()
+
+    def _on_page_toggle(self, key: str, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY[key] = is_checked
+        self.cfg.save()
 
     def _on_lines_per_category_changed(self, val: int):
         self.cfg.OVERLAY["lines_per_category"] = int(val)
