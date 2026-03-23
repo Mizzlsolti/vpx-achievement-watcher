@@ -148,8 +148,8 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             outline: none;
         }}
         QComboBox QAbstractItemView::item {{
-            min-height: 32px;
-            padding: 4px 8px;
+            min-height: 22px;
+            padding: 2px 8px;
         }}
 
         /* --- Slider (Volume & Scale) --- */

@@ -17,6 +17,7 @@ from PyQt6.QtGui import (
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
+import themes as _themes
 
 # Active theme colors – updated by MainWindow._apply_overlay_theme().
 # Defaults match the neon_blue theme so existing behaviour is unchanged.
@@ -758,6 +759,25 @@ class OverlayWindow(QWidget):
         self._highlight_timer.setInterval(16)
         self._highlight_timer.timeout.connect(self._highlight_tick)
 
+    def _sync_theme_globals(self):
+        """Sync module-level theme globals from the configured theme in cfg.OVERLAY.
+
+        Called at the start of _render_fixed_columns() so that the correct theme
+        colors are always used even on the very first render after a watcher restart,
+        before MainWindow._apply_overlay_theme() has been invoked.
+        """
+        global _CURRENT_THEME_BORDER, _CURRENT_THEME_PRIMARY, _CURRENT_THEME_ACCENT, _CURRENT_THEME_BG, _CURRENT_THEME_PAGE_ACCENTS
+        try:
+            theme_id = self.parent_gui.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
+            t = _themes.get_theme(theme_id)
+            _CURRENT_THEME_BORDER = t.get("border", _CURRENT_THEME_BORDER)
+            _CURRENT_THEME_PRIMARY = t.get("primary", _CURRENT_THEME_PRIMARY)
+            _CURRENT_THEME_ACCENT = t.get("accent", _CURRENT_THEME_ACCENT)
+            _CURRENT_THEME_BG = t.get("bg", _CURRENT_THEME_BG)
+            _CURRENT_THEME_PAGE_ACCENTS = t.get("page_accents", [])
+        except Exception:
+            pass
+
     def _apply_container_style(self):
         """Apply the current theme bg and border to the overlay container CSS."""
         border = _CURRENT_THEME_BORDER
@@ -782,11 +802,14 @@ class OverlayWindow(QWidget):
         self.container.setStyleSheet(css)
 
     def refresh_theme(self):
-        """Re-apply the current theme colours to the overlay container without rebuilding content."""
+        """Re-apply the current theme colours to the overlay container and re-render content."""
         try:
             self._apply_container_style()
             if hasattr(self, '_effects_widget'):
                 self._effects_widget.set_accent(QColor(_CURRENT_THEME_BORDER))
+            # Re-render page 1 HTML so inline colors match the new theme.
+            if getattr(self, '_current_combined', None) is not None:
+                self._render_fixed_columns()
             if self.portrait_mode and self.isVisible():
                 self.request_rotation(force=True)
         except Exception:
@@ -1263,6 +1286,8 @@ class OverlayWindow(QWidget):
         self.request_rotation(force=True)
 
     def _render_fixed_columns(self):
+        # Ensure theme globals reflect the current configured theme before building HTML.
+        self._sync_theme_globals()
         self.title.setText(self._current_title or "Highlights")
         players = list((self._current_combined or {}).get("players") or [])
         rom_name = str((self._current_combined or {}).get("rom_name") or getattr(self.parent_gui.watcher, "current_rom", None) or "Unknown ROM")
@@ -1451,6 +1476,7 @@ class OverlayWindow(QWidget):
 
         if not players:
             self.body.setText("<div>-</div>")
+            self._apply_container_style()
             self._layout_positions()
             return
 
@@ -1461,6 +1487,7 @@ class OverlayWindow(QWidget):
         body_pt = getattr(self, "_body_pt", 20)
         css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
         self.body.setText(f"<div style='{css}'>{html}</div>")
+        self._apply_container_style()
         self._layout_positions()
         
     def _score_spin_tick(self):
