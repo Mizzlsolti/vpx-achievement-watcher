@@ -226,7 +226,7 @@ def _parse_version(v_str):
 
 
 class MainWindow(QMainWindow, CloudStatsMixin):
-    CURRENT_VERSION = "2.6"
+    CURRENT_VERSION = "2.7"
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
     _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
 
