@@ -2674,7 +2674,7 @@ class Watcher:
                     lbl = str(f.get("label") or f.get("name") or "")
                     if lbl and lbl in audits:
                         priority_fields.append(lbl)
-                        priority_set.add(lbl) # Direkt ins Set schreiben
+                        priority_set.add(lbl) # Write directly into the set
 
         target_session_total = max(36, len(priority_fields) * 2 + 15)
         session_time_minutes = [5, 10, 15, 20, 30, 45]
@@ -4228,15 +4228,15 @@ class Watcher:
             now = time.time()
 
             if not self._vp_player_visible():
-                # Grace Period: erst nach 3s Unsichtbarkeit abbrechen
+                # Grace period: only abort after 3s of invisibility
                 grace_start = float(ch.get("_vpx_gone_since", 0.0))
                 if grace_start == 0.0:
                     ch["_vpx_gone_since"] = now
                     self.challenge = ch
-                    return  # noch NICHT abbrechen
+                    return  # do NOT abort yet
                 elif (now - grace_start) < 3.0:
-                    return  # noch innerhalb Grace Period
-                # Ab hier: VPX war > 3s nicht sichtbar → jetzt abbrechen
+                    return  # still within grace period
+                # From here: VPX was not visible for >3s → abort now
                 log(self.cfg, "[CHALLENGE] VPX Player window gone for >3s. Aborting challenge.")
                 kind = str(ch.get("kind", "")).lower()
                 
@@ -4259,7 +4259,7 @@ class Watcher:
                 self.challenge = ch
                 return
             else:
-                # VPX ist sichtbar → Grace-Timer zurücksetzen
+                # VPX is visible → reset grace timer
                 if ch.get("_vpx_gone_since"):
                     ch.pop("_vpx_gone_since", None)
                     self.challenge = ch
@@ -4291,7 +4291,7 @@ class Watcher:
                         ch["prekill_end"] = dict(audits_now)
                         self.challenge = ch
 
-                    # 3) VPX schließen
+                    # 3) Close VPX
                     try:
                         self._kill_vpx_process()
                     except Exception:
@@ -4940,7 +4940,7 @@ class Watcher:
                 if not fn.lower().endswith(".json"):
                     continue
                 if fn.lower() == placeholder:
-                    continue  # nur diese eine Datei ignorieren
+                    continue  # ignore only this one file
                 data = load_json(os.path.join(cdir, fn), {}) or {}
                 if isinstance(data.get("rules"), list):
                     rules.extend(data["rules"])

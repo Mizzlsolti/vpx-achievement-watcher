@@ -216,7 +216,7 @@ def parse_vpx_flipper_bindings(ini_path: str) -> dict:
             vk_l = vsc_to_vk(l_sc) if l_sc else 0
             vk_r = vsc_to_vk(r_sc) if r_sc else 0
 
-            # Fallbacks für LShift/RShift
+            # Fallbacks for LShift/RShift
             if not vk_l and l_sc == 42:  # DI scancode for LShift
                 vk_l = 0xA0  # VK_LSHIFT
             if not vk_r and r_sc == 54:  # DI scancode for RShift

@@ -790,6 +790,8 @@ class OverlayWindow(QWidget):
         """Re-apply the current theme colours to the overlay container without rebuilding content."""
         try:
             self._apply_container_style()
+            if hasattr(self, '_effects_widget'):
+                self._effects_widget.set_accent(QColor(_CURRENT_THEME_BORDER))
             if self.portrait_mode and self.isVisible():
                 self.request_rotation(force=True)
         except Exception:
@@ -2698,7 +2700,7 @@ class MiniInfoPositionPicker(QWidget):
                 x0 = int(ov.get("notifications_x_landscape", 100))
                 y0 = int(ov.get("notifications_y_landscape", 100))
         else:
-            # Wenn noch nie gespeichert, starte in der Mitte
+            # If never saved, start in the center
             x0 = int(geo.left() + (geo.width() - self._w) // 2)
             y0 = int(geo.top() + (geo.height() - self._h) // 2)
 
@@ -3692,9 +3694,9 @@ class AchToastWindow(QWidget):
         if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
             self._tw_full = line1
 
-        # Feste Theme-Farben
+        # Fixed theme colors
         title_color = QColor(_CURRENT_THEME_ACCENT)
-        text_color = QColor("#FFFFFF")  # Weiß
+        text_color = QColor("#FFFFFF")  # White
         levelup_color = QColor(_CURRENT_THEME_PRIMARY)  # Cyan for level-up line1
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
@@ -4028,7 +4030,7 @@ class AchToastManager(QObject):
         self._active_window: Optional[AchToastWindow] = None
 
     def enqueue(self, title: str, rom: str, seconds: int = 5):
-        """Fügt einen Toast in die Warteschlange ein."""
+        """Enqueue a toast notification."""
         self._queue.append((title, rom, seconds))
         if not self._active:
             self._show_next()

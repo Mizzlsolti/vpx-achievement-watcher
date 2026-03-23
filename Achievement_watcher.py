@@ -840,7 +840,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     ]
 
     def _on_mini_info_test(self):
-        # Ruft das Fenster direkt auf, ohne auf ein offenes Spiel zu warten!
+        # Directly shows the window without waiting for an active game!
         if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
             self._mini_overlay = MiniInfoOverlay(self)
         msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
@@ -1785,7 +1785,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _apply_theme(self):
         app = QApplication.instance()
-        # Fusion ist die beste Basis für starke Custom-Themes
+        # Fusion is the best base for strong custom themes
         app.setStyle("Fusion") 
         
         app.setStyleSheet(pinball_arcade_style())
@@ -1965,41 +1965,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     def _on_demo_test_main_overlay(self):
-        """Show a demo main stats overlay with example achievement data."""
-        try:
-            if getattr(self, "_demo_main_win", None):
-                try:
-                    self._demo_main_win.close()
-                except Exception:
-                    pass
-                self._demo_main_win = None
-            demo_ov = OverlayWindow(self)
-            self._demo_main_win = demo_ov
-            css = "<style>td{color:#FFFFFF;} td.pct{color:#FF7F00; font-weight:bold;}</style>"
-            header = "<div style='color:#00E5FF; font-weight:bold; font-size:1.2em;'>🏆 Demo Table</div>"
-            rows = [
-                f"<tr><td>High Score Master</td><td class='pct'>✅ 1,250,000</td></tr>",
-                f"<tr><td>Multiball Madness</td><td class='pct'>✅ 750,000</td></tr>",
-                f"<tr><td>Jackpot King</td><td class='pct'>✅ 500,000</td></tr>",
-                f"<tr><td>Flipper Expert</td><td class='pct'>⬜ 0</td></tr>",
-                f"<tr><td>Wizard Mode</td><td class='pct'>⬜ 0</td></tr>",
-            ]
-            demo_ov.set_html_scrollable(css, header, rows, session_title="Demo Preview")
-            demo_ov.show()
-            demo_ov.raise_()
-
-            def _safe_close():
-                try:
-                    w = getattr(self, "_demo_main_win", None)
-                    if w:
-                        w.close()
-                except Exception:
-                    pass
-                self._demo_main_win = None
-
-            QTimer.singleShot(5000, _safe_close)
-        except Exception:
-            pass
+        """Show a demo main stats overlay with example achievement data (same as Overlay tab test)."""
+        self._on_overlay_test_clicked()
 
     def _apply_overlay_theme(self):
         """Push current theme colors into config keys and the overlay module variables."""
@@ -2097,28 +2064,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     _TAB_HELP = {
         "player": (
             "<b>👤 Player</b><br><br>"
-            "The Player tab shows your personal profile and progress.<br><br>"
-            "• <b>Player Level</b>: Your current level and XP progress bar based on unlocked achievements. "
-            "Earn prestige stars (up to ☆☆☆☆☆) by unlocking 2000 achievements each.<br>"
-            "• <b>Level Table</b>: Shows all level thresholds and XP requirements.<br>"
-            "• <b>Badges</b>: Collectible badges earned through gameplay milestones. "
-            "Use the <b>Display Badge</b> dropdown to choose which badge appears next to your name on leaderboards."
+            "The Player tab shows your personal profile and achievement progress.<br><br>"
+            "• <b>Player Level</b>: Your current level and XP progress bar based on total unlocked achievements. "
+            "Earn prestige stars (up to ☆☆☆☆☆) by unlocking 2000 achievements per star.<br>"
+            "• <b>Level Table</b>: Shows all level thresholds and XP requirements for each level.<br>"
+            "• <b>Badges</b>: 37+ collectible badges earned through gameplay milestones — "
+            "unlock achievements, complete challenges, reach levels, accumulate playtime, and more.<br>"
+            "• Use the <b>Display Badge</b> dropdown to choose which badge icon appears next to your name "
+            "on cloud leaderboards."
         ),
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status, your player level, "
             "badges, and the latest session information.<br><br>"
             "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
-            "• <b>Player Level</b>: Your current level and progress bar based on unlocked achievements. "
-            "Reach Prestige 1–5 by unlocking 2000 achievements per star.<br>"
-            "• <b>Badges</b>: 37 collectible badges earned through gameplay milestones. "
-            "Earn badges by unlocking achievements, completing challenges, reaching levels, "
-            "accumulating playtime, and more. "
-            "Use the <b>Display Badge</b> dropdown to choose which badge icon appears next to "
-            "your name on cloud leaderboards.<br>"
             "• <b>Session Summary</b>: Overview of the last and current play session including "
-            "score, achievements, and cloud status.<br>"
-            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
+            "score, achievements, and cloud upload status.<br>"
+            "• <b>📬 Notifications</b>: Recent system events — update availability, VPS mapping alerts, "
+            "leaderboard rank changes, and highscore beaten alerts. "
+            "Click a notification to navigate to the relevant tab. "
+            "Use <b>Mark all read</b> or <b>Clear All</b> to manage notifications.<br>"
+            "• <b>Quick Actions</b>: Restart the watcher engine, minimize to tray, or quit the application."
         ),
         "progress": (
             "<b>📈 Progress</b><br><br>"
@@ -2126,72 +2092,97 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• Select a ROM from the dropdown at the top.<br>"
             "• The view lists all available achievements with their current status "
             "(unlocked ✅ / locked 🔒).<br>"
-            "• Click an achievement link to see more details.<br>"
-            "• Use <b>🔄 Refresh</b> to reload the list."
+            "• Click an achievement link to see more details about that achievement.<br>"
+            "• Use <b>🔄 Refresh</b> to reload the list after playing."
         ),
         "appearance": (
             "<b>🎨 Appearance</b><br><br>"
-            "The Appearance tab lets you configure the visual style of all overlays.<br><br>"
-            "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
-            "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, Challenge Menu, Timers & Counters, System Notifications, Heat Bar, Status Overlay).<br>"
-            "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
-            "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
-            "Landscape mode in one click.<br>"
-            "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
-            "the overlay.<br><br>"
-            "• <b>🎨 Theme</b>: Pick a colour theme from the dropdown and click <b>Apply Theme</b> "
-            "to apply it to the GUI and all supported overlays immediately. "
-            "The theme controls the border, accent, primary, and background colours. "
-            "<i>System Notification</i> and <i>Status Overlay</i> are intentionally excluded from theme changes.<br>"
-            "• <b>Overlay Preview</b>: Use the demo buttons to preview how overlays look with the chosen theme.<br><br>"
-            "• <b>🔊 Sound</b>: Enable/disable sound effects, choose a sound pack, adjust volume, "
-            "and toggle individual sound events on or off."
+            "The Appearance tab has three sub-tabs: <b>Overlay</b>, <b>Theme</b>, and <b>Sound</b>.<br><br>"
+            "<b>🖼️ Overlay sub-tab:</b><br>"
+            "• <b>Global Styling</b>: Choose the font family, base size, and overlay scale (30–300%).<br>"
+            "• <b>Widget Placement &amp; Orientation</b>: Position and rotate each overlay window. "
+            "Use <b>Place</b> to drag the overlay to its position, and <b>Test</b> to preview it with sample data.<br>"
+            "• Overlays: Main Stats Overlay, Achievement Toast, Challenge Menu, Timers &amp; Counters, "
+            "System Notifications, Heat Bar, and Status Overlay.<br>"
+            "• <b>Switch All Portrait ↔ Landscape</b>: Toggle all overlay orientations at once with the orange button.<br><br>"
+            "<b>🎨 Theme sub-tab:</b><br>"
+            "• Pick a colour theme from the dropdown (Neon Blue, Amber Arcade, Crimson Night, etc.) "
+            "and click <b>Apply Theme</b> to apply it to the GUI and all overlays immediately.<br>"
+            "• The theme controls border, accent, primary, and background colours. "
+            "<i>System Notification</i> and <i>Status Overlay</i> use fixed styles.<br>"
+            "• <b>Overlay Preview &amp; Test</b>: Click the <b>Test</b> button next to any overlay name "
+            "to preview it with sample data and the current theme colours.<br><br>"
+            "<b>🔊 Sound sub-tab:</b><br>"
+            "• Enable/disable all sound effects globally and adjust the master volume.<br>"
+            "• <b>Sound Pack</b>: Choose between different audio packs (e.g. Arcade, Retro).<br>"
+            "• <b>Events</b>: Toggle each sound event on or off individually. "
+            "Click the <b>▶</b> button next to an event to preview its sound with the current pack and volume."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
-            "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
-            "• <b>Search</b>: Filter by table name or ROM name.<br>"
-            "• <b>🎯 Local tables with nvram map</b>: Show only local tables that have an NVRAM mapping.<br>"
-            "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs.<br>"
-            "• <b>Columns</b>: Table name, ROM, NVRAM Map (✅/❌), local .vpx found (🟠), "
-            "VPS-ID, author, and a detail button (+)."
+            "This tab lists all known tables from the cloud VPS index and your local VPX installation.<br><br>"
+            "• <b>Search</b>: Filter the list by table name or ROM name in real time.<br>"
+            "• <b>🎯 Local tables with nvram map</b>: Show only local tables that have an NVRAM mapping file.<br>"
+            "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs based on name matching.<br>"
+            "• <b>Columns</b>: Table name, ROM, NVRAM Map (✅ mapped / ❌ not mapped), "
+            "local .vpx file found (🟠), VPS-ID, table author, and a detail button (+) to open more info.<br>"
+            "• Tables marked ✅ with a VPS-ID will upload scores to the cloud leaderboard. "
+            "Tables without a mapping (❌) are tracked locally only."
         ),
         "controls": (
             "<b>🕹️ Controls</b><br><br>"
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
-            "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Challenge Action / Start</b>: Bind a key or button to start or trigger a challenge action.<br>"
-            "• <b>Challenge Left / Right</b>: Bind keys or buttons for left/right challenge navigation.<br>"
-            "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
+            "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the main stats overlay.<br>"
+            "• <b>Challenge Action / Start</b>: Bind a key or button to start or confirm a challenge action.<br>"
+            "• <b>Challenge Left / Right</b>: Bind keys or buttons for left/right navigation in the challenge menu.<br>"
+            "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, "
+            "then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
-            "• <b>Mute</b>: Silence all voice announcements."
+            "• <b>Mute</b>: Silence all AI voice announcements while keeping sound effects active."
         ),
         "cloud": (
             "<b>☁️ Cloud</b><br><br>"
             "The Cloud tab lets you browse the global leaderboard stored in the cloud.<br><br>"
             "• <b>Category</b>: Choose between Achievement Progress, Timed Challenge, Flip Challenge, or Heat Challenge.<br>"
-            "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
-            "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM."
+            "• <b>Table / ROM</b>: Enter the table or ROM name to look up (e.g. <i>afm_113b</i>). "
+            "Use the autocomplete suggestions to find your table quickly.<br>"
+            "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM.<br>"
+            "• <b>Cloud Leaderboard Rules</b>: Only tables mapped to a valid VPS-ID can appear. "
+            "Your player profile must be set up and Cloud Sync must be enabled in the System tab. "
+            "Click the ℹ️ Rules button for the full anti-cheat and validation details."
         ),
         "system": (
             "<b>⚙️ System</b><br><br>"
-            "The System tab is where you manage your player profile, directory paths, and "
+            "The System tab is where you manage your player profile, directory paths, cloud sync, and "
             "maintenance tools.<br><br>"
             "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
-            "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
-            "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
-            "• <b>Directory Setup</b>: Configure paths for BASE, NVRAM, and tables directories.<br>"
-            "• <b>Maintenance</b>: Repair data folders, force the map cache, update databases, "
-            "or install an app update."
+            "The player ID is required for cloud sync and data recovery — keep it safe and unique!<br>"
+            "• <b>Display Badge</b>: Choose which badge icon appears next to your name on cloud leaderboards.<br>"
+            "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup. "
+            "Without this, no data will be uploaded to the leaderboard.<br>"
+            "• <b>Directory Setup</b>: Configure paths for BASE, NVRAM, and tables directories. "
+            "Make sure all paths are correct for the watcher to function.<br>"
+            "• <b>Maintenance</b>: Repair data folders, force the VPS map cache refresh, update the "
+            "ROM name database, or install an available app update.<br>"
+            "• <b>Version Info</b>: Shows the current app version and checks for updates."
         ),
         "stats": (
             "<b>📊 Records &amp; Stats</b><br><br>"
-            "The Records &amp; Stats tab gives you an overview of high scores and statistics.<br><br>"
-            "• <b>🌍 Global NVRAM Dumps</b>: All saved NVRAM scores for the selected table "
-            "across all players.<br>"
-            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
-            "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest challenge results."
+            "The Records &amp; Stats tab gives you an in-depth overview of your high scores and play history.<br><br>"
+            "• <b>🌍 Global NVRAM Dumps</b>: Shows all raw NVRAM values for the currently active table "
+            "(scores, counters, audit data). Refreshes automatically when a session ends.<br>"
+            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session — "
+            "compare how each field changed from session start to session end.<br>"
+            "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest Timed, Flip, and Heat challenge results. "
+            "Only players with valid VPS mappings appear here.<br>"
+            "• <b>📈 Trends</b>: Visual trend analysis for the selected table. "
+            "Select a table from the dropdown and click 🔄 to refresh. "
+            "Three panels are shown side by side:<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Score Trend</b>: Your last 10 sessions with a sparkline and trend percentage.<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Playtime Trend</b>: Session durations with average and trend indicator.<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Last vs. Average</b>: Side-by-side comparison of your most recent session "
+            "against your session average across all tracked metrics.<br>"
+            "Trends data is built from session summary files stored locally in the BASE folder."
         ),
     }
 
@@ -2752,12 +2743,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             row_ov.addWidget(lbl_icon)
             row_ov.addWidget(lbl_name)
             row_ov.addWidget(lbl_desc)
-            row_ov.addStretch(1)
             if test_fn is not None:
                 btn_test = QPushButton("Test")
                 btn_test.setStyleSheet("font-size: 8pt; padding: 2px 8px;")
                 btn_test.clicked.connect(test_fn)
                 row_ov.addWidget(btn_test)
+            row_ov.addStretch(1)
             demo_lay.addLayout(row_ov)
 
         theme_layout.addWidget(demo_grp)
@@ -2853,6 +2844,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_en_hdr.setStyleSheet("color: #888; font-size: 8pt;")
         lbl_en_hdr.setFixedWidth(70)
         hdr_row.addWidget(lbl_en_hdr)
+        lbl_test_hdr = QLabel("Test")
+        lbl_test_hdr.setStyleSheet("color: #888; font-size: 8pt;")
+        lbl_test_hdr.setFixedWidth(50)
+        hdr_row.addWidget(lbl_test_hdr)
         hdr_row.addStretch(1)
         events_lay.addLayout(hdr_row)
 
@@ -2876,6 +2871,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             chk_ev.setFixedWidth(70)
             ev_row.addWidget(chk_ev)
             self._sound_event_checkboxes[ev_key] = chk_ev
+
+            btn_play = QPushButton("▶")
+            btn_play.setFixedWidth(36)
+            btn_play.setFixedHeight(22)
+            btn_play.setStyleSheet("font-size: 8pt; padding: 0px 4px;")
+            btn_play.setToolTip(f"Preview: {ev_label}")
+            btn_play.clicked.connect(lambda _, e=ev_key: _sound.play_sound_preview(self.cfg, e))
+            ev_row.addWidget(btn_play)
 
             ev_row.addStretch(1)
             events_lay.addLayout(ev_row)
@@ -5162,7 +5165,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             combined_players = [p1] if p1 else [combined_players[0]]
 
         if combined_players:
-            # --- Hole die Deltas für unsere einzige Seite ---
+            # --- Fetch the deltas for our only page ---
             active_deltas = {}
             try:
                 live_deltas = self.watcher.players.get(1, {}).get("session_deltas", {})
@@ -5858,7 +5861,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
 
-                # 1. Challenge-Daten (Text/Infos) über die GET API abrufen
+                # 1. Fetch challenge data (text/info) via GET API
                 req_api = urllib.request.Request(
                     "https://virtualpinballchat.com/vpc/api/v1/currentWeek?channelName=competition-corner",
                     headers={'User-Agent': 'VPX-Achievement-Watcher'}
@@ -5876,7 +5879,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                 week_text = f"Week {week_number} - " if week_number else ""
 
-                # 2. Ausrichtung erkennen (Portrait oder Landscape) – komplett getrennte Pfade
+                # 2. Detect orientation (Portrait or Landscape) – completely separate paths
                 is_portrait = getattr(self.overlay, 'portrait_mode', False) if self.overlay else False
 
                 if is_portrait:
@@ -5907,7 +5910,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
 
                 else:
-                    # Landscape: eigener API-Aufruf mit layout="landscape"
+                    # Landscape: separate API call with layout="landscape"
                     landscape_payload = json.dumps({
                         "layout": "landscape"
                     }).encode('utf-8')
@@ -5961,7 +5964,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                     self.overlay.resizeEvent = _hooked_resize
 
-                # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
+                # Emit via the defined signal so PyQt6 safely delivers it to the main thread!
                 signals.update_ui.emit(final_html, "VPC Weekly")
 
             except Exception as e:
@@ -5986,7 +5989,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         try:
             if self.watcher and self.watcher.game_active:
-                # Wenn eine Challenge aktiv ist oder gestartet wird → nichts tun
+                # If a challenge is active or being started → do nothing
                 ch = getattr(self.watcher, "challenge", {}) or {}
                 if ch.get("active") or ch.get("suppress_big_overlay_once"):
                     return
@@ -7014,13 +7017,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     @pyqtSlot(str)
     def _add_update_notification(self, tag: str):
         """Add an 'update available' notification (called from UI thread)."""
-        title = f"Neues Update verfügbar: v{tag}"
+        title = f"New update available: v{tag}"
         _notif.add_notification(
             self.cfg,
             type="update_available",
             icon="🆕",
             title=title,
-            detail="Klicke um die System-Tab zu öffnen",
+            detail="Click to open the System tab",
             action_tab="system",
         )
         try:
@@ -7032,13 +7035,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Add/update a 'vps_missing' notification (called from UI thread)."""
         if count <= 0:
             return
-        title = f"{count} ROM{'s' if count != 1 else ''} ohne VPS-ID – kein Cloud Upload möglich"
+        title = f"{count} ROM{'s' if count != 1 else ''} without VPS-ID – cloud upload not possible"
         _notif.add_notification(
             self.cfg,
             type="vps_missing",
             icon="⚠️",
             title=title,
-            detail="Öffne Available Maps um VPS-IDs zuzuweisen",
+            detail="Open Available Maps to assign VPS-IDs",
             action_tab="available_maps",
             rom=rom,
         )
@@ -7052,7 +7055,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Add a 'leaderboard_rank' notification (called from UI thread)."""
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
         display_name = _strip_version_from_name(romnames.get(rom, rom.upper()))
-        title = f"Du bist Top {rank} auf {display_name} Leaderboard!"
+        title = f"You are Top {rank} on the {display_name} Leaderboard!"
         _notif.add_notification(
             self.cfg,
             type="leaderboard_rank",
@@ -7084,8 +7087,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         your_unlocked = data.get("your_unlocked", 0)
         your_total = data.get("your_total", 0)
         vps_id = data.get("vps_id", "")
-        title = f"Dein Highscore auf {table_name} wurde übertroffen!"
-        detail = f"{other_player} erreichte {other_pct:.1f}% auf {table_name} ({rom})"
+        title = f"Your highscore on {table_name} has been beaten!"
+        detail = f"{other_player} reached {other_pct:.1f}% on {table_name} ({rom})"
         _notif.add_notification(
             self.cfg,
             type="highscore_beaten",
@@ -7330,7 +7333,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-        # Während Challenge keine Overlay-Toggle erlauben
+        # Do not allow overlay toggle during an active challenge
         try:
             ch = getattr(self.watcher, "challenge", {}) or {}
             if ch.get("active") or ch.get("suppress_big_overlay_once"):
@@ -8189,11 +8192,35 @@ class HighscoreBeatenDialog(QDialog):
         other_unlocked = int(notif.get("other_unlocked", 0))
         other_total = int(notif.get("other_total", 0))
 
+        # Try to load recent local session scores for this ROM
+        your_best_score: int = 0
+        try:
+            import os as _os
+            highlights_dir = _os.path.join(cfg.BASE, "session_stats", "Highlights")
+            if _os.path.isdir(highlights_dir):
+                from watcher_core import secure_load_json as _slj
+                best = 0
+                for fn in _os.listdir(highlights_dir):
+                    if not fn.endswith(".summary.json"):
+                        continue
+                    data = _slj(_os.path.join(highlights_dir, fn), {}) or {}
+                    if str(data.get("rom", "")).strip() != rom:
+                        continue
+                    players = data.get("players", [])
+                    p1 = players[0] if players else {}
+                    s = int(data.get("score") or p1.get("score") or 0)
+                    if s > best:
+                        best = s
+                if best > 0:
+                    your_best_score = best
+        except Exception:
+            pass
+
         # Build human-readable score strings:
         # prefer unlocked/total when total > 0, otherwise fall back to percentage
         def _score_str(unlocked: int, total: int, pct: float) -> str:
             if total > 0:
-                return f"{unlocked} / {total}"
+                return f"{unlocked} / {total} achievements"
             return f"{pct:.1f}%"
 
         your_score_str = _score_str(your_unlocked, your_total, your_pct)
@@ -8207,7 +8234,7 @@ class HighscoreBeatenDialog(QDialog):
         score_lay.setContentsMargins(12, 10, 12, 10)
         score_lay.setSpacing(4)
 
-        lbl_card_hdr = QLabel("<b>Achievement Progress Comparison</b>")
+        lbl_card_hdr = QLabel("<b>Score Comparison</b>")
         lbl_card_hdr.setStyleSheet(f"color:{primary}; font-size:10pt;")
         score_lay.addWidget(lbl_card_hdr)
 
@@ -8231,7 +8258,10 @@ class HighscoreBeatenDialog(QDialog):
             row.addWidget(lbl_v)
             return row
 
-        score_lay.addLayout(_score_row("↓", "Your Score", your_score_str, "#FF4444"))
+        if your_best_score > 0:
+            best_score_str = f"{your_best_score:,}".replace(",", ".")
+            score_lay.addLayout(_score_row("🎯", "Your Best Session Score", best_score_str, "#FF4444"))
+        score_lay.addLayout(_score_row("↓", "Your Achievement Score", your_score_str, "#FF4444"))
         score_lay.addLayout(_score_row("↑", f"New Leader: {other_player}", other_score_str, "#00C853"))
         layout.addWidget(score_card)
 
