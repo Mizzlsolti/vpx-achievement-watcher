@@ -8,6 +8,7 @@ from __future__ import annotations
 import io
 import math
 import struct
+import threading
 import wave
 
 # ---------------------------------------------------------------------------
@@ -450,8 +451,6 @@ def _rescale_wav(wav_bytes: bytes, scale: float) -> bytes:
 
 def _play_raw(wav_bytes: bytes) -> None:
     """Play WAV bytes asynchronously via a daemon thread using winsound (Windows) or silent fallback."""
-    import threading
-
     def _worker(data: bytes) -> None:
         try:
             import winsound

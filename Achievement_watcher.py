@@ -1877,7 +1877,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Show a demo challenge select overlay to preview the current theme."""
         try:
             win = ChallengeSelectOverlay(self, selected_idx=0)
-            QTimer.singleShot(4000, lambda: (win.close() if win else None))
+            def _safe_close():
+                try:
+                    win.close()
+                except Exception:
+                    pass
+            QTimer.singleShot(4000, _safe_close)
         except Exception:
             pass
 
@@ -1918,6 +1923,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 btn.setStyleSheet(
                     f"QPushButton {{ background: {accent}; color: #000; font-weight: bold;"
                     f"  padding: 6px 16px; border-radius: 6px; font-size: 10pt; }}"
+                    f"QPushButton:hover {{ background: {accent}CC; }}"
+                )
+            # Update the Apply Theme button accent
+            btn_apply = getattr(self, "_btn_apply_theme", None)
+            if btn_apply is not None:
+                btn_apply.setStyleSheet(
+                    f"QPushButton {{ background: {accent}; color: #000; font-weight: bold;"
+                    f"  padding: 5px 14px; border-radius: 6px; font-size: 10pt; }}"
                     f"QPushButton:hover {{ background: {accent}CC; }}"
                 )
             # Update the theme dropdown label accent color
@@ -2538,10 +2551,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 break
         row_select.addWidget(self.cmb_theme)
         self._btn_apply_theme = QPushButton("Apply Theme")
+        _theme_accent = _themes.get_theme(current_theme_id).get("accent", "#FF7F00")
         self._btn_apply_theme.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #000; font-weight: bold;"
-            "  padding: 5px 14px; border-radius: 6px; font-size: 10pt; }"
-            "QPushButton:hover { background: #FFA040; }"
+            f"QPushButton {{ background: {_theme_accent}; color: #000; font-weight: bold;"
+            f"  padding: 5px 14px; border-radius: 6px; font-size: 10pt; }}"
+            f"QPushButton:hover {{ background: {_theme_accent}CC; }}"
         )
         self._btn_apply_theme.clicked.connect(self._on_apply_theme)
         row_select.addWidget(self._btn_apply_theme)

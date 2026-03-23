@@ -29,6 +29,8 @@ _CURRENT_THEME_BG = "#080C16"
 def _get_overlay_bg_color(alpha: int = 245) -> "QColor":
     """Return the current overlay background color from the active theme."""
     c = QColor(_CURRENT_THEME_BG)
+    if not c.isValid():
+        c = QColor(8, 12, 22)  # neon_blue fallback
     c.setAlpha(alpha)
     return c
 
@@ -760,9 +762,11 @@ class OverlayWindow(QWidget):
         # Parse hex to RGBA for stylesheet (always use alpha 252/255 ≈ 0.99)
         try:
             c = QColor(bg_hex)
+            if not c.isValid():
+                c = QColor(8, 12, 22)  # neon_blue default bg
             r, g, b = c.red(), c.green(), c.blue()
         except Exception:
-            r, g, b = 8, 12, 22
+            r, g, b = 8, 12, 22  # neon_blue default bg
         bg_url = getattr(self, "bg_url", None)
         if bg_url:
             css = (f"QWidget#overlay_bg {{"
