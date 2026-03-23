@@ -1790,7 +1790,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         # Fusion ist die beste Basis für starke Custom-Themes
         app.setStyle("Fusion") 
         
-        app.setStyleSheet(pinball_arcade_style)
+        app.setStyleSheet(pinball_arcade_style())
 
         self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
         self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
@@ -1908,6 +1908,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             ov = getattr(self, "overlay", None)
             if ov is not None:
                 ov.refresh_theme()
+        except Exception:
+            pass
+        # Re-apply the main GUI stylesheet so tabs, buttons, sliders, etc. update immediately
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                app.setStyleSheet(pinball_arcade_style(primary=primary, accent=accent))
         except Exception:
             pass
         self._refresh_overlay_styles()
