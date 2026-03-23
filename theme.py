@@ -138,6 +138,20 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             border: 1px solid {primary};
         }}
 
+        /* --- Dropdown Menus --- */
+        QComboBox QAbstractItemView {{
+            background-color: {c_input};
+            color: #FFFFFF;
+            border: 1px solid {primary};
+            selection-background-color: {primary};
+            selection-color: #000000;
+            outline: none;
+        }}
+        QComboBox QAbstractItemView::item {{
+            min-height: 32px;
+            padding: 4px 8px;
+        }}
+
         /* --- Slider (Volume & Scale) --- */
         QSlider::groove:horizontal {{
             border: 1px solid #444;
