@@ -103,6 +103,42 @@ THEMES = {
         "bg": "#03111A",
         "description": "Light blue harmony – deep sea calm",
     },
+    "midnight_gold": {
+        "name": "Midnight Gold",
+        "icon": "✨",
+        "primary": "#FFD700",
+        "accent": "#FFA500",
+        "border": "#DAA520",
+        "bg": "#0A0A14",
+        "description": "Gold & amber on midnight – luxury feel",
+    },
+    "cherry_blossom": {
+        "name": "Cherry Blossom",
+        "icon": "🌸",
+        "primary": "#FFB7C5",
+        "accent": "#FF69B4",
+        "border": "#FF69B4",
+        "bg": "#1A0A12",
+        "description": "Soft pink & rose – delicate and warm",
+    },
+    "forest": {
+        "name": "Forest",
+        "icon": "🌲",
+        "primary": "#228B22",
+        "accent": "#90EE90",
+        "border": "#2E8B57",
+        "bg": "#0A120A",
+        "description": "Deep green & leaf – natural woodland",
+    },
+    "sunset": {
+        "name": "Sunset",
+        "icon": "🌅",
+        "primary": "#FF6347",
+        "accent": "#FFD700",
+        "border": "#FF4500",
+        "bg": "#1A0A05",
+        "description": "Tomato red & gold – warm evening glow",
+    },
 }
 
 DEFAULT_THEME = "neon_blue"
@@ -125,5 +161,6 @@ def list_themes() -> list:
         "neon_blue", "retro_arcade", "classic_pinball", "stealth",
         "synthwave", "lava", "arctic", "royal_purple",
         "toxic_green", "cyberpunk", "ocean",
+        "midnight_gold", "cherry_blossom", "forest", "sunset",
     ]
     return [(tid, THEMES[tid]) for tid in order if tid in THEMES]

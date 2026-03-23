@@ -4,18 +4,50 @@ Keeping the CSS in its own file makes the main module easier to read.
 """
 
 
-def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> str:
+def _tint_color(base_hex: str, tint_hex: str, factor: float) -> str:
+    """Blend *base_hex* toward *tint_hex* by *factor* (0.0 = base, 1.0 = tint)."""
+    def _parse(h: str):
+        h = h.lstrip("#")
+        return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    br, base_g, bb = _parse(base_hex)
+    tr, tg, tb = _parse(tint_hex)
+    r = int(br * (1 - factor) + tr * factor)
+    g = int(base_g * (1 - factor) + tg * factor)
+    b = int(bb * (1 - factor) + tb * factor)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: str = "#080C16") -> str:
     """Return the application stylesheet with the given theme colors applied.
 
     *primary* is used for GroupBox titles, focus borders and checked checkboxes.
     *accent*  is used for selected tabs, button hover/pressed, slider fill and
               checkbox hover borders.
-    Dark background colors stay fixed regardless of the chosen theme.
+    *bg*      is the theme background color; dark base colors are tinted toward
+              it by ~12%.  When *bg* is the neon_blue default ``#080C16`` the
+              output is pixel-identical to the original hardcoded stylesheet.
     """
+    _DEFAULT_BG = "#080C16"
+    if bg.upper() == _DEFAULT_BG.upper():
+        # Neon-blue default – keep exact original values for pixel-identical output
+        c_main = "#121212"
+        c_panel = "#181818"
+        c_group = "#1A1A1A"
+        c_input = "#222222"
+        c_text = "#0A0A0A"
+    else:
+        # Tint base dark colors toward the theme bg for a subtle coordinated look
+        _BLEND = 0.12
+        c_main = _tint_color("#121212", bg, _BLEND)
+        c_panel = _tint_color("#181818", bg, _BLEND)
+        c_group = _tint_color("#1A1A1A", bg, _BLEND)
+        c_input = _tint_color("#222222", bg, _BLEND)
+        c_text = _tint_color("#0A0A0A", bg, _BLEND)
+
     return f"""
         /* --- Basis: Tiefschwarz (Cabinet) --- */
         QMainWindow, QDialog, QWidget {{
-            background-color: #121212;
+            background-color: {c_main};
             color: #E0E0E0;
             font-family: 'Segoe UI', sans-serif;
             font-size: 10pt;
@@ -24,7 +56,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> s
         /* --- Die Haupt-Tabs --- */
         QTabWidget::pane {{
             border: 1px solid #333333;
-            background-color: #181818;
+            background-color: {c_panel};
             border-radius: 4px;
         }}
         QTabBar::tab {{
@@ -44,7 +76,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> s
             color: #FFFFFF;
         }}
         QTabBar::tab:selected {{
-            background-color: #181818;
+            background-color: {c_panel};
             color: {accent};
             border-top: 3px solid {accent};
         }}
@@ -74,7 +106,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> s
             border: 1px solid #444444;
             border-radius: 6px;
             margin-top: 20px;
-            background-color: #1A1A1A;
+            background-color: {c_group};
         }}
         QGroupBox::title {{
             subcontrol-origin: margin;
@@ -88,7 +120,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> s
 
         /* --- Textfelder & Listen (z.B. für Stats) --- */
         QTextBrowser, QTextEdit {{
-            background-color: #0A0A0A;
+            background-color: {c_text};
             border: 1px solid #333333;
             border-radius: 4px;
             color: {accent};
@@ -96,7 +128,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00") -> s
 
         /* --- Eingabefelder --- */
         QLineEdit, QComboBox, QSpinBox {{
-            background-color: #222222;
+            background-color: {c_input};
             color: #FFFFFF;
             border: 1px solid #555555;
             border-radius: 3px;
