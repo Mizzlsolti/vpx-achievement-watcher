@@ -54,6 +54,7 @@ from watcher_core import (
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
 from theme import pinball_arcade_style
 from ui_cloud_stats import CloudStatsMixin
+import themes as _themes
 
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog,
@@ -63,6 +64,7 @@ from ui_vps import (
 
 import notifications as _notif
 
+import ui_overlay
 from ui_overlay import (
     OverlayWindow,
     MiniInfoOverlay,
@@ -353,6 +355,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.watcher.start()
 
         self._apply_theme()
+        self._apply_overlay_theme()
         self._check_for_updates()
         self._init_tooltips_main()
         self._init_overlay_tooltips()
@@ -1787,6 +1790,56 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
         self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
 
+    def _on_theme_changed(self, index: int):
+        """Called when the user picks a new theme in the Theme sub-tab."""
+        theme_id = self.cmb_theme.itemData(index)
+        if not theme_id:
+            return
+        theme = _themes.get_theme(theme_id)
+        self._update_theme_preview(theme)
+        self.cfg.OVERLAY["theme"] = theme_id
+        self.cfg.save()
+        self._apply_overlay_theme()
+
+    def _update_theme_preview(self, theme: dict):
+        """Refresh the color-swatch preview widgets and description label."""
+        keys = ("primary", "accent", "border", "bg")
+        for swatch, key in zip(self._theme_preview_swatches, keys):
+            color = theme.get(key, "#000000")
+            swatch.setStyleSheet(
+                f"background-color: {color}; border-radius: 4px; border: 1px solid #444;"
+            )
+        self._theme_desc_lbl.setText(theme.get("description", ""))
+
+    def _apply_overlay_theme(self):
+        """Push current theme colors into config keys and the overlay module variable."""
+        theme_id = self.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
+        theme = _themes.get_theme(theme_id)
+        border = theme.get("border", "#00E5FF")
+        primary = theme.get("primary", "#00E5FF")
+        accent = theme.get("accent", "#FF7F00")
+        self.cfg.OVERLAY["theme_border"] = border
+        self.cfg.OVERLAY["theme_primary"] = primary
+        self.cfg.OVERLAY["theme_accent"] = accent
+        ui_overlay._CURRENT_THEME_BORDER = border
+        self._refresh_overlay_styles()
+
+    def _refresh_overlay_styles(self):
+        """Update GUI stylesheet accents for key widgets to reflect the active theme."""
+        try:
+            primary = self.cfg.OVERLAY.get("theme_primary", "#00E5FF")
+            accent = self.cfg.OVERLAY.get("theme_accent", "#FF7F00")
+            # Update the Switch All Orientation button accent
+            btn = getattr(self, "btn_switch_all_orientation", None)
+            if btn is not None:
+                btn.setStyleSheet(
+                    f"QPushButton {{ background: {accent}; color: #000; font-weight: bold;"
+                    f"  padding: 6px 16px; border-radius: 6px; font-size: 10pt; }}"
+                    f"QPushButton:hover {{ background: {accent}CC; }}"
+                )
+        except Exception:
+            pass
+
     # ==========================================
     # TAB HELP TEXTS & HELPERS
     # ==========================================
@@ -2330,14 +2383,79 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._update_switch_all_button_label()
         appearance_tabs.addTab(overlay_tab, "🖼️ Overlay")
 
-        # --- Sub-tab 2: Theme (placeholder) ---
+        # --- Sub-tab 2: Theme ---
         theme_tab = QWidget()
         theme_layout = QVBoxLayout(theme_tab)
-        theme_placeholder = QLabel("🎨 Theme settings coming soon...")
-        theme_placeholder.setStyleSheet("color: #888; font-size: 12pt; padding: 40px;")
-        theme_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        theme_layout.addWidget(theme_placeholder)
+        theme_layout.setContentsMargins(12, 12, 12, 12)
+        theme_layout.setSpacing(10)
+
+        # Dropdown row
+        row_select = QHBoxLayout()
+        lbl_theme_select = QLabel("Active theme:")
+        lbl_theme_select.setStyleSheet("color: #00E5FF; font-weight: bold;")
+        row_select.addWidget(lbl_theme_select)
+        self.cmb_theme = QComboBox()
+        for tid, td in _themes.list_themes():
+            self.cmb_theme.addItem(f"{td['icon']}  {td['name']}", userData=tid)
+        current_theme_id = self.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
+        for i in range(self.cmb_theme.count()):
+            if self.cmb_theme.itemData(i) == current_theme_id:
+                self.cmb_theme.setCurrentIndex(i)
+                break
+        row_select.addWidget(self.cmb_theme)
+        row_select.addStretch(1)
+        theme_layout.addLayout(row_select)
+
+        # Color preview row
+        preview_grp = QGroupBox("Color Preview")
+        preview_lay = QHBoxLayout(preview_grp)
+        self._theme_preview_swatches = []
+        for swatch_label in ("Primary", "Accent", "Border", "BG"):
+            col = QVBoxLayout()
+            swatch = QLabel()
+            swatch.setFixedSize(36, 36)
+            swatch.setStyleSheet("border-radius: 4px; border: 1px solid #444;")
+            lbl_sw = QLabel(swatch_label)
+            lbl_sw.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl_sw.setStyleSheet("color: #aaa; font-size: 8pt;")
+            col.addWidget(swatch, alignment=Qt.AlignmentFlag.AlignHCenter)
+            col.addWidget(lbl_sw)
+            preview_lay.addLayout(col)
+            self._theme_preview_swatches.append(swatch)
+        preview_lay.addStretch(1)
+        theme_layout.addWidget(preview_grp)
+
+        # Description label
+        self._theme_desc_lbl = QLabel()
+        self._theme_desc_lbl.setStyleSheet("color: #aaa; font-size: 9pt; padding: 2px 4px;")
+        self._theme_desc_lbl.setWordWrap(True)
+        theme_layout.addWidget(self._theme_desc_lbl)
+
+        # Theme list
+        list_grp = QGroupBox("Available Themes")
+        list_lay = QVBoxLayout(list_grp)
+        for tid, td in _themes.list_themes():
+            row = QHBoxLayout()
+            icon_lbl = QLabel(td["icon"])
+            icon_lbl.setFixedWidth(28)
+            name_lbl = QLabel(f"<b>{td['name']}</b>")
+            name_lbl.setStyleSheet("color: #e0e0e0;")
+            name_lbl.setFixedWidth(140)
+            desc_lbl = QLabel(td["description"])
+            desc_lbl.setStyleSheet("color: #888; font-size: 8pt;")
+            row.addWidget(icon_lbl)
+            row.addWidget(name_lbl)
+            row.addWidget(desc_lbl)
+            row.addStretch(1)
+            list_lay.addLayout(row)
+        theme_layout.addWidget(list_grp)
         theme_layout.addStretch(1)
+
+        # Wire up the combo box signal
+        self.cmb_theme.currentIndexChanged.connect(self._on_theme_changed)
+        # Apply initial preview
+        self._update_theme_preview(_themes.get_theme(current_theme_id))
+
         appearance_tabs.addTab(theme_tab, "🎨 Theme")
 
         # --- Sub-tab 3: Sound (placeholder) ---
