@@ -3317,7 +3317,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ==========================================
     def _build_tab_system(self):
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+
+        system_tabs = QTabWidget()
+
+        # --- Sub-tab 1: ⚙️ General ---
+        general_tab = QWidget()
+        general_layout = QVBoxLayout(general_tab)
 
         # --- 👤 Player Profile ---
         grp_profile = QGroupBox("👤 Player Profile")
@@ -3347,7 +3353,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
         lay_profile.addWidget(lbl_id_warning, 1, 0, 1, 4)
 
-        layout.addWidget(grp_profile)
+        general_layout.addWidget(grp_profile)
 
         # --- ☁️ Cloud Sync & Backup ---
         grp_cloud = QGroupBox("☁️ Cloud Sync & Backup")
@@ -3391,43 +3397,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_cloud_btns.addWidget(self.btn_restore_cloud)
 
         lay_cloud.addLayout(lay_cloud_btns)
-        layout.addWidget(grp_cloud)
-
-        # --- 📁 Directory Setup ---
-        grp_paths = QGroupBox("📁 Directory Setup")
-        lay_paths = QGridLayout(grp_paths)
-        self.base_label = QLabel(f"BASE: {self.cfg.BASE}")
-        self.btn_base = QPushButton("Browse..."); self.btn_base.clicked.connect(self.change_base)
-        self.nvram_label = QLabel(f"NVRAM: {self.cfg.NVRAM_DIR}")
-        self.btn_nvram = QPushButton("Browse..."); self.btn_nvram.clicked.connect(self.change_nvram)
-        self.tables_label = QLabel(f"TABLES: {self.cfg.TABLES_DIR}")
-        self.btn_tables = QPushButton("Browse..."); self.btn_tables.clicked.connect(self.change_tables)
-        lay_paths.addWidget(self.btn_base, 0, 0); lay_paths.addWidget(self.base_label, 0, 1)
-        lay_paths.addWidget(self.btn_nvram, 1, 0); lay_paths.addWidget(self.nvram_label, 1, 1)
-        lay_paths.addWidget(self.btn_tables, 2, 0); lay_paths.addWidget(self.tables_label, 2, 1)
-        lay_paths.setColumnStretch(1, 1); layout.addWidget(grp_paths)
-
-        # --- 🔧 Maintenance & Updates ---
-        grp_maint = QGroupBox("🔧 Maintenance & Updates")
-        lay_maint = QVBoxLayout(grp_maint)
-        self.btn_repair = QPushButton("Repair Data Folders")
-        self.btn_repair.clicked.connect(self._repair_data_folders)
-        self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
-        self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
-        lay_maint.addWidget(self.btn_repair)
-        lay_maint.addWidget(self.btn_prefetch)
-
-        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
-        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
-        self.btn_update_dbs.clicked.connect(self._update_databases_now)
-        lay_maint.addWidget(self.btn_update_dbs)
-
-        self.btn_self_update = QPushButton("⬆️ Watcher Update")
-        self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
-        self.btn_self_update.clicked.connect(self._check_for_app_update)
-        lay_maint.addWidget(self.btn_self_update)
-
-        layout.addWidget(grp_maint)
+        general_layout.addWidget(grp_cloud)
 
         # --- ⚡ Performance & Animations ---
         grp_perf_anim = QGroupBox("⚡ Performance & Animations")
@@ -3495,7 +3465,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             ]:
                 _chk.setEnabled(False)
 
-        layout.addWidget(grp_perf_anim)
+        general_layout.addWidget(grp_perf_anim)
 
         # --- 🐛 Feedback & Bug Reports ---
         grp_feedback = QGroupBox("🐛 Feedback & Bug Reports")
@@ -3514,10 +3484,56 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         )
         btn_feedback.clicked.connect(lambda: FeedbackDialog(self).exec())
         lay_feedback.addWidget(btn_feedback)
-        layout.addWidget(grp_feedback)
+        general_layout.addWidget(grp_feedback)
 
-        layout.addStretch(1)
-        self._add_tab_help_button(layout, "system")
+        general_layout.addStretch(1)
+        system_tabs.addTab(general_tab, "⚙️ General")
+
+        # --- Sub-tab 2: 🔧 Maintenance ---
+        maint_tab = QWidget()
+        maint_layout = QVBoxLayout(maint_tab)
+
+        # --- 📁 Directory Setup ---
+        grp_paths = QGroupBox("📁 Directory Setup")
+        lay_paths = QGridLayout(grp_paths)
+        self.base_label = QLabel(f"BASE: {self.cfg.BASE}")
+        self.btn_base = QPushButton("Browse..."); self.btn_base.clicked.connect(self.change_base)
+        self.nvram_label = QLabel(f"NVRAM: {self.cfg.NVRAM_DIR}")
+        self.btn_nvram = QPushButton("Browse..."); self.btn_nvram.clicked.connect(self.change_nvram)
+        self.tables_label = QLabel(f"TABLES: {self.cfg.TABLES_DIR}")
+        self.btn_tables = QPushButton("Browse..."); self.btn_tables.clicked.connect(self.change_tables)
+        lay_paths.addWidget(self.btn_base, 0, 0); lay_paths.addWidget(self.base_label, 0, 1)
+        lay_paths.addWidget(self.btn_nvram, 1, 0); lay_paths.addWidget(self.nvram_label, 1, 1)
+        lay_paths.addWidget(self.btn_tables, 2, 0); lay_paths.addWidget(self.tables_label, 2, 1)
+        lay_paths.setColumnStretch(1, 1); maint_layout.addWidget(grp_paths)
+
+        # --- 🔧 Maintenance & Updates ---
+        grp_maint = QGroupBox("🔧 Maintenance & Updates")
+        lay_maint = QVBoxLayout(grp_maint)
+        self.btn_repair = QPushButton("Repair Data Folders")
+        self.btn_repair.clicked.connect(self._repair_data_folders)
+        self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
+        self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
+        lay_maint.addWidget(self.btn_repair)
+        lay_maint.addWidget(self.btn_prefetch)
+
+        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
+        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
+        self.btn_update_dbs.clicked.connect(self._update_databases_now)
+        lay_maint.addWidget(self.btn_update_dbs)
+
+        self.btn_self_update = QPushButton("⬆️ Watcher Update")
+        self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
+        self.btn_self_update.clicked.connect(self._check_for_app_update)
+        lay_maint.addWidget(self.btn_self_update)
+
+        maint_layout.addWidget(grp_maint)
+
+        maint_layout.addStretch(1)
+        system_tabs.addTab(maint_tab, "🔧 Maintenance")
+
+        tab_layout.addWidget(system_tabs)
+        self._add_tab_help_button(tab_layout, "system")
         self.main_tabs.addTab(tab, "⚙️ System")
 
     # ==========================================
