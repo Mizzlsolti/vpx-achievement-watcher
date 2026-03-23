@@ -69,6 +69,7 @@ def add_notification(
     title: str,
     detail: str = "",
     action_tab: Optional[str] = None,
+    **extra,
 ) -> dict:
     """
     Create a new notification, deduplicate, trim to _MAX_ENTRIES and save.
@@ -78,6 +79,9 @@ def add_notification(
     - ``vps_missing``:       replace any existing ``vps_missing`` entry (title may change).
     - ``update_available``:  skip if an entry with same type *and* same title already exists.
     - ``leaderboard_rank`` / ``highscore_beaten``:  deduplicated by the caller (per ROM).
+
+    Any additional keyword arguments (e.g. ``rom``, ``vps_id``, ``other_player``) are
+    merged into the entry dict so click-handlers can access them.
     """
     items = load_notifications(cfg)
 
@@ -99,6 +103,7 @@ def add_notification(
         "read": False,
         "action_tab": action_tab,
     }
+    entry.update(extra)
 
     items.insert(0, entry)
 

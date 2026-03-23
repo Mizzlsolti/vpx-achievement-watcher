@@ -200,6 +200,7 @@ class Bridge(QObject):
     status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
     close_secondary_overlays = pyqtSignal()
     session_ended = pyqtSignal(str)  # (rom)
+    notification_added = pyqtSignal()  # refresh Dashboard feed
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -272,6 +273,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
+        self.bridge.notification_added.connect(self._refresh_notification_feed)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -2302,9 +2304,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_notif_outer.setContentsMargins(6, 6, 6, 6)
         lay_notif_outer.setSpacing(4)
 
-        # Top-right "Clear All" button
+        # Top-right buttons: "Mark all read" + "Clear All"
         row_notif_header = QHBoxLayout()
         row_notif_header.addStretch(1)
+        btn_notif_mark_read = QPushButton("✔ Mark all read")
+        btn_notif_mark_read.setFixedHeight(22)
+        btn_notif_mark_read.setStyleSheet(
+            "QPushButton { background: #1a2a1a; color: #66AA66; border: 1px solid #2a4a2a; "
+            "border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
+            "QPushButton:hover { background: #2a4a2a; }"
+        )
+        btn_notif_mark_read.clicked.connect(self._on_notif_mark_all_read)
+        row_notif_header.addWidget(btn_notif_mark_read)
         btn_notif_clear = QPushButton("🗑️ Clear All")
         btn_notif_clear.setFixedHeight(22)
         btn_notif_clear.setStyleSheet(
@@ -3599,11 +3610,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._update_cloud_rom_completer()
             # Notify about ROMs missing a VPS-ID
             try:
-                missing = sum(
-                    1 for e in entries
+                missing_entries = [
+                    e for e in entries
                     if e.get("is_local") and e.get("has_map") and not e.get("vps_id", "")
-                )
-                self._add_vps_missing_notification(missing)
+                ]
+                if missing_entries:
+                    first_rom = missing_entries[0].get("rom", "")
+                    self._add_vps_missing_notification(len(missing_entries), first_rom)
             except Exception:
                 pass
 
@@ -6922,12 +6935,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 w.deleteLater()
 
         # Tab indices (order matches addTab calls in __init__:
-        #   0=Dashboard, 1=Appearance, 2=Controls, 3=Records&Stats,
-        #   4=Progress, 5=Available Maps, 6=Cloud, 7=System)
+        #   0=Dashboard, 1=Player, 2=Appearance, 3=Controls, 4=Records&Stats,
+        #   5=Progress, 6=Available Maps, 7=Cloud, 8=System)
         _TAB_MAP = {
-            "cloud": 6,
-            "system": 7,
-            "available_maps": 5,
+            "cloud": 7,
+            "system": 8,
+            "available_maps": 6,
         }
 
         if not display:
@@ -7011,14 +7024,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         notif_id = notif.get("id", "")
         action_tab = notif.get("action_tab")
+        notif_rom = notif.get("rom", "")
 
-        def _on_click(_event, _nid=notif_id, _tab=action_tab):
+        def _on_click(_event, _nid=notif_id, _tab=action_tab, _notif_data=notif, _rom=notif_rom):
             _notif.mark_read(self.cfg, _nid)
-            if _tab and _tab in tab_map:
+            if _tab == "highscore_detail":
+                try:
+                    dlg = HighscoreBeatenDialog(_notif_data, self.cfg, parent=self)
+                    dlg.exec()
+                except Exception:
+                    pass
+            elif _tab and _tab in tab_map:
                 try:
                     self.main_tabs.setCurrentIndex(tab_map[_tab])
                 except Exception:
                     pass
+                if _tab == "available_maps" and _rom:
+                    QTimer.singleShot(200, lambda _r=_rom: self._highlight_available_maps_row(_r))
             try:
                 self._refresh_notification_feed()
             except Exception:
@@ -7028,10 +7050,50 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         return row
 
     @pyqtSlot()
+    def _on_notif_mark_all_read(self):
+        """Mark all notifications as read and refresh the feed."""
+        _notif.mark_all_read(self.cfg)
+        self._refresh_notification_feed()
+
+    @pyqtSlot()
     def _on_notif_clear_all(self):
         """Clear all notifications and refresh the feed."""
         _notif.clear_all(self.cfg)
         self._refresh_notification_feed()
+
+    def _highlight_available_maps_row(self, rom: str):
+        """Scroll to and briefly highlight the row for *rom* in the Available Maps table."""
+        try:
+            table = self.maps_table
+            for row in range(table.rowCount()):
+                item = table.item(row, 1)  # ROM column
+                if item and item.text().strip().lower() == rom.strip().lower():
+                    table.scrollToItem(item)
+                    table.selectRow(row)
+                    # Flash highlight: set background, then restore after 3 s
+                    try:
+                        accent = self.cfg.OVERLAY.get("accent_color", "#FF7F00")
+                    except Exception:
+                        accent = "#FF7F00"
+                    highlight_color = QColor(accent)
+                    highlight_color.setAlpha(85)  # ~33% opacity
+                    for col in range(table.columnCount()):
+                        it = table.item(row, col)
+                        if it:
+                            it.setBackground(highlight_color)
+                    def _restore_row(_row=row):
+                        try:
+                            for _col in range(table.columnCount()):
+                                _it = table.item(_row, _col)
+                                if _it:
+                                    _it.setData(Qt.ItemDataRole.BackgroundRole, None)
+                            table.clearSelection()
+                        except Exception:
+                            pass
+                    QTimer.singleShot(3000, _restore_row)
+                    break
+        except Exception:
+            pass
 
     @pyqtSlot(str)
     def _on_session_ended(self, rom: str):
@@ -7066,8 +7128,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-    @pyqtSlot(int)
-    def _add_vps_missing_notification(self, count: int):
+    def _add_vps_missing_notification(self, count: int, rom: str = ""):
         """Add/update a 'vps_missing' notification (called from UI thread)."""
         if count <= 0:
             return
@@ -7079,6 +7140,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             title=title,
             detail="Öffne Available Maps um VPS-IDs zuzuweisen",
             action_tab="available_maps",
+            rom=rom,
         )
         try:
             self._refresh_notification_feed()
@@ -7105,18 +7167,34 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     @pyqtSlot(str)
-    def _add_highscore_beaten_notification(self, rom: str):
-        """Add a 'highscore_beaten' notification (called from UI thread)."""
+    def _add_highscore_beaten_notification(self, payload_json: str):
+        """Add a 'highscore_beaten' notification (called from UI thread via JSON payload)."""
+        try:
+            data = json.loads(payload_json)
+        except Exception:
+            data = {}
+        rom = data.get("rom", "")
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-        display_name = _strip_version_from_name(romnames.get(rom, rom.upper()))
-        title = f"Dein Highscore auf {display_name} wurde übertroffen!"
+        table_name = data.get("table_name") or _strip_version_from_name(romnames.get(rom, rom.upper()))
+        other_player = data.get("other_player", "Unknown")
+        other_pct = data.get("other_pct", 0.0)
+        your_pct = data.get("your_pct", 0.0)
+        vps_id = data.get("vps_id", "")
+        title = f"Dein Highscore auf {table_name} wurde übertroffen!"
+        detail = f"{other_player} erreichte {other_pct:.1f}% auf {table_name} ({rom})"
         _notif.add_notification(
             self.cfg,
             type="highscore_beaten",
             icon="⚔️",
             title=title,
-            detail=f"ROM: {rom}",
-            action_tab="cloud",
+            detail=detail,
+            action_tab="highscore_detail",
+            rom=rom,
+            table_name=table_name,
+            vps_id=vps_id,
+            other_player=other_player,
+            other_pct=other_pct,
+            your_pct=your_pct,
         )
         try:
             self._refresh_notification_feed()
@@ -7196,9 +7274,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         try:
                             ts = datetime.fromisoformat(n.get("timestamp", ""))
                             if (now - ts.astimezone(timezone.utc)) < timedelta(hours=self._NOTIF_COOLDOWN_HOURS):
-                                detail = n.get("detail", "")
-                                if detail.startswith("ROM: "):
-                                    recently_notified.add(detail[5:])
+                                n_rom = n.get("rom", "")
+                                if n_rom:
+                                    recently_notified.add(n_rom)
+                                else:
+                                    # Legacy entries stored "ROM: <name>" in detail
+                                    detail = n.get("detail", "")
+                                    if detail.startswith("ROM: "):
+                                        recently_notified.add(detail[5:])
                         except Exception:
                             pass
 
@@ -7213,21 +7296,32 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         if entry and isinstance(entry, dict):
                             pct = float(entry.get("percentage", 0))
                             p_id = path.split("/")[1] if "/" in path else ""
-                            scores.append((pct, p_id))
+                            p_name = entry.get("name", p_id)
+                            vps_id = entry.get("vps_id", "")
+                            table_name = entry.get("table_name", "")
+                            scores.append((pct, p_id, p_name, vps_id, table_name))
                     scores.sort(reverse=True)
 
                     if not scores:
                         continue
-                    top_pid = scores[0][1]
+                    top_pct, top_pid, top_name, top_vps_id, top_table = scores[0]
                     if top_pid and top_pid != pid:
                         # Check own score exists at all
-                        own_in = any(p_id == pid for _, p_id in scores)
-                        if own_in:
+                        own_entry = next(((pct, p_id) for pct, p_id, *_ in scores if p_id == pid), None)
+                        if own_entry:
+                            payload = json.dumps({
+                                "rom": rom,
+                                "table_name": top_table,
+                                "vps_id": top_vps_id,
+                                "other_player": top_name,
+                                "other_pct": top_pct,
+                                "your_pct": own_entry[0],
+                            })
                             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                             QMetaObject.invokeMethod(
                                 self, "_add_highscore_beaten_notification",
                                 Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, rom),
+                                Q_ARG(str, payload),
                             )
             except Exception:
                 pass
@@ -8061,6 +8155,131 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     pass
         except Exception:
             pass
+
+
+class HighscoreBeatenDialog(QDialog):
+    """Modal dialog shown when another player has surpassed the user's achievement score."""
+
+    def __init__(self, notif: dict, cfg, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("🎯 Highscore Beaten!")
+        self.setModal(True)
+        self.resize(500, 400)
+        self.setStyleSheet("QDialog { background: #111; color: #DDD; }")
+
+        try:
+            primary = cfg.OVERLAY.get("primary_color", "#00E5FF")
+        except Exception:
+            primary = "#00E5FF"
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        # ── Header ─────────────────────────────────────────────────────────
+        lbl_hdr = QLabel(
+            f"<b style='font-size:15px; color:{primary};'>🎯 Highscore Beaten!</b>"
+        )
+        lbl_hdr.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(lbl_hdr)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #333;")
+        layout.addWidget(sep)
+
+        # ── Table image placeholder ─────────────────────────────────────────
+        lbl_img = QLabel()
+        lbl_img.setFixedHeight(120)
+        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_img.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 4px;")
+        vps_id = notif.get("vps_id", "")
+        table_name = notif.get("table_name", notif.get("rom", ""))
+        # Try to load VPS image
+        img_loaded = False
+        if vps_id:
+            try:
+                from watcher_core import p_vps_img
+                img_dir = p_vps_img(cfg)
+                import glob as _glob
+                candidates = _glob.glob(os.path.join(img_dir, f"{vps_id}*"))
+                if candidates:
+                    pix = QPixmap(candidates[0])
+                    if not pix.isNull():
+                        pix = pix.scaledToHeight(118, Qt.TransformationMode.SmoothTransformation)
+                        lbl_img.setPixmap(pix)
+                        img_loaded = True
+            except Exception:
+                pass
+        if not img_loaded:
+            lbl_img.setText(
+                f"<span style='color:#555; font-size:11pt;'>{table_name}</span>"
+            )
+            lbl_img.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(lbl_img)
+
+        # ── Table metadata ──────────────────────────────────────────────────
+        rom = notif.get("rom", "")
+        meta_lines = []
+        if table_name:
+            meta_lines.append(f"📋 <b>Table:</b> {table_name}")
+        if rom:
+            meta_lines.append(f"🔧 <b>ROM:</b> {rom}")
+        if vps_id:
+            meta_lines.append(f"🆔 <b>VPS ID:</b> {vps_id}")
+        if meta_lines:
+            lbl_meta = QLabel("<br>".join(meta_lines))
+            lbl_meta.setTextFormat(Qt.TextFormat.RichText)
+            lbl_meta.setStyleSheet("color: #CCC; font-size: 10pt; padding: 4px 0;")
+            layout.addWidget(lbl_meta)
+
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet("color: #333;")
+        layout.addWidget(sep2)
+
+        # ── Score comparison ────────────────────────────────────────────────
+        your_pct = notif.get("your_pct", 0.0)
+        other_pct = notif.get("other_pct", 0.0)
+        other_player = notif.get("other_player", "Unknown")
+
+        score_html = (
+            "<table width='100%' cellpadding='6' style='border-collapse:collapse;'>"
+            "<tr style='border-bottom:1px solid #333;'>"
+            f"<td style='color:#FF4444; font-weight:bold;'>↓ Your Score</td>"
+            f"<td style='color:#FF4444; text-align:right; font-size:13pt; font-weight:bold;'>"
+            f"{your_pct:.1f}%</td>"
+            "</tr>"
+            "<tr>"
+            f"<td style='color:#00C853; font-weight:bold;'>↑ New Leader: {other_player}</td>"
+            f"<td style='color:#00C853; text-align:right; font-size:13pt; font-weight:bold;'>"
+            f"{other_pct:.1f}%</td>"
+            "</tr>"
+            "</table>"
+        )
+        lbl_scores = QLabel(score_html)
+        lbl_scores.setTextFormat(Qt.TextFormat.RichText)
+        lbl_scores.setStyleSheet(
+            "background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 4px;"
+        )
+        layout.addWidget(lbl_scores)
+
+        layout.addStretch(1)
+
+        # ── Close button ────────────────────────────────────────────────────
+        btn_close = QPushButton("Close")
+        btn_close.setFixedWidth(100)
+        btn_close.setStyleSheet(
+            f"QPushButton {{ background: #1a1a1a; color: {primary}; border: 1px solid {primary}; "
+            "border-radius: 4px; padding: 4px 12px; }"
+            f"QPushButton:hover {{ background: {primary}; color: #000; }}"
+        )
+        btn_close.clicked.connect(self.accept)
+        h_btn = QHBoxLayout()
+        h_btn.addStretch(1)
+        h_btn.addWidget(btn_close)
+        layout.addLayout(h_btn)
+
 
 def main():
     cfg = AppConfig.load()
