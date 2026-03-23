@@ -35,6 +35,14 @@ def _get_overlay_bg_color(alpha: int = 245) -> "QColor":
     return c
 
 
+def _hex_to_css_rgba(hex_color: str, alpha: float) -> str:
+    """Convert a hex color string and alpha (0.0–1.0) to a CSS rgba() string."""
+    c = QColor(hex_color)
+    if not c.isValid():
+        c = QColor(_CURRENT_THEME_PRIMARY)
+    return f"rgba({c.red()}, {c.green()}, {c.blue()}, {alpha:.2f})"
+
+
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
                       radius: int = 18, color: QColor = None, layers: int = 3,
                       low_perf: bool = False):
@@ -179,7 +187,7 @@ class OverlayNavArrows(QWidget):
             cy = draw_h // 2
             pad = 16
             right_cx = draw_w - pad + int(wobble)
-            arrow_color = QColor("#00E5FF")
+            arrow_color = QColor(_CURRENT_THEME_PRIMARY)
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -1307,16 +1315,16 @@ class OverlayWindow(QWidget):
                 if old_pct_target >= 0:
                     self._trigger_shine()
 
-        style = """
+        style = f"""
         <style>
-          table.hltable { border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }
-          .hltable th, .hltable td { padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }
-          .hltable th { text-align: center; background: rgba(0, 229, 255, 0.20); color: #00E5FF; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid rgba(0, 229, 255, 0.35); }
-          .hltable td.left { text-align: left; }
-          .hltable td.right { text-align: right; font-weight: bold; font-size: 1.15em; color: #FF7F00; }
-          .rom-title { text-align: center; font-size: 1.6em; font-weight: bold; color: #FF7F00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid rgba(0, 229, 255, 0.3); padding-bottom: 0.3em; }
-          .score-box { text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: #00E5FF; }
-          .divider { border-top: 1px solid rgba(255, 127, 0, 0.3); margin-top: 0.6em; padding-top: 0.6em; }
+          table.hltable {{ border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }}
+          .hltable th, .hltable td {{ padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }}
+          .hltable th {{ text-align: center; background: {_hex_to_css_rgba(_CURRENT_THEME_PRIMARY, 0.20)}; color: {_CURRENT_THEME_PRIMARY}; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid {_hex_to_css_rgba(_CURRENT_THEME_PRIMARY, 0.35)}; }}
+          .hltable td.left {{ text-align: left; }}
+          .hltable td.right {{ text-align: right; font-weight: bold; font-size: 1.15em; color: {_CURRENT_THEME_ACCENT}; }}
+          .rom-title {{ text-align: center; font-size: 1.6em; font-weight: bold; color: {_CURRENT_THEME_ACCENT}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid {_hex_to_css_rgba(_CURRENT_THEME_PRIMARY, 0.30)}; padding-bottom: 0.3em; }}
+          .score-box {{ text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: {_CURRENT_THEME_PRIMARY}; }}
+          .divider {{ border-top: 1px solid {_hex_to_css_rgba(_CURRENT_THEME_ACCENT, 0.30)}; margin-top: 0.6em; padding-top: 0.6em; }}
         </style>
         """
 
@@ -2035,7 +2043,7 @@ class FlipCounterOverlay(QWidget):
         body_pt = 15
         title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
 
-        title_color = QColor("#FF7F00")
+        title_color = QColor(_CURRENT_THEME_ACCENT)
         hi_color = QColor("#FFFFFF")
 
         title = f"Total flips: {int(self._total)}/{int(self._goal)}"
@@ -3682,9 +3690,9 @@ class AchToastWindow(QWidget):
             self._tw_full = line1
 
         # Feste Theme-Farben
-        title_color = QColor("#FF7F00") # Orange
+        title_color = QColor(_CURRENT_THEME_ACCENT)
         text_color = QColor("#FFFFFF")  # Weiß
-        levelup_color = QColor("#00E5FF")  # Cyan for level-up line1
+        levelup_color = QColor(_CURRENT_THEME_PRIMARY)  # Cyan for level-up line1
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
         title_for_size = line1  # always use full text for width calculation
@@ -4275,7 +4283,7 @@ class ChallengeSelectOverlay(QWidget):
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
 
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(_CURRENT_THEME_ACCENT)
 
         _CHALLENGE_LABELS = [
             ("⌛ Timed Challenge", "3:00 minutes playing time."),
@@ -4420,7 +4428,7 @@ class ChallengeSelectOverlay(QWidget):
             left_cx = pad_lr + max(12, int(round(24 * factor))) + int(-wobble)
             right_cx = w - pad_lr - max(12, int(round(24 * factor))) + int(wobble)
             
-            arrow_color = QColor("#00E5FF")
+            arrow_color = QColor(_CURRENT_THEME_PRIMARY)
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -4580,7 +4588,7 @@ class FlipDifficultyOverlay(QWidget):
         scaled_body_pt = 20  # Flip difficulty overlay is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(_CURRENT_THEME_ACCENT)
 
         factor = scaled_body_pt / 20.0
         pad_lr = max(12, int(round(24 * factor)))
@@ -4671,14 +4679,16 @@ class FlipDifficultyOverlay(QWidget):
                 if selected:
                     amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
                     alpha = 40 + int(60 * amp)
-                    p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(255, 127, 0, alpha))
-                    p.setPen(QPen(QColor("#00E5FF"), 2))
+                    _ac = QColor(_CURRENT_THEME_ACCENT); _ac.setAlpha(alpha)
+                    p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), _ac)
+                    p.setPen(QPen(QColor(_CURRENT_THEME_PRIMARY), 2))
                     if snap_flash_alpha > 0:
                         p.fillRect(draw_rect, QColor(255, 255, 255, snap_flash_alpha))
                 else:
                     p.setPen(QPen(QColor(255, 255, 255, 80), 1))
                     if prev_fade_alpha > 0:
-                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(0, 229, 255, prev_fade_alpha))
+                        _pc = QColor(_CURRENT_THEME_PRIMARY); _pc.setAlpha(prev_fade_alpha)
+                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), _pc)
 
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRoundedRect(draw_rect, 10, 10)
@@ -4690,7 +4700,7 @@ class FlipDifficultyOverlay(QWidget):
                     name_pt -= 1
                     fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
                 name_h = fm_n.height()
-                p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
+                p.setPen(QColor(_CURRENT_THEME_ACCENT) if selected else QColor("#FFFFFF"))
                 p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
                 if int(flips) == -1:
                     name_y = y0 + inner_pad + (box_h - name_h) // 2
@@ -5119,12 +5129,12 @@ class ChallengeStartCountdown(QWidget):
         except Exception:
             pass
 
-        # Countdown sequence: ('3', cyan), ('2', cyan), ('1', cyan), ('GO!', orange)
+        # Countdown sequence: ('3', primary), ('2', primary), ('1', primary), ('GO!', accent)
         self._steps = [
-            ('3',   QColor('#00E5FF'), 800, False),
-            ('2',   QColor('#00E5FF'), 800, False),
-            ('1',   QColor('#00E5FF'), 800, False),
-            ('GO!', QColor('#FF7F00'), 500, True),   # last step fades out
+            ('3',   QColor(_CURRENT_THEME_PRIMARY), 800, False),
+            ('2',   QColor(_CURRENT_THEME_PRIMARY), 800, False),
+            ('1',   QColor(_CURRENT_THEME_PRIMARY), 800, False),
+            ('GO!', QColor(_CURRENT_THEME_ACCENT), 500, True),   # last step fades out
         ]
         self._step_idx = 0
         self._step_elapsed = 0.0
