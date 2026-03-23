@@ -1797,15 +1797,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
 
     def _on_theme_changed(self, index: int):
-        """Called when the user picks a new theme in the Theme sub-tab."""
+        """Called when the user picks a new theme in the Theme sub-tab (preview only)."""
         theme_id = self.cmb_theme.itemData(index)
         if not theme_id:
             return
         theme = _themes.get_theme(theme_id)
         self._update_theme_preview(theme)
-        self.cfg.OVERLAY["theme"] = theme_id
-        self.cfg.save()
-        self._apply_overlay_theme()
+        # Update pending selection (not yet applied – user must click Apply)
+        self._pending_theme_id = theme_id
 
     def _update_theme_preview(self, theme: dict):
         """Refresh the color-swatch preview widgets and description label."""
@@ -1816,6 +1815,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 f"background-color: {color}; border-radius: 4px; border: 1px solid #444;"
             )
         self._theme_desc_lbl.setText(theme.get("description", ""))
+
+    def _on_apply_theme(self):
+        """Apply the selected theme immediately to GUI and all supported overlays."""
+        theme_id = getattr(self, "_pending_theme_id", None)
+        if not theme_id:
+            # Fall back to currently selected combo item
+            idx = self.cmb_theme.currentIndex()
+            theme_id = self.cmb_theme.itemData(idx)
+        if not theme_id:
+            return
+        self.cfg.OVERLAY["theme"] = theme_id
+        self.cfg.save()
+        self._apply_overlay_theme()
+        # Visual feedback: briefly change the Apply button text
+        try:
+            btn = getattr(self, "_btn_apply_theme", None)
+            if btn is not None:
+                btn.setText("✅ Applied!")
+                QTimer.singleShot(1500, lambda: btn.setText("Apply Theme"))
+        except Exception:
+            pass
 
     def _on_sound_enabled_toggle(self, state: int):
         self.cfg.OVERLAY["sound_enabled"] = bool(state)
@@ -1842,17 +1862,49 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.OVERLAY["sound_events"][event_key] = bool(state)
         self.cfg.save()
 
+    def _on_demo_test_toast(self):
+        """Show a demo achievement toast to preview the current theme."""
+        try:
+            self._ach_toast_mgr.enqueue("🏆 Theme Preview Achievement", "__demo__", seconds=4)
+        except Exception:
+            pass
+        try:
+            _sound.play_sound_preview(self.cfg, "achievement_unlock")
+        except Exception:
+            pass
+
+    def _on_demo_test_challenge(self):
+        """Show a demo challenge select overlay to preview the current theme."""
+        try:
+            win = ChallengeSelectOverlay(self, selected_idx=0)
+            QTimer.singleShot(4000, lambda: (win.close() if win else None))
+        except Exception:
+            pass
+
     def _apply_overlay_theme(self):
-        """Push current theme colors into config keys and the overlay module variable."""
+        """Push current theme colors into config keys and the overlay module variables."""
         theme_id = self.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
         theme = _themes.get_theme(theme_id)
         border = theme.get("border", "#00E5FF")
         primary = theme.get("primary", "#00E5FF")
         accent = theme.get("accent", "#FF7F00")
+        bg = theme.get("bg", "#080C16")
         self.cfg.OVERLAY["theme_border"] = border
         self.cfg.OVERLAY["theme_primary"] = primary
         self.cfg.OVERLAY["theme_accent"] = accent
+        self.cfg.OVERLAY["theme_bg"] = bg
+        # Push to ui_overlay module globals so all overlay rendering uses the new theme
         ui_overlay._CURRENT_THEME_BORDER = border
+        ui_overlay._CURRENT_THEME_PRIMARY = primary
+        ui_overlay._CURRENT_THEME_ACCENT = accent
+        ui_overlay._CURRENT_THEME_BG = bg
+        # Refresh live overlay instances (MiniInfoOverlay and StatusOverlay are excluded)
+        try:
+            ov = getattr(self, "overlay", None)
+            if ov is not None:
+                ov.refresh_theme()
+        except Exception:
+            pass
         self._refresh_overlay_styles()
 
     def _refresh_overlay_styles(self):
@@ -1868,6 +1920,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     f"  padding: 6px 16px; border-radius: 6px; font-size: 10pt; }}"
                     f"QPushButton:hover {{ background: {accent}CC; }}"
                 )
+            # Update the theme dropdown label accent color
+            lbl = getattr(self, "_lbl_theme_select", None)
+            if lbl is not None:
+                lbl.setStyleSheet(f"color: {primary}; font-weight: bold;")
+            # Update the theme preview swatch labels
+            lbl_desc = getattr(self, "_theme_desc_lbl", None)
+            if lbl_desc is not None:
+                lbl_desc.setStyleSheet(f"color: {primary}; font-size: 9pt; padding: 2px 4px;")
         except Exception:
             pass
 
@@ -1921,7 +1981,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
-            "the overlay."
+            "the overlay.<br><br>"
+            "• <b>🎨 Theme</b>: Pick a colour theme from the dropdown and click <b>Apply Theme</b> "
+            "to apply it to the GUI and all supported overlays immediately. "
+            "The theme controls the border, accent, primary, and background colours. "
+            "<i>System Notification</i> and <i>Status Overlay</i> are intentionally excluded from theme changes.<br>"
+            "• <b>Overlay Preview</b>: Use the demo buttons to preview how overlays look with the chosen theme. "
+            "You can also play a test sound directly from this section.<br><br>"
+            "• <b>🔊 Sound</b>: Enable/disable sound effects, choose a sound pack, adjust volume, "
+            "and toggle individual events. Use the <b>▶ Play</b> buttons to preview each sound."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
@@ -2454,20 +2522,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         theme_layout.setContentsMargins(12, 12, 12, 12)
         theme_layout.setSpacing(10)
 
-        # Dropdown row
+        # Dropdown row + Apply button
         row_select = QHBoxLayout()
-        lbl_theme_select = QLabel("Active theme:")
-        lbl_theme_select.setStyleSheet("color: #00E5FF; font-weight: bold;")
-        row_select.addWidget(lbl_theme_select)
+        self._lbl_theme_select = QLabel("Active theme:")
+        self._lbl_theme_select.setStyleSheet("color: #00E5FF; font-weight: bold;")
+        row_select.addWidget(self._lbl_theme_select)
         self.cmb_theme = QComboBox()
         for tid, td in _themes.list_themes():
             self.cmb_theme.addItem(f"{td['icon']}  {td['name']}", userData=tid)
         current_theme_id = self.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
+        self._pending_theme_id = current_theme_id
         for i in range(self.cmb_theme.count()):
             if self.cmb_theme.itemData(i) == current_theme_id:
                 self.cmb_theme.setCurrentIndex(i)
                 break
         row_select.addWidget(self.cmb_theme)
+        self._btn_apply_theme = QPushButton("Apply Theme")
+        self._btn_apply_theme.setStyleSheet(
+            "QPushButton { background: #FF7F00; color: #000; font-weight: bold;"
+            "  padding: 5px 14px; border-radius: 6px; font-size: 10pt; }"
+            "QPushButton:hover { background: #FFA040; }"
+        )
+        self._btn_apply_theme.clicked.connect(self._on_apply_theme)
+        row_select.addWidget(self._btn_apply_theme)
         row_select.addStretch(1)
         theme_layout.addLayout(row_select)
 
@@ -2495,6 +2572,67 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._theme_desc_lbl.setStyleSheet("color: #aaa; font-size: 9pt; padding: 2px 4px;")
         self._theme_desc_lbl.setWordWrap(True)
         theme_layout.addWidget(self._theme_desc_lbl)
+
+        # Overlay preview / demo section
+        demo_grp = QGroupBox("Overlay Preview & Test")
+        demo_lay = QVBoxLayout(demo_grp)
+        demo_lay.setSpacing(6)
+        lbl_demo_info = QLabel(
+            "Preview how overlays look with the current theme. "
+            "System Notification and Status Overlay are not affected by themes."
+        )
+        lbl_demo_info.setWordWrap(True)
+        lbl_demo_info.setStyleSheet("color: #999; font-size: 8pt;")
+        demo_lay.addWidget(lbl_demo_info)
+
+        demo_btn_row = QHBoxLayout()
+        # Test Achievement Toast
+        btn_test_toast = QPushButton("🏆 Test Achievement Toast")
+        btn_test_toast.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_toast.clicked.connect(self._on_demo_test_toast)
+        demo_btn_row.addWidget(btn_test_toast)
+        # Test Challenge Overlay
+        btn_test_ch = QPushButton("⚔️ Test Challenge Overlay")
+        btn_test_ch.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_ch.clicked.connect(self._on_demo_test_challenge)
+        demo_btn_row.addWidget(btn_test_ch)
+        # Play test sound
+        btn_test_sound = QPushButton("🔊 Play Test Sound")
+        btn_test_sound.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_sound.clicked.connect(
+            lambda: _sound.play_sound_preview(self.cfg, "achievement_unlock")
+        )
+        demo_btn_row.addWidget(btn_test_sound)
+        demo_btn_row.addStretch(1)
+        demo_lay.addLayout(demo_btn_row)
+
+        # Overlay description mini-table
+        overlays_info = [
+            ("✅", "Main Stats Overlay",      "Full achievement list & stats"),
+            ("✅", "Achievement Toast",        "Pops up on each unlock"),
+            ("✅", "Challenge Menu",           "Choose Timed/Flip/Heat"),
+            ("✅", "Challenge Timer",          "Countdown during timed challenge"),
+            ("✅", "Flip Counter",             "Flip tally for flip challenge"),
+            ("✅", "Heat Bar",                 "Heat barometer for heat challenge"),
+            ("⛔", "System Notification",      "Error/info notices – fixed style"),
+            ("⛔", "Status Overlay",           "Cloud sync badge – fixed style"),
+        ]
+        for icon, name, desc in overlays_info:
+            row_ov = QHBoxLayout()
+            lbl_icon = QLabel(icon)
+            lbl_icon.setFixedWidth(22)
+            lbl_name = QLabel(f"<b>{name}</b>")
+            lbl_name.setFixedWidth(180)
+            lbl_name.setStyleSheet("color: #e0e0e0; font-size: 8pt;")
+            lbl_desc = QLabel(desc)
+            lbl_desc.setStyleSheet("color: #888; font-size: 8pt;")
+            row_ov.addWidget(lbl_icon)
+            row_ov.addWidget(lbl_name)
+            row_ov.addWidget(lbl_desc)
+            row_ov.addStretch(1)
+            demo_lay.addLayout(row_ov)
+
+        theme_layout.addWidget(demo_grp)
 
         # Theme list
         list_grp = QGroupBox("Available Themes")

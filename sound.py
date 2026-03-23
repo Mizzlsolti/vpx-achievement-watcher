@@ -449,12 +449,17 @@ def _rescale_wav(wav_bytes: bytes, scale: float) -> bytes:
 
 
 def _play_raw(wav_bytes: bytes) -> None:
-    """Play WAV bytes asynchronously via winsound (Windows) or silent fallback."""
-    try:
-        import winsound
-        winsound.PlaySound(wav_bytes, winsound.SND_MEMORY | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
-    except Exception:
-        pass
+    """Play WAV bytes asynchronously via a daemon thread using winsound (Windows) or silent fallback."""
+    import threading
+
+    def _worker(data: bytes) -> None:
+        try:
+            import winsound
+            winsound.PlaySound(data, winsound.SND_MEMORY | winsound.SND_NODEFAULT)
+        except Exception:
+            pass
+
+    threading.Thread(target=_worker, args=(wav_bytes,), daemon=True).start()
 
 
 def _resolve_pack_id(ov: dict) -> str:

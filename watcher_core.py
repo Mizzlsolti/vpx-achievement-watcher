@@ -169,6 +169,11 @@ DEFAULT_OVERLAY = {
     "prefer_ascii_icons": False,
     "auto_show_on_end": True,
     "live_updates": False,
+    "theme": "neon_blue",
+    "theme_border": "#00E5FF",
+    "theme_primary": "#00E5FF",
+    "theme_accent": "#FF7F00",
+    "theme_bg": "#080C16",
     "ach_toast_custom": False,
     "ach_toast_x_landscape": 100,
     "ach_toast_y_landscape": 100,
@@ -336,6 +341,8 @@ class AppConfig:
 
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
 
+                "theme", "theme_border", "theme_primary", "theme_accent", "theme_bg",
+
                 "total_playtime_sec",
                 "last_export_ts",
             ]
@@ -408,6 +415,8 @@ class AppConfig:
                 "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
 
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+
+                "theme", "theme_border", "theme_primary", "theme_accent", "theme_bg",
 
                 "total_playtime_sec",
                 "last_export_ts",
