@@ -375,7 +375,7 @@ class CloudStatsMixin:
         style = f"""
         <style>
           body {{ background:#111318; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
-                  margin: 10px 12px; padding: 0; }}
+                  margin: 14px 18px; padding: 0; }}
           h2 {{ color:#FFF; margin: 0 0 2px 0; font-size: 1.3em; }}
           .meta {{ color:#888; font-size:0.9em; margin: 0 0 14px 0; }}
           .cols-outer {{ width:100%; border-collapse:separate; border-spacing:0; }}
@@ -386,9 +386,10 @@ class CloudStatsMixin:
             border: 2px solid {_border};
             border-left: 5px solid {_accent};
             border-radius: 10px;
-            padding: 16px 18px 14px 18px;
+            padding: 20px 22px 18px 22px;
+            min-width: 220px;
           }}
-          .col-sep {{ width:12px; }}
+          .col-sep {{ width:24px; }}
           .col-panel h3 {{
             color: {_primary};
             margin: 0 0 10px 0;
@@ -1269,7 +1270,7 @@ class CloudStatsMixin:
         
         rows = ["<tr>"]
         for _ in range(COLUMNS):
-            rows.append("<th>Feld / Name</th><th class='right'>Wert</th>")
+            rows.append("<th>Field / Name</th><th class='right'>Value</th>")
         rows.append("</tr>")
         
         items = []

@@ -45,7 +45,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
         c_text = _tint_color("#0A0A0A", bg, _BLEND)
 
     return f"""
-        /* --- Basis: Tiefschwarz (Cabinet) --- */
+        /* --- Base: Deep Black (Cabinet) --- */
         QMainWindow, QDialog, QWidget {{
             background-color: {c_main};
             color: #E0E0E0;
@@ -53,7 +53,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             font-size: 10pt;
         }}
 
-        /* --- Die Haupt-Tabs --- */
+        /* --- Main Tabs --- */
         QTabWidget::pane {{
             border: 1px solid #333333;
             background-color: {c_panel};
@@ -81,7 +81,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             border-top: 3px solid {accent};
         }}
 
-        /* --- Buttons (Arcade Style mit Metallic-Gradient) --- */
+        /* --- Buttons (Arcade Style with Metallic Gradient) --- */
         QPushButton {{
             background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #383838, stop:1 #252525);
             color: #FFFFFF;
@@ -101,7 +101,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             border: 1px solid {accent};
         }}
 
-        /* --- Panels (Groupboxen für die Struktur) --- */
+        /* --- Panels (GroupBoxes for structure) --- */
         QGroupBox {{
             border: 1px solid #444444;
             border-radius: 6px;
@@ -118,7 +118,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             font-size: 11pt;
         }}
 
-        /* --- Textfelder & Listen (z.B. für Stats) --- */
+        /* --- Text fields & lists (e.g. for stats) --- */
         QTextBrowser, QTextEdit {{
             background-color: {c_text};
             border: 1px solid #333333;
@@ -126,7 +126,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             color: {accent};
         }}
 
-        /* --- Eingabefelder --- */
+        /* --- Input fields --- */
         QLineEdit, QComboBox, QSpinBox {{
             background-color: {c_input};
             color: #FFFFFF;
@@ -138,7 +138,7 @@ def pinball_arcade_style(primary: str = "#00E5FF", accent: str = "#FF7F00", bg: 
             border: 1px solid {primary};
         }}
 
-        /* --- Slider (Für Volume & Skalierung) --- */
+        /* --- Slider (Volume & Scale) --- */
         QSlider::groove:horizontal {{
             border: 1px solid #444;
             height: 8px;
