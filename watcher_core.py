@@ -237,6 +237,10 @@ DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
+DEFAULT_OVERLAY.setdefault("page_2_enabled", True)
+DEFAULT_OVERLAY.setdefault("page_3_enabled", True)
+DEFAULT_OVERLAY.setdefault("page_4_enabled", True)
+DEFAULT_OVERLAY.setdefault("page_5_enabled", True)
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -345,6 +349,8 @@ class AppConfig:
 
                 "total_playtime_sec",
                 "last_export_ts",
+
+                "page_2_enabled", "page_3_enabled", "page_4_enabled", "page_5_enabled",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -420,6 +426,8 @@ class AppConfig:
 
                 "total_playtime_sec",
                 "last_export_ts",
+
+                "page_2_enabled", "page_3_enabled", "page_4_enabled", "page_5_enabled",
             ]
             
             for k in allowed_keys:
