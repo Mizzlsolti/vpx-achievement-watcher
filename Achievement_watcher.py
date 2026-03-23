@@ -1875,6 +1875,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # TAB HELP TEXTS & HELPERS
     # ==========================================
     _TAB_HELP = {
+        "player": (
+            "<b>👤 Player</b><br><br>"
+            "The Player tab shows your personal profile and progress.<br><br>"
+            "• <b>Player Level</b>: Your current level and XP progress bar based on unlocked achievements. "
+            "Earn prestige stars (up to ☆☆☆☆☆) by unlocking 2000 achievements each.<br>"
+            "• <b>Level Table</b>: Shows all level thresholds and XP requirements.<br>"
+            "• <b>Badges</b>: Collectible badges earned through gameplay milestones. "
+            "Use the <b>Display Badge</b> dropdown to choose which badge appears next to your name on leaderboards.<br>"
+            "• <b>Profile Card</b>: A compact business-card-style summary of your stats. "
+            "Use <b>Export as PNG</b> to save it or <b>Copy to Clipboard</b> to share it."
+        ),
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status, your player level, "
@@ -6276,7 +6287,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                             if str(r.get("title", "")).strip() in unlocked_titles
                         )
                         pct = round((unlocked / total) * 100, 1)
-                        top_tables.append({"name": rom, "pct": pct})
+                        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+                        friendly = _strip_version_from_name(romnames.get(rom, "")) or rom
+                        top_tables.append({"name": friendly, "rom": rom, "pct": pct})
                     except Exception:
                         pass
                 top_tables.sort(key=lambda x: x["pct"], reverse=True)
@@ -6356,7 +6369,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             img = render_profile_card(data)
             self._profile_card_img = img
             pix = QPixmap.fromImage(img)
-            pix = pix.scaledToWidth(400, Qt.TransformationMode.SmoothTransformation)
+            pix = pix.scaledToWidth(560, Qt.TransformationMode.SmoothTransformation)
             self.lbl_profile_card_preview.setPixmap(pix)
         except Exception:
             pass

@@ -1,5 +1,5 @@
 """
-profile_card.py – Renders an 800×600 profile card image using QPainter.
+profile_card.py – Renders a compact business-card-style profile card image using QPainter.
 
 Public API:
     render_profile_card(data: dict) -> QImage
@@ -21,8 +21,8 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-CARD_W = 800
-CARD_H = 600
+CARD_W = 600
+CARD_H = 360
 
 
 def _draw_text(painter: "QPainter", x: int, y: int, w: int, h: int,
@@ -40,12 +40,12 @@ def _draw_text(painter: "QPainter", x: int, y: int, w: int, h: int,
 
 def render_profile_card(data: dict) -> "QImage":
     """
-    Render an 800×600 profile card and return a QImage.
+    Render a compact 600×360 business-card-style profile card and return a QImage.
 
     Expected keys in *data* (all optional – missing values show placeholders):
         player_name, level, prestige_display, total_achievements (int),
         badges (list), total_playtime_sec (int), tables_played (int),
-        top_tables (list of dicts with 'name' and 'pct'),
+        top_tables (list of dicts with 'name', 'rom' and 'pct'),
         challenge_records (dict), theme_colors (dict with 'border', 'accent'),
         version (str)
     """
@@ -94,12 +94,12 @@ def _render_card_contents(painter: "QPainter", data: dict) -> None:
     painter.fillRect(0, 0, CARD_W, CARD_H, QBrush(grad))
 
     # ---- Border ---------------------------------------------------------
-    border_pen = QPen(border_color, 3)
+    border_pen = QPen(border_color, 2)
     painter.setPen(border_pen)
-    painter.drawRect(3, 3, CARD_W - 6, CARD_H - 6)
+    painter.drawRect(1, 1, CARD_W - 2, CARD_H - 2)
 
     # ---- Header band ----------------------------------------------------
-    header_h = 90
+    header_h = 62
     header_grad = QLinearGradient(0, 0, CARD_W, 0)
     header_grad.setColorAt(0.0, QColor(border_color.red(), border_color.green(), border_color.blue(), 40))
     header_grad.setColorAt(1.0, QColor(0, 0, 0, 0))
@@ -107,8 +107,8 @@ def _render_card_contents(painter: "QPainter", data: dict) -> None:
 
     # ---- Player name ----------------------------------------------------
     player_name = str(data.get("player_name") or "Player")
-    f_name = QFont("Segoe UI", 26, QFont.Weight.Bold)
-    _draw_text(painter, 20, 12, CARD_W - 40, 44, player_name,
+    f_name = QFont("Segoe UI", 18, QFont.Weight.Bold)
+    _draw_text(painter, 12, 8, CARD_W - 24, 32, player_name,
                f_name, text_primary,
                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
@@ -116,20 +116,20 @@ def _render_card_contents(painter: "QPainter", data: dict) -> None:
     level = int(data.get("level") or 1)
     prestige_display = str(data.get("prestige_display") or "☆☆☆☆☆")
     level_text = f"Level {level}"
-    f_level = QFont("Segoe UI", 14)
-    _draw_text(painter, 20, 56, 300, 28, level_text,
+    f_level = QFont("Segoe UI", 10)
+    _draw_text(painter, 12, 40, 200, 20, level_text,
                f_level, accent_color,
                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     # ---- Prestige stars -------------------------------------------------
-    f_stars = QFont("Segoe UI", 14)
-    _draw_text(painter, 20, 56, CARD_W - 40, 28, prestige_display,
+    f_stars = QFont("Segoe UI", 10)
+    _draw_text(painter, 12, 40, CARD_W - 24, 20, prestige_display,
                f_stars, gold,
                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
     # ---- Divider --------------------------------------------------------
     painter.setPen(QPen(border_color, 1))
-    painter.drawLine(20, header_h, CARD_W - 20, header_h)
+    painter.drawLine(12, header_h, CARD_W - 12, header_h)
 
     # ---- Stats row ------------------------------------------------------
     total_ach = int(data.get("total_achievements") or 0)
@@ -143,65 +143,71 @@ def _render_card_contents(painter: "QPainter", data: dict) -> None:
     stats = [
         ("🏆", "Achievements", str(total_ach)),
         ("🎖️", "Badges", str(badge_count)),
-        ("🎲", "Tables", str(tables_played)),
+        ("🎲", "Played Tables", str(tables_played)),
         ("⏱️", "Playtime", playtime_str),
     ]
-    stat_y = header_h + 14
-    stat_w = (CARD_W - 40) // len(stats)
-    f_stat_val = QFont("Segoe UI", 16, QFont.Weight.Bold)
-    f_stat_lbl = QFont("Segoe UI", 9)
+    stat_y = header_h + 8
+    stat_w = (CARD_W - 24) // len(stats)
+    f_stat_val = QFont("Segoe UI", 12, QFont.Weight.Bold)
+    f_stat_lbl = QFont("Segoe UI", 7)
     for i, (icon, label, value) in enumerate(stats):
-        sx = 20 + i * stat_w
-        _draw_text(painter, sx, stat_y, stat_w, 26, f"{icon} {value}",
+        sx = 12 + i * stat_w
+        _draw_text(painter, sx, stat_y, stat_w, 20, f"{icon} {value}",
                    f_stat_val, text_primary,
                    Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
-        _draw_text(painter, sx, stat_y + 26, stat_w, 18, label,
+        _draw_text(painter, sx, stat_y + 20, stat_w, 14, label,
                    f_stat_lbl, text_dim,
                    Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
 
     # ---- Divider --------------------------------------------------------
-    section_y = header_h + 68
+    section_y = header_h + 48
     painter.setPen(QPen(QColor(60, 60, 70), 1))
-    painter.drawLine(20, section_y, CARD_W - 20, section_y)
+    painter.drawLine(12, section_y, CARD_W - 12, section_y)
 
     # ---- Top 3 tables ---------------------------------------------------
     top_tables = data.get("top_tables") or []
-    col_left = 20
-    col_w = (CARD_W // 2) - 30
+    col_left = 12
+    col_w = (CARD_W // 2) - 18
 
-    f_sec = QFont("Segoe UI", 11, QFont.Weight.Bold)
-    f_tbl = QFont("Segoe UI", 9)
+    f_sec = QFont("Segoe UI", 8, QFont.Weight.Bold)
+    f_tbl = QFont("Segoe UI", 7)
 
-    tbl_y = section_y + 10
-    _draw_text(painter, col_left, tbl_y, col_w, 22, "🏅 Top Tables",
+    tbl_y = section_y + 8
+    _draw_text(painter, col_left, tbl_y, col_w, 16, "🏅 Top Tables",
                f_sec, border_color,
                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-    tbl_y += 24
+    tbl_y += 18
     for i, tbl in enumerate(top_tables[:3]):
         name = str(tbl.get("name") or f"Table {i+1}")
+        rom = str(tbl.get("rom") or "")
         pct = float(tbl.get("pct") or 0)
-        # truncate long names
+        # Build combined label: "Table Name (rom)" or just the name if no rom
+        if rom and rom.lower() != name.lower():
+            combined = f"{name} ({rom})"
+        else:
+            combined = name
+        # truncate long combined labels
         fm = QFontMetrics(f_tbl)
-        max_w = col_w - 55
-        name = fm.elidedText(name, Qt.TextElideMode.ElideRight, max_w)
-        row_text = f"{i+1}. {name}"
-        _draw_text(painter, col_left, tbl_y, col_w - 55, 18, row_text,
+        max_w = col_w - 42
+        combined = fm.elidedText(combined, Qt.TextElideMode.ElideRight, max_w)
+        row_text = f"{i+1}. {combined}"
+        _draw_text(painter, col_left, tbl_y, col_w - 42, 15, row_text,
                    f_tbl, text_primary,
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         pct_text = f"{pct:.0f}%"
-        _draw_text(painter, col_left + col_w - 55, tbl_y, 50, 18, pct_text,
+        _draw_text(painter, col_left + col_w - 42, tbl_y, 38, 15, pct_text,
                    f_tbl, accent_color,
                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        tbl_y += 20
+        tbl_y += 16
 
     # ---- Challenge records ----------------------------------------------
-    chal_x = CARD_W // 2 + 10
-    chal_w = CARD_W // 2 - 30
-    chal_y = section_y + 10
-    _draw_text(painter, chal_x, chal_y, chal_w, 22, "🎯 Challenge Records",
+    chal_x = CARD_W // 2 + 6
+    chal_w = CARD_W // 2 - 18
+    chal_y = section_y + 8
+    _draw_text(painter, chal_x, chal_y, chal_w, 16, "🎯 Challenge Records",
                f_sec, border_color,
                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-    chal_y += 24
+    chal_y += 18
     records = data.get("challenge_records") or {}
     record_items = [
         ("⏱️ Timed", records.get("timed_best", "—")),
@@ -209,24 +215,24 @@ def _render_card_contents(painter: "QPainter", data: dict) -> None:
         ("🌡️ Heat", records.get("heat_best", "—")),
     ]
     for label, value in record_items:
-        _draw_text(painter, chal_x, chal_y, chal_w - 80, 18, label,
+        _draw_text(painter, chal_x, chal_y, chal_w - 60, 15, label,
                    f_tbl, text_dim,
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        _draw_text(painter, chal_x + chal_w - 80, chal_y, 80, 18, str(value),
+        _draw_text(painter, chal_x + chal_w - 60, chal_y, 58, 15, str(value),
                    f_tbl, text_primary,
                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        chal_y += 20
+        chal_y += 16
 
     # ---- Bottom divider -------------------------------------------------
-    footer_y = CARD_H - 30
+    footer_y = CARD_H - 22
     painter.setPen(QPen(QColor(50, 50, 60), 1))
-    painter.drawLine(20, footer_y, CARD_W - 20, footer_y)
+    painter.drawLine(12, footer_y, CARD_W - 12, footer_y)
 
     # ---- Version footer -------------------------------------------------
     version = str(data.get("version") or "")
-    f_footer = QFont("Segoe UI", 8)
+    f_footer = QFont("Segoe UI", 6)
     footer_text = f"VPX Achievement Watcher  {version}"
-    _draw_text(painter, 20, footer_y + 4, CARD_W - 40, 22, footer_text,
+    _draw_text(painter, 12, footer_y + 3, CARD_W - 24, 16, footer_text,
                f_footer, text_dim,
                Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
 
