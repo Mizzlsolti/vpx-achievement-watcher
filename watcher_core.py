@@ -2442,6 +2442,21 @@ class Watcher:
                             log(self.cfg, f"[INFO] Mini overlay (no VPS-ID) shown for {rom}")
                         except Exception as e:
                             log(self.cfg, f"[OVERLAY] mini info vps emit failed: {e}", "WARN")
+                        # Also add a persistent Dashboard notification
+                        try:
+                            from notifications import add_notification
+                            add_notification(
+                                self.cfg,
+                                type="vps_missing",
+                                icon="⚠️",
+                                title=f"No VPS mapping for {rom}",
+                                detail=f"ROM '{rom}' could not be linked to a VPS table. Some features require a VPS ID.",
+                                action_tab="available_maps",
+                                rom=rom,
+                            )
+                            self.bridge.notification_added.emit()
+                        except Exception as e:
+                            log(self.cfg, f"[NOTIF] vps_missing notification failed: {e}", "WARN")
                         return
                     time.sleep(0.5)
             except Exception as e:
