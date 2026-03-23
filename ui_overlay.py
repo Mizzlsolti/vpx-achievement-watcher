@@ -24,6 +24,10 @@ _CURRENT_THEME_BORDER = "#00E5FF"
 _CURRENT_THEME_PRIMARY = "#00E5FF"
 _CURRENT_THEME_ACCENT = "#FF7F00"
 _CURRENT_THEME_BG = "#080C16"
+# Per-page accent colours for the active theme (empty list = use border colour on all pages).
+_CURRENT_THEME_PAGE_ACCENTS: list = []
+# Number of navigable overlay pages (used to keep _page_index in bounds when no page_accents).
+_OVERLAY_PAGE_COUNT = 4
 
 
 def _get_overlay_bg_color(alpha: int = 245) -> "QColor":
@@ -356,15 +360,6 @@ class OverlayEffectsWidget(QWidget):
                 p.end()
             except Exception:
                 pass
-
-
-# Per-page accent colours for the main overlay (cycles as user navigates)
-_OVERLAY_PAGE_ACCENTS = [
-    QColor(0, 229, 255),    # page 0: cyan (default/highlights)
-    QColor(255, 127, 0),    # page 1: orange (achievement progress)
-    QColor(0, 200, 110),    # page 2: green (other views)
-    QColor(180, 80, 255),   # page 3: purple (cloud/VPS)
-]
 
 
 class _OverlayShineWidget(QWidget):
@@ -1624,13 +1619,17 @@ class OverlayWindow(QWidget):
             return
 
         # Advance page index for accent colour cycling
-        n = len(_OVERLAY_PAGE_ACCENTS)
+        page_accents = _CURRENT_THEME_PAGE_ACCENTS
+        n = len(page_accents) if page_accents else _OVERLAY_PAGE_COUNT
         if direction == 'left':
             self._page_index = (self._page_index + 1) % n
         else:
             self._page_index = (self._page_index - 1) % n
         if hasattr(self, '_effects_widget'):
-            self._effects_widget.set_accent(_OVERLAY_PAGE_ACCENTS[self._page_index])
+            if page_accents:
+                self._effects_widget.set_accent(QColor(page_accents[self._page_index]))
+            else:
+                self._effects_widget.set_accent(QColor(_CURRENT_THEME_BORDER))
 
         # Pause the page-2 scroll timer for the duration of the transition so it
         # cannot update content mid-animation and cause flicker.
