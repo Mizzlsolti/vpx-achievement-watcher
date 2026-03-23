@@ -790,6 +790,8 @@ class OverlayWindow(QWidget):
         """Re-apply the current theme colours to the overlay container without rebuilding content."""
         try:
             self._apply_container_style()
+            if self.portrait_mode and self.isVisible():
+                self.request_rotation(force=True)
         except Exception:
             pass
 

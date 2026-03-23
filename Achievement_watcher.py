@@ -2729,51 +2729,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_demo_info.setStyleSheet("color: #999; font-size: 8pt;")
         demo_lay.addWidget(lbl_demo_info)
 
-        demo_btn_row = QHBoxLayout()
-        # Test Achievement Toast
-        btn_test_toast = QPushButton("🏆 Test Achievement Toast")
-        btn_test_toast.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_toast.clicked.connect(self._on_demo_test_toast)
-        demo_btn_row.addWidget(btn_test_toast)
-        # Test Challenge Overlay
-        btn_test_ch = QPushButton("⚔️ Test Challenge Overlay")
-        btn_test_ch.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_ch.clicked.connect(self._on_demo_test_challenge)
-        demo_btn_row.addWidget(btn_test_ch)
-        # Test Timer Overlay
-        btn_test_timer = QPushButton("⏱️ Test Timer")
-        btn_test_timer.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_timer.clicked.connect(self._on_demo_test_timer)
-        demo_btn_row.addWidget(btn_test_timer)
-        # Test Flip Counter
-        btn_test_flip = QPushButton("🎯 Test Flip Counter")
-        btn_test_flip.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_flip.clicked.connect(self._on_demo_test_flip)
-        demo_btn_row.addWidget(btn_test_flip)
-        demo_btn_row.addStretch(1)
-        demo_lay.addLayout(demo_btn_row)
-
-        demo_btn_row2 = QHBoxLayout()
-        # Test Heat Bar
-        btn_test_heat = QPushButton("🔥 Test Heat Bar")
-        btn_test_heat.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_heat.clicked.connect(self._on_demo_test_heat)
-        demo_btn_row2.addWidget(btn_test_heat)
-        demo_btn_row2.addStretch(1)
-        demo_lay.addLayout(demo_btn_row2)
-
-        # Overlay description mini-table
+        # Overlay description rows with inline test buttons
         overlays_info = [
-            ("✅", "Main Stats Overlay",      "Full achievement list & stats"),
-            ("✅", "Achievement Toast",        "Pops up on each unlock"),
-            ("✅", "Challenge Menu",           "Choose Timed/Flip/Heat"),
-            ("✅", "Challenge Timer",          "Countdown during timed challenge"),
-            ("✅", "Flip Counter",             "Flip tally for flip challenge"),
-            ("✅", "Heat Bar",                 "Heat barometer for heat challenge"),
-            ("⛔", "System Notification",      "Error/info notices – fixed style"),
-            ("⛔", "Status Overlay",           "Cloud sync badge – fixed style"),
+            ("✅", "Main Stats Overlay",      "Full achievement list & stats",          self._on_demo_test_main_overlay),
+            ("✅", "Achievement Toast",        "Pops up on each unlock",                 self._on_demo_test_toast),
+            ("✅", "Challenge Menu",           "Choose Timed/Flip/Heat",                 self._on_demo_test_challenge),
+            ("✅", "Challenge Timer",          "Countdown during timed challenge",        self._on_demo_test_timer),
+            ("✅", "Flip Counter",             "Flip tally for flip challenge",           self._on_demo_test_flip),
+            ("✅", "Heat Bar",                 "Heat barometer for heat challenge",       self._on_demo_test_heat),
+            ("⛔", "System Notification",      "Error/info notices – fixed style",        None),
+            ("⛔", "Status Overlay",           "Cloud sync badge – fixed style",          None),
         ]
-        for icon, name, desc in overlays_info:
+        for icon, name, desc, test_fn in overlays_info:
             row_ov = QHBoxLayout()
             lbl_icon = QLabel(icon)
             lbl_icon.setFixedWidth(22)
@@ -2786,6 +2753,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             row_ov.addWidget(lbl_name)
             row_ov.addWidget(lbl_desc)
             row_ov.addStretch(1)
+            if test_fn is not None:
+                btn_test = QPushButton("Test")
+                btn_test.setStyleSheet("font-size: 8pt; padding: 2px 8px;")
+                btn_test.clicked.connect(test_fn)
+                row_ov.addWidget(btn_test)
             demo_lay.addLayout(row_ov)
 
         theme_layout.addWidget(demo_grp)
