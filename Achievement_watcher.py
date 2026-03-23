@@ -2181,7 +2181,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _build_tab_appearance(self):
         tab = QWidget()
         tab_layout = QVBoxLayout(tab)
-        tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        appearance_tabs = QTabWidget()
+
+        # --- Sub-tab 1: Overlay (ALL existing content) ---
+        overlay_tab = QWidget()
+        overlay_tab_layout = QVBoxLayout(overlay_tab)
+        overlay_tab_layout.setContentsMargins(0, 0, 0, 0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -2190,7 +2196,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         inner = QWidget()
         layout = QVBoxLayout(inner)
         scroll.setWidget(inner)
-        tab_layout.addWidget(scroll)
+        overlay_tab_layout.addWidget(scroll)
 
         grp_style = QGroupBox("Global Styling")
         lay_style = QGridLayout(grp_style)
@@ -2321,8 +2327,31 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)
-        self._add_tab_help_button(layout, "appearance")
         self._update_switch_all_button_label()
+        appearance_tabs.addTab(overlay_tab, "🖼️ Overlay")
+
+        # --- Sub-tab 2: Theme (placeholder) ---
+        theme_tab = QWidget()
+        theme_layout = QVBoxLayout(theme_tab)
+        theme_placeholder = QLabel("🎨 Theme settings coming soon...")
+        theme_placeholder.setStyleSheet("color: #888; font-size: 12pt; padding: 40px;")
+        theme_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        theme_layout.addWidget(theme_placeholder)
+        theme_layout.addStretch(1)
+        appearance_tabs.addTab(theme_tab, "🎨 Theme")
+
+        # --- Sub-tab 3: Sound (placeholder) ---
+        sound_tab = QWidget()
+        sound_layout = QVBoxLayout(sound_tab)
+        sound_placeholder = QLabel("🔊 Sound settings coming soon...")
+        sound_placeholder.setStyleSheet("color: #888; font-size: 12pt; padding: 40px;")
+        sound_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sound_layout.addWidget(sound_placeholder)
+        sound_layout.addStretch(1)
+        appearance_tabs.addTab(sound_tab, "🔊 Sound")
+
+        tab_layout.addWidget(appearance_tabs)
+        self._add_tab_help_button(tab_layout, "appearance")
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
     def _portrait_checkboxes(self):
