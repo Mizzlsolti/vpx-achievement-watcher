@@ -366,33 +366,58 @@ class CloudStatsMixin:
         return "".join(blocks[min(7, int((v - mn) / rng * 7))] for v in values)
 
     def _build_trends_html(self, rom: str, sessions: list) -> str:
-        """Generate the full trends HTML for a ROM."""
+        """Generate the full trends HTML for a ROM using dashboard card layout."""
         esc = _html.escape
         _primary = get_theme_color(self.cfg, "primary")
         _accent = get_theme_color(self.cfg, "accent")
+        _border = get_theme_color(self.cfg, "border")
+
+        # Build semi-transparent border color for cards (30% opacity = ~77/255 ≈ 4D hex)
+        _border_card = _border  # used in rgba below
+
         style = f"""
         <style>
-          body {{ background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif; }}
-          h3 {{ color:{_primary}; margin-top:12px; margin-bottom:4px; }}
+          body {{ background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif;
+                  margin: 8px; padding: 0; }}
+          h2 {{ color:#FFF; margin: 0 0 2px 0; }}
+          .meta {{ color:#888; font-size:0.9em; margin: 0 0 10px 0; }}
+          .trend-card {{
+            background: rgba(255,255,255,0.04);
+            border: 1px solid {_border_card};
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 10px 0;
+          }}
+          .trend-card h3 {{
+            color: {_primary};
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+          }}
           table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
-          th, td {{ padding:0.2em 0.5em; border-bottom:1px solid #333; white-space:nowrap; color:#E0E0E0; }}
-          th {{ text-align:left; background:#1A1A1A; font-weight:bold; color:{_primary}; }}
+          th, td {{ padding:0.25em 0.5em; border-bottom:1px solid #333;
+                    white-space:nowrap; color:#E0E0E0; }}
+          th {{ text-align:left; background:rgba(0,0,0,0.3); font-weight:bold;
+                color:{_primary}; }}
           td.val {{ text-align:right; font-weight:bold; color:{_accent}; }}
           td.up {{ color:#00E676; }}
           td.down {{ color:#FF5252; }}
-          .spark {{ font-family:monospace; font-size:16pt; color:{_accent}; letter-spacing:2px; }}
-          .meta {{ color:#888; font-size:0.9em; }}
+          .spark {{ font-family:monospace; font-size:16pt; color:{_accent};
+                    letter-spacing:2px; display:block; margin-bottom:8px; }}
+          .card-footer {{ margin-top:10px; color:#ccc; font-size:0.92em; }}
+          .card-footer b {{ color:{_accent}; }}
           .no-data {{ color:#888; font-style:italic; }}
         </style>
         """
+
         romnames = {}
         try:
             romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
         except Exception:
             pass
         table_name = _strip_version_from_name(romnames.get(rom, "")) or rom
-        lines = [style, f"<h2 style='color:#FFF;'>{esc(table_name)}</h2>"]
-        lines.append(f"<p class='meta'>ROM: {esc(rom)}</p>")
+        lines = [style,
+                 f"<h2>{esc(table_name)}</h2>",
+                 f"<p class='meta'>ROM: {esc(rom)}</p>"]
 
         recent = sessions[-10:] if sessions else []
 
@@ -400,7 +425,12 @@ class CloudStatsMixin:
             lines.append("<p class='no-data'>No session data available yet.</p>")
             return "".join(lines)
 
-        # ── Score Trend ──────────────────────────────────────────────────────
+        def _fmt_playtime(sec: int) -> str:
+            h, rem = divmod(int(sec), 3600)
+            m = rem // 60
+            return f"{h}h {m:02d}m"
+
+        # ── Card 1: Score Trend ─────────────────────────────────────────────
         scores = [s["score"] for s in recent]
         avg_score = sum(scores) / len(scores) if scores else 0
         last_score = scores[-1] if scores else 0
@@ -408,21 +438,23 @@ class CloudStatsMixin:
         trend_icon = "↑" if score_trend_pct >= 0 else "↓"
         fire = " 🔥" if score_trend_pct > 50 else ""
 
+        lines.append("<div class='trend-card'>")
         lines.append("<h3>📈 Score Trend (Last 10 Sessions)</h3>")
-        lines.append(f"<div class='spark'>{self._sparkline(scores)}</div>")
+        lines.append(f"<span class='spark'>{self._sparkline(scores)}</span>")
         lines.append("<table>")
-        lines.append("<tr><th>Date</th><th class='right' style='text-align:right'>Score</th></tr>")
+        lines.append("<tr><th>Date</th><th style='text-align:right'>Score</th></tr>")
         for s in recent:
             score_str = f"{s['score']:,}".replace(",", ".")
             lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{score_str}</td></tr>")
         lines.append("</table>")
         avg_score_str = f"{int(avg_score):,}".replace(",", ".")
         lines.append(
-            f"<p>Average: <b>{avg_score_str}</b> | "
+            f"<p class='card-footer'>Average: <b>{avg_score_str}</b> &nbsp;|&nbsp; "
             f"Trend: <b>{trend_icon} {score_trend_pct:+.0f}%{fire}</b></p>"
         )
+        lines.append("</div>")
 
-        # ── Playtime Trend ───────────────────────────────────────────────────
+        # ── Card 2: Playtime Trend ──────────────────────────────────────────
         playtimes = [s["playtime_sec"] for s in recent]
         avg_play = sum(playtimes) / len(playtimes) if playtimes else 0
         last_play = playtimes[-1] if playtimes else 0
@@ -430,28 +462,33 @@ class CloudStatsMixin:
         play_trend_icon = "↑" if play_trend_pct >= 0 else "↓"
         play_fire = " 🔥" if play_trend_pct > 50 else ""
 
-        def _fmt_playtime(sec: int) -> str:
-            h, rem = divmod(int(sec), 3600)
-            m = rem // 60
-            return f"{h}h {m:02d}m"
-
+        lines.append("<div class='trend-card'>")
         lines.append("<h3>⏱️ Playtime Trend (per session)</h3>")
-        lines.append(f"<div class='spark'>{self._sparkline(playtimes)}</div>")
+        lines.append(f"<span class='spark'>{self._sparkline(playtimes)}</span>")
         lines.append("<table>")
         lines.append("<tr><th>Date</th><th style='text-align:right'>Playtime</th></tr>")
         for s in recent:
-            lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{_fmt_playtime(s['playtime_sec'])}</td></tr>")
+            lines.append(
+                f"<tr><td>{esc(s['ts_str'])}</td>"
+                f"<td class='val'>{_fmt_playtime(s['playtime_sec'])}</td></tr>"
+            )
         lines.append("</table>")
         lines.append(
-            f"<p>Average: <b>{_fmt_playtime(int(avg_play))}</b> | "
+            f"<p class='card-footer'>Average: <b>{_fmt_playtime(int(avg_play))}</b> &nbsp;|&nbsp; "
             f"Trend: <b>{play_trend_icon} {play_trend_pct:+.0f}%{play_fire}</b></p>"
         )
+        lines.append("</div>")
 
-        # ── Last vs Average Comparison ───────────────────────────────────────
+        # ── Card 3: Last vs Average ─────────────────────────────────────────
+        lines.append("<div class='trend-card'>")
         lines.append("<h3>📊 Last vs. Average Comparison</h3>")
         lines.append("<table>")
-        lines.append("<tr><th>Metric</th><th style='text-align:right'>Last</th>"
-                     "<th style='text-align:right'>Average</th><th>Trend</th></tr>")
+        lines.append(
+            "<tr><th>Metric</th>"
+            "<th style='text-align:right'>Last</th>"
+            "<th style='text-align:right'>Average</th>"
+            "<th>Trend</th></tr>"
+        )
 
         # Score row
         last_s = f"{last_score:,}".replace(",", ".")
@@ -460,7 +497,8 @@ class CloudStatsMixin:
         lines.append(
             f"<tr><td>Score</td><td class='val'>{last_s}</td>"
             f"<td class='val'>{avg_s}</td>"
-            f"<td class='{s_cls}'>{trend_icon} {score_trend_pct:+.0f}%{'🔥' if score_trend_pct > 50 else ''}</td></tr>"
+            f"<td class='{s_cls}'>{trend_icon} {score_trend_pct:+.0f}%"
+            f"{'🔥' if score_trend_pct > 50 else ''}</td></tr>"
         )
 
         # Playtime row
@@ -468,10 +506,11 @@ class CloudStatsMixin:
         lines.append(
             f"<tr><td>Playtime</td><td class='val'>{_fmt_playtime(last_play)}</td>"
             f"<td class='val'>{_fmt_playtime(int(avg_play))}</td>"
-            f"<td class='{p_cls}'>{play_trend_icon} {play_trend_pct:+.0f}%{'🔥' if play_trend_pct > 50 else ''}</td></tr>"
+            f"<td class='{p_cls}'>{play_trend_icon} {play_trend_pct:+.0f}%"
+            f"{'🔥' if play_trend_pct > 50 else ''}</td></tr>"
         )
 
-        # Delta metrics from last session vs average across sessions
+        # Delta metrics
         try:
             all_delta_keys: set = set()
             for s in recent:
@@ -495,6 +534,7 @@ class CloudStatsMixin:
             pass
 
         lines.append("</table>")
+        lines.append("</div>")
 
         return "".join(lines)
 
