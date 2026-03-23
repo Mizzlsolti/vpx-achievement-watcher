@@ -332,7 +332,9 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -400,7 +402,9 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
             ]
             
             for k in allowed_keys:

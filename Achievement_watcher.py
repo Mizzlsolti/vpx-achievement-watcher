@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
     QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
     QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea, QCompleter,
+    QFrame,
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
@@ -55,6 +56,7 @@ from ui_dialogs import SetupWizardDialog, FeedbackDialog
 from theme import pinball_arcade_style
 from ui_cloud_stats import CloudStatsMixin
 import themes as _themes
+import sound as _sound
 
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog,
@@ -1811,6 +1813,31 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             )
         self._theme_desc_lbl.setText(theme.get("description", ""))
 
+    def _on_sound_enabled_toggle(self, state: int):
+        self.cfg.OVERLAY["sound_enabled"] = bool(state)
+        self.cfg.save()
+
+    def _on_sound_volume_changed(self, value: int):
+        self.cfg.OVERLAY["sound_volume"] = value
+        try:
+            self._lbl_sound_vol_pct.setText(f"{value}%")
+        except Exception:
+            pass
+        self.cfg.save()
+
+    def _on_sound_pack_changed(self, index: int):
+        pack_id = self.cmb_sound_pack.itemData(index)
+        if not pack_id:
+            return
+        self.cfg.OVERLAY["sound_pack"] = pack_id
+        self.cfg.save()
+
+    def _on_sound_event_toggle(self, event_key: str, state: int):
+        if "sound_events" not in self.cfg.OVERLAY or not isinstance(self.cfg.OVERLAY.get("sound_events"), dict):
+            self.cfg.OVERLAY["sound_events"] = {}
+        self.cfg.OVERLAY["sound_events"][event_key] = bool(state)
+        self.cfg.save()
+
     def _apply_overlay_theme(self):
         """Push current theme colors into config keys and the overlay module variable."""
         theme_id = self.cfg.OVERLAY.get("theme", _themes.DEFAULT_THEME)
@@ -2458,14 +2485,115 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         appearance_tabs.addTab(theme_tab, "🎨 Theme")
 
-        # --- Sub-tab 3: Sound (placeholder) ---
+        # --- Sub-tab 3: Sound ---
         sound_tab = QWidget()
         sound_layout = QVBoxLayout(sound_tab)
-        sound_placeholder = QLabel("🔊 Sound settings coming soon...")
-        sound_placeholder.setStyleSheet("color: #888; font-size: 12pt; padding: 40px;")
-        sound_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        sound_layout.addWidget(sound_placeholder)
+        sound_layout.setContentsMargins(12, 12, 12, 12)
+        sound_layout.setSpacing(10)
+
+        # Header
+        lbl_sound_hdr = QLabel("🔊 Sound Effects")
+        lbl_sound_hdr.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 11pt;")
+        sound_layout.addWidget(lbl_sound_hdr)
+
+        # Row 1: Enable checkbox + Volume slider
+        row_enable = QHBoxLayout()
+        self.chk_sound_enabled = QCheckBox("Enable Sound Effects")
+        self.chk_sound_enabled.setChecked(bool(self.cfg.OVERLAY.get("sound_enabled", True)))
+        row_enable.addWidget(self.chk_sound_enabled)
+        row_enable.addSpacing(20)
+        lbl_vol = QLabel("Volume:")
+        lbl_vol.setStyleSheet("color: #aaa;")
+        row_enable.addWidget(lbl_vol)
+        self.sld_sound_volume = QSlider(Qt.Orientation.Horizontal)
+        self.sld_sound_volume.setRange(0, 100)
+        self.sld_sound_volume.setValue(int(self.cfg.OVERLAY.get("sound_volume", 70)))
+        self.sld_sound_volume.setFixedWidth(140)
+        row_enable.addWidget(self.sld_sound_volume)
+        self._lbl_sound_vol_pct = QLabel(f"{self.sld_sound_volume.value()}%")
+        self._lbl_sound_vol_pct.setStyleSheet("color: #aaa; min-width: 36px;")
+        row_enable.addWidget(self._lbl_sound_vol_pct)
+        row_enable.addStretch(1)
+        sound_layout.addLayout(row_enable)
+
+        # Row 2: Sound pack dropdown
+        row_pack = QHBoxLayout()
+        lbl_pack = QLabel("Sound Pack:")
+        lbl_pack.setStyleSheet("color: #aaa;")
+        row_pack.addWidget(lbl_pack)
+        self.cmb_sound_pack = QComboBox()
+        for pack_id, pack_name in _sound.SOUND_PACKS.items():
+            self.cmb_sound_pack.addItem(pack_name, userData=pack_id)
+        current_pack = self.cfg.OVERLAY.get("sound_pack", "arcade")
+        for i in range(self.cmb_sound_pack.count()):
+            if self.cmb_sound_pack.itemData(i) == current_pack:
+                self.cmb_sound_pack.setCurrentIndex(i)
+                break
+        self.cmb_sound_pack.setFixedWidth(200)
+        row_pack.addWidget(self.cmb_sound_pack)
+        row_pack.addStretch(1)
+        sound_layout.addLayout(row_pack)
+
+        # Event table
+        events_grp = QGroupBox("Events")
+        events_lay = QVBoxLayout(events_grp)
+        events_lay.setSpacing(4)
+
+        # Header row
+        hdr_row = QHBoxLayout()
+        lbl_ev_hdr = QLabel("Event")
+        lbl_ev_hdr.setStyleSheet("color: #888; font-size: 8pt;")
+        lbl_ev_hdr.setFixedWidth(210)
+        hdr_row.addWidget(lbl_ev_hdr)
+        lbl_en_hdr = QLabel("Enabled")
+        lbl_en_hdr.setStyleSheet("color: #888; font-size: 8pt;")
+        lbl_en_hdr.setFixedWidth(70)
+        hdr_row.addWidget(lbl_en_hdr)
+        lbl_test_hdr = QLabel("Test")
+        lbl_test_hdr.setStyleSheet("color: #888; font-size: 8pt;")
+        hdr_row.addWidget(lbl_test_hdr)
+        hdr_row.addStretch(1)
+        events_lay.addLayout(hdr_row)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color: #333;")
+        events_lay.addWidget(sep)
+
+        sound_events_cfg = self.cfg.OVERLAY.get("sound_events") or {}
+        self._sound_event_checkboxes: dict = {}
+
+        for ev_key, ev_label in _sound.SOUND_EVENTS:
+            ev_row = QHBoxLayout()
+            lbl_ev = QLabel(ev_label)
+            lbl_ev.setFixedWidth(210)
+            lbl_ev.setStyleSheet("color: #e0e0e0; font-size: 9pt;")
+            ev_row.addWidget(lbl_ev)
+
+            chk_ev = QCheckBox()
+            chk_ev.setChecked(bool(sound_events_cfg.get(ev_key, True)))
+            chk_ev.setFixedWidth(70)
+            ev_row.addWidget(chk_ev)
+            self._sound_event_checkboxes[ev_key] = chk_ev
+
+            btn_play = QPushButton("▶ Play")
+            btn_play.setFixedWidth(72)
+            btn_play.setStyleSheet("font-size: 8pt; padding: 2px 6px;")
+            btn_play.clicked.connect(lambda checked, ek=ev_key: _sound.play_sound_preview(self.cfg, ek))
+            ev_row.addWidget(btn_play)
+            ev_row.addStretch(1)
+            events_lay.addLayout(ev_row)
+
+        sound_layout.addWidget(events_grp)
         sound_layout.addStretch(1)
+
+        # Wire up sound signals
+        self.chk_sound_enabled.stateChanged.connect(self._on_sound_enabled_toggle)
+        self.sld_sound_volume.valueChanged.connect(self._on_sound_volume_changed)
+        self.cmb_sound_pack.currentIndexChanged.connect(self._on_sound_pack_changed)
+        for ev_key, chk_ev in self._sound_event_checkboxes.items():
+            chk_ev.stateChanged.connect(lambda state, ek=ev_key: self._on_sound_event_toggle(ek, state))
+
         appearance_tabs.addTab(sound_tab, "🔊 Sound")
 
         tab_layout.addWidget(appearance_tabs)
@@ -5585,6 +5713,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._ch_last_spoken["timed"] = now
         except Exception:
             pass
+        try:
+            _sound.play_sound(self.cfg, "challenge_start")
+        except Exception:
+            pass
 
     def _on_challenge_timer_stop(self):
         try:
@@ -5612,6 +5744,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
         try:
             self._update_challenges_results_view()
+        except Exception:
+            pass
+        try:
+            msg_upper = str(message).upper()
+            if "CHALLENGE COMPLETE" in msg_upper:
+                _sound.play_sound(self.cfg, "challenge_complete")
+            elif "ABORTED" in msg_upper:
+                _sound.play_sound(self.cfg, "challenge_fail")
         except Exception:
             pass
 
@@ -5701,6 +5841,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._ach_toast_mgr.enqueue(title, rom, max(1, int(seconds)))
         except Exception:
             pass
+        try:
+            _sound.play_sound(self.cfg, "achievement_unlock")
+        except Exception:
+            pass
 
     def _on_level_up(self, level_name: str, level_number: int):
         try:
@@ -5710,6 +5854,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
         try:
             self._refresh_level_display()
+        except Exception:
+            pass
+        try:
+            _sound.play_sound(self.cfg, "level_up")
         except Exception:
             pass
 
