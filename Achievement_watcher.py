@@ -1985,6 +1985,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         ui_overlay._CURRENT_THEME_PRIMARY = primary
         ui_overlay._CURRENT_THEME_ACCENT = accent
         ui_overlay._CURRENT_THEME_BG = bg
+        ui_overlay._CURRENT_THEME_PAGE_ACCENTS = theme.get("page_accents", [])
         # Refresh live overlay instances so border/bg/accent changes take effect immediately.
         # Main OverlayWindow: full CSS refresh (border via _apply_container_style).
         # Other QPainter-based overlays: trigger a repaint so they pick up new module globals.

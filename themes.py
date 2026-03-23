@@ -12,6 +12,14 @@ THEMES = {
         "border": "#00E5FF",
         "bg": "#080C16",
         "description": "Default look, cyan + orange",
+        # Per-page accent colours that cycle as the user navigates overlay pages.
+        # Only neon_blue defines these; other themes use their border colour on all pages.
+        "page_accents": [
+            "#00E5FF",  # page 0: cyan  (default/highlights)
+            "#FF7F00",  # page 1: orange (achievement progress)
+            "#00C86E",  # page 2: green  (other views)
+            "#B450FF",  # page 3: purple (cloud/VPS)
+        ],
     },
     "retro_arcade": {
         "name": "Retro Arcade",
