@@ -6928,15 +6928,27 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         notif_id = notif.get("id", "")
         action_tab = notif.get("action_tab")
         notif_rom = notif.get("rom", "")
+        notif_type = notif.get("type", "")
 
-        def _on_click(_event, _nid=notif_id, _tab=action_tab, _notif_data=notif, _rom=notif_rom):
-            _notif.mark_read(self.cfg, _nid)
+        def _on_click(_event, _nid=notif_id, _tab=action_tab, _notif_data=notif,
+                      _rom=notif_rom, _ntype=notif_type):
+            # For dismissable notification types, record the key so the same event
+            # is never re-created after the user acknowledges it.
+            if _ntype in _notif._DISMISSABLE_TYPES:
+                _notif.dismiss_notification(self.cfg, _nid)
+            else:
+                _notif.mark_read(self.cfg, _nid)
             if _tab == "highscore_detail":
                 try:
                     dlg = HighscoreBeatenDialog(_notif_data, self.cfg, parent=self)
                     dlg.exec()
                 except Exception:
                     pass
+                # After the dialog, also navigate to the Cloud tab for this ROM
+                if _rom:
+                    self._navigate_to_cloud_for_rom(_rom, ntype=_ntype)
+            elif _tab == "cloud" and _rom:
+                self._navigate_to_cloud_for_rom(_rom, ntype=_ntype)
             elif _tab and _tab in tab_map:
                 try:
                     self.main_tabs.setCurrentIndex(tab_map[_tab])
@@ -6963,6 +6975,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         """Clear all notifications and refresh the feed."""
         _notif.clear_all(self.cfg)
         self._refresh_notification_feed()
+
+    def _navigate_to_cloud_for_rom(self, rom: str, ntype: str = ""):
+        """Switch to the Cloud tab, pre-fill *rom*, set an appropriate category and auto-fetch."""
+        try:
+            # Switch to Cloud tab (index 7)
+            self.main_tabs.setCurrentIndex(7)
+            # Pre-fill the ROM text field
+            self.txt_cloud_rom.setText(rom)
+            # Use "Achievement Progress" (index 0) for leaderboard_rank / highscore_beaten
+            self.cmb_cloud_category.setCurrentIndex(0)
+            # Trigger the fetch after a short delay to let the tab finish rendering
+            QTimer.singleShot(150, self._fetch_cloud_leaderboard)
+        except Exception:
+            pass
 
     def _highlight_available_maps_row(self, rom: str):
         """Scroll to and briefly highlight the row for *rom* in the Available Maps table."""
@@ -7063,6 +7089,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             title=title,
             detail=f"ROM: {rom}",
             action_tab="cloud",
+            rom=rom,
         )
         try:
             self._refresh_notification_feed()
