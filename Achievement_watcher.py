@@ -2018,13 +2018,38 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         ui_overlay._CURRENT_THEME_PRIMARY = primary
         ui_overlay._CURRENT_THEME_ACCENT = accent
         ui_overlay._CURRENT_THEME_BG = bg
-        # Refresh live overlay instances (MiniInfoOverlay and StatusOverlay are excluded)
+        # Refresh live overlay instances so border/bg/accent changes take effect immediately.
+        # Main OverlayWindow: full CSS refresh (border via _apply_container_style).
+        # Other QPainter-based overlays: trigger a repaint so they pick up new module globals.
         try:
             ov = getattr(self, "overlay", None)
             if ov is not None:
                 ov.refresh_theme()
         except Exception:
             pass
+        for attr in (
+            "_ach_toast_mgr",       # AchToastManager – its active AchToastWindow
+            "_challenge_select_test",
+            "_demo_challenge_win",
+            "_demo_timer_win",
+            "_demo_flip_win",
+            "_demo_heat_win",
+            "_demo_main_win",
+        ):
+            try:
+                obj = getattr(self, attr, None)
+                if obj is None:
+                    continue
+                # AchToastManager: update its active window
+                if hasattr(obj, "_active_window") and obj._active_window is not None:
+                    try:
+                        obj._active_window.update()
+                    except Exception:
+                        pass
+                elif hasattr(obj, "update"):
+                    obj.update()
+            except Exception:
+                pass
         # Re-apply the main GUI stylesheet so tabs, buttons, sliders, etc. update immediately
         try:
             app = QApplication.instance()
@@ -2119,10 +2144,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "to apply it to the GUI and all supported overlays immediately. "
             "The theme controls the border, accent, primary, and background colours. "
             "<i>System Notification</i> and <i>Status Overlay</i> are intentionally excluded from theme changes.<br>"
-            "• <b>Overlay Preview</b>: Use the demo buttons to preview how overlays look with the chosen theme. "
-            "You can also play a test sound directly from this section.<br><br>"
+            "• <b>Overlay Preview</b>: Use the demo buttons to preview how overlays look with the chosen theme.<br><br>"
             "• <b>🔊 Sound</b>: Enable/disable sound effects, choose a sound pack, adjust volume, "
-            "and toggle individual events. Use the <b>▶ Play</b> buttons to preview each sound."
+            "and toggle individual sound events on or off."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
@@ -2857,9 +2881,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_en_hdr.setStyleSheet("color: #888; font-size: 8pt;")
         lbl_en_hdr.setFixedWidth(70)
         hdr_row.addWidget(lbl_en_hdr)
-        lbl_test_hdr = QLabel("Test")
-        lbl_test_hdr.setStyleSheet("color: #888; font-size: 8pt;")
-        hdr_row.addWidget(lbl_test_hdr)
         hdr_row.addStretch(1)
         events_lay.addLayout(hdr_row)
 
@@ -2884,11 +2905,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             ev_row.addWidget(chk_ev)
             self._sound_event_checkboxes[ev_key] = chk_ev
 
-            btn_play = QPushButton("▶ Play")
-            btn_play.setFixedWidth(72)
-            btn_play.setStyleSheet("font-size: 8pt; padding: 2px 6px;")
-            btn_play.clicked.connect(lambda checked, ek=ev_key: _sound.play_sound_preview(self.cfg, ek))
-            ev_row.addWidget(btn_play)
             ev_row.addStretch(1)
             events_lay.addLayout(ev_row)
 
@@ -6421,13 +6437,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _export_settings(self):
-        """Export config, VPS mapping, achievements state, challenge scores, and trends cache as a ZIP archive."""
+        """Export config, VPS mapping, achievements state, challenge scores, trends cache,
+        notifications, ROM names, and session highlights as a ZIP archive."""
         try:
             from PyQt6.QtWidgets import QFileDialog, QMessageBox
             import zipfile
             import json as _json
             from datetime import datetime, timezone
-            from watcher_core import f_vps_mapping, f_achievements_state
+            from watcher_core import f_vps_mapping, f_achievements_state, f_romnames, p_highlights
 
             path, _ = QFileDialog.getSaveFileName(
                 self, "Export Settings", "vpx_watcher_settings.zip",
@@ -6468,6 +6485,30 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         zf.write(trends_src, "trends_cache.json")
                         exported.append("trends_cache.json")
 
+                    # ROM names mapping
+                    romnames_src = f_romnames(self.cfg)
+                    if os.path.isfile(romnames_src):
+                        zf.write(romnames_src, "romnames.json")
+                        exported.append("romnames.json")
+
+                    # Notifications
+                    notif_src = os.path.join(self.cfg.BASE, "notifications.json")
+                    if os.path.isfile(notif_src):
+                        zf.write(notif_src, "notifications.json")
+                        exported.append("notifications.json")
+
+                    # Session highlights (*.summary.json)
+                    highlights_dir = p_highlights(self.cfg)
+                    hl_count = 0
+                    if os.path.isdir(highlights_dir):
+                        for fname in os.listdir(highlights_dir):
+                            if fname.endswith(".summary.json"):
+                                fpath = os.path.join(highlights_dir, fname)
+                                zf.write(fpath, os.path.join("session_highlights", fname))
+                                hl_count += 1
+                    if hl_count:
+                        exported.append(f"session_highlights/ ({hl_count} files)")
+
                 ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
                 self.cfg.OVERLAY["last_export_ts"] = ts
                 self.cfg.save()
@@ -6491,7 +6532,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             from PyQt6.QtWidgets import QFileDialog, QMessageBox
             import zipfile
             import json as _json
-            from watcher_core import f_vps_mapping, f_achievements_state, ensure_dir
+            from watcher_core import f_vps_mapping, f_achievements_state, f_romnames, p_highlights, ensure_dir
 
             path, _ = QFileDialog.getOpenFileName(
                 self, "Import Settings", "",
@@ -6565,6 +6606,39 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                 fh.write(zf.read("trends_cache.json"))
                         except Exception:
                             pass
+
+                    # Restore ROM names mapping
+                    if "romnames.json" in names:
+                        rn_dst = f_romnames(self.cfg)
+                        try:
+                            ensure_dir(os.path.dirname(rn_dst))
+                            with open(rn_dst, "wb") as fh:
+                                fh.write(zf.read("romnames.json"))
+                        except Exception:
+                            pass
+
+                    # Restore notifications
+                    if "notifications.json" in names:
+                        notif_dst = os.path.join(self.cfg.BASE, "notifications.json")
+                        try:
+                            with open(notif_dst, "wb") as fh:
+                                fh.write(zf.read("notifications.json"))
+                        except Exception:
+                            pass
+
+                    # Restore session highlights
+                    highlights_dir = p_highlights(self.cfg)
+                    try:
+                        ensure_dir(highlights_dir)
+                        for name in names:
+                            if name.startswith("session_highlights/") and name.endswith(".summary.json"):
+                                fname = os.path.basename(name)
+                                if fname:
+                                    dst = os.path.join(highlights_dir, fname)
+                                    with open(dst, "wb") as fh:
+                                        fh.write(zf.read(name))
+                    except Exception:
+                        pass
 
                 QMessageBox.information(
                     self,
@@ -7033,6 +7107,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         other_player = data.get("other_player", "Unknown")
         other_pct = data.get("other_pct", 0.0)
         your_pct = data.get("your_pct", 0.0)
+        other_unlocked = data.get("other_unlocked", 0)
+        other_total = data.get("other_total", 0)
+        your_unlocked = data.get("your_unlocked", 0)
+        your_total = data.get("your_total", 0)
         vps_id = data.get("vps_id", "")
         title = f"Dein Highscore auf {table_name} wurde übertroffen!"
         detail = f"{other_player} erreichte {other_pct:.1f}% auf {table_name} ({rom})"
@@ -7049,6 +7127,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             other_player=other_player,
             other_pct=other_pct,
             your_pct=your_pct,
+            other_unlocked=other_unlocked,
+            other_total=other_total,
+            your_unlocked=your_unlocked,
+            your_total=your_total,
         )
         try:
             self._refresh_notification_feed()
@@ -7153,15 +7235,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                             p_name = entry.get("name", p_id)
                             vps_id = entry.get("vps_id", "")
                             table_name = entry.get("table_name", "")
-                            scores.append((pct, p_id, p_name, vps_id, table_name))
+                            unlocked = int(entry.get("unlocked", 0))
+                            total = int(entry.get("total", 0))
+                            scores.append((pct, p_id, p_name, vps_id, table_name, unlocked, total))
                     scores.sort(reverse=True)
 
                     if not scores:
                         continue
-                    top_pct, top_pid, top_name, top_vps_id, top_table = scores[0]
+                    top_pct, top_pid, top_name, top_vps_id, top_table, top_unlocked, top_total = scores[0]
                     if top_pid and top_pid != pid:
                         # Check own score exists at all
-                        own_entry = next(((pct, p_id) for pct, p_id, *_ in scores if p_id == pid), None)
+                        own_entry = next(
+                            ((pct, p_id, unl, tot) for pct, p_id, _, __, ___, unl, tot in scores if p_id == pid),
+                            None,
+                        )
                         if own_entry:
                             payload = json.dumps({
                                 "rom": rom,
@@ -7170,6 +7257,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                 "other_player": top_name,
                                 "other_pct": top_pct,
                                 "your_pct": own_entry[0],
+                                "other_unlocked": top_unlocked,
+                                "other_total": top_total,
+                                "your_unlocked": own_entry[2],
+                                "your_total": own_entry[3],
                             })
                             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                             QMetaObject.invokeMethod(
@@ -8012,29 +8103,34 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
 
 class HighscoreBeatenDialog(QDialog):
-    """Modal dialog shown when another player has surpassed the user's achievement score."""
+    """Modal dialog shown when another player has surpassed the user's achievement score.
+
+    Layout mirrors CloudProgressVpsInfoDialog: header bar, separator, hero image panel,
+    and a clean two-row score comparison card.  Real achievement counts (unlocked / total)
+    are shown instead of raw percentages; the original red/green colour coding is preserved.
+    """
 
     def __init__(self, notif: dict, cfg, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("🎯 Highscore Beaten!")
+        self.setWindowTitle("⚔️ Highscore Beaten!")
         self.setModal(True)
-        self.resize(500, 400)
-        self.setStyleSheet("QDialog { background: #111; color: #DDD; }")
+        self.setMinimumWidth(520)
+        self.setStyleSheet("background:#111; color:#DDD;")
 
         try:
-            primary = cfg.OVERLAY.get("primary_color", "#00E5FF")
+            primary = cfg.OVERLAY.get("theme_primary", "#00E5FF")
         except Exception:
             primary = "#00E5FF"
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
         # ── Header ─────────────────────────────────────────────────────────
         lbl_hdr = QLabel(
-            f"<b style='font-size:15px; color:{primary};'>🎯 Highscore Beaten!</b>"
+            f"<b style='font-size:14px; color:{primary};'>⚔️ Highscore Beaten!</b>"
         )
-        lbl_hdr.setTextFormat(Qt.TextFormat.RichText)
+        lbl_hdr.setWordWrap(True)
         layout.addWidget(lbl_hdr)
 
         sep = QFrame()
@@ -8042,81 +8138,130 @@ class HighscoreBeatenDialog(QDialog):
         sep.setStyleSheet("color: #333;")
         layout.addWidget(sep)
 
-        # ── Table image placeholder ─────────────────────────────────────────
-        lbl_img = QLabel()
-        lbl_img.setFixedHeight(120)
-        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_img.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 4px;")
+        # ── Hero panel: image + table info side by side ─────────────────────
         vps_id = notif.get("vps_id", "")
         table_name = notif.get("table_name", notif.get("rom", ""))
-        # Try to load VPS image
+        rom = notif.get("rom", "")
+
+        hero_frame = QFrame()
+        hero_frame.setStyleSheet(
+            "QFrame{background:#151515; border:1px solid #2a2a2a; border-radius:6px;}"
+        )
+        hero_lay = QHBoxLayout(hero_frame)
+        hero_lay.setContentsMargins(10, 10, 10, 10)
+        hero_lay.setSpacing(14)
+
+        # Table image
+        lbl_img = QLabel()
+        lbl_img.setFixedSize(160, 100)
+        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_img.setStyleSheet(
+            "background:#111; border:1px solid #2a2a2a; border-radius:4px;"
+        )
         img_loaded = False
         if vps_id:
             try:
                 from watcher_core import p_vps_img
-                img_dir = p_vps_img(cfg)
                 import glob as _glob
+                img_dir = p_vps_img(cfg)
                 candidates = _glob.glob(os.path.join(img_dir, f"{vps_id}*"))
                 if candidates:
                     pix = QPixmap(candidates[0])
                     if not pix.isNull():
-                        pix = pix.scaledToHeight(118, Qt.TransformationMode.SmoothTransformation)
+                        pix = pix.scaled(
+                            160, 100,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
                         lbl_img.setPixmap(pix)
                         img_loaded = True
             except Exception:
                 pass
         if not img_loaded:
             lbl_img.setText(
-                f"<span style='color:#555; font-size:11pt;'>{table_name}</span>"
+                f"<span style='color:#444; font-size:9pt;'>🎰</span>"
             )
             lbl_img.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(lbl_img)
+        hero_lay.addWidget(lbl_img)
 
-        # ── Table metadata ──────────────────────────────────────────────────
-        rom = notif.get("rom", "")
-        meta_lines = []
-        if table_name:
-            meta_lines.append(f"📋 <b>Table:</b> {table_name}")
-        if rom:
-            meta_lines.append(f"🔧 <b>ROM:</b> {rom}")
+        # Table details column
+        details = QVBoxLayout()
+        details.setContentsMargins(0, 0, 0, 0)
+        details.setSpacing(3)
+
+        lbl_name = QLabel(table_name or rom or "Unknown Table")
+        lbl_name.setStyleSheet("color:#FFFFFF; font-size:14px; font-weight:bold;")
+        lbl_name.setWordWrap(True)
+        details.addWidget(lbl_name)
+
+        if rom and rom != table_name:
+            lbl_rom = QLabel(f"ROM: {rom}")
+            lbl_rom.setStyleSheet("color:#888; font-size:11px;")
+            details.addWidget(lbl_rom)
+
         if vps_id:
-            meta_lines.append(f"🆔 <b>VPS ID:</b> {vps_id}")
-        if meta_lines:
-            lbl_meta = QLabel("<br>".join(meta_lines))
-            lbl_meta.setTextFormat(Qt.TextFormat.RichText)
-            lbl_meta.setStyleSheet("color: #CCC; font-size: 10pt; padding: 4px 0;")
-            layout.addWidget(lbl_meta)
+            lbl_vid = QLabel(f"VPS ID: {vps_id}")
+            lbl_vid.setStyleSheet("color:#555; font-size:10px;")
+            details.addWidget(lbl_vid)
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color: #333;")
-        layout.addWidget(sep2)
+        details.addStretch()
+        hero_lay.addLayout(details, stretch=1)
+        layout.addWidget(hero_frame)
 
-        # ── Score comparison ────────────────────────────────────────────────
+        # ── Score comparison card ───────────────────────────────────────────
         your_pct = notif.get("your_pct", 0.0)
         other_pct = notif.get("other_pct", 0.0)
         other_player = notif.get("other_player", "Unknown")
+        your_unlocked = int(notif.get("your_unlocked", 0))
+        your_total = int(notif.get("your_total", 0))
+        other_unlocked = int(notif.get("other_unlocked", 0))
+        other_total = int(notif.get("other_total", 0))
 
-        score_html = (
-            "<table width='100%' cellpadding='6' style='border-collapse:collapse;'>"
-            "<tr style='border-bottom:1px solid #333;'>"
-            f"<td style='color:#FF4444; font-weight:bold;'>↓ Your Score</td>"
-            f"<td style='color:#FF4444; text-align:right; font-size:13pt; font-weight:bold;'>"
-            f"{your_pct:.1f}%</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='color:#00C853; font-weight:bold;'>↑ New Leader: {other_player}</td>"
-            f"<td style='color:#00C853; text-align:right; font-size:13pt; font-weight:bold;'>"
-            f"{other_pct:.1f}%</td>"
-            "</tr>"
-            "</table>"
+        # Build human-readable score strings:
+        # prefer unlocked/total when total > 0, otherwise fall back to percentage
+        def _score_str(unlocked: int, total: int, pct: float) -> str:
+            if total > 0:
+                return f"{unlocked} / {total}"
+            return f"{pct:.1f}%"
+
+        your_score_str = _score_str(your_unlocked, your_total, your_pct)
+        other_score_str = _score_str(other_unlocked, other_total, other_pct)
+
+        score_card = QFrame()
+        score_card.setStyleSheet(
+            "QFrame{background:#1a1a1a; border:1px solid #2a2a2a; border-radius:6px;}"
         )
-        lbl_scores = QLabel(score_html)
-        lbl_scores.setTextFormat(Qt.TextFormat.RichText)
-        lbl_scores.setStyleSheet(
-            "background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 4px;"
-        )
-        layout.addWidget(lbl_scores)
+        score_lay = QVBoxLayout(score_card)
+        score_lay.setContentsMargins(12, 10, 12, 10)
+        score_lay.setSpacing(4)
+
+        lbl_card_hdr = QLabel("<b>Achievement Progress Comparison</b>")
+        lbl_card_hdr.setStyleSheet(f"color:{primary}; font-size:10pt;")
+        score_lay.addWidget(lbl_card_hdr)
+
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.HLine)
+        sep2.setStyleSheet("color:#2a2a2a;")
+        score_lay.addWidget(sep2)
+
+        # Row helper: colored label pair
+        def _score_row(icon: str, label: str, value: str, color: str) -> QHBoxLayout:
+            row = QHBoxLayout()
+            lbl_l = QLabel(f"{icon} {label}")
+            lbl_l.setStyleSheet(f"color:{color}; font-weight:bold; font-size:10pt;")
+            lbl_v = QLabel(value)
+            lbl_v.setStyleSheet(
+                f"color:{color}; font-weight:bold; font-size:13pt; text-align:right;"
+            )
+            lbl_v.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            row.addWidget(lbl_l)
+            row.addStretch(1)
+            row.addWidget(lbl_v)
+            return row
+
+        score_lay.addLayout(_score_row("↓", "Your Score", your_score_str, "#FF4444"))
+        score_lay.addLayout(_score_row("↑", f"New Leader: {other_player}", other_score_str, "#00C853"))
+        layout.addWidget(score_card)
 
         layout.addStretch(1)
 
@@ -8133,6 +8278,7 @@ class HighscoreBeatenDialog(QDialog):
         h_btn.addStretch(1)
         h_btn.addWidget(btn_close)
         layout.addLayout(h_btn)
+        self.adjustSize()
 
 
 def main():
