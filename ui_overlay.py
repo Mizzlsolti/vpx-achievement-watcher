@@ -18,13 +18,17 @@ from PyQt6.QtGui import (
 
 from watcher_core import APP_DIR, register_raw_input_for_window
 
+# Active theme border color – updated by MainWindow._apply_overlay_theme().
+# Defaults to the original neon-blue so existing behaviour is unchanged.
+_CURRENT_THEME_BORDER = "#00E5FF"
+
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
                       radius: int = 18, color: QColor = None, layers: int = 3,
                       low_perf: bool = False):
     """Draw a multi-layer neon glow border for a modern sci-fi look."""
     if color is None:
-        color = QColor("#00E5FF")
+        color = QColor(_CURRENT_THEME_BORDER)
     if not low_perf:
         # Outer glow layers
         for i in range(layers, 0, -1):
@@ -3606,7 +3610,7 @@ class AchToastWindow(QWidget):
 
         is_level_up = (self._rom == "__levelup__")
         if is_level_up:
-            border_color = QColor("#00E5FF")
+            border_color = QColor(ov.get("theme_border", "#00E5FF"))
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
         else:
