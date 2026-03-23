@@ -3943,6 +3943,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._msgbox_topmost("warn", "Restore from Cloud", f"Failed to save restored data locally:\n{e}")
             return
 
+        # Restore total_playtime_sec from achievements payload
+        try:
+            total_play = data.get("total_playtime_sec")
+            if total_play is not None:
+                self.cfg.OVERLAY["total_playtime_sec"] = int(total_play)
+                self.cfg.save()
+        except Exception:
+            pass
+
         # Restore Challenge Scores from Cloud
         scores_restored = False
         try:
@@ -4018,6 +4027,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     log(self.cfg, f"[CLOUD] VPS mapping cache refresh failed: {_refresh_err}", "WARN")
         except Exception as _vps_err:
             log(self.cfg, f"[CLOUD] VPS mapping restore failed: {_vps_err}", "WARN")
+
+        # Restore trend data from cloud
+        try:
+            trends_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/trends")
+            if trends_data and isinstance(trends_data, dict):
+                from watcher_core import secure_save_json as _ssj
+                trend_cache_path = os.path.join(self.cfg.BASE, "session_stats", "trends_cache.json")
+                _ssj(trend_cache_path, trends_data)
+                log(self.cfg, f"[CLOUD] Trends cache restored: {len(trends_data)} ROM(s)")
+        except Exception:
+            pass
 
         # Refresh level display and notify listeners
         try:
@@ -4096,6 +4116,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "badges": badges,
                     "badge_count": len(badges),
                     "selected_badge": selected_badge,
+                    "total_playtime_sec": int(self.cfg.OVERLAY.get("total_playtime_sec", 0)),
                 }
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
                     results.append("✅ Achievements")
@@ -4163,6 +4184,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception as e:
                 errors.append(f"❌ Progress: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
+
+            # 4. Upload trend data
+            try:
+                trend_data = self._collect_trend_data_for_cloud()
+                if trend_data and CloudSync.set_node(self.cfg, f"players/{pid}/trends", trend_data):
+                    results.append(f"✅ Trends ({len(trend_data)} ROM(s))")
+                    log(self.cfg, f"[CLOUD] Manual backup: trends uploaded for {len(trend_data)} ROM(s)")
+                elif trend_data:
+                    errors.append("❌ Trends: upload failed")
+            except Exception as e:
+                errors.append(f"❌ Trends: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: trends upload failed: {e}", "WARN")
 
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             summary = "\n".join(results + errors)
@@ -6362,6 +6395,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     @pyqtSlot(str)
     def _on_session_ended(self, rom: str):
         """Called when a game session ends; triggers leaderboard rank check."""
+        # Accumulate total playtime from the just-ended session
+        try:
+            session_playtime_sec = int(self.watcher.players.get(1, {}).get("active_play_seconds", 0))
+            current_total = int(self.cfg.OVERLAY.get("total_playtime_sec", 0))
+            self.cfg.OVERLAY["total_playtime_sec"] = current_total + session_playtime_sec
+            self.cfg.save()
+        except Exception:
+            pass
         if rom and self.cfg.CLOUD_ENABLED:
             self._check_leaderboard_rank_after_upload(rom)
 

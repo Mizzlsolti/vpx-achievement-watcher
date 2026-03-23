@@ -335,6 +335,8 @@ class AppConfig:
                 "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
 
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+
+                "total_playtime_sec",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -405,6 +407,8 @@ class AppConfig:
                 "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
 
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+
+                "total_playtime_sec",
             ]
             
             for k in allowed_keys:
