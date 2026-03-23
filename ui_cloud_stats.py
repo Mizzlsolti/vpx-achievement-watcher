@@ -200,12 +200,300 @@ class CloudStatsMixin:
         ch_layout.addWidget(self.ch_results_view)
         self.stats_tabs.addTab(ch_tab, "⚔️ Challenge Leaderboards")
 
+        trends_tab = self._build_trends_tab()
+        self.stats_tabs.addTab(trends_tab, "📈 Trends")
+
         layout.addWidget(self.stats_tabs)
         self._add_tab_help_button(layout, "stats")
         self.main_tabs.addTab(tab, "📊 Records & Stats")
         
         try: self._update_challenges_results_view()
         except Exception: pass
+
+    # ==========================================
+    # TRENDS SUB-TAB
+    # ==========================================
+
+    def _build_trends_tab(self) -> QWidget:
+        """Build the 📈 Trends sub-tab widget."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Top controls: ROM selector + refresh button
+        ctrl_row = QHBoxLayout()
+        ctrl_row.addWidget(QLabel("Select Table:"))
+        self.cmb_trends_rom = QComboBox()
+        self.cmb_trends_rom.setMinimumWidth(280)
+        ctrl_row.addWidget(self.cmb_trends_rom, 1)
+
+        btn_trends_refresh = QPushButton("🔄")
+        btn_trends_refresh.setFixedWidth(36)
+        btn_trends_refresh.setToolTip("Rescan summary files and refresh trends")
+        btn_trends_refresh.clicked.connect(self._refresh_trends)
+        ctrl_row.addWidget(btn_trends_refresh)
+        layout.addLayout(ctrl_row)
+
+        # Trend content viewer
+        self.trends_view = _NoBrowseBrowser()
+        self.trends_view.setOpenLinks(False)
+        layout.addWidget(self.trends_view)
+
+        # Populate ROM list and connect signal
+        self._populate_trends_rom_combo()
+        self.cmb_trends_rom.currentIndexChanged.connect(self._refresh_trends)
+
+        return tab
+
+    def _populate_trends_rom_combo(self):
+        """Scan summary files and populate the ROM combo box."""
+        try:
+            trend_data = self._collect_trend_data()
+            roms = sorted(trend_data.keys())
+            self.cmb_trends_rom.blockSignals(True)
+            prev = self.cmb_trends_rom.currentData()
+            self.cmb_trends_rom.clear()
+            romnames = {}
+            try:
+                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+            except Exception:
+                pass
+            for rom in roms:
+                label = _strip_version_from_name(romnames.get(rom, "")) or rom
+                display = f"{rom} – {label}" if label != rom else rom
+                self.cmb_trends_rom.addItem(display, userData=rom)
+            # Restore previous selection if still available
+            if prev:
+                for i in range(self.cmb_trends_rom.count()):
+                    if self.cmb_trends_rom.itemData(i) == prev:
+                        self.cmb_trends_rom.setCurrentIndex(i)
+                        break
+            self.cmb_trends_rom.blockSignals(False)
+        except Exception:
+            pass
+
+    def _collect_trend_data(self) -> dict:
+        """Scan all *.summary.json files and return {rom: [sorted session dicts]}."""
+        result: dict = {}
+        try:
+            highlights_dir = os.path.join(self.cfg.BASE, "session_stats", "Highlights")
+            if not os.path.isdir(highlights_dir):
+                return result
+            for fname in os.listdir(highlights_dir):
+                if not fname.endswith(".summary.json"):
+                    continue
+                fpath = os.path.join(highlights_dir, fname)
+                try:
+                    data = secure_load_json(fpath, {}) or {}
+                    rom = str(data.get("rom", "") or "").strip()
+                    if not rom:
+                        continue
+                    ts_str = str(data.get("end_timestamp") or data.get("ts") or "")
+                    try:
+                        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    except Exception:
+                        try:
+                            ts = datetime.fromtimestamp(os.path.getmtime(fpath))
+                        except Exception:
+                            continue
+                    players = data.get("players", [])
+                    p1 = players[0] if players else {}
+                    score = int(data.get("score") or (p1.get("score") or 0))
+                    playtime_sec = int(p1.get("playtime_sec", 0) or 0)
+                    deltas = dict(p1.get("deltas", {}) or {})
+                    session = {
+                        "ts": ts,
+                        "ts_str": ts.strftime("%b") + " " + str(ts.day) if ts else "",
+                        "score": score,
+                        "playtime_sec": playtime_sec,
+                        "deltas": deltas,
+                    }
+                    result.setdefault(rom, []).append(session)
+                except Exception:
+                    continue
+            # Sort each ROM's sessions by timestamp ascending
+            for rom in result:
+                result[rom].sort(key=lambda s: s["ts"])
+        except Exception:
+            pass
+        return result
+
+    def _collect_trend_data_for_cloud(self) -> dict:
+        """Return trend data in a cloud-friendly serialisable format."""
+        try:
+            raw = self._collect_trend_data()
+            cloud: dict = {}
+            for rom, sessions in raw.items():
+                cloud[rom] = [
+                    {
+                        "ts": s["ts"].isoformat() if hasattr(s["ts"], "isoformat") else str(s["ts"]),
+                        "score": s["score"],
+                        "playtime_sec": s["playtime_sec"],
+                        "deltas": s["deltas"],
+                    }
+                    for s in sessions
+                ]
+            return cloud
+        except Exception:
+            return {}
+
+    def _refresh_trends(self):
+        """Rebuild the trends view for the currently selected ROM."""
+        try:
+            self._populate_trends_rom_combo()
+            rom = self.cmb_trends_rom.currentData()
+            if not rom:
+                self.trends_view.setHtml("<p style='color:#888;'>No summary data found yet. Play a game first!</p>")
+                return
+            trend_data = self._collect_trend_data()
+            sessions = trend_data.get(rom, [])
+            html = self._build_trends_html(rom, sessions)
+            self.trends_view.setHtml(html)
+        except Exception as e:
+            try:
+                self.trends_view.setHtml(f"<p style='color:#F44;'>Error loading trends: {_html.escape(str(e))}</p>")
+            except Exception:
+                pass
+
+    @staticmethod
+    def _sparkline(values: list) -> str:
+        """Return a unicode sparkline string for the given values."""
+        blocks = "▁▂▃▄▅▆▇█"
+        if not values:
+            return ""
+        mn, mx = min(values), max(values)
+        rng = mx - mn if mx != mn else 1
+        return "".join(blocks[min(7, int((v - mn) / rng * 7))] for v in values)
+
+    def _build_trends_html(self, rom: str, sessions: list) -> str:
+        """Generate the full trends HTML for a ROM."""
+        esc = _html.escape
+        style = """
+        <style>
+          body { background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif; }
+          h3 { color:#00E5FF; margin-top:12px; margin-bottom:4px; }
+          table { border-collapse:collapse; width:100%; margin-top:6px; }
+          th, td { padding:0.2em 0.5em; border-bottom:1px solid #333; white-space:nowrap; color:#E0E0E0; }
+          th { text-align:left; background:#1A1A1A; font-weight:bold; color:#00E5FF; }
+          td.val { text-align:right; font-weight:bold; color:#FF7F00; }
+          td.up { color:#00E676; }
+          td.down { color:#FF5252; }
+          .spark { font-family:monospace; font-size:16pt; color:#FF7F00; letter-spacing:2px; }
+          .meta { color:#888; font-size:0.9em; }
+          .no-data { color:#888; font-style:italic; }
+        </style>
+        """
+        romnames = {}
+        try:
+            romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+        except Exception:
+            pass
+        table_name = _strip_version_from_name(romnames.get(rom, "")) or rom
+        lines = [style, f"<h2 style='color:#FFF;'>{esc(table_name)}</h2>"]
+        lines.append(f"<p class='meta'>ROM: {esc(rom)}</p>")
+
+        recent = sessions[-10:] if sessions else []
+
+        if not recent:
+            lines.append("<p class='no-data'>No session data available yet.</p>")
+            return "".join(lines)
+
+        # ── Score Trend ──────────────────────────────────────────────────────
+        scores = [s["score"] for s in recent]
+        avg_score = sum(scores) / len(scores) if scores else 0
+        last_score = scores[-1] if scores else 0
+        score_trend_pct = ((last_score - avg_score) / avg_score * 100) if avg_score else 0
+        trend_icon = "↑" if score_trend_pct >= 0 else "↓"
+        fire = " 🔥" if score_trend_pct > 50 else ""
+
+        lines.append("<h3>📈 Score Trend (Last 10 Sessions)</h3>")
+        lines.append(f"<div class='spark'>{self._sparkline(scores)}</div>")
+        lines.append("<table>")
+        lines.append("<tr><th>Date</th><th class='right' style='text-align:right'>Score</th></tr>")
+        for s in recent:
+            score_str = f"{s['score']:,}".replace(",", ".")
+            lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{score_str}</td></tr>")
+        lines.append("</table>")
+        avg_score_str = f"{int(avg_score):,}".replace(",", ".")
+        lines.append(
+            f"<p>Average: <b>{avg_score_str}</b> | "
+            f"Trend: <b>{trend_icon} {score_trend_pct:+.0f}%{fire}</b></p>"
+        )
+
+        # ── Playtime Trend ───────────────────────────────────────────────────
+        playtimes = [s["playtime_sec"] for s in recent]
+        avg_play = sum(playtimes) / len(playtimes) if playtimes else 0
+        last_play = playtimes[-1] if playtimes else 0
+        play_trend_pct = ((last_play - avg_play) / avg_play * 100) if avg_play else 0
+        play_trend_icon = "↑" if play_trend_pct >= 0 else "↓"
+        play_fire = " 🔥" if play_trend_pct > 50 else ""
+
+        def _fmt_playtime(sec: int) -> str:
+            h, rem = divmod(int(sec), 3600)
+            m = rem // 60
+            return f"{h}h {m:02d}m"
+
+        lines.append("<h3>⏱️ Playtime Trend (per session)</h3>")
+        lines.append(f"<div class='spark'>{self._sparkline(playtimes)}</div>")
+        lines.append("<table>")
+        lines.append("<tr><th>Date</th><th style='text-align:right'>Playtime</th></tr>")
+        for s in recent:
+            lines.append(f"<tr><td>{esc(s['ts_str'])}</td><td class='val'>{_fmt_playtime(s['playtime_sec'])}</td></tr>")
+        lines.append("</table>")
+        lines.append(
+            f"<p>Average: <b>{_fmt_playtime(int(avg_play))}</b> | "
+            f"Trend: <b>{play_trend_icon} {play_trend_pct:+.0f}%{play_fire}</b></p>"
+        )
+
+        # ── Last vs Average Comparison ───────────────────────────────────────
+        lines.append("<h3>📊 Last vs. Average Comparison</h3>")
+        lines.append("<table>")
+        lines.append("<tr><th>Metric</th><th style='text-align:right'>Last</th>"
+                     "<th style='text-align:right'>Average</th><th>Trend</th></tr>")
+
+        # Score row
+        last_s = f"{last_score:,}".replace(",", ".")
+        avg_s = f"{int(avg_score):,}".replace(",", ".")
+        s_cls = "up" if score_trend_pct >= 0 else "down"
+        lines.append(
+            f"<tr><td>Score</td><td class='val'>{last_s}</td>"
+            f"<td class='val'>{avg_s}</td>"
+            f"<td class='{s_cls}'>{trend_icon} {score_trend_pct:+.0f}%{'🔥' if score_trend_pct > 50 else ''}</td></tr>"
+        )
+
+        # Playtime row
+        p_cls = "up" if play_trend_pct >= 0 else "down"
+        lines.append(
+            f"<tr><td>Playtime</td><td class='val'>{_fmt_playtime(last_play)}</td>"
+            f"<td class='val'>{_fmt_playtime(int(avg_play))}</td>"
+            f"<td class='{p_cls}'>{play_trend_icon} {play_trend_pct:+.0f}%{'🔥' if play_trend_pct > 50 else ''}</td></tr>"
+        )
+
+        # Delta metrics from last session vs average across sessions
+        try:
+            all_delta_keys: set = set()
+            for s in recent:
+                all_delta_keys.update(s["deltas"].keys())
+            for dk in sorted(all_delta_keys):
+                last_dv = int(recent[-1]["deltas"].get(dk, 0))
+                avg_dv = sum(int(s["deltas"].get(dk, 0)) for s in recent) / len(recent)
+                if avg_dv == 0 and last_dv == 0:
+                    continue
+                d_trend = ((last_dv - avg_dv) / avg_dv * 100) if avg_dv else 0
+                d_icon = "↑" if d_trend >= 0 else "↓"
+                d_cls = "up" if d_trend >= 0 else "down"
+                d_fire = "🔥" if d_trend > 50 else ""
+                lines.append(
+                    f"<tr><td>{esc(dk)}</td>"
+                    f"<td class='val'>{last_dv:,}</td>"
+                    f"<td class='val'>{avg_dv:.1f}</td>"
+                    f"<td class='{d_cls}'>{d_icon} {d_trend:+.0f}%{d_fire}</td></tr>"
+                )
+        except Exception:
+            pass
+
+        lines.append("</table>")
+
+        return "".join(lines)
 
     # ==========================================
     # TAB 5: CLOUD LEADERBOARD
