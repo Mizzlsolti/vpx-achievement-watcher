@@ -3657,7 +3657,7 @@ class AchToastWindow(QWidget):
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
         else:
-            border_color = QColor("#555555")
+            border_color = QColor(_CURRENT_THEME_BORDER)
             raw_title = self._title or "Achievement unlocked"
             rom = self._rom or ""
 

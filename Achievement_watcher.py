@@ -267,10 +267,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bridge.achievements_updated.connect(self._refresh_level_display)
         self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
-        try:
-            self.bridge.achievements_updated.connect(self._refresh_profile_card)
-        except Exception:
-            pass
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
         self.bridge.notification_added.connect(self._refresh_notification_feed)
@@ -1870,10 +1866,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._ach_toast_mgr.enqueue("🏆 Theme Preview Achievement", "__demo__", seconds=4)
         except Exception:
             pass
-        try:
-            _sound.play_sound_preview(self.cfg, "achievement_unlock")
-        except Exception:
-            pass
 
     def _on_demo_test_challenge(self):
         """Show a demo challenge select overlay to preview the current theme."""
@@ -2484,34 +2476,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_level.addLayout(row_level_badges)
         layout.addWidget(grp_level)
 
-        # --- 📸 Profile Card ---
-        try:
-            grp_profile_card = QGroupBox("📸 Profile Card")
-            lay_profile_card = QVBoxLayout(grp_profile_card)
-            self.lbl_profile_card_preview = QLabel()
-            self.lbl_profile_card_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.lbl_profile_card_preview.setMinimumHeight(200)
-            self.lbl_profile_card_preview.setStyleSheet("background: #111; border: 1px solid #333;")
-            lay_profile_card.addWidget(self.lbl_profile_card_preview)
-            row_card_btns = QHBoxLayout()
-            self.btn_export_profile_card = QPushButton("📸 Export as PNG")
-            self.btn_export_profile_card.clicked.connect(self._export_profile_card_png)
-            self.btn_copy_profile_card = QPushButton("📋 Copy to Clipboard")
-            self.btn_copy_profile_card.clicked.connect(self._copy_profile_card_clipboard)
-            row_card_btns.addWidget(self.btn_export_profile_card)
-            row_card_btns.addWidget(self.btn_copy_profile_card)
-            lay_profile_card.addLayout(row_card_btns)
-            layout.addWidget(grp_profile_card)
-            self._profile_card_img = None
-        except Exception:
-            pass
-
         layout.addStretch(1)
         self._add_tab_help_button(layout, "player")
 
         self.main_tabs.addTab(tab, "👤 Player")
         QTimer.singleShot(1500, self._refresh_level_display)
-        QTimer.singleShot(2000, self._refresh_profile_card)
 
     # ==========================================
     # TAB 2: APPEARANCE (Grid Layout)
@@ -2773,13 +2742,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn_test_main.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
         btn_test_main.clicked.connect(self._on_demo_test_main_overlay)
         demo_btn_row2.addWidget(btn_test_main)
-        # Play test sound
-        btn_test_sound = QPushButton("🔊 Play Test Sound")
-        btn_test_sound.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
-        btn_test_sound.clicked.connect(
-            lambda: _sound.play_sound_preview(self.cfg, "achievement_unlock")
-        )
-        demo_btn_row2.addWidget(btn_test_sound)
         demo_btn_row2.addStretch(1)
         demo_lay.addLayout(demo_btn_row2)
 
@@ -4164,7 +4126,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             grp_export = QGroupBox("📦 Config Export / Import")
             lay_export = QVBoxLayout(grp_export)
             lbl_export_info = QLabel(
-                "Export your complete settings as a portable ZIP.\n"
+                "Export your complete settings and data as a portable ZIP.\n"
+                "Includes: config, VPS ID mapping, achievements, challenge scores and notifications.\n"
                 "Import to restore on a new PC."
             )
             lbl_export_info.setWordWrap(True)
@@ -4420,16 +4383,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-        # Restore profile card data (total_playtime_sec) from cloud
-        try:
-            card_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/profile_card")
-            if card_data and isinstance(card_data, dict):
-                if "total_playtime_sec" in card_data:
-                    self.cfg.OVERLAY["total_playtime_sec"] = int(card_data["total_playtime_sec"])
-                    self.cfg.save()
-        except Exception:
-            pass
-
         # Refresh level display and notify listeners
         try:
             self._refresh_level_display()
@@ -4587,16 +4540,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception as e:
                 errors.append(f"❌ Trends: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: trends upload failed: {e}", "WARN")
-
-            # 5. Upload profile card data
-            try:
-                card_data = self._gather_profile_card_data()
-                if card_data and CloudSync.set_node(self.cfg, f"players/{pid}/profile_card", card_data):
-                    results.append("✅ Profile Card")
-                elif card_data:
-                    errors.append("❌ Profile Card: upload failed")
-            except Exception as e:
-                errors.append(f"❌ Profile Card: {e}")
 
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             summary = "\n".join(results + errors)
@@ -6486,11 +6429,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _export_settings(self):
-        """Export config.json as a ZIP archive."""
+        """Export settings and data as a ZIP archive."""
         try:
             from PyQt6.QtWidgets import QFileDialog, QMessageBox
             import zipfile
             from datetime import datetime, timezone
+            from watcher_core import f_achievements_state, f_vps_mapping
 
             path, _ = QFileDialog.getSaveFileName(
                 self, "Export Settings", "vpx_watcher_settings.zip",
@@ -6499,10 +6443,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             if not path:
                 return
             try:
-                src = os.path.join(self.cfg.BASE, "config.json")
+                # Files to include: (source_path, archive_name)
+                files_to_export = [
+                    (os.path.join(self.cfg.BASE, "config.json"), "config.json"),
+                    (f_vps_mapping(self.cfg), "vps_id_mapping.json"),
+                    (f_achievements_state(self.cfg), "achievements_state.json"),
+                    (os.path.join(self.cfg.BASE, "challenge_scores.json"), "challenge_scores.json"),
+                    (os.path.join(self.cfg.BASE, "notifications.json"), "notifications.json"),
+                ]
                 with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    if os.path.isfile(src):
-                        zf.write(src, "config.json")
+                    for src, arcname in files_to_export:
+                        if os.path.isfile(src):
+                            zf.write(src, arcname)
                 ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
                 self.cfg.OVERLAY["last_export_ts"] = ts
                 self.cfg.save()
@@ -6522,6 +6474,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             from PyQt6.QtWidgets import QFileDialog, QMessageBox
             import zipfile
             import json as _json
+            from watcher_core import f_achievements_state, f_vps_mapping, ensure_dir
 
             path, _ = QFileDialog.getOpenFileName(
                 self, "Import Settings", "",
@@ -6532,7 +6485,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             confirm = QMessageBox.question(
                 self,
                 "Import Settings",
-                "This will overwrite your current settings. Continue?",
+                "This will overwrite your current settings and data. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -6545,15 +6498,56 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         QMessageBox.warning(self, "Import Settings", "No config.json found in ZIP.")
                         return
                     raw = zf.read("config.json")
-                imported = _json.loads(raw.decode("utf-8"))
-                # Merge OVERLAY keys and path-like keys
-                if "OVERLAY" in imported and isinstance(imported["OVERLAY"], dict):
-                    for k, v in imported["OVERLAY"].items():
-                        self.cfg.OVERLAY[k] = v
-                for key in ("BASE", "NVRAM_DIR", "TABLES_DIR"):
-                    if key in imported and imported[key]:
-                        setattr(self.cfg, key, imported[key])
-                self.cfg.save()
+                    imported = _json.loads(raw.decode("utf-8"))
+                    # Merge OVERLAY keys and path-like keys
+                    if "OVERLAY" in imported and isinstance(imported["OVERLAY"], dict):
+                        for k, v in imported["OVERLAY"].items():
+                            self.cfg.OVERLAY[k] = v
+                    for key in ("BASE", "NVRAM_DIR", "TABLES_DIR"):
+                        if key in imported and imported[key]:
+                            setattr(self.cfg, key, imported[key])
+                    self.cfg.save()
+
+                    # Restore VPS ID mapping
+                    if "vps_id_mapping.json" in names:
+                        try:
+                            dest = f_vps_mapping(self.cfg)
+                            ensure_dir(os.path.dirname(dest))
+                            with open(dest, "wb") as fh:
+                                fh.write(zf.read("vps_id_mapping.json"))
+                        except Exception:
+                            pass
+
+                    # Restore achievements state
+                    if "achievements_state.json" in names:
+                        try:
+                            dest = f_achievements_state(self.cfg)
+                            ensure_dir(os.path.dirname(dest))
+                            with open(dest, "wb") as fh:
+                                fh.write(zf.read("achievements_state.json"))
+                        except Exception:
+                            pass
+
+                    # Restore challenge scores
+                    if "challenge_scores.json" in names:
+                        try:
+                            dest = os.path.join(self.cfg.BASE, "challenge_scores.json")
+                            ensure_dir(os.path.dirname(dest))
+                            with open(dest, "wb") as fh:
+                                fh.write(zf.read("challenge_scores.json"))
+                        except Exception:
+                            pass
+
+                    # Restore notifications
+                    if "notifications.json" in names:
+                        try:
+                            dest = os.path.join(self.cfg.BASE, "notifications.json")
+                            ensure_dir(os.path.dirname(dest))
+                            with open(dest, "wb") as fh:
+                                fh.write(zf.read("notifications.json"))
+                        except Exception:
+                            pass
+
                 QMessageBox.information(
                     self,
                     "Import Settings",
@@ -6565,162 +6559,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             pass
 
     # ------------------------------------------------------------------
-    # Profile Card
-    # ------------------------------------------------------------------
-
-    def _gather_profile_card_data(self) -> dict:
-        """Collect all data needed to render the profile card."""
-        try:
-            from watcher_core import compute_player_level, WATCHER_VERSION
-            state = self.watcher._ach_state_load()
-            lv = compute_player_level(state)
-
-            player_name = self.cfg.OVERLAY.get("player_name", "Player") or "Player"
-            total_playtime_sec = int(self.cfg.OVERLAY.get("total_playtime_sec", 0) or 0)
-            badges = list(state.get("badges") or [])
-
-            # Tables played
-            roms_played = list(state.get("roms_played") or [])
-            session = state.get("session") or {}
-            tables_played = len(set(list(roms_played) + list(session.keys())))
-
-            # Top tables by completion %
-            top_tables = []
-            try:
-                for rom, entries in session.items():
-                    if not entries:
-                        continue
-                    try:
-                        rules = self.watcher._collect_player_rules_for_rom(rom)
-                        total = len(rules)
-                        if total == 0:
-                            continue
-                        unlocked_titles = {
-                            str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-                            for e in entries
-                        }
-                        unlocked = sum(
-                            1 for r in rules
-                            if str(r.get("title", "")).strip() in unlocked_titles
-                        )
-                        pct = round((unlocked / total) * 100, 1)
-                        romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-                        friendly = _strip_version_from_name(romnames.get(rom, "")) or rom
-                        top_tables.append({"name": friendly, "rom": rom, "pct": pct})
-                    except Exception:
-                        pass
-                top_tables.sort(key=lambda x: x["pct"], reverse=True)
-            except Exception:
-                pass
-
-            # Challenge records
-            challenge_records = {}
-            try:
-                import json as _json
-                scores_path = os.path.join(self.cfg.BASE, "challenge_scores.json")
-                if os.path.isfile(scores_path):
-                    with open(scores_path, "r", encoding="utf-8") as fh:
-                        scores = _json.load(fh)
-                    best_timed = None
-                    best_flip = None
-                    best_heat = None
-                    for rom_scores in scores.values():
-                        for entry in (rom_scores if isinstance(rom_scores, list) else []):
-                            mode = str(entry.get("mode", "")).lower()
-                            sc = entry.get("score")
-                            if sc is None:
-                                continue
-                            if mode == "timed":
-                                if best_timed is None or sc > best_timed:
-                                    best_timed = sc
-                            elif mode == "flip":
-                                if best_flip is None or sc > best_flip:
-                                    best_flip = sc
-                            elif mode == "heat":
-                                if best_heat is None or sc > best_heat:
-                                    best_heat = sc
-                    if best_timed is not None:
-                        challenge_records["timed_best"] = best_timed
-                    if best_flip is not None:
-                        challenge_records["flip_best"] = best_flip
-                    if best_heat is not None:
-                        challenge_records["heat_best"] = best_heat
-            except Exception:
-                pass
-
-            # Theme colors
-            theme_colors = {}
-            try:
-                from themes import get_theme
-                theme_name = self.cfg.OVERLAY.get("theme", "Neon Blue")
-                td = get_theme(theme_name)
-                theme_colors = {
-                    "border": td.get("border", "#00E5FF"),
-                    "accent": td.get("accent", "#FF7F00"),
-                }
-            except Exception:
-                theme_colors = {"border": "#00E5FF", "accent": "#FF7F00"}
-
-            return {
-                "player_name": player_name,
-                "level": lv["level"],
-                "prestige_display": lv["prestige_display"],
-                "total_achievements": lv["total"],
-                "badges": badges,
-                "total_playtime_sec": total_playtime_sec,
-                "tables_played": tables_played,
-                "top_tables": top_tables[:3],
-                "challenge_records": challenge_records,
-                "theme_colors": theme_colors,
-                "version": WATCHER_VERSION,
-            }
-        except Exception:
-            return {}
-
-    def _refresh_profile_card(self):
-        """Re-render the profile card preview."""
-        try:
-            from profile_card import render_profile_card
-            from PyQt6.QtGui import QPixmap
-            data = self._gather_profile_card_data()
-            img = render_profile_card(data)
-            self._profile_card_img = img
-            pix = QPixmap.fromImage(img)
-            pix = pix.scaledToWidth(560, Qt.TransformationMode.SmoothTransformation)
-            self.lbl_profile_card_preview.setPixmap(pix)
-        except Exception:
-            pass
-
-    def _export_profile_card_png(self):
-        """Export the profile card as a PNG file."""
-        try:
-            from PyQt6.QtWidgets import QFileDialog, QMessageBox
-            from profile_card import render_profile_card, save_profile_card
-            data = self._gather_profile_card_data()
-            img = render_profile_card(data)
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Export Profile Card", "profile_card.png",
-                "PNG Image (*.png)"
-            )
-            if not path:
-                return
-            if save_profile_card(img, path):
-                QMessageBox.information(self, "Export Profile Card", f"Profile card saved to:\n{path}")
-            else:
-                QMessageBox.warning(self, "Export Profile Card", "Failed to save profile card.")
-        except Exception:
-            pass
-
-    def _copy_profile_card_clipboard(self):
-        """Copy the profile card image to the clipboard."""
-        try:
-            from PyQt6.QtWidgets import QApplication
-            from profile_card import render_profile_card
-            data = self._gather_profile_card_data()
-            img = render_profile_card(data)
-            QApplication.clipboard().setImage(img)
-        except Exception:
-            pass
 
     def _collect_trend_data_for_cloud(self) -> dict:
         """Load the local trends cache and return it for cloud upload."""
@@ -7179,9 +7017,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         other_player = data.get("other_player", "Unknown")
         other_pct = data.get("other_pct", 0.0)
         your_pct = data.get("your_pct", 0.0)
+        other_unlocked = data.get("other_unlocked")
+        other_total = data.get("other_total")
+        your_unlocked = data.get("your_unlocked")
+        your_total = data.get("your_total")
         vps_id = data.get("vps_id", "")
         title = f"Dein Highscore auf {table_name} wurde übertroffen!"
-        detail = f"{other_player} erreichte {other_pct:.1f}% auf {table_name} ({rom})"
+        # Use unlocked/total for detail if available, else fall back to percentage
+        if other_unlocked is not None and other_total is not None:
+            detail = f"{other_player} erreichte {other_unlocked}/{other_total} auf {table_name} ({rom})"
+        else:
+            detail = f"{other_player} erreichte {other_pct:.1f}% auf {table_name} ({rom})"
         _notif.add_notification(
             self.cfg,
             type="highscore_beaten",
@@ -7195,6 +7041,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             other_player=other_player,
             other_pct=other_pct,
             your_pct=your_pct,
+            other_unlocked=other_unlocked,
+            other_total=other_total,
+            your_unlocked=your_unlocked,
+            your_total=your_total,
         )
         try:
             self._refresh_notification_feed()
@@ -7299,15 +7149,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                             p_name = entry.get("name", p_id)
                             vps_id = entry.get("vps_id", "")
                             table_name = entry.get("table_name", "")
-                            scores.append((pct, p_id, p_name, vps_id, table_name))
+                            unlocked = entry.get("unlocked")
+                            total = entry.get("total")
+                            scores.append((pct, p_id, p_name, vps_id, table_name, unlocked, total))
                     scores.sort(reverse=True)
 
                     if not scores:
                         continue
-                    top_pct, top_pid, top_name, top_vps_id, top_table = scores[0]
+                    top_pct, top_pid, top_name, top_vps_id, top_table, top_unlocked, top_total = scores[0]
                     if top_pid and top_pid != pid:
                         # Check own score exists at all
-                        own_entry = next(((pct, p_id) for pct, p_id, *_ in scores if p_id == pid), None)
+                        own_entry = next(((pct, p_id, un, tot) for pct, p_id, _, __, ___, un, tot in scores if p_id == pid), None)
                         if own_entry:
                             payload = json.dumps({
                                 "rom": rom,
@@ -7316,6 +7168,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                                 "other_player": top_name,
                                 "other_pct": top_pct,
                                 "your_pct": own_entry[0],
+                                "other_unlocked": top_unlocked,
+                                "other_total": top_total,
+                                "your_unlocked": own_entry[2],
+                                "your_total": own_entry[3],
                             })
                             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                             QMetaObject.invokeMethod(
@@ -8164,7 +8020,7 @@ class HighscoreBeatenDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("🎯 Highscore Beaten!")
         self.setModal(True)
-        self.resize(500, 400)
+        self.resize(500, 380)
         self.setStyleSheet("QDialog { background: #111; color: #DDD; }")
 
         try:
@@ -8188,14 +8044,24 @@ class HighscoreBeatenDialog(QDialog):
         sep.setStyleSheet("color: #333;")
         layout.addWidget(sep)
 
-        # ── Table image placeholder ─────────────────────────────────────────
-        lbl_img = QLabel()
-        lbl_img.setFixedHeight(120)
-        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_img.setStyleSheet("background: #1a1a1a; border: 1px solid #333; border-radius: 4px;")
         vps_id = notif.get("vps_id", "")
         table_name = notif.get("table_name", notif.get("rom", ""))
-        # Try to load VPS image
+        rom = notif.get("rom", "")
+
+        # ── Table image + metadata card ─────────────────────────────────────
+        card_table = QWidget()
+        card_table.setStyleSheet(
+            "background: #1a1a1a; border-radius: 6px; border: 1px solid #2a2a2a;"
+        )
+        card_table_layout = QHBoxLayout(card_table)
+        card_table_layout.setContentsMargins(8, 8, 8, 8)
+        card_table_layout.setSpacing(10)
+
+        # Image thumbnail
+        lbl_img = QLabel()
+        lbl_img.setFixedSize(80, 80)
+        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_img.setStyleSheet("background: #111; border-radius: 4px; border: 1px solid #333;")
         img_loaded = False
         if vps_id:
             try:
@@ -8206,63 +8072,95 @@ class HighscoreBeatenDialog(QDialog):
                 if candidates:
                     pix = QPixmap(candidates[0])
                     if not pix.isNull():
-                        pix = pix.scaledToHeight(118, Qt.TransformationMode.SmoothTransformation)
+                        pix = pix.scaled(
+                            78, 78,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
                         lbl_img.setPixmap(pix)
                         img_loaded = True
             except Exception:
                 pass
         if not img_loaded:
-            lbl_img.setText(
-                f"<span style='color:#555; font-size:11pt;'>{table_name}</span>"
-            )
+            lbl_img.setText("<span style='color:#555; font-size:18pt;'>🎰</span>")
             lbl_img.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(lbl_img)
+        card_table_layout.addWidget(lbl_img)
 
-        # ── Table metadata ──────────────────────────────────────────────────
-        rom = notif.get("rom", "")
-        meta_lines = []
+        # Metadata column
+        meta_col = QVBoxLayout()
+        meta_col.setSpacing(3)
         if table_name:
-            meta_lines.append(f"📋 <b>Table:</b> {table_name}")
+            lbl_name = QLabel(f"<b style='font-size:12pt; color:#DDD;'>{table_name}</b>")
+            lbl_name.setTextFormat(Qt.TextFormat.RichText)
+            lbl_name.setWordWrap(True)
+            meta_col.addWidget(lbl_name)
         if rom:
-            meta_lines.append(f"🔧 <b>ROM:</b> {rom}")
+            lbl_rom = QLabel(f"<span style='color:#888; font-size:9pt;'>🔧 {rom}</span>")
+            lbl_rom.setTextFormat(Qt.TextFormat.RichText)
+            meta_col.addWidget(lbl_rom)
         if vps_id:
-            meta_lines.append(f"🆔 <b>VPS ID:</b> {vps_id}")
-        if meta_lines:
-            lbl_meta = QLabel("<br>".join(meta_lines))
-            lbl_meta.setTextFormat(Qt.TextFormat.RichText)
-            lbl_meta.setStyleSheet("color: #CCC; font-size: 10pt; padding: 4px 0;")
-            layout.addWidget(lbl_meta)
+            lbl_vps = QLabel(f"<span style='color:#888; font-size:9pt;'>🆔 {vps_id}</span>")
+            lbl_vps.setTextFormat(Qt.TextFormat.RichText)
+            meta_col.addWidget(lbl_vps)
+        meta_col.addStretch()
+        card_table_layout.addLayout(meta_col, 1)
+        layout.addWidget(card_table)
 
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("color: #333;")
-        layout.addWidget(sep2)
-
-        # ── Score comparison ────────────────────────────────────────────────
+        # ── Score comparison cards ──────────────────────────────────────────
+        your_unlocked = notif.get("your_unlocked")
+        your_total = notif.get("your_total")
+        other_unlocked = notif.get("other_unlocked")
+        other_total = notif.get("other_total")
         your_pct = notif.get("your_pct", 0.0)
         other_pct = notif.get("other_pct", 0.0)
         other_player = notif.get("other_player", "Unknown")
 
-        score_html = (
-            "<table width='100%' cellpadding='6' style='border-collapse:collapse;'>"
-            "<tr style='border-bottom:1px solid #333;'>"
-            f"<td style='color:#FF4444; font-weight:bold;'>↓ Your Score</td>"
-            f"<td style='color:#FF4444; text-align:right; font-size:13pt; font-weight:bold;'>"
-            f"{your_pct:.1f}%</td>"
-            "</tr>"
-            "<tr>"
-            f"<td style='color:#00C853; font-weight:bold;'>↑ New Leader: {other_player}</td>"
-            f"<td style='color:#00C853; text-align:right; font-size:13pt; font-weight:bold;'>"
-            f"{other_pct:.1f}%</td>"
-            "</tr>"
-            "</table>"
+        def _fmt_score(unlocked, total, pct):
+            """Format score as 'X / Y' if unlocked/total are available, else as percentage."""
+            if unlocked is not None and total is not None:
+                return f"{unlocked} / {total}"
+            return f"{pct:.1f}%"
+
+        # Your score card (red)
+        card_your = QWidget()
+        card_your.setStyleSheet(
+            "background: #1a1a1a; border-radius: 6px; border: 1px solid #2a2a2a;"
         )
-        lbl_scores = QLabel(score_html)
-        lbl_scores.setTextFormat(Qt.TextFormat.RichText)
-        lbl_scores.setStyleSheet(
-            "background: #1a1a1a; border: 1px solid #333; border-radius: 4px; padding: 4px;"
+        your_layout = QHBoxLayout(card_your)
+        your_layout.setContentsMargins(12, 8, 12, 8)
+        lbl_your_title = QLabel("<b style='color:#FF4444;'>↓ Your Score</b>")
+        lbl_your_title.setTextFormat(Qt.TextFormat.RichText)
+        your_score_str = _fmt_score(your_unlocked, your_total, your_pct)
+        lbl_your_val = QLabel(
+            f"<b style='color:#FF4444; font-size:14pt;'>{your_score_str}</b>"
         )
-        layout.addWidget(lbl_scores)
+        lbl_your_val.setTextFormat(Qt.TextFormat.RichText)
+        lbl_your_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        your_layout.addWidget(lbl_your_title, 1)
+        your_layout.addWidget(lbl_your_val)
+        layout.addWidget(card_your)
+
+        # New leader card (green)
+        card_other = QWidget()
+        card_other.setStyleSheet(
+            "background: #1a1a1a; border-radius: 6px; border: 1px solid #2a2a2a;"
+        )
+        other_layout = QHBoxLayout(card_other)
+        other_layout.setContentsMargins(12, 8, 12, 8)
+        lbl_other_title = QLabel(
+            f"<b style='color:#00C853;'>↑ New Leader: {other_player}</b>"
+        )
+        lbl_other_title.setTextFormat(Qt.TextFormat.RichText)
+        lbl_other_title.setWordWrap(True)
+        other_score_str = _fmt_score(other_unlocked, other_total, other_pct)
+        lbl_other_val = QLabel(
+            f"<b style='color:#00C853; font-size:14pt;'>{other_score_str}</b>"
+        )
+        lbl_other_val.setTextFormat(Qt.TextFormat.RichText)
+        lbl_other_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        other_layout.addWidget(lbl_other_title, 1)
+        other_layout.addWidget(lbl_other_val)
+        layout.addWidget(card_other)
 
         layout.addStretch(1)
 
