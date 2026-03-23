@@ -18,9 +18,21 @@ from PyQt6.QtGui import (
 
 from watcher_core import APP_DIR, register_raw_input_for_window
 
-# Active theme border color – updated by MainWindow._apply_overlay_theme().
-# Defaults to the original neon-blue so existing behaviour is unchanged.
+# Active theme colors – updated by MainWindow._apply_overlay_theme().
+# Defaults match the neon_blue theme so existing behaviour is unchanged.
 _CURRENT_THEME_BORDER = "#00E5FF"
+_CURRENT_THEME_PRIMARY = "#00E5FF"
+_CURRENT_THEME_ACCENT = "#FF7F00"
+_CURRENT_THEME_BG = "#080C16"
+
+
+def _get_overlay_bg_color(alpha: int = 245) -> "QColor":
+    """Return the current overlay background color from the active theme."""
+    c = QColor(_CURRENT_THEME_BG)
+    if not c.isValid():
+        c = QColor(8, 12, 22)  # neon_blue fallback
+    c.setAlpha(alpha)
+    return c
 
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
@@ -671,14 +683,7 @@ class OverlayWindow(QWidget):
         self.container = QWidget(self)
         self.container.setObjectName("overlay_bg")
         self.container.setGeometry(0, 0, self.width(), self.height())
-        if self.bg_url:
-            css = ("QWidget#overlay_bg {"
-                   f"border-image: url('{self.bg_url}') 0 0 0 0 stretch stretch;"
-                   "background:rgba(8,12,22,252);border:2px solid #00E5FF;border-radius:18px;}")
-        else:
-            css = ("QWidget#overlay_bg {background:rgba(8,12,22,252);"
-                   "border:2px solid #00E5FF;border-radius:18px;}")
-        self.container.setStyleSheet(css)
+        self._apply_container_style()
         self.text_container = QWidget(self)
         self.text_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.text_container.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -749,6 +754,36 @@ class OverlayWindow(QWidget):
         self._highlight_timer = QTimer(self)
         self._highlight_timer.setInterval(16)
         self._highlight_timer.timeout.connect(self._highlight_tick)
+
+    def _apply_container_style(self):
+        """Apply the current theme bg and border to the overlay container CSS."""
+        border = _CURRENT_THEME_BORDER
+        bg_hex = _CURRENT_THEME_BG
+        # Parse hex to RGBA for stylesheet (always use alpha 252/255 ≈ 0.99)
+        try:
+            c = QColor(bg_hex)
+            if not c.isValid():
+                c = QColor(8, 12, 22)  # neon_blue default bg
+            r, g, b = c.red(), c.green(), c.blue()
+        except Exception:
+            r, g, b = 8, 12, 22  # neon_blue default bg
+        bg_url = getattr(self, "bg_url", None)
+        if bg_url:
+            css = (f"QWidget#overlay_bg {{"
+                   f"border-image: url('{bg_url}') 0 0 0 0 stretch stretch;"
+                   f"background:rgba({r},{g},{b},252);"
+                   f"border:2px solid {border};border-radius:18px;}}")
+        else:
+            css = (f"QWidget#overlay_bg {{background:rgba({r},{g},{b},252);"
+                   f"border:2px solid {border};border-radius:18px;}}")
+        self.container.setStyleSheet(css)
+
+    def refresh_theme(self):
+        """Re-apply the current theme colours to the overlay container without rebuilding content."""
+        try:
+            self._apply_container_style()
+        except Exception:
+            pass
 
     def request_rotation(self, force: bool = False):
         if not self.portrait_mode:
@@ -920,9 +955,9 @@ class OverlayWindow(QWidget):
                     bg_img = scaled.copy(cx, cy, min(W, sw - cx), min(H, sh - cy)).toImage().convertToFormat(
                         QImage.Format.Format_ARGB32_Premultiplied)
                 else:
-                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 245))
+                    bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(_get_overlay_bg_color(245))
             else:
-                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(QColor(8, 12, 22, 245))
+                bg_img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied); bg_img.fill(_get_overlay_bg_color(245))
             pre_w, pre_h = H, W
             old_geom = self.text_container.geometry()
             old_title_vis = self.title.isVisible()
@@ -2026,7 +2061,7 @@ class FlipCounterOverlay(QWidget):
         p = QPainter(img)
         try:
             p.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing, True)
-            bg = QColor(8, 12, 22, 245)
+            bg = _get_overlay_bg_color(245)
             radius = 16
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(bg)
@@ -2208,11 +2243,11 @@ class FlipCounterPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Flip Counter\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2327,11 +2362,11 @@ class TimerPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Timer\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2465,11 +2500,11 @@ class ToastPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Achievement Toast\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2582,11 +2617,11 @@ class ChallengeOVPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3342,11 +3377,11 @@ class OverlayPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Main Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3688,7 +3723,7 @@ class AchToastWindow(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         
-        bg = QColor(8, 12, 22, 245)
+        bg = _get_overlay_bg_color(245)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(bg)
         radius = 16
@@ -4094,7 +4129,7 @@ class ChallengeCountdownOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(8, 12, 22, 245))
+        p.setBrush(_get_overlay_bg_color(245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
         _draw_glow_border(p, 0, 0, w, h, radius=16,
                           low_perf=bool(ov.get("low_performance_mode", False)))
@@ -4270,7 +4305,7 @@ class ChallengeSelectOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 245))
+            p.setBrush(_get_overlay_bg_color(245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
 
@@ -4597,7 +4632,7 @@ class FlipDifficultyOverlay(QWidget):
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 245))
+            p.setBrush(_get_overlay_bg_color(245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
@@ -4817,7 +4852,7 @@ class HeatBarometerOverlay(QWidget):
 
             # background
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(8, 12, 22, 245))
+            p.setBrush(_get_overlay_bg_color(245))
             p.drawRoundedRect(0, 0, w, h, 10, 10)
 
             # border with glow
@@ -5015,13 +5050,13 @@ class HeatBarPositionPicker(QWidget):
     def paintEvent(self, _evt):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF"))
+        p.fillRect(0, 0, self._w, self._h, _get_overlay_bg_color(245))
+        pen = QPen(QColor(_CURRENT_THEME_BORDER))
         pen.setWidth(2)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(_CURRENT_THEME_ACCENT))
         p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         msg = "Heat Bar\nDrag to position. Click the button again to save"
         if self._portrait:
