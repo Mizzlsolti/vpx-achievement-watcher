@@ -2548,6 +2548,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cmb_font_family = QFontComboBox()
         self.cmb_font_family.setCurrentFont(QFont(self.cfg.OVERLAY.get("font_family", "Segoe UI")))
         self.cmb_font_family.currentFontChanged.connect(self._on_font_family_changed)
+        self.cmb_font_family.setMaxVisibleItems(15)
+        self.cmb_font_family.view().setStyleSheet(
+            "QAbstractItemView::item { min-height: 20px; padding: 2px 6px; }"
+        )
         
         self.spn_font_size = QSpinBox()
         self.spn_font_size.setRange(8, 64)
