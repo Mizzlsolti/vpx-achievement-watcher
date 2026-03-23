@@ -2680,6 +2680,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_pages_hint.setStyleSheet("color: #888; font-size: 8pt;")
         lay_pages.addWidget(lbl_pages_hint)
 
+        lbl_pages_cycle_hint = QLabel("Disable pages you don\u2019t need \u2014 they will be skipped when cycling through the overlay.")
+        lbl_pages_cycle_hint.setStyleSheet("color: #888; font-size: 8pt;")
+        lbl_pages_cycle_hint.setWordWrap(True)
+        lay_pages.addWidget(lbl_pages_cycle_hint)
+
         self.chk_page2 = QCheckBox("Page 2: Achievement Progress")
         self.chk_page2.setToolTip("Scrollable list of all unlocked/locked achievements for the current ROM")
         self.chk_page2.setChecked(bool(self.cfg.OVERLAY.get("page_2_enabled", True)))
@@ -6103,12 +6108,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._overlay_cycle["idx"] = 0
                 self._show_overlay_section(secs[0])
             else:
-                # Overlay already visible – cycle to next page, close after last
-                next_page = (int(getattr(self, "_overlay_page", 0)) + 1)
-                if next_page > 4:
-                    # After page 4 (last page) → close overlay
+                # Overlay already visible – cycle to next enabled page, close after last
+                ov_cfg = self.cfg.OVERLAY
+                enabled_pages = [0]
+                if ov_cfg.get("page_2_enabled", True):
+                    enabled_pages.append(1)
+                if ov_cfg.get("page_3_enabled", True):
+                    enabled_pages.append(2)
+                if ov_cfg.get("page_4_enabled", True):
+                    enabled_pages.append(3)
+                if ov_cfg.get("page_5_enabled", True):
+                    enabled_pages.append(4)
+
+                current = int(getattr(self, "_overlay_page", 0))
+                if current not in enabled_pages:
+                    current = enabled_pages[0]
+
+                idx = enabled_pages.index(current)
+                if idx >= len(enabled_pages) - 1:
+                    # Already on the last enabled page → close overlay
                     self._hide_overlay()
                 else:
+                    next_page = enabled_pages[idx + 1]
                     self._overlay_page = next_page
                     self._show_overlay_page(next_page)
         finally:
