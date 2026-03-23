@@ -17,6 +17,7 @@ from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
 from watcher_core import CloudSync, secure_load_json, _strip_version_from_name
+from themes import get_theme_color
 
 
 class _NoBrowseBrowser(QTextBrowser):
@@ -126,15 +127,15 @@ class CloudStatsMixin:
             except Exception:
                 return str(n)
 
-        css = """
+        css = f"""
         <style>
-          table { border-collapse: collapse; margin-top: 5px; }
-          th, td { padding: 8px 10px; border-bottom: 1px solid #444; white-space: nowrap; }
-          th { background: #1A1A1A; font-weight: bold; color: #00E5FF; }
-          td.left { color: #FFFFFF; font-weight: bold; } 
-          td.val { color: #FF7F00; font-weight: bold; } 
-          td.diff { color: #AAAAAA; font-style: italic; } 
-          h4 { margin: 5px 0 10px 0; color: #FFFFFF; font-size: 1.4em; text-align: left; text-transform: uppercase; letter-spacing: 2px; }
+          table {{ border-collapse: collapse; margin-top: 5px; }}
+          th, td {{ padding: 8px 10px; border-bottom: 1px solid #444; white-space: nowrap; }}
+          th {{ background: #1A1A1A; font-weight: bold; color: {get_theme_color(self.cfg, 'primary')}; }}
+          td.left {{ color: #FFFFFF; font-weight: bold; }}
+          td.val {{ color: {get_theme_color(self.cfg, 'accent')}; font-weight: bold; }}
+          td.diff {{ color: #AAAAAA; font-style: italic; }}
+          h4 {{ margin: 5px 0 10px 0; color: #FFFFFF; font-size: 1.4em; text-align: left; text-transform: uppercase; letter-spacing: 2px; }}
         </style>
         """
 
@@ -367,19 +368,21 @@ class CloudStatsMixin:
     def _build_trends_html(self, rom: str, sessions: list) -> str:
         """Generate the full trends HTML for a ROM."""
         esc = _html.escape
-        style = """
+        _primary = get_theme_color(self.cfg, "primary")
+        _accent = get_theme_color(self.cfg, "accent")
+        style = f"""
         <style>
-          body { background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif; }
-          h3 { color:#00E5FF; margin-top:12px; margin-bottom:4px; }
-          table { border-collapse:collapse; width:100%; margin-top:6px; }
-          th, td { padding:0.2em 0.5em; border-bottom:1px solid #333; white-space:nowrap; color:#E0E0E0; }
-          th { text-align:left; background:#1A1A1A; font-weight:bold; color:#00E5FF; }
-          td.val { text-align:right; font-weight:bold; color:#FF7F00; }
-          td.up { color:#00E676; }
-          td.down { color:#FF5252; }
-          .spark { font-family:monospace; font-size:16pt; color:#FF7F00; letter-spacing:2px; }
-          .meta { color:#888; font-size:0.9em; }
-          .no-data { color:#888; font-style:italic; }
+          body {{ background:#1A1A2E; color:#E0E0E0; font-family: Segoe UI, Arial, sans-serif; }}
+          h3 {{ color:{_primary}; margin-top:12px; margin-bottom:4px; }}
+          table {{ border-collapse:collapse; width:100%; margin-top:6px; }}
+          th, td {{ padding:0.2em 0.5em; border-bottom:1px solid #333; white-space:nowrap; color:#E0E0E0; }}
+          th {{ text-align:left; background:#1A1A1A; font-weight:bold; color:{_primary}; }}
+          td.val {{ text-align:right; font-weight:bold; color:{_accent}; }}
+          td.up {{ color:#00E676; }}
+          td.down {{ color:#FF5252; }}
+          .spark {{ font-family:monospace; font-size:16pt; color:{_accent}; letter-spacing:2px; }}
+          .meta {{ color:#888; font-size:0.9em; }}
+          .no-data {{ color:#888; font-style:italic; }}
         </style>
         """
         romnames = {}
@@ -695,17 +698,19 @@ class CloudStatsMixin:
         threading.Thread(target=_bg_fetch, daemon=True).start()
 
     def _generate_cloud_html(self, data: list, category: str, rom: str, selected_diff: str = None, include_info_badges: bool = True) -> str:
-        css = """
+        _primary = get_theme_color(self.cfg, "primary")
+        _accent = get_theme_color(self.cfg, "accent")
+        css = f"""
         <style>
-          table { border-collapse: collapse; width: 80%; margin: 10px auto; }
-          th, td { padding: 10px; border-bottom: 1px solid #444; color: #FFF; text-align: center; vertical-align: middle; }
-          th { background: #1A1A1A; color: #00E5FF; font-weight: bold; }
-          td.rank { font-weight: bold; color: #FF7F00; font-size: 1.2em; width: 50px; }
-          td.name { font-weight: bold; text-align: left; }
-          td.score { color: #00B050; font-weight: bold; font-size: 1.2em; }
-          .title { font-size: 1.5em; color: #FFF; text-transform: uppercase; font-weight: bold; text-align: center; margin-bottom: 10px; }
-          .bar-bg { background: #222; border-radius: 10px; width: 100%; height: 22px; position: relative; border: 1px solid #555; }
-          .bar-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; color: #FFF; font-size: 12px; font-weight: bold; line-height: 22px; text-shadow: 1px 1px 2px #000; }
+          table {{ border-collapse: collapse; width: 80%; margin: 10px auto; }}
+          th, td {{ padding: 10px; border-bottom: 1px solid #444; color: #FFF; text-align: center; vertical-align: middle; }}
+          th {{ background: #1A1A1A; color: {_primary}; font-weight: bold; }}
+          td.rank {{ font-weight: bold; color: {_accent}; font-size: 1.2em; width: 50px; }}
+          td.name {{ font-weight: bold; text-align: left; }}
+          td.score {{ color: #00B050; font-weight: bold; font-size: 1.2em; }}
+          .title {{ font-size: 1.5em; color: #FFF; text-transform: uppercase; font-weight: bold; text-align: center; margin-bottom: 10px; }}
+          .bar-bg {{ background: #222; border-radius: 10px; width: 100%; height: 22px; position: relative; border: 1px solid #555; }}
+          .bar-text {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; text-align: center; color: #FFF; font-size: 12px; font-weight: bold; line-height: 22px; text-shadow: 1px 1px 2px #000; }}
         </style>
         """
         if not data:
@@ -795,7 +800,7 @@ class CloudStatsMixin:
                 
                 bar = f"""
                 <div class='bar-bg'>
-                    <div style='background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FF7F00, stop:1 #FFD700); width: {pct}%; height: 100%; border-radius: 9px;'></div>
+                    <div style='background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {_accent}, stop:1 {_primary}); width: {pct}%; height: 100%; border-radius: 9px;'></div>
                     <div class='bar-text'>{unlocked} / {total} ({pct}%)</div>
                 </div>
                 """
@@ -866,15 +871,17 @@ class CloudStatsMixin:
             pass
 
     def _gui_stats_global_html(self) -> str:
-        style = """
+        _primary = get_theme_color(self.cfg, "primary")
+        _accent = get_theme_color(self.cfg, "accent")
+        style = f"""
         <style>
-          table { border-collapse: collapse; margin-top: 10px; }
-          th, td { padding: 0.2em 0.5em; border-bottom: 1px solid #444; white-space: nowrap; color: #E0E0E0; }
-          th { text-align: left; background: #1A1A1A; font-weight: bold; color: #00E5FF; }
-          th.right { text-align: right; }
-          td.val { text-align: right; font-weight: bold; color: #FF7F00; }
-          .meta { color: #888888; margin-bottom: 0.8em; font-size: 1.1em; font-weight: bold; text-align: center; }
-          .rom-title { font-size: 1.6em; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+          table {{ border-collapse: collapse; margin-top: 10px; }}
+          th, td {{ padding: 0.2em 0.5em; border-bottom: 1px solid #444; white-space: nowrap; color: #E0E0E0; }}
+          th {{ text-align: left; background: #1A1A1A; font-weight: bold; color: {_primary}; }}
+          th.right {{ text-align: right; }}
+          td.val {{ text-align: right; font-weight: bold; color: {_accent}; }}
+          .meta {{ color: #888888; margin-bottom: 0.8em; font-size: 1.1em; font-weight: bold; text-align: center; }}
+          .rom-title {{ font-size: 1.6em; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 5px; text-transform: uppercase; }}
         </style>
         """
         rom = ""
@@ -913,7 +920,7 @@ class CloudStatsMixin:
         html_lines = ["<div align='center'>"]
         html_lines.append(f"<div class='rom-title'>ROM: {rom}</div>")
         if table_title:
-            html_lines.append(f"<div style='font-size:1.2em; color:#00E5FF; font-weight:bold; text-align:center; margin-bottom:5px;'>{_html.escape(table_title)}</div>")
+            html_lines.append(f"<div style='font-size:1.2em; color:{_primary}; font-weight:bold; text-align:center; margin-bottom:5px;'>{_html.escape(table_title)}</div>")
         html_lines.append(f"<div class='meta'>All global values</div>")
 
         if not audits:
@@ -950,15 +957,17 @@ class CloudStatsMixin:
         def esc(x) -> str:
             return str(x).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        style = """
+        _primary = get_theme_color(self.cfg, "primary")
+        _accent = get_theme_color(self.cfg, "accent")
+        style = f"""
         <style>
-          table { border-collapse: collapse; margin-top: 10px; }
-          th, td { padding: 0.2em 0.5em; border-bottom: 1px solid #444; white-space: nowrap; color: #E0E0E0; }
-          th { text-align: left; background: #1A1A1A; font-weight: bold; color: #00E5FF; }
-          th.right { text-align: right; }
-          td.val { text-align: right; font-weight: bold; color: #FF7F00; }
-          .meta { color: #888888; margin-bottom: 0.8em; font-size: 1.1em; font-weight: bold; text-align: center; }
-          .rom-title { font-size: 1.6em; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 5px; text-transform: uppercase; }
+          table {{ border-collapse: collapse; margin-top: 10px; }}
+          th, td {{ padding: 0.2em 0.5em; border-bottom: 1px solid #444; white-space: nowrap; color: #E0E0E0; }}
+          th {{ text-align: left; background: #1A1A1A; font-weight: bold; color: {_primary}; }}
+          th.right {{ text-align: right; }}
+          td.val {{ text-align: right; font-weight: bold; color: {_accent}; }}
+          .meta {{ color: #888888; margin-bottom: 0.8em; font-size: 1.1em; font-weight: bold; text-align: center; }}
+          .rom-title {{ font-size: 1.6em; font-weight: bold; color: #FFFFFF; text-align: center; margin-bottom: 5px; text-transform: uppercase; }}
         </style>
         """
 
@@ -1022,7 +1031,7 @@ class CloudStatsMixin:
         html_lines = ["<div align='center'>"]
         html_lines.append(f"<div class='rom-title'>ROM: {esc(rom)}</div>")
         if table_title:
-            html_lines.append(f"<div style='font-size:1.2em; color:#00E5FF; font-weight:bold; text-align:center; margin-bottom:5px;'>{esc(table_title)}</div>")
+            html_lines.append(f"<div style='font-size:1.2em; color:{_primary}; font-weight:bold; text-align:center; margin-bottom:5px;'>{esc(table_title)}</div>")
 
         if playtime_str:
             html_lines.append(f"<div class='meta'>Playtime: {esc(playtime_str)} &nbsp;&nbsp;|&nbsp;&nbsp; Actions from session</div>")

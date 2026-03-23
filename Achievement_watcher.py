@@ -1876,13 +1876,134 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _on_demo_test_challenge(self):
         """Show a demo challenge select overlay to preview the current theme."""
         try:
-            win = ChallengeSelectOverlay(self, selected_idx=0)
-            def _safe_close():
+            if getattr(self, "_demo_challenge_win", None):
                 try:
-                    win.close()
+                    self._demo_challenge_win.close()
                 except Exception:
                     pass
+                self._demo_challenge_win = None
+            self._demo_challenge_win = ChallengeSelectOverlay(self, selected_idx=0)
+
+            def _safe_close():
+                try:
+                    w = getattr(self, "_demo_challenge_win", None)
+                    if w:
+                        w.close()
+                except Exception:
+                    pass
+                self._demo_challenge_win = None
+
             QTimer.singleShot(4000, _safe_close)
+        except Exception:
+            pass
+
+    def _on_demo_test_timer(self):
+        """Show a demo challenge countdown timer overlay."""
+        try:
+            if getattr(self, "_demo_timer_win", None):
+                try:
+                    self._demo_timer_win.close()
+                except Exception:
+                    pass
+                self._demo_timer_win = None
+            self._demo_timer_win = ChallengeCountdownOverlay(self, total_seconds=30)
+
+            def _safe_close():
+                try:
+                    w = getattr(self, "_demo_timer_win", None)
+                    if w:
+                        w.close()
+                except Exception:
+                    pass
+                self._demo_timer_win = None
+
+            QTimer.singleShot(5000, _safe_close)
+        except Exception:
+            pass
+
+    def _on_demo_test_flip(self):
+        """Show a demo flip counter overlay with example data."""
+        try:
+            if getattr(self, "_demo_flip_win", None):
+                try:
+                    self._demo_flip_win.close()
+                except Exception:
+                    pass
+                self._demo_flip_win = None
+            self._demo_flip_win = FlipCounterOverlay(self, total=50, remaining=50, goal=100)
+
+            def _safe_close():
+                try:
+                    w = getattr(self, "_demo_flip_win", None)
+                    if w:
+                        w.close()
+                except Exception:
+                    pass
+                self._demo_flip_win = None
+
+            QTimer.singleShot(5000, _safe_close)
+        except Exception:
+            pass
+
+    def _on_demo_test_heat(self):
+        """Show a demo heat barometer overlay at ~60%."""
+        try:
+            if getattr(self, "_demo_heat_win", None):
+                try:
+                    self._demo_heat_win.close()
+                except Exception:
+                    pass
+                self._demo_heat_win = None
+            self._demo_heat_win = HeatBarometerOverlay(self)
+            self._demo_heat_win.set_heat(60)
+
+            def _safe_close():
+                try:
+                    w = getattr(self, "_demo_heat_win", None)
+                    if w:
+                        w.close()
+                except Exception:
+                    pass
+                self._demo_heat_win = None
+
+            QTimer.singleShot(5000, _safe_close)
+        except Exception:
+            pass
+
+    def _on_demo_test_main_overlay(self):
+        """Show a demo main stats overlay with example achievement data."""
+        try:
+            if getattr(self, "_demo_main_win", None):
+                try:
+                    self._demo_main_win.close()
+                except Exception:
+                    pass
+                self._demo_main_win = None
+            demo_ov = OverlayWindow(self)
+            self._demo_main_win = demo_ov
+            css = "<style>td{color:#FFFFFF;} td.pct{color:#FF7F00; font-weight:bold;}</style>"
+            header = "<div style='color:#00E5FF; font-weight:bold; font-size:1.2em;'>🏆 Demo Table</div>"
+            rows = [
+                f"<tr><td>High Score Master</td><td class='pct'>✅ 1,250,000</td></tr>",
+                f"<tr><td>Multiball Madness</td><td class='pct'>✅ 750,000</td></tr>",
+                f"<tr><td>Jackpot King</td><td class='pct'>✅ 500,000</td></tr>",
+                f"<tr><td>Flipper Expert</td><td class='pct'>⬜ 0</td></tr>",
+                f"<tr><td>Wizard Mode</td><td class='pct'>⬜ 0</td></tr>",
+            ]
+            demo_ov.set_html_scrollable(css, header, rows, session_title="Demo Preview")
+            demo_ov.show()
+            demo_ov.raise_()
+
+            def _safe_close():
+                try:
+                    w = getattr(self, "_demo_main_win", None)
+                    if w:
+                        w.close()
+                except Exception:
+                    pass
+                self._demo_main_win = None
+
+            QTimer.singleShot(5000, _safe_close)
         except Exception:
             pass
 
@@ -1914,7 +2035,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             app = QApplication.instance()
             if app is not None:
-                app.setStyleSheet(pinball_arcade_style(primary=primary, accent=accent))
+                app.setStyleSheet(pinball_arcade_style(primary=primary, accent=accent, bg=bg))
         except Exception:
             pass
         self._refresh_overlay_styles()
@@ -2617,15 +2738,39 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn_test_ch.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
         btn_test_ch.clicked.connect(self._on_demo_test_challenge)
         demo_btn_row.addWidget(btn_test_ch)
+        # Test Timer Overlay
+        btn_test_timer = QPushButton("⏱️ Test Timer")
+        btn_test_timer.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_timer.clicked.connect(self._on_demo_test_timer)
+        demo_btn_row.addWidget(btn_test_timer)
+        # Test Flip Counter
+        btn_test_flip = QPushButton("🎯 Test Flip Counter")
+        btn_test_flip.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_flip.clicked.connect(self._on_demo_test_flip)
+        demo_btn_row.addWidget(btn_test_flip)
+        demo_btn_row.addStretch(1)
+        demo_lay.addLayout(demo_btn_row)
+
+        demo_btn_row2 = QHBoxLayout()
+        # Test Heat Bar
+        btn_test_heat = QPushButton("🔥 Test Heat Bar")
+        btn_test_heat.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_heat.clicked.connect(self._on_demo_test_heat)
+        demo_btn_row2.addWidget(btn_test_heat)
+        # Test Main Overlay
+        btn_test_main = QPushButton("📊 Test Main Overlay")
+        btn_test_main.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
+        btn_test_main.clicked.connect(self._on_demo_test_main_overlay)
+        demo_btn_row2.addWidget(btn_test_main)
         # Play test sound
         btn_test_sound = QPushButton("🔊 Play Test Sound")
         btn_test_sound.setStyleSheet("font-size: 9pt; padding: 4px 10px;")
         btn_test_sound.clicked.connect(
             lambda: _sound.play_sound_preview(self.cfg, "achievement_unlock")
         )
-        demo_btn_row.addWidget(btn_test_sound)
-        demo_btn_row.addStretch(1)
-        demo_lay.addLayout(demo_btn_row)
+        demo_btn_row2.addWidget(btn_test_sound)
+        demo_btn_row2.addStretch(1)
+        demo_lay.addLayout(demo_btn_row2)
 
         # Overlay description mini-table
         overlays_info = [
