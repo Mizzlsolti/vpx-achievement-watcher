@@ -7114,8 +7114,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         your_unlocked = data.get("your_unlocked", 0)
         your_total = data.get("your_total", 0)
         vps_id = data.get("vps_id", "")
-        title = f"Your highscore on {table_name} has been beaten!"
-        detail = f"{other_player} reached {other_pct:.1f}% on {table_name} ({rom})"
+        title = f"Your achievement progress on {table_name} was beaten!"
+        if other_total > 0:
+            detail = f"{other_player} reached {other_unlocked} / {other_total} achievements on {table_name} ({rom})"
+        else:
+            detail = f"{other_player} reached {other_pct:.1f}% on {table_name} ({rom})"
         _notif.add_notification(
             self.cfg,
             type="highscore_beaten",
@@ -8107,16 +8110,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 class HighscoreBeatenDialog(QDialog):
     """Modal dialog shown when another player has surpassed the user's achievement score.
 
-    Layout mirrors CloudProgressVpsInfoDialog: header bar, separator, hero image panel,
-    and a clean two-row score comparison card.  Real achievement counts (unlocked / total)
-    are shown instead of raw percentages; the original red/green colour coding is preserved.
+    Layout mirrors CloudProgressVpsInfoDialog: header bar, separator, VpsHeroPanel
+    (image + full table metadata), and a clean two-row achievement comparison card.
+    Real achievement counts (unlocked / total) are shown instead of raw percentages.
     """
 
     def __init__(self, notif: dict, cfg, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("⚔️ Highscore Beaten!")
+        self.setWindowTitle("⚔️ Achievement Progress Beaten!")
         self.setModal(True)
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(640)
         self.setStyleSheet("background:#111; color:#DDD;")
 
         try:
@@ -8130,7 +8133,7 @@ class HighscoreBeatenDialog(QDialog):
 
         # ── Header ─────────────────────────────────────────────────────────
         lbl_hdr = QLabel(
-            f"<b style='font-size:14px; color:{primary};'>⚔️ Highscore Beaten!</b>"
+            f"<b style='font-size:14px; color:{primary};'>⚔️ Achievement Progress Beaten!</b>"
         )
         lbl_hdr.setWordWrap(True)
         layout.addWidget(lbl_hdr)
@@ -8140,77 +8143,56 @@ class HighscoreBeatenDialog(QDialog):
         sep.setStyleSheet("color: #333;")
         layout.addWidget(sep)
 
-        # ── Hero panel: image + table info side by side ─────────────────────
+        # ── Hero panel: VpsHeroPanel with image + full table metadata ───────
         vps_id = notif.get("vps_id", "")
         table_name = notif.get("table_name", notif.get("rom", ""))
         rom = notif.get("rom", "")
 
-        hero_frame = QFrame()
-        hero_frame.setStyleSheet(
-            "QFrame{background:#151515; border:1px solid #2a2a2a; border-radius:6px;}"
-        )
-        hero_lay = QHBoxLayout(hero_frame)
-        hero_lay.setContentsMargins(10, 10, 10, 10)
-        hero_lay.setSpacing(14)
+        try:
+            from ui_vps import VpsHeroPanel, _load_vpsdb, _process_pending_image_callbacks
+            from watcher_core import p_vps_img
+            img_dir = p_vps_img(cfg)
+            hero = VpsHeroPanel(img_dir, parent=self)
 
-        # Table image
-        lbl_img = QLabel()
-        lbl_img.setFixedSize(160, 100)
-        lbl_img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_img.setStyleSheet(
-            "background:#111; border:1px solid #2a2a2a; border-radius:4px;"
-        )
-        img_loaded = False
-        if vps_id:
-            try:
-                from watcher_core import p_vps_img
-                import glob as _glob
-                img_dir = p_vps_img(cfg)
-                candidates = _glob.glob(os.path.join(img_dir, f"{vps_id}*"))
-                if candidates:
-                    pix = QPixmap(candidates[0])
-                    if not pix.isNull():
-                        pix = pix.scaled(
-                            160, 100,
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        lbl_img.setPixmap(pix)
-                        img_loaded = True
-            except Exception:
-                pass
-        if not img_loaded:
-            lbl_img.setText(
-                f"<span style='color:#444; font-size:9pt;'>🎰</span>"
+            vps_entry = None
+            tf_entry = None
+            if vps_id:
+                tables = _load_vpsdb(cfg)
+                if tables:
+                    for t in tables:
+                        if t.get("id") == vps_id:
+                            vps_entry = t
+                            break
+                        for tf in (t.get("tableFiles") or []):
+                            if tf.get("id") == vps_id:
+                                vps_entry = t
+                                tf_entry = tf
+                                break
+                        if vps_entry:
+                            break
+
+            hero.update_selection(vps_entry, tf_entry or {})
+            layout.addWidget(hero)
+
+            self._cb_timer = QTimer(self)
+            self._cb_timer.timeout.connect(_process_pending_image_callbacks)
+            self._cb_timer.start(80)
+            self.finished.connect(self._cb_timer.stop)
+        except Exception:
+            # Fallback: simple frame with table name
+            hero_frame = QFrame()
+            hero_frame.setStyleSheet(
+                "QFrame{background:#151515; border:1px solid #2a2a2a; border-radius:6px;}"
             )
-            lbl_img.setTextFormat(Qt.TextFormat.RichText)
-        hero_lay.addWidget(lbl_img)
+            hero_lay = QHBoxLayout(hero_frame)
+            hero_lay.setContentsMargins(10, 10, 10, 10)
+            lbl_name = QLabel(table_name or rom or "Unknown Table")
+            lbl_name.setStyleSheet("color:#FFFFFF; font-size:14px; font-weight:bold;")
+            lbl_name.setWordWrap(True)
+            hero_lay.addWidget(lbl_name)
+            layout.addWidget(hero_frame)
 
-        # Table details column
-        details = QVBoxLayout()
-        details.setContentsMargins(0, 0, 0, 0)
-        details.setSpacing(3)
-
-        lbl_name = QLabel(table_name or rom or "Unknown Table")
-        lbl_name.setStyleSheet("color:#FFFFFF; font-size:14px; font-weight:bold;")
-        lbl_name.setWordWrap(True)
-        details.addWidget(lbl_name)
-
-        if rom and rom != table_name:
-            lbl_rom = QLabel(f"ROM: {rom}")
-            lbl_rom.setStyleSheet("color:#888; font-size:11px;")
-            details.addWidget(lbl_rom)
-
-        if vps_id:
-            lbl_vid = QLabel(f"VPS ID: {vps_id}")
-            lbl_vid.setStyleSheet("color:#555; font-size:10px;")
-            details.addWidget(lbl_vid)
-
-        details.addStretch()
-        hero_lay.addLayout(details, stretch=1)
-        layout.addWidget(hero_frame)
-
-        # ── Score comparison card ───────────────────────────────────────────
+        # ── Achievement comparison card ──────────────────────────────────────
         your_pct = notif.get("your_pct", 0.0)
         other_pct = notif.get("other_pct", 0.0)
         other_player = notif.get("other_player", "Unknown")
@@ -8219,32 +8201,6 @@ class HighscoreBeatenDialog(QDialog):
         other_unlocked = int(notif.get("other_unlocked", 0))
         other_total = int(notif.get("other_total", 0))
 
-        # Try to load recent local session scores for this ROM
-        your_best_score: int = 0
-        try:
-            import os as _os
-            highlights_dir = _os.path.join(cfg.BASE, "session_stats", "Highlights")
-            if _os.path.isdir(highlights_dir):
-                from watcher_core import secure_load_json as _slj
-                best = 0
-                for fn in _os.listdir(highlights_dir):
-                    if not fn.endswith(".summary.json"):
-                        continue
-                    data = _slj(_os.path.join(highlights_dir, fn), {}) or {}
-                    if str(data.get("rom", "")).strip() != rom:
-                        continue
-                    players = data.get("players", [])
-                    p1 = players[0] if players else {}
-                    s = int(data.get("score") or p1.get("score") or 0)
-                    if s > best:
-                        best = s
-                if best > 0:
-                    your_best_score = best
-        except Exception:
-            pass
-
-        # Build human-readable score strings:
-        # prefer unlocked/total when total > 0, otherwise fall back to percentage
         def _score_str(unlocked: int, total: int, pct: float) -> str:
             if total > 0:
                 return f"{unlocked} / {total} achievements"
@@ -8261,7 +8217,7 @@ class HighscoreBeatenDialog(QDialog):
         score_lay.setContentsMargins(12, 10, 12, 10)
         score_lay.setSpacing(4)
 
-        lbl_card_hdr = QLabel("<b>Score Comparison</b>")
+        lbl_card_hdr = QLabel("<b>Achievement Comparison</b>")
         lbl_card_hdr.setStyleSheet(f"color:{primary}; font-size:10pt;")
         score_lay.addWidget(lbl_card_hdr)
 
@@ -8270,7 +8226,6 @@ class HighscoreBeatenDialog(QDialog):
         sep2.setStyleSheet("color:#2a2a2a;")
         score_lay.addWidget(sep2)
 
-        # Row helper: colored label pair
         def _score_row(icon: str, label: str, value: str, color: str) -> QHBoxLayout:
             row = QHBoxLayout()
             lbl_l = QLabel(f"{icon} {label}")
@@ -8285,10 +8240,7 @@ class HighscoreBeatenDialog(QDialog):
             row.addWidget(lbl_v)
             return row
 
-        if your_best_score > 0:
-            best_score_str = f"{your_best_score:,}".replace(",", ".")
-            score_lay.addLayout(_score_row("🎯", "Your Best Session Score", best_score_str, "#FF4444"))
-        score_lay.addLayout(_score_row("↓", "Your Achievement Score", your_score_str, "#FF4444"))
+        score_lay.addLayout(_score_row("↓", "Your Achievement Progress", your_score_str, "#FF4444"))
         score_lay.addLayout(_score_row("↑", f"New Leader: {other_player}", other_score_str, "#00C853"))
         layout.addWidget(score_card)
 
