@@ -69,16 +69,25 @@ def add_notification(
     title: str,
     detail: str = "",
     action_tab: Optional[str] = None,
-) -> dict:
+    dedup_key: Optional[str] = None,
+    extra: Optional[dict] = None,
+) -> Optional[dict]:
     """
     Create a new notification, deduplicate, trim to _MAX_ENTRIES and save.
 
     Deduplication rules
     -------------------
-    - ``vps_missing``:       replace any existing ``vps_missing`` entry (title may change).
-    - ``update_available``:  skip if an entry with same type *and* same title already exists.
-    - ``leaderboard_rank`` / ``highscore_beaten``:  deduplicated by the caller (per ROM).
+    - ``vps_missing``:          replace any existing ``vps_missing`` entry (title may change).
+    - ``update_available``:     skip if an entry with same type *and* same title already exists.
+    - ``leaderboard_rank`` / ``achievement_beaten``:  deduplicated by the caller (per ROM).
+    - ``dedup_key`` dismissed:  skip creation if the key is in the dismissed-keys file.
     """
+    # Check dismissed keys first
+    if dedup_key:
+        dismissed = load_dismissed_keys(cfg)
+        if dedup_key in dismissed:
+            return None
+
     items = load_notifications(cfg)
 
     if type == "vps_missing":
@@ -89,7 +98,7 @@ def add_notification(
             if n.get("type") == "update_available" and n.get("title") == title:
                 return n
 
-    entry = {
+    entry: dict = {
         "id": str(uuid.uuid4()),
         "type": type,
         "icon": icon,
@@ -99,6 +108,10 @@ def add_notification(
         "read": False,
         "action_tab": action_tab,
     }
+    if dedup_key:
+        entry["dedup_key"] = dedup_key
+    if extra:
+        entry.update(extra)
 
     items.insert(0, entry)
 
@@ -142,3 +155,46 @@ def unread_count(cfg) -> int:
     """Return the number of unread notifications."""
     items = load_notifications(cfg)
     return sum(1 for n in items if not n.get("read", False))
+
+
+# ── Dismissed-key helpers ─────────────────────────────────────────────────────
+
+def _dismissed_path(cfg) -> str:
+    return os.path.join(cfg.BASE, "dismissed_keys.json")
+
+
+def load_dismissed_keys(cfg) -> set:
+    """Load the set of dismissed notification dedup keys."""
+    path = _dismissed_path(cfg)
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return set(data)
+    except Exception:
+        pass
+    return set()
+
+
+def save_dismissed_keys(cfg, keys: set):
+    """Persist dismissed keys to disk."""
+    path = _dismissed_path(cfg)
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(sorted(keys), f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def dismiss_all(cfg):
+    """Add all current notification dedup_keys to the dismissed set, then clear."""
+    items = load_notifications(cfg)
+    dismissed = load_dismissed_keys(cfg)
+    for n in items:
+        dk = n.get("dedup_key")
+        if dk:
+            dismissed.add(dk)
+    save_dismissed_keys(cfg, dismissed)
+    clear_all(cfg)
