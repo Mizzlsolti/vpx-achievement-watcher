@@ -44,17 +44,12 @@ SOUND_PACKS = {
 
 SOUND_EVENTS = [
     ("achievement_unlock", "🏆 Achievement Unlock"),
-    ("achievement_rare",   "💎 Rare Achievement"),
     ("challenge_start",    "⚔️ Challenge Start"),
     ("challenge_complete", "✅ Challenge Complete"),
     ("challenge_fail",     "❌ Challenge Fail"),
     ("level_up",           "⬆️ Level Up"),
-    ("toast_info",         "ℹ️ Toast Info"),
-    ("toast_warning",      "⚠️ Toast Warning"),
     ("countdown_tick",     "🕐 Countdown Tick"),
     ("countdown_final",    "🔔 Countdown Final"),
-    ("personal_best",      "🌟 Personal Best"),
-    ("combo",              "🔥 Combo"),
 ]
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
@@ -205,10 +200,6 @@ def _build_arcade(event: str) -> List[float]:
             _square(440, 0.08, SR), _square(554, 0.08, SR),
             _square(659, 0.08, SR), _square(880, 0.18, SR),
         ), 0.01, 0.05, 0.7, 0.12, SR)
-    elif event == "achievement_rare":
-        s = _concat(*[_square(f, 0.06, SR)
-                      for f in [440, 494, 554, 622, 659, 740, 880, 988]])
-        return _envelope(s, 0.01, 0.04, 0.7, 0.18, SR)
     elif event == "challenge_start":
         return _envelope(_concat(
             _square(220, 0.09, SR), _square(330, 0.09, SR),
@@ -228,29 +219,12 @@ def _build_arcade(event: str) -> List[float]:
         freqs = [262, 294, 330, 349, 392, 440, 494, 523]
         s = _concat(*[_square(f, 0.07, SR) for f in freqs])
         return _envelope(s, 0.01, 0.04, 0.8, 0.2, SR)
-    elif event == "toast_info":
-        return _envelope(_square(880, 0.1, SR), 0.01, 0.05, 0.5, 0.1, SR)
-    elif event == "toast_warning":
-        return _envelope(_concat(
-            _square(660, 0.09, SR), _silence(0.04, SR),
-            _square(660, 0.09, SR),
-        ), 0.01, 0.03, 0.6, 0.1, SR)
     elif event == "countdown_tick":
         return _envelope(_square(440, 0.05, SR), 0.005, 0.02, 0.4, 0.03, SR)
     elif event == "countdown_final":
         return _envelope(_concat(
             _square(880, 0.1, SR), _square(1100, 0.18, SR),
         ), 0.005, 0.04, 0.7, 0.12, SR)
-    elif event == "personal_best":
-        s = _concat(
-            _square(523, 0.08, SR), _square(659, 0.08, SR),
-            _square(784, 0.08, SR), _silence(0.04, SR),
-            _square(784, 0.08, SR), _square(1046, 0.22, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.8, 0.18, SR)
-    else:  # combo
-        s = _concat(*[_square(f, 0.05, SR) for f in [330, 415, 523, 622, 784]])
-        return _envelope(s, 0.005, 0.03, 0.7, 0.08, SR)
 
 
 def _build_subtle(event: str) -> List[float]:
@@ -259,10 +233,6 @@ def _build_subtle(event: str) -> List[float]:
         return _envelope(_concat(
             _sine(523, 0.1, SR), _sine(659, 0.1, SR), _sine(784, 0.2, SR),
         ), 0.02, 0.08, 0.6, 0.2, SR)
-    elif event == "achievement_rare":
-        base = _sine(880, 0.35, SR)
-        mod = _tremolo(base, 8.0, 0.3, SR)
-        return _envelope(mod, 0.03, 0.1, 0.6, 0.2, SR)
     elif event == "challenge_start":
         return _envelope(_concat(
             _sine(392, 0.12, SR), _sine(523, 0.18, SR),
@@ -278,25 +248,10 @@ def _build_subtle(event: str) -> List[float]:
     elif event == "level_up":
         s = _concat(*[_sine(f, 0.08, SR) for f in [262, 330, 392, 523, 659, 784]])
         return _envelope(s, 0.02, 0.06, 0.7, 0.25, SR)
-    elif event == "toast_info":
-        return _envelope(_sine(784, 0.12, SR), 0.02, 0.06, 0.5, 0.12, SR)
-    elif event == "toast_warning":
-        return _envelope(_concat(
-            _sine(523, 0.1, SR), _silence(0.05, SR), _sine(523, 0.1, SR),
-        ), 0.01, 0.04, 0.6, 0.1, SR)
     elif event == "countdown_tick":
         return _envelope(_sine(660, 0.06, SR), 0.005, 0.025, 0.4, 0.03, SR)
     elif event == "countdown_final":
         return _envelope(_sine(880, 0.22, SR), 0.01, 0.06, 0.7, 0.15, SR)
-    elif event == "personal_best":
-        s = _concat(
-            _sine(523, 0.08, SR), _sine(659, 0.08, SR),
-            _sine(784, 0.08, SR), _sine(1046, 0.25, SR),
-        )
-        return _envelope(s, 0.02, 0.07, 0.75, 0.25, SR)
-    else:  # combo
-        s = _concat(*[_sine(f, 0.06, SR) for f in [392, 494, 587, 740]])
-        return _envelope(s, 0.01, 0.04, 0.65, 0.1, SR)
 
 
 def _build_sci_fi(event: str) -> List[float]:
@@ -305,9 +260,6 @@ def _build_sci_fi(event: str) -> List[float]:
         s = _sweep(300, 1200, 0.18, SR)
         s2 = _sine(880, 0.2, SR)
         return _envelope(_concat(s, s2), 0.01, 0.06, 0.65, 0.15, SR)
-    elif event == "achievement_rare":
-        s = _mix(_sweep(200, 2000, 0.4, SR), _sine(440, 0.4, SR))
-        return _envelope(_tremolo(s, 12, 0.25, SR), 0.02, 0.08, 0.65, 0.2, SR)
     elif event == "challenge_start":
         s = _concat(_sweep(100, 600, 0.15, SR), _silence(0.04, SR), _sine(600, 0.2, SR))
         return _envelope(s, 0.01, 0.06, 0.6, 0.15, SR)
@@ -320,26 +272,11 @@ def _build_sci_fi(event: str) -> List[float]:
     elif event == "level_up":
         s = _concat(_sweep(200, 800, 0.2, SR), _sweep(800, 1600, 0.15, SR), _sine(1200, 0.2, SR))
         return _envelope(s, 0.01, 0.06, 0.75, 0.2, SR)
-    elif event == "toast_info":
-        s = _sweep(600, 900, 0.12, SR)
-        return _envelope(s, 0.01, 0.05, 0.5, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(_sweep(400, 700, 0.1, SR), _silence(0.04, SR), _sweep(400, 700, 0.1, SR))
-        return _envelope(s, 0.01, 0.04, 0.6, 0.12, SR)
     elif event == "countdown_tick":
         return _envelope(_sweep(600, 400, 0.06, SR), 0.005, 0.02, 0.4, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(_sweep(300, 1200, 0.1, SR), _sine(1200, 0.18, SR))
         return _envelope(s, 0.01, 0.04, 0.7, 0.15, SR)
-    elif event == "personal_best":
-        s = _concat(
-            _sweep(200, 1000, 0.15, SR), _silence(0.03, SR),
-            _sweep(500, 1500, 0.12, SR), _sine(1200, 0.22, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.75, 0.2, SR)
-    else:  # combo
-        s = _concat(*[_sweep(f, f * 1.5, 0.05, SR) for f in [300, 400, 500, 600, 700]])
-        return _envelope(s, 0.005, 0.03, 0.65, 0.1, SR)
 
 
 def _build_retro_8bit(event: str) -> List[float]:
@@ -350,9 +287,6 @@ def _build_retro_8bit(event: str) -> List[float]:
                  _envelope(_concat(*[_square(f * 2, 0.07, SR) for f in [523, 659, 784, 1046]]),
                             0.005, 0.04, 0.3, 0.12, SR))
         return n
-    elif event == "achievement_rare":
-        s = _concat(*[_square(f, 0.055, SR) for f in [440, 494, 554, 622, 698, 784, 880, 988, 1108]])
-        return _envelope(s, 0.005, 0.03, 0.75, 0.18, SR)
     elif event == "challenge_start":
         s = _concat(_square(220, 0.07, SR), _silence(0.03, SR),
                     _square(294, 0.07, SR), _silence(0.03, SR),
@@ -368,26 +302,11 @@ def _build_retro_8bit(event: str) -> List[float]:
         freqs = [262, 294, 330, 392, 440, 494, 523, 587, 659, 784]
         s = _concat(*[_square(f, 0.06, SR) for f in freqs])
         return _envelope(s, 0.005, 0.03, 0.8, 0.2, SR)
-    elif event == "toast_info":
-        return _envelope(_square(880, 0.08, SR), 0.005, 0.03, 0.5, 0.08, SR)
-    elif event == "toast_warning":
-        s = _concat(_square(660, 0.07, SR), _silence(0.04, SR), _square(880, 0.07, SR))
-        return _envelope(s, 0.005, 0.03, 0.6, 0.1, SR)
     elif event == "countdown_tick":
         return _envelope(_square(440, 0.04, SR), 0.002, 0.015, 0.45, 0.025, SR)
     elif event == "countdown_final":
         s = _concat(_square(880, 0.08, SR), _square(1108, 0.15, SR))
         return _envelope(s, 0.002, 0.03, 0.72, 0.12, SR)
-    elif event == "personal_best":
-        s = _concat(
-            *[_square(f, 0.06, SR) for f in [523, 659, 784, 880, 1046]],
-            _silence(0.04, SR),
-            *[_square(f, 0.06, SR) for f in [523, 659, 784, 880, 1046]],
-        )
-        return _envelope(s, 0.005, 0.03, 0.8, 0.2, SR)
-    else:  # combo
-        s = _concat(*[_square(f, 0.045, SR) for f in [330, 440, 523, 660, 784, 880]])
-        return _envelope(s, 0.002, 0.025, 0.68, 0.08, SR)
 
 
 def _build_pinball_classic(event: str) -> List[float]:
@@ -401,12 +320,6 @@ def _build_pinball_classic(event: str) -> List[float]:
             _envelope(_sine(880, 0.18, SR), 0.01, 0.06, 0.6, 0.18, SR),
         )
         return s
-    elif event == "achievement_rare":
-        chime = _concat(*[
-            _envelope(_sine(f, 0.12, SR), 0.005, 0.05, 0.6, 0.1, SR)
-            for f in [784, 988, 1175, 1568]
-        ])
-        return chime
     elif event == "challenge_start":
         flipper = _mix(_sine(80, 0.1, SR), _noise(0.1, SR))
         flipper = [s * 0.5 for s in flipper]
@@ -432,15 +345,6 @@ def _build_pinball_classic(event: str) -> List[float]:
             for f in [392, 494, 587, 698, 784, 988]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_sine(1046, 0.1, SR), 0.01, 0.04, 0.55, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_sine(660, 0.09, SR), 0.01, 0.04, 0.6, 0.07, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(660, 0.09, SR), 0.01, 0.04, 0.6, 0.07, SR),
-        )
-        return s
     elif event == "countdown_tick":
         click = _mix(_sine(300, 0.04, SR), _noise(0.04, SR))
         click = [s * 0.3 for s in click]
@@ -451,19 +355,6 @@ def _build_pinball_classic(event: str) -> List[float]:
             _envelope(_sine(1100, 0.18, SR), 0.005, 0.05, 0.72, 0.15, SR),
         )
         return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_sine(f, 0.09, SR), 0.005, 0.04, 0.72, 0.1, SR)
-            for f in [523, 659, 784, 880, 988, 1175]
-        ])
-        return s
-    else:  # combo
-        bumps = _concat(*[
-            _envelope(_mix(_sine(220, 0.05, SR), _noise(0.05, SR)),
-                      0.002, 0.02, 0.4, 0.04, SR)
-            for _ in range(4)
-        ])
-        return [s * 0.5 for s in bumps]
 
 
 def _build_galactic_battle(event: str) -> List[float]:
@@ -472,9 +363,6 @@ def _build_galactic_battle(event: str) -> List[float]:
         s = _concat(_sweep(200, 1000, 0.15, SR), _silence(0.03, SR), _sine(1000, 0.22, SR))
         laser = _ring(s[:int(0.1 * SR)], 180, SR)
         return _envelope(_concat(laser, s[int(0.1 * SR):]), 0.01, 0.05, 0.68, 0.18, SR)
-    elif event == "achievement_rare":
-        s = _mix(_sweep(150, 2000, 0.4, SR), _sine(800, 0.4, SR), _sine(1200, 0.4, SR))
-        return _envelope(_tremolo(s, 10, 0.2, SR), 0.01, 0.07, 0.68, 0.22, SR)
     elif event == "challenge_start":
         alarm = _concat(*[_sine(440 if i % 2 == 0 else 550, 0.07, SR) for i in range(4)])
         s = _concat(alarm, _silence(0.04, SR), _sweep(300, 900, 0.15, SR))
@@ -491,27 +379,11 @@ def _build_galactic_battle(event: str) -> List[float]:
             _sweep(1200, 1800, 0.1, SR), _sine(1800, 0.2, SR),
         )
         return _envelope(s, 0.01, 0.05, 0.75, 0.2, SR)
-    elif event == "toast_info":
-        s = _sweep(500, 800, 0.1, SR)
-        return _envelope(s, 0.005, 0.04, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(_sweep(300, 600, 0.09, SR), _silence(0.04, SR), _sweep(300, 600, 0.09, SR))
-        return _envelope(s, 0.005, 0.03, 0.6, 0.12, SR)
     elif event == "countdown_tick":
         return _envelope(_sweep(500, 300, 0.06, SR), 0.002, 0.02, 0.4, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(_sweep(200, 1200, 0.1, SR), _sine(1200, 0.2, SR))
         return _envelope(s, 0.005, 0.04, 0.72, 0.15, SR)
-    elif event == "personal_best":
-        s = _concat(
-            _sweep(200, 900, 0.12, SR), _silence(0.03, SR),
-            _sweep(400, 1200, 0.1, SR), _silence(0.03, SR),
-            _sine(1200, 0.25, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.75, 0.2, SR)
-    else:  # combo
-        s = _concat(*[_sweep(f, f * 1.4, 0.055, SR) for f in [250, 350, 450, 550, 650]])
-        return _envelope(s, 0.004, 0.025, 0.65, 0.1, SR)
 
 
 def _build_stage_magic(event: str) -> List[float]:
@@ -522,12 +394,6 @@ def _build_stage_magic(event: str) -> List[float]:
             for f in [784, 988, 1175, 1568, 1975]
         ])
         return shimmer
-    elif event == "achievement_rare":
-        s = _concat(*[
-            _envelope(_sine(f, 0.065, SR), 0.005, 0.025, 0.65, 0.065, SR)
-            for f in [523, 659, 784, 880, 988, 1175, 1319, 1568, 1760]
-        ])
-        return s
     elif event == "challenge_start":
         drum = _mix(_sine(80, 0.15, SR), _noise(0.15, SR))
         drum = [s * 0.45 for s in drum]
@@ -551,33 +417,12 @@ def _build_stage_magic(event: str) -> List[float]:
             for f in [262, 330, 392, 523, 659, 784, 1046, 1319]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_sine(1175, 0.1, SR), 0.01, 0.04, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_sine(660, 0.09, SR), 0.01, 0.04, 0.6, 0.07, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(880, 0.09, SR), 0.01, 0.04, 0.65, 0.07, SR),
-        )
-        return s
     elif event == "countdown_tick":
         return _envelope(_sine(1046, 0.06, SR), 0.003, 0.02, 0.45, 0.04, SR)
     elif event == "countdown_final":
         s = _concat(*[
             _envelope(_sine(f, 0.09, SR), 0.003, 0.035, 0.65, 0.09, SR)
             for f in [880, 1108, 1319]
-        ])
-        return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_sine(f, 0.075, SR), 0.004, 0.03, 0.72, 0.09, SR)
-            for f in [523, 659, 784, 880, 988, 1175, 1319, 1568]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_sine(f, 0.055, SR), 0.003, 0.025, 0.65, 0.06, SR)
-            for f in [440, 554, 659, 784, 880]
         ])
         return s
 
@@ -587,9 +432,6 @@ def _build_neon_grid(event: str) -> List[float]:
     if event == "achievement_unlock":
         s = _mix(_sweep(220, 880, 0.18, SR), _sine(440, 0.18, SR))
         return _envelope(_ring(s, 80, SR), 0.01, 0.05, 0.65, 0.18, SR)
-    elif event == "achievement_rare":
-        s = _mix(_sweep(110, 1760, 0.38, SR), _sine(880, 0.38, SR), _sine(440, 0.38, SR))
-        return _envelope(_tremolo(_ring(s, 60, SR), 8, 0.2, SR), 0.01, 0.07, 0.65, 0.22, SR)
     elif event == "challenge_start":
         s = _concat(_sweep(80, 440, 0.12, SR), _silence(0.04, SR), _sine(440, 0.2, SR))
         return _envelope(_ring(s, 55, SR), 0.005, 0.04, 0.62, 0.15, SR)
@@ -606,28 +448,12 @@ def _build_neon_grid(event: str) -> List[float]:
             _sine(440, 0.3, SR),
         )
         return _envelope(s, 0.01, 0.07, 0.72, 0.22, SR)
-    elif event == "toast_info":
-        s = _ring(_sine(660, 0.1, SR), 110, SR)
-        return _envelope(s, 0.005, 0.04, 0.5, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _ring(_sine(440, 0.08, SR), 80, SR),
-            _silence(0.04, SR),
-            _ring(_sine(440, 0.08, SR), 80, SR),
-        )
-        return _envelope(s, 0.005, 0.03, 0.58, 0.1, SR)
     elif event == "countdown_tick":
         s = _ring(_sine(440, 0.055, SR), 120, SR)
         return _envelope(s, 0.002, 0.02, 0.4, 0.03, SR)
     elif event == "countdown_final":
         s = _mix(_sine(880, 0.2, SR), _ring(_sine(880, 0.2, SR), 110, SR))
         return _envelope(s, 0.005, 0.04, 0.7, 0.15, SR)
-    elif event == "personal_best":
-        s = _mix(_sweep(220, 1320, 0.32, SR), _sweep(440, 1760, 0.32, SR))
-        return _envelope(_tremolo(s, 6, 0.15, SR), 0.01, 0.06, 0.72, 0.22, SR)
-    else:  # combo
-        s = _concat(*[_ring(_sine(f, 0.055, SR), 80, SR) for f in [330, 440, 550, 660, 770]])
-        return _envelope(s, 0.003, 0.025, 0.62, 0.1, SR)
 
 
 def _build_martian_assault(event: str) -> List[float]:
@@ -636,12 +462,6 @@ def _build_martian_assault(event: str) -> List[float]:
         alien = _ring(_sweep(150, 900, 0.2, SR), 220, SR)
         s = _concat(alien, _sine(900, 0.18, SR))
         return _envelope(s, 0.01, 0.05, 0.65, 0.18, SR)
-    elif event == "achievement_rare":
-        s = _mix(
-            _ring(_sweep(80, 1200, 0.4, SR), 180, SR),
-            _sine(600, 0.4, SR),
-        )
-        return _envelope(_tremolo(s, 9, 0.22, SR), 0.01, 0.07, 0.65, 0.22, SR)
     elif event == "challenge_start":
         blaster = _concat(*[_ring(_sine(220 + i * 40, 0.06, SR), 140, SR) for i in range(3)])
         s = _concat(blaster, _silence(0.04, SR), _sweep(300, 700, 0.18, SR))
@@ -659,31 +479,12 @@ def _build_martian_assault(event: str) -> List[float]:
             _ring(_sine(1400, 0.22, SR), 220, SR),
         )
         return _envelope(s, 0.01, 0.05, 0.72, 0.2, SR)
-    elif event == "toast_info":
-        s = _ring(_sine(660, 0.1, SR), 120, SR)
-        return _envelope(s, 0.005, 0.04, 0.5, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _ring(_sine(400, 0.08, SR), 100, SR),
-            _silence(0.04, SR),
-            _ring(_sine(500, 0.08, SR), 100, SR),
-        )
-        return _envelope(s, 0.005, 0.03, 0.58, 0.1, SR)
     elif event == "countdown_tick":
         s = _ring(_sine(400, 0.055, SR), 140, SR)
         return _envelope(s, 0.002, 0.02, 0.38, 0.03, SR)
     elif event == "countdown_final":
         s = _ring(_concat(_sweep(200, 1100, 0.1, SR), _sine(1100, 0.18, SR)), 180, SR)
         return _envelope(s, 0.005, 0.04, 0.7, 0.15, SR)
-    elif event == "personal_best":
-        s = _mix(
-            _ring(_sweep(150, 1200, 0.3, SR), 200, SR),
-            _sweep(300, 1800, 0.3, SR),
-        )
-        return _envelope(s, 0.01, 0.06, 0.72, 0.22, SR)
-    else:  # combo
-        s = _concat(*[_ring(_sine(f, 0.055, SR), 120, SR) for f in [280, 370, 460, 550, 640]])
-        return _envelope(s, 0.003, 0.025, 0.62, 0.1, SR)
 
 
 def _build_carnival_show(event: str) -> List[float]:
@@ -692,12 +493,6 @@ def _build_carnival_show(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_sine(f, 0.075, SR), 0.005, 0.025, 0.65, 0.08, SR)
             for f in [523, 659, 784, 880, 1046, 1319]
-        ])
-        return s
-    elif event == "achievement_rare":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.5, 0.07, SR)), 0.005, 0.025, 0.65, 0.08, SR)
-            for f in [440, 554, 659, 784, 880, 1046, 1175, 1319]
         ])
         return s
     elif event == "challenge_start":
@@ -722,33 +517,12 @@ def _build_carnival_show(event: str) -> List[float]:
             for f in [262, 330, 392, 523, 659, 784, 880, 1046]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_sine(1046, 0.09, SR), 0.008, 0.04, 0.52, 0.09, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_sine(660, 0.09, SR), 0.005, 0.035, 0.62, 0.07, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(880, 0.09, SR), 0.005, 0.035, 0.65, 0.07, SR),
-        )
-        return s
     elif event == "countdown_tick":
         return _envelope(_mix(_sine(880, 0.04, SR), _noise(0.04, SR)), 0.001, 0.015, 0.4, 0.025, SR)
     elif event == "countdown_final":
         s = _concat(*[
             _envelope(_sine(f, 0.07, SR), 0.003, 0.03, 0.68, 0.08, SR)
             for f in [784, 988, 1175]
-        ])
-        return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.5, 0.07, SR)), 0.004, 0.028, 0.72, 0.08, SR)
-            for f in [523, 659, 784, 880, 1046, 1175, 1319, 1568]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_sine(f, 0.055, SR), 0.003, 0.022, 0.62, 0.06, SR)
-            for f in [440, 554, 659, 784, 880]
         ])
         return s
 
@@ -761,13 +535,6 @@ def _build_medieval_quest(event: str) -> List[float]:
             for f in [392, 523, 659, 784]
         ])
         return horn
-    elif event == "achievement_rare":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR), _sine(f * 1.5, 0.09, SR)),
-                      0.008, 0.035, 0.65, 0.1, SR)
-            for f in [330, 392, 494, 587, 659, 784, 880, 988]
-        ])
-        return s
     elif event == "challenge_start":
         drums = _concat(*[_envelope(_mix(_sine(60, 0.08, SR), _noise(0.08, SR)),
                                     0.001, 0.03, 0.45, 0.06, SR) for _ in range(2)])
@@ -794,15 +561,6 @@ def _build_medieval_quest(event: str) -> List[float]:
             for f in [262, 330, 392, 494, 587, 659, 784, 988, 1175]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_mix(_sine(659, 0.1, SR), _sine(988, 0.1, SR)), 0.01, 0.04, 0.55, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_mix(_sine(440, 0.09, SR), _sine(550, 0.09, SR)), 0.008, 0.035, 0.62, 0.08, SR),
-            _silence(0.04, SR),
-            _envelope(_mix(_sine(440, 0.09, SR), _sine(550, 0.09, SR)), 0.008, 0.035, 0.62, 0.08, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _mix(_sine(330, 0.05, SR), _sine(495, 0.05, SR))
         return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
@@ -810,19 +568,6 @@ def _build_medieval_quest(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.005, 0.035, 0.68, 0.1, SR)
             for f in [523, 659, 784]
-        ])
-        return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR), _sine(f * 1.5, 0.08, SR)),
-                      0.006, 0.03, 0.72, 0.1, SR)
-            for f in [392, 494, 587, 659, 784, 880, 988, 1175]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.055, SR), _sine(f * 1.5, 0.055, SR)), 0.003, 0.022, 0.62, 0.07, SR)
-            for f in [330, 415, 523, 622, 784]
         ])
         return s
 
@@ -833,13 +578,6 @@ def _build_haunted_manor(event: str) -> List[float]:
         s = _mix(_sweep(300, 600, 0.22, SR), _crackle(0.22, SR))
         tone = _tremolo(_sine(600, 0.18, SR), 5, 0.4, SR)
         return _envelope(_concat(s, tone), 0.02, 0.08, 0.55, 0.22, SR)
-    elif event == "achievement_rare":
-        s = _mix(
-            _tremolo(_sine(300, 0.45, SR), 4, 0.5, SR),
-            _sweep(200, 800, 0.45, SR),
-            _crackle(0.45, SR),
-        )
-        return _envelope(s, 0.03, 0.1, 0.55, 0.28, SR)
     elif event == "challenge_start":
         creak = _mix(_sweep(100, 200, 0.18, SR), _crackle(0.18, SR))
         sting = _tremolo(_sine(440, 0.22, SR), 6, 0.45, SR)
@@ -857,35 +595,12 @@ def _build_haunted_manor(event: str) -> List[float]:
             _crackle(0.35, SR),
         )
         return _envelope(s, 0.02, 0.08, 0.62, 0.25, SR)
-    elif event == "toast_info":
-        s = _tremolo(_sine(440, 0.12, SR), 6, 0.35, SR)
-        return _envelope(s, 0.01, 0.05, 0.48, 0.12, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_mix(_sine(330, 0.1, SR), _crackle(0.1, SR)), 0.005, 0.04, 0.5, 0.08, SR),
-            _silence(0.05, SR),
-            _envelope(_mix(_sine(440, 0.1, SR), _crackle(0.1, SR)), 0.005, 0.04, 0.55, 0.08, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _mix(_sine(220, 0.06, SR), _crackle(0.06, SR))
         return _envelope(s, 0.002, 0.02, 0.38, 0.04, SR)
     elif event == "countdown_final":
         s = _mix(_sweep(180, 600, 0.12, SR), _tremolo(_sine(400, 0.2, SR), 5, 0.4, SR))
         return _envelope(s, 0.008, 0.05, 0.62, 0.2, SR)
-    elif event == "personal_best":
-        s = _mix(
-            _sweep(200, 800, 0.32, SR),
-            _tremolo(_sine(400, 0.32, SR), 4, 0.4, SR),
-            _crackle(0.32, SR),
-        )
-        return _envelope(s, 0.02, 0.08, 0.62, 0.25, SR)
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.06, SR), _crackle(0.06, SR)), 0.002, 0.025, 0.42, 0.06, SR)
-            for f in [220, 277, 330, 415, 494]
-        ])
-        return s
 
 
 def _build_deep_ocean(event: str) -> List[float]:
@@ -894,17 +609,6 @@ def _build_deep_ocean(event: str) -> List[float]:
         s = _tremolo(_sine(220, 0.35, SR), 3, 0.4, SR)
         ping = _envelope(_sine(880, 0.18, SR), 0.01, 0.08, 0.6, 0.18, SR)
         return _concat(_envelope(s, 0.04, 0.1, 0.55, 0.25, SR), _silence(0.02, SR), ping)
-    elif event == "achievement_rare":
-        s = _mix(
-            _tremolo(_sine(110, 0.5, SR), 2, 0.5, SR),
-            _tremolo(_sine(220, 0.5, SR), 3, 0.35, SR),
-        )
-        ping = _concat(
-            _envelope(_sine(880, 0.12, SR), 0.01, 0.06, 0.65, 0.15, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(1100, 0.12, SR), 0.01, 0.06, 0.65, 0.15, SR),
-        )
-        return _concat(_envelope(s, 0.05, 0.12, 0.55, 0.3, SR), ping)
     elif event == "challenge_start":
         s = _tremolo(_sine(180, 0.28, SR), 2.5, 0.45, SR)
         ping = _envelope(_sine(660, 0.22, SR), 0.01, 0.07, 0.62, 0.2, SR)
@@ -928,15 +632,6 @@ def _build_deep_ocean(event: str) -> List[float]:
             for f in [440, 550, 660, 880]
         ])
         return _concat(_envelope(s, 0.04, 0.1, 0.58, 0.28, SR), pings)
-    elif event == "toast_info":
-        return _envelope(_tremolo(_sine(440, 0.12, SR), 3, 0.3, SR), 0.02, 0.05, 0.5, 0.12, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_tremolo(_sine(330, 0.1, SR), 4, 0.35, SR), 0.01, 0.04, 0.52, 0.09, SR),
-            _silence(0.05, SR),
-            _envelope(_tremolo(_sine(440, 0.1, SR), 4, 0.38, SR), 0.01, 0.04, 0.55, 0.09, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _tremolo(_sine(660, 0.07, SR), 4, 0.2, SR)
         return _envelope(s, 0.005, 0.025, 0.42, 0.04, SR)
@@ -946,22 +641,6 @@ def _build_deep_ocean(event: str) -> List[float]:
             _envelope(_tremolo(_sine(880, 0.22, SR), 3, 0.3, SR), 0.01, 0.07, 0.7, 0.2, SR),
         )
         return s
-    elif event == "personal_best":
-        s = _mix(
-            _tremolo(_sine(110, 0.42, SR), 2, 0.45, SR),
-            _tremolo(_sine(220, 0.42, SR), 2.8, 0.38, SR),
-        )
-        pings = _concat(*[
-            _envelope(_sine(f, 0.1, SR), 0.008, 0.04, 0.68, 0.12, SR)
-            for f in [440, 550, 660, 784, 880]
-        ])
-        return _concat(_envelope(s, 0.04, 0.1, 0.6, 0.3, SR), pings)
-    else:  # combo
-        s = _concat(*[
-            _envelope(_tremolo(_sine(f, 0.065, SR), 4, 0.22, SR), 0.005, 0.025, 0.52, 0.07, SR)
-            for f in [330, 415, 523, 622, 784]
-        ])
-        return s
 
 
 def _build_jukebox(event: str) -> List[float]:
@@ -970,14 +649,6 @@ def _build_jukebox(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)), 0.008, 0.035, 0.68, 0.1, SR)
             for f in [392, 494, 587, 784, 988]
-        ])
-        return s
-    elif event == "achievement_rare":
-        notes = [330, 415, 494, 587, 698, 784, 880, 988, 1175]
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.25, 0.07, SR),
-                           _sine(f * 1.5, 0.07, SR)), 0.006, 0.028, 0.65, 0.09, SR)
-            for f in notes
         ])
         return s
     elif event == "challenge_start":
@@ -1008,15 +679,6 @@ def _build_jukebox(event: str) -> List[float]:
             for f in notes
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_mix(_sine(784, 0.1, SR), _sine(988, 0.1, SR)), 0.008, 0.04, 0.55, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_mix(_sine(523, 0.09, SR), _sine(659, 0.09, SR)), 0.007, 0.035, 0.62, 0.09, SR),
-            _silence(0.04, SR),
-            _envelope(_mix(_sine(659, 0.09, SR), _sine(784, 0.09, SR)), 0.007, 0.035, 0.65, 0.09, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _mix(_sine(440, 0.045, SR), _sine(550, 0.045, SR))
         return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
@@ -1024,20 +686,6 @@ def _build_jukebox(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR)), 0.005, 0.03, 0.7, 0.1, SR)
             for f in [523, 659, 784]
-        ])
-        return s
-    elif event == "personal_best":
-        notes = [392, 494, 587, 698, 784, 880, 988, 1175, 1319]
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.25, 0.07, SR),
-                           _sine(f * 1.5, 0.07, SR)), 0.005, 0.025, 0.72, 0.09, SR)
-            for f in notes
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.055, SR), _sine(f * 1.25, 0.055, SR)), 0.004, 0.022, 0.62, 0.07, SR)
-            for f in [330, 415, 494, 622, 740]
         ])
         return s
 
@@ -1051,14 +699,6 @@ def _build_showtime(event: str) -> List[float]:
             for f in [392, 523, 659, 784, 1046]
         ])
         return fanfare
-    elif event == "achievement_rare":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR),
-                           _sine(f * 2, 0.08, SR), _sine(f * 2.5, 0.08, SR)),
-                      0.007, 0.03, 0.7, 0.1, SR)
-            for f in [330, 392, 494, 587, 659, 784, 880, 1046, 1175, 1319]
-        ])
-        return s
     elif event == "challenge_start":
         drums = _concat(*[_envelope(_mix(_sine(80, 0.07, SR), _noise(0.07, SR)),
                                     0.001, 0.025, 0.5, 0.05, SR) for _ in range(3)])
@@ -1087,15 +727,6 @@ def _build_showtime(event: str) -> List[float]:
             for f in [262, 330, 392, 494, 587, 659, 784, 880, 988, 1175, 1319]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_mix(_sine(880, 0.1, SR), _sine(1100, 0.1, SR)), 0.008, 0.04, 0.55, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_mix(_sine(660, 0.09, SR), _sine(825, 0.09, SR)), 0.007, 0.035, 0.62, 0.08, SR),
-            _silence(0.04, SR),
-            _envelope(_mix(_sine(880, 0.09, SR), _sine(1100, 0.09, SR)), 0.007, 0.035, 0.68, 0.08, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _mix(_sine(660, 0.045, SR), _sine(825, 0.045, SR))
         return _envelope(s, 0.002, 0.018, 0.45, 0.03, SR)
@@ -1106,21 +737,6 @@ def _build_showtime(event: str) -> List[float]:
             for f in [523, 659, 784, 1046]
         ])
         return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.075, SR), _sine(f * 1.25, 0.075, SR),
-                           _sine(f * 2, 0.075, SR), _sine(f * 2.5, 0.075, SR)),
-                      0.005, 0.028, 0.75, 0.1, SR)
-            for f in [392, 494, 587, 698, 784, 880, 988, 1175, 1319, 1568]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.055, SR), _sine(f * 1.5, 0.055, SR),
-                           _sine(f * 2, 0.055, SR)), 0.004, 0.022, 0.65, 0.07, SR)
-            for f in [330, 415, 523, 622, 784]
-        ])
-        return s
 
 
 def _build_chrome_steel(event: str) -> List[float]:
@@ -1129,12 +745,6 @@ def _build_chrome_steel(event: str) -> List[float]:
         metal = _ring(_sine(660, 0.22, SR), 440, SR)
         s = _concat(_sweep(200, 800, 0.1, SR), metal)
         return _envelope(s, 0.005, 0.04, 0.65, 0.2, SR)
-    elif event == "achievement_rare":
-        s = _mix(
-            _ring(_sweep(200, 1200, 0.4, SR), 300, SR),
-            _ring(_sine(880, 0.4, SR), 220, SR),
-        )
-        return _envelope(_tremolo(s, 8, 0.2, SR), 0.01, 0.06, 0.65, 0.25, SR)
     elif event == "challenge_start":
         clank = _mix(_ring(_sine(200, 0.12, SR), 160, SR), _noise(0.12, SR))
         clank = [s * 0.5 for s in clank]
@@ -1160,16 +770,6 @@ def _build_chrome_steel(event: str) -> List[float]:
             _ring(_sine(1600, 0.22, SR), 400, SR),
         )
         return _envelope(s, 0.01, 0.05, 0.72, 0.22, SR)
-    elif event == "toast_info":
-        s = _ring(_sine(880, 0.1, SR), 440, SR)
-        return _envelope(s, 0.005, 0.04, 0.5, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _ring(_sine(600, 0.09, SR), 300, SR),
-            _silence(0.04, SR),
-            _ring(_sine(800, 0.09, SR), 400, SR),
-        )
-        return _envelope(s, 0.005, 0.035, 0.58, 0.1, SR)
     elif event == "countdown_tick":
         s = _ring(_sine(500, 0.055, SR), 250, SR)
         return _envelope(s, 0.002, 0.02, 0.4, 0.03, SR)
@@ -1179,15 +779,6 @@ def _build_chrome_steel(event: str) -> List[float]:
             _ring(_sine(1200, 0.2, SR), 300, SR),
         )
         return _envelope(s, 0.005, 0.04, 0.7, 0.18, SR)
-    elif event == "personal_best":
-        s = _mix(
-            _ring(_sweep(200, 1400, 0.32, SR), 200, SR),
-            _ring(_sweep(400, 1600, 0.32, SR), 300, SR),
-        )
-        return _envelope(s, 0.01, 0.06, 0.72, 0.25, SR)
-    else:  # combo
-        s = _concat(*[_ring(_sine(f, 0.055, SR), f // 2, SR) for f in [330, 440, 550, 660, 770]])
-        return _envelope(s, 0.003, 0.025, 0.62, 0.1, SR)
 
 
 def _build_treasure_hunt(event: str) -> List[float]:
@@ -1196,13 +787,6 @@ def _build_treasure_hunt(event: str) -> List[float]:
         coins = _concat(*[
             _envelope(_mix(_sine(f, 0.06, SR), _sine(f * 2, 0.06, SR)), 0.003, 0.02, 0.62, 0.08, SR)
             for f in [880, 1100, 1320, 1760]
-        ])
-        return coins
-    elif event == "achievement_rare":
-        coins = _concat(*[
-            _envelope(_mix(_sine(f, 0.055, SR), _sine(f * 2, 0.055, SR),
-                           _sine(f * 3, 0.055, SR)), 0.003, 0.018, 0.65, 0.08, SR)
-            for f in [660, 784, 880, 988, 1100, 1175, 1320, 1568, 1760]
         ])
         return coins
     elif event == "challenge_start":
@@ -1230,34 +814,12 @@ def _build_treasure_hunt(event: str) -> List[float]:
             for f in [262, 330, 392, 494, 587, 659, 784, 880, 1046, 1319]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_mix(_sine(880, 0.09, SR), _sine(1760, 0.09, SR)), 0.007, 0.035, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_sine(660, 0.08, SR), 0.006, 0.03, 0.58, 0.09, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(880, 0.08, SR), 0.006, 0.03, 0.62, 0.09, SR),
-        )
-        return s
     elif event == "countdown_tick":
         return _envelope(_mix(_sine(880, 0.04, SR), _sine(1760, 0.04, SR)), 0.002, 0.015, 0.42, 0.025, SR)
     elif event == "countdown_final":
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 2, 0.08, SR)), 0.004, 0.03, 0.7, 0.1, SR)
             for f in [659, 784, 988]
-        ])
-        return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.065, SR), _sine(f * 2, 0.065, SR),
-                           _sine(f * 3, 0.065, SR)), 0.004, 0.025, 0.72, 0.09, SR)
-            for f in [392, 494, 587, 698, 784, 880, 988, 1175, 1319, 1568]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.05, SR), _sine(f * 2, 0.05, SR)), 0.003, 0.02, 0.62, 0.07, SR)
-            for f in [523, 659, 784, 880, 1046]
         ])
         return s
 
@@ -1268,13 +830,6 @@ def _build_turbo_racer(event: str) -> List[float]:
         engine = _sweep(200, 1600, 0.18, SR)
         s = _concat(engine, _sine(1600, 0.12, SR))
         return _envelope(s, 0.01, 0.04, 0.68, 0.15, SR)
-    elif event == "achievement_rare":
-        s = _mix(
-            _sweep(100, 2000, 0.38, SR),
-            _sweep(200, 1800, 0.38, SR),
-            _sine(1000, 0.38, SR),
-        )
-        return _envelope(_tremolo(s, 12, 0.15, SR), 0.01, 0.06, 0.68, 0.22, SR)
     elif event == "challenge_start":
         rev = _concat(*[_sweep(200 + i * 200, 400 + i * 200, 0.07, SR) for i in range(3)])
         go = _concat(_silence(0.04, SR), _sweep(300, 1800, 0.2, SR))
@@ -1293,26 +848,11 @@ def _build_turbo_racer(event: str) -> List[float]:
             _sine(2400, 0.18, SR),
         )
         return _envelope(s, 0.01, 0.04, 0.72, 0.2, SR)
-    elif event == "toast_info":
-        return _envelope(_sweep(600, 900, 0.1, SR), 0.005, 0.04, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(_sweep(400, 700, 0.09, SR), _silence(0.04, SR), _sweep(400, 700, 0.09, SR))
-        return _envelope(s, 0.005, 0.03, 0.6, 0.1, SR)
     elif event == "countdown_tick":
         return _envelope(_sweep(500, 300, 0.055, SR), 0.002, 0.02, 0.4, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(_sweep(300, 2000, 0.12, SR), _sine(2000, 0.15, SR))
         return _envelope(s, 0.005, 0.04, 0.72, 0.15, SR)
-    elif event == "personal_best":
-        s = _concat(
-            _sweep(100, 1000, 0.12, SR),
-            _sweep(1000, 2200, 0.1, SR),
-            _sine(2200, 0.2, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.75, 0.2, SR)
-    else:  # combo
-        s = _concat(*[_sweep(f, f * 1.6, 0.055, SR) for f in [200, 300, 400, 500, 600]])
-        return _envelope(s, 0.004, 0.022, 0.65, 0.1, SR)
 
 
 def _build_neon_lounge(event: str) -> List[float]:
@@ -1321,13 +861,6 @@ def _build_neon_lounge(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.5, 0.1, SR)), 0.01, 0.04, 0.62, 0.12, SR)
             for f in [330, 415, 494, 659, 784]
-        ])
-        return s
-    elif event == "achievement_rare":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR),
-                           _sine(f * 1.5, 0.09, SR)), 0.008, 0.035, 0.65, 0.1, SR)
-            for f in [277, 330, 415, 494, 587, 698, 784, 880, 988]
         ])
         return s
     elif event == "challenge_start":
@@ -1360,15 +893,6 @@ def _build_neon_lounge(event: str) -> List[float]:
             for f in [220, 277, 330, 415, 494, 587, 659, 784, 880, 1047]
         ])
         return s
-    elif event == "toast_info":
-        return _envelope(_mix(_sine(660, 0.1, SR), _sine(990, 0.1, SR)), 0.01, 0.04, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _envelope(_mix(_sine(494, 0.09, SR), _sine(740, 0.09, SR)), 0.008, 0.035, 0.6, 0.09, SR),
-            _silence(0.04, SR),
-            _envelope(_mix(_sine(587, 0.09, SR), _sine(880, 0.09, SR)), 0.008, 0.035, 0.62, 0.09, SR),
-        )
-        return s
     elif event == "countdown_tick":
         s = _mix(_sine(494, 0.045, SR), _sine(740, 0.045, SR))
         return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
@@ -1376,20 +900,6 @@ def _build_neon_lounge(event: str) -> List[float]:
         s = _concat(*[
             _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.006, 0.035, 0.68, 0.1, SR)
             for f in [523, 659, 784]
-        ])
-        return s
-    elif event == "personal_best":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR),
-                           _sine(f * 1.5, 0.08, SR), _sine(f * 2, 0.08, SR)),
-                      0.006, 0.028, 0.72, 0.1, SR)
-            for f in [277, 330, 415, 494, 587, 698, 784, 880, 988, 1175]
-        ])
-        return s
-    else:  # combo
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.06, SR), _sine(f * 1.5, 0.06, SR)), 0.004, 0.024, 0.62, 0.08, SR)
-            for f in [330, 415, 494, 622, 784]
         ])
         return s
 
@@ -1402,13 +912,6 @@ def _build_voltage(event: str) -> List[float]:
             _mix(_sine(1000, 0.2, SR), _ring(_sine(1000, 0.2, SR), 200, SR)),
         )
         return _envelope(s, 0.005, 0.04, 0.68, 0.18, SR)
-    elif event == "achievement_rare":
-        s = _mix(
-            _ring(_sweep(100, 2000, 0.42, SR), 150, SR),
-            _ring(_sweep(200, 1600, 0.42, SR), 200, SR),
-            _sine(800, 0.42, SR),
-        )
-        return _envelope(_tremolo(s, 10, 0.18, SR), 0.01, 0.06, 0.68, 0.25, SR)
     elif event == "challenge_start":
         zap = _concat(*[
             _ring(_sine(200 + i * 100, 0.06, SR), 100 + i * 30, SR)
@@ -1432,16 +935,6 @@ def _build_voltage(event: str) -> List[float]:
             _mix(_sine(1600, 0.22, SR), _ring(_sine(1600, 0.22, SR), 300, SR)),
         )
         return _envelope(s, 0.01, 0.05, 0.72, 0.22, SR)
-    elif event == "toast_info":
-        s = _ring(_sine(660, 0.1, SR), 130, SR)
-        return _envelope(s, 0.005, 0.04, 0.52, 0.1, SR)
-    elif event == "toast_warning":
-        s = _concat(
-            _ring(_sine(440, 0.09, SR), 110, SR),
-            _silence(0.04, SR),
-            _ring(_sine(600, 0.09, SR), 150, SR),
-        )
-        return _envelope(s, 0.005, 0.03, 0.6, 0.1, SR)
     elif event == "countdown_tick":
         s = _ring(_sine(500, 0.055, SR), 150, SR)
         return _envelope(s, 0.002, 0.02, 0.38, 0.03, SR)
@@ -1451,18 +944,6 @@ def _build_voltage(event: str) -> List[float]:
             _mix(_sine(1400, 0.2, SR), _ring(_sine(1400, 0.2, SR), 280, SR)),
         )
         return _envelope(s, 0.005, 0.04, 0.72, 0.18, SR)
-    elif event == "personal_best":
-        s = _mix(
-            _ring(_sweep(150, 1500, 0.32, SR), 150, SR),
-            _ring(_sweep(300, 1800, 0.32, SR), 200, SR),
-            _sine(900, 0.32, SR),
-        )
-        return _envelope(s, 0.01, 0.06, 0.72, 0.25, SR)
-    else:  # combo
-        s = _concat(*[_ring(_sine(f, 0.055, SR), f // 3, SR) for f in [300, 400, 500, 600, 700]])
-        return _envelope(s, 0.003, 0.025, 0.62, 0.1, SR)
-
-
 # ── Pack registry ─────────────────────────────────────────────────────────────
 
 _PACK_BUILDERS = {
