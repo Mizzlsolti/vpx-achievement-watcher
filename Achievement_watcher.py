@@ -1933,12 +1933,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, Challenge Menu, Timers & Counters, System Notifications, Heat Bar, Status Overlay).<br>"
+            "(Main Overlay, Toast, Challenge Menu, Timers &amp; Counters, System Notifications, Heat Bar, Status Overlay).<br>"
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
-            "the overlay."
+            "the overlay.<br>"
+            "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
+            "(Pages 2–5). Page 1 (Highlights &amp; Score) is always active. "
+            "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
         ),
         "appearance_theme": (
             "<b>🎨 Theme</b><br><br>"
@@ -2455,6 +2458,42 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_pos.addLayout(box_status_overlay, 4, 0)
 
         layout.addWidget(grp_pos)
+
+        # ── Overlay Pages toggle ────────────────────────────────────────────────
+        grp_pages = QGroupBox("📄 Overlay Pages")
+        lay_pages = QVBoxLayout(grp_pages)
+
+        lbl_page1 = QLabel("Page 1 (Highlights &amp; Score) is always active.")
+        lbl_page1.setStyleSheet("color: #FF7F00; font-size: 9pt;")
+        lay_pages.addWidget(lbl_page1)
+
+        lbl_hint = QLabel("Disable pages you don't need — they will be skipped when cycling through the overlay.")
+        lbl_hint.setStyleSheet("color: #AAA; font-size: 9pt; font-style: italic;")
+        lbl_hint.setWordWrap(True)
+        lay_pages.addWidget(lbl_hint)
+
+        self.chk_overlay_page2 = QCheckBox("Page 2: Achievement Progress")
+        self.chk_overlay_page2.setChecked(bool(self.cfg.OVERLAY.get("overlay_page2_enabled", True)))
+        self.chk_overlay_page2.stateChanged.connect(self._save_overlay_page_settings)
+        lay_pages.addWidget(self.chk_overlay_page2)
+
+        self.chk_overlay_page3 = QCheckBox("Page 3: Challenge Leaderboard")
+        self.chk_overlay_page3.setChecked(bool(self.cfg.OVERLAY.get("overlay_page3_enabled", True)))
+        self.chk_overlay_page3.stateChanged.connect(self._save_overlay_page_settings)
+        lay_pages.addWidget(self.chk_overlay_page3)
+
+        self.chk_overlay_page4 = QCheckBox("Page 4: Cloud Leaderboard")
+        self.chk_overlay_page4.setChecked(bool(self.cfg.OVERLAY.get("overlay_page4_enabled", True)))
+        self.chk_overlay_page4.stateChanged.connect(self._save_overlay_page_settings)
+        lay_pages.addWidget(self.chk_overlay_page4)
+
+        self.chk_overlay_page5 = QCheckBox("Page 5: VPC Leaderboard")
+        self.chk_overlay_page5.setChecked(bool(self.cfg.OVERLAY.get("overlay_page5_enabled", True)))
+        self.chk_overlay_page5.stateChanged.connect(self._save_overlay_page_settings)
+        lay_pages.addWidget(self.chk_overlay_page5)
+
+        layout.addWidget(grp_pages)
+
         layout.addStretch(1)
         self._add_tab_help_button(layout, "appearance_overlay")
         self._update_switch_all_button_label()
@@ -3765,6 +3804,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cfg.OVERLAY["anim_challenge"] = bool(getattr(self, "chk_anim_challenge", None) and self.chk_anim_challenge.isChecked())
         self.cfg.save()
 
+    def _save_overlay_page_settings(self):
+        self.cfg.OVERLAY["overlay_page2_enabled"] = self.chk_overlay_page2.isChecked()
+        self.cfg.OVERLAY["overlay_page3_enabled"] = self.chk_overlay_page3.isChecked()
+        self.cfg.OVERLAY["overlay_page4_enabled"] = self.chk_overlay_page4.isChecked()
+        self.cfg.OVERLAY["overlay_page5_enabled"] = self.chk_overlay_page5.isChecked()
+        self.cfg.save()
+
     def _save_player_name(self, name):
         self.cfg.OVERLAY["player_name"] = name.strip()
         self.cfg.save()
@@ -4794,8 +4840,31 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _navigate_overlay_page(self, direction: int):
-        """Cycle to the next/previous overlay page (endless loop, 5 pages)."""
-        self._overlay_page = (int(getattr(self, "_overlay_page", 0)) + direction) % 5
+        """Cycle to the next/previous overlay page, skipping disabled pages."""
+        ov = self.cfg.OVERLAY or {}
+        # Build list of enabled page indices (page 0 is always enabled)
+        enabled_pages = [0]
+        if ov.get("overlay_page2_enabled", True):
+            enabled_pages.append(1)
+        if ov.get("overlay_page3_enabled", True):
+            enabled_pages.append(2)
+        if ov.get("overlay_page4_enabled", True):
+            enabled_pages.append(3)
+        if ov.get("overlay_page5_enabled", True):
+            enabled_pages.append(4)
+
+        if not enabled_pages:
+            enabled_pages = [0]
+
+        current = int(getattr(self, "_overlay_page", 0))
+        if current in enabled_pages:
+            current_idx = enabled_pages.index(current)
+        else:
+            current_idx = 0
+
+        new_idx = (current_idx + direction) % len(enabled_pages)
+        self._overlay_page = enabled_pages[new_idx]
+
         try:
             self._show_overlay_page(self._overlay_page)
         except Exception as e:
