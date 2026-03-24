@@ -227,7 +227,7 @@ class CloudStatsMixin:
         self.cmb_cloud_diff.hide() 
         
         self.txt_cloud_rom = QLineEdit()
-        self.txt_cloud_rom.setPlaceholderText("Enter ROM Name (e.g. afm_113b)")
+        self.txt_cloud_rom.setPlaceholderText("Enter Table or ROM Name")
         self.txt_cloud_rom.returnPressed.connect(self._fetch_cloud_leaderboard)
 
         self._cloud_rom_completer_model = QStringListModel([], self)
@@ -254,7 +254,7 @@ class CloudStatsMixin:
         lay_ctrl.addWidget(QLabel("Category:"))
         lay_ctrl.addWidget(self.cmb_cloud_category)
         lay_ctrl.addWidget(self.cmb_cloud_diff)
-        lay_ctrl.addWidget(QLabel("ROM:"))
+        lay_ctrl.addWidget(QLabel("Table/ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
         layout.addWidget(grp_controls)
