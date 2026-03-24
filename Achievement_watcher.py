@@ -1940,7 +1940,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
-            "(Pages 2–5). Page 1 (Highlights &amp; Score) is always active. "
+            "(Pages 2–5). Page 1 (Highlights & Score) is always active. "
             "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
         ),
         "appearance_theme": (
@@ -2463,7 +2463,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_pages = QGroupBox("📄 Overlay Pages")
         lay_pages = QVBoxLayout(grp_pages)
 
-        lbl_page1 = QLabel("Page 1 (Highlights &amp; Score) is always active.")
+        lbl_page1 = QLabel("Page 1 (Highlights & Score) is always active.")
         lbl_page1.setStyleSheet("color: #FF7F00; font-size: 9pt;")
         lay_pages.addWidget(lbl_page1)
 
