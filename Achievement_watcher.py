@@ -231,7 +231,7 @@ class AchievementBeatenDialog(QDialog):
 
     def __init__(self, cfg, notif_data: dict, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Achievement Beaten!")
+        self.setWindowTitle("Achievement-Progress Beaten!")
         self.setMinimumWidth(500)
         self.setStyleSheet("background:#1a1a1a; color:#DDD;")
 
@@ -240,7 +240,7 @@ class AchievementBeatenDialog(QDialog):
         layout.setSpacing(10)
 
         # Header
-        lbl_hdr = QLabel("<b style='font-size:14px; color:#FF3B30;'>🔴 Achievement Beaten!</b>")
+        lbl_hdr = QLabel("<b style='font-size:14px; color:#FF7F00;'>🎯 Achievement-Progress Beaten!</b>")
         lbl_hdr.setWordWrap(True)
         layout.addWidget(lbl_hdr)
 
@@ -254,7 +254,15 @@ class AchievementBeatenDialog(QDialog):
         new_leader_name = str(notif_data.get("new_leader_name", ""))
         new_leader_score = float(notif_data.get("new_leader_score", 0.0))
 
+        # Resolve table name from parent watcher ROMNAMES if available
+        try:
+            romnames = (getattr(parent.watcher, "ROMNAMES", None) or {}) if (parent and hasattr(parent, "watcher")) else {}
+        except Exception:
+            romnames = {}
+        table_name = _strip_version_from_name(romnames.get(rom, rom)) if rom else rom
+
         # Table info via VPS data
+        vps_id = ""
         try:
             from watcher_core import p_vps_img
             mapping = _load_vps_mapping(cfg)
@@ -285,28 +293,59 @@ class AchievementBeatenDialog(QDialog):
                     hero.update_selection(vps_entry, tf_entry or {})
                     layout.addWidget(hero)
                 else:
-                    self._add_basic_info(layout, rom, vps_id)
+                    self._add_basic_info(layout, rom, vps_id, table_name)
             else:
-                self._add_basic_info(layout, rom, "")
+                self._add_basic_info(layout, rom, "", table_name)
         except Exception:
-            self._add_basic_info(layout, rom, "")
+            self._add_basic_info(layout, rom, "", table_name)
+
+        # Styled card: table info
+        card_lines = []
+        if table_name:
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
+            )
+        if rom:
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
+            )
+        if vps_id:
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
+            )
+        if card_lines:
+            card_html = "<br>".join(card_lines)
+            lbl_card = QLabel(f"<div style='line-height:1.6;'>{card_html}</div>")
+            lbl_card.setWordWrap(True)
+            lbl_card.setStyleSheet(
+                "background:#111; border:1px solid #333; border-radius:6px; padding:10px; margin-top:6px;"
+            )
+            layout.addWidget(lbl_card)
 
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet("color:#333;")
         layout.addWidget(sep2)
 
-        # Score comparison
-        lbl_your = QLabel(
-            f"<span style='font-size:13px; color:#FF7F00;'>↓ Your Score: {your_score:.1f}%</span>"
-        )
-        layout.addWidget(lbl_your)
-
+        # Score comparison — grid layout
         leader_display = new_leader_name if new_leader_name else "Unknown"
-        lbl_leader = QLabel(
-            f"<span style='font-size:13px; color:#00C853;'>↑ New Leader: {leader_display} — {new_leader_score:.1f}%</span>"
-        )
-        layout.addWidget(lbl_leader)
+        score_grid = QGridLayout()
+        score_grid.setHorizontalSpacing(12)
+        score_grid.setVerticalSpacing(6)
+
+        lbl_your_txt = QLabel("<span style='font-size:13px; color:#FF7F00;'>↓ Your Progress</span>")
+        lbl_your_pct = QLabel(f"<b style='font-size:14px; color:#FF3B30;'>{your_score:.1f}%</b>")
+        lbl_your_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        score_grid.addWidget(lbl_your_txt, 0, 0)
+        score_grid.addWidget(lbl_your_pct, 0, 1)
+
+        lbl_leader_txt = QLabel(f"<span style='font-size:13px; color:#00C853;'>↑ New Leader: {leader_display}</span>")
+        lbl_leader_pct = QLabel(f"<b style='font-size:14px; color:#00C853;'>{new_leader_score:.1f}%</b>")
+        lbl_leader_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        score_grid.addWidget(lbl_leader_txt, 1, 0)
+        score_grid.addWidget(lbl_leader_pct, 1, 1)
+
+        layout.addLayout(score_grid)
 
         # Close button
         btn_close = QPushButton("Close")
@@ -316,16 +355,29 @@ class AchievementBeatenDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
 
-    def _add_basic_info(self, layout: QVBoxLayout, rom: str, vps_id: str):
-        """Fallback: show plain text table info."""
+    def _add_basic_info(self, layout: QVBoxLayout, rom: str, vps_id: str, table_name: str = ""):
+        """Fallback: show table info as a styled card."""
+        card_lines = []
+        if table_name:
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
+            )
         if rom:
-            lbl = QLabel(f"<b style='color:#FF7F00; font-size:13px;'>ROM: {rom}</b>")
-            lbl.setWordWrap(True)
-            layout.addWidget(lbl)
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
+            )
         if vps_id:
-            lbl_id = QLabel(f"<span style='color:#888; font-size:11px;'>VPS-ID: {vps_id}</span>")
-            lbl_id.setWordWrap(True)
-            layout.addWidget(lbl_id)
+            card_lines.append(
+                f"<span style='color:#FF7F00;'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
+            )
+        if card_lines:
+            card_html = "<br>".join(card_lines)
+            lbl_card = QLabel(f"<div style='line-height:1.6;'>{card_html}</div>")
+            lbl_card.setWordWrap(True)
+            lbl_card.setStyleSheet(
+                "background:#111; border:1px solid #333; border-radius:6px; padding:10px; margin-top:6px;"
+            )
+            layout.addWidget(lbl_card)
 
 
 class MainWindow(QMainWindow, CloudStatsMixin):
