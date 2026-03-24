@@ -91,11 +91,44 @@ def _ease_out_cubic(t: float) -> float:
     return 1.0 - (1.0 - t) ** 3
 
 
+def _is_vpx_foreground() -> bool:
+    """Return True if a VPinballX process is currently the foreground window.
+    Used to gate topmost enforcement so overlays don't fight PinUP Popper for z-order.
+    Uses only stdlib ctypes so no extra dependency is required."""
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        if not hwnd:
+            return False
+        pid = ctypes.c_ulong(0)
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return False
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+        if not h:
+            return False
+        try:
+            buf = ctypes.create_unicode_buffer(260)
+            size = ctypes.c_ulong(260)
+            ctypes.windll.kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size))
+            name = os.path.basename(buf.value)
+            return name.lower().startswith("vpinballx")
+        finally:
+            ctypes.windll.kernel32.CloseHandle(h)
+    except Exception:
+        return False
+
+
 def _force_topmost(widget: QWidget):
     """Force a widget to the topmost z-order using Win32 API.
     Works even against fullscreen DirectX/OpenGL applications.
+    Only enforces topmost when VPinballX.exe is the active foreground window to avoid
+    fighting PinUP Popper or other frontends for z-order supremacy.
     No-ops silently when the widget is not visible or win32 is unavailable."""
     if not widget.isVisible():
+        return
+    if not _is_vpx_foreground():
         return
     try:
         import win32gui, win32con
@@ -2040,7 +2073,7 @@ class FlipCounterOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -3928,7 +3961,7 @@ class AchToastWindow(QWidget):
                 hwnd = int(self.winId())
                 win32gui.SetWindowPos(
                     hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
                 )
             except Exception:
                 pass
@@ -4106,7 +4139,7 @@ class ChallengeCountdownOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -4243,7 +4276,7 @@ class ChallengeSelectOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -4560,7 +4593,7 @@ class FlipDifficultyOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -4834,7 +4867,7 @@ class HeatBarometerOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
