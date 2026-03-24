@@ -2852,13 +2852,13 @@ class Watcher:
             retriggered_meta = []
 
         try:
-            from_ga = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-            from_ga_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
-            if from_ga or from_ga_rt:
-                self._ach_record_unlocks("global", self.current_rom, from_ga, retriggered=from_ga_rt)
+            valid_hits = [m for m in (awarded_meta or []) if m.get("origin") in ("global_achievements", "rom_specific", "custom")]
+            valid_rt = [m for m in (retriggered_meta or []) if m.get("origin") in ("global_achievements", "rom_specific", "custom")]
+            if valid_hits or valid_rt:
+                self._ach_record_unlocks("global", self.current_rom, valid_hits, retriggered=valid_rt)
                 try:
-                    if from_ga:
-                        self._emit_achievement_toasts(from_ga, seconds=5)
+                    if valid_hits:
+                        self._emit_achievement_toasts(valid_hits, seconds=5)
                 except Exception:
                     pass
         except Exception as e:
