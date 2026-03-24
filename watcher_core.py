@@ -26,6 +26,12 @@ try:
 except Exception:
     win32gui = None
 
+# [AUTO-MAP-GEN] Optional auto-map-generator module — safe to delete
+try:
+    from nvram_map_generator import NvramMapGenerator as _NvramMapGenerator
+except ImportError:
+    _NvramMapGenerator = None
+
 import ctypes
 from ctypes import wintypes
 import ssl
@@ -241,6 +247,8 @@ DEFAULT_OVERLAY.setdefault("page_2_enabled", True)
 DEFAULT_OVERLAY.setdefault("page_3_enabled", True)
 DEFAULT_OVERLAY.setdefault("page_4_enabled", True)
 DEFAULT_OVERLAY.setdefault("page_5_enabled", True)
+# [AUTO-MAP-GEN] Feature flag — disabled by default; set to True in config.json to enable
+DEFAULT_OVERLAY.setdefault("AUTO_MAP_GENERATOR", False)
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -351,6 +359,9 @@ class AppConfig:
                 "last_export_ts",
 
                 "page_2_enabled", "page_3_enabled", "page_4_enabled", "page_5_enabled",
+
+                # [AUTO-MAP-GEN]
+                "AUTO_MAP_GENERATOR",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -428,6 +439,9 @@ class AppConfig:
                 "last_export_ts",
 
                 "page_2_enabled", "page_3_enabled", "page_4_enabled", "page_5_enabled",
+
+                # [AUTO-MAP-GEN]
+                "AUTO_MAP_GENERATOR",
             ]
             
             for k in allowed_keys:
@@ -6402,6 +6416,21 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[HOOK] write_aw_hook in on_session_start failed: {e}", "WARN")
 
+        # [AUTO-MAP-GEN] Initialise auto-map generator if enabled and no map exists
+        self._map_generator = None
+        try:
+            if _NvramMapGenerator is not None and self.cfg.OVERLAY.get("AUTO_MAP_GENERATOR", False):
+                rom = self.current_rom or ""
+                fields, _ = self.load_map_for_rom(rom)
+                if not fields:
+                    nv_path = os.path.join(self.cfg.NVRAM_DIR, rom + ".nv")
+                    maps_dir = p_local_maps(self.cfg)
+                    self._map_generator = _NvramMapGenerator(self.cfg, rom, nv_path, maps_dir)
+                    log(self.cfg, f"[MAP-GEN] generator started for ROM '{rom}'")
+        except Exception as _e:
+            log(self.cfg, f"[MAP-GEN] generator init failed: {_e}", "WARN")
+            self._map_generator = None
+
     def _ensure_singleplayer_min_playtime(self, nplayers: int, duration_sec: int) -> None:
         try:
             if int(nplayers) == 1:
@@ -6414,6 +6443,17 @@ class Watcher:
     def on_session_end(self):
         if not self.game_active:
             return
+
+        # [AUTO-MAP-GEN] Finalise auto-map generator (analyse snapshots, save map)
+        try:
+            if getattr(self, "_map_generator", None) is not None:
+                saved = self._map_generator.on_game_end()
+                if saved:
+                    log(self.cfg, f"[MAP-GEN] map saved: {saved}")
+                self._map_generator = None
+        except Exception as _e:
+            log(self.cfg, f"[MAP-GEN] on_game_end failed: {_e}", "WARN")
+            self._map_generator = None
 
         ch = getattr(self, "challenge", {}) or {}
         is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")
@@ -6778,6 +6818,13 @@ class Watcher:
                         self._challenge_tick(audits_ctl)
                     except Exception as e:
                         log(self.cfg, f"[CHALLENGE] tick failed in loop: {e}", "WARN")
+
+                    # [AUTO-MAP-GEN] Periodic NVRAM snapshot while game is active
+                    try:
+                        if getattr(self, "_map_generator", None) is not None:
+                            self._map_generator.on_game_tick()
+                    except Exception as _e:
+                        log(self.cfg, f"[MAP-GEN] tick failed: {_e}", "WARN")
 
                     if self.snapshot_mode:
                         try:
