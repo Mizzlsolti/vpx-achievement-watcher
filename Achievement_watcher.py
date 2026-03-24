@@ -6301,7 +6301,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         log(self.cfg, f"[AUTOMAP] sampler started for {rom}")
         self._on_automap_sampler_started(rom)
            
-    @pyqtSlot(str, str, int)
     def _on_ach_toast_show(self, title: str, rom: str, seconds: int = 5):
         try:
             self._ach_toast_mgr.enqueue(title, rom, max(1, int(seconds)))
@@ -6312,7 +6311,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception:
             pass
 
-    @pyqtSlot(str, int)
     def _on_level_up(self, level_name: str, level_number: int):
         try:
             toast_title = f"LEVEL UP!  {level_name}"
