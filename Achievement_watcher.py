@@ -287,11 +287,14 @@ class AchievementBeatenDialog(QDialog):
                             break
 
                 if vps_entry:
-                    from ui_vps import VpsHeroPanel
+                    from ui_vps import VpsHeroPanel, _process_pending_image_callbacks
                     img_dir = p_vps_img(cfg)
                     hero = VpsHeroPanel(img_dir, parent=self)
                     hero.update_selection(vps_entry, tf_entry or {})
                     layout.addWidget(hero)
+                    self._cb_timer = QTimer(self)
+                    self._cb_timer.timeout.connect(_process_pending_image_callbacks)
+                    self._cb_timer.start(80)
                 else:
                     self._add_basic_info(layout, rom, vps_id, table_name)
             else:
@@ -6835,13 +6838,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         if own_in:
                             leader_score = float(scores[0][0])
                             your_score = next((pct for pct, p_id in scores if p_id == pid), 0.0)
+                            leader_entry = batch.get(f"players/{top_pid}/progress/{rom}", {})
+                            # player_name/name may be stored alongside the progress entry in Firebase;
+                            # fall back to the player ID if no name field is present.
+                            leader_name = str(leader_entry.get("player_name", "") or leader_entry.get("name", "") or top_pid)
                             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
                             QMetaObject.invokeMethod(
                                 self, "_add_achievement_beaten_notification",
                                 Qt.ConnectionType.QueuedConnection,
                                 Q_ARG(str, rom),
                                 Q_ARG(float, float(your_score)),
-                                Q_ARG(str, str(top_pid)),
+                                Q_ARG(str, leader_name),
                                 Q_ARG(float, leader_score),
                             )
             except Exception:
