@@ -2040,7 +2040,7 @@ class FlipCounterOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
             )
         except Exception:
             pass
@@ -3467,7 +3467,8 @@ class AchToastWindow(QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.Tool |
+            Qt.WindowType.SubWindow
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
@@ -3927,10 +3928,10 @@ class AchToastWindow(QWidget):
                 hwnd = int(self.winId())
                 win32gui.SetWindowPos(
                     hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
                 )
-            except Exception as e:
-                print(f"[TOAST] SetWindowPos failed: {e}")
+            except Exception:
+                pass
         except Exception as e:
             print(f"[TOAST] render_and_place failed: {e}")
 
@@ -4057,7 +4058,6 @@ class AchToastManager(QObject):
     def enqueue(self, title: str, rom: str, seconds: int = 5):
         """Enqueue a toast notification."""
         self._queue.append((title, rom, seconds))
-        print(f"[TOAST] Enqueued: title='{title}', rom='{rom}', queue_size={len(self._queue)}, active={self._active}")
         if not self._active:
             self._show_next()
 
@@ -4076,7 +4076,6 @@ class AchToastManager(QObject):
         self._active = True
         title, rom, seconds = self._queue.pop(0)
         win = AchToastWindow(self.parent_gui, title, rom, seconds)
-        print(f"[TOAST] Showing toast: title='{title}', rom='{rom}', seconds={seconds}, geometry={win.geometry()}")
         win.finished.connect(self._on_finished)
         self._active_window = win
 
@@ -4107,7 +4106,7 @@ class ChallengeCountdownOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
             )
         except Exception:
             pass
@@ -4244,7 +4243,7 @@ class ChallengeSelectOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
             )
         except Exception:
             pass
@@ -4561,7 +4560,7 @@ class FlipDifficultyOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
             )
         except Exception:
             pass
@@ -4835,7 +4834,7 @@ class HeatBarometerOverlay(QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
             )
         except Exception:
             pass
