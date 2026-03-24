@@ -5613,12 +5613,28 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self._overlay_cycle["idx"] = 0
                 self._show_overlay_section(secs[0])
             else:
-                # Overlay already visible – cycle to next page, close after last
-                next_page = (int(getattr(self, "_overlay_page", 0)) + 1)
-                if next_page > 4:
-                    # After page 4 (last page) → close overlay
+                # Overlay already visible – cycle to next enabled page, close after last
+                ov = self.cfg.OVERLAY or {}
+                enabled_pages = [0]
+                if ov.get("overlay_page2_enabled", True):
+                    enabled_pages.append(1)
+                if ov.get("overlay_page3_enabled", True):
+                    enabled_pages.append(2)
+                if ov.get("overlay_page4_enabled", True):
+                    enabled_pages.append(3)
+                if ov.get("overlay_page5_enabled", True):
+                    enabled_pages.append(4)
+                current = int(getattr(self, "_overlay_page", 0))
+                if current in enabled_pages:
+                    current_idx = enabled_pages.index(current)
+                else:
+                    current_idx = 0
+                next_idx = current_idx + 1
+                if next_idx >= len(enabled_pages):
+                    # After last enabled page → close overlay
                     self._hide_overlay()
                 else:
+                    next_page = enabled_pages[next_idx]
                     self._overlay_page = next_page
                     self._show_overlay_page(next_page)
         finally:
