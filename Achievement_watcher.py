@@ -2199,6 +2199,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "compare how each field changed from session start to session end.<br>"
             "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest Timed, Flip, and Heat challenge results. "
             "Only players with valid VPS mappings appear here.<br>"
+            "• <b>📈 Trends</b>: Visual trend analysis for the selected table. "
+            "Select a table from the dropdown and click 🔄 to refresh. "
+            "Three panels are shown side by side:<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Score Trend</b>: Your last 10 sessions with a sparkline and trend percentage.<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Playtime Trend</b>: Session durations with average and trend indicator.<br>"
+            "&nbsp;&nbsp;&nbsp;– <b>Last vs. Average</b>: Side-by-side comparison of your most recent session "
+            "against your session average across all tracked metrics.<br>"
+            "Trends data is built from session summary files stored locally in the BASE folder."
         ),
     }
 
@@ -4416,6 +4424,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception as _vps_err:
             log(self.cfg, f"[CLOUD] VPS mapping restore failed: {_vps_err}", "WARN")
 
+        # Restore trend data from cloud
+        try:
+            trends_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/trends")
+            if trends_data and isinstance(trends_data, dict):
+                from watcher_core import secure_save_json as _ssj
+                trend_cache_path = os.path.join(self.cfg.BASE, "session_stats", "trends_cache.json")
+                _ssj(trend_cache_path, trends_data)
+                log(self.cfg, f"[CLOUD] Trends cache restored: {len(trends_data)} ROM(s)")
+        except Exception:
+            pass
+
         # Refresh level display and notify listeners
         try:
             self._refresh_level_display()
@@ -4561,6 +4580,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception as e:
                 errors.append(f"❌ Progress: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
+
+            # 4. Upload trend data
+            try:
+                trend_data = self._collect_trend_data_for_cloud()
+                if trend_data and CloudSync.set_node(self.cfg, f"players/{pid}/trends", trend_data):
+                    results.append(f"✅ Trends ({len(trend_data)} ROM(s))")
+                    log(self.cfg, f"[CLOUD] Manual backup: trends uploaded for {len(trend_data)} ROM(s)")
+                elif trend_data:
+                    errors.append("❌ Trends: upload failed")
+            except Exception as e:
+                errors.append(f"❌ Trends: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: trends upload failed: {e}", "WARN")
 
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             summary = "\n".join(results + errors)
@@ -6486,7 +6517,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ------------------------------------------------------------------
 
     def _export_settings(self):
-        """Export config, VPS mapping, achievements state, challenge scores,
+        """Export config, VPS mapping, achievements state, challenge scores, trends cache,
         notifications, ROM names, and session highlights as a ZIP archive."""
         try:
             from PyQt6.QtWidgets import QFileDialog, QMessageBox
@@ -6527,6 +6558,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     if os.path.isfile(ch_src):
                         zf.write(ch_src, "challenge_scores.json")
                         exported.append("challenge_scores.json")
+
+                    # Trends cache
+                    trends_src = os.path.join(self.cfg.BASE, "session_stats", "trends_cache.json")
+                    if os.path.isfile(trends_src):
+                        zf.write(trends_src, "trends_cache.json")
+                        exported.append("trends_cache.json")
 
                     # ROM names mapping
                     romnames_src = f_romnames(self.cfg)
@@ -6639,6 +6676,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         except Exception:
                             pass
 
+                    # Restore trends cache
+                    if "trends_cache.json" in names:
+                        trends_dir = os.path.join(self.cfg.BASE, "session_stats")
+                        trends_dst = os.path.join(trends_dir, "trends_cache.json")
+                        try:
+                            ensure_dir(trends_dir)
+                            with open(trends_dst, "wb") as fh:
+                                fh.write(zf.read("trends_cache.json"))
+                        except Exception:
+                            pass
+
                     # Restore ROM names mapping
                     if "romnames.json" in names:
                         rn_dst = f_romnames(self.cfg)
@@ -6681,6 +6729,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 QMessageBox.warning(self, "Import Settings", f"Import failed:\n{e}")
         except Exception:
             pass
+
+    def _collect_trend_data_for_cloud(self) -> dict:
+        """Load the local trends cache and return it for cloud upload."""
+        try:
+            import json as _json
+            trend_cache_path = os.path.join(self.cfg.BASE, "session_stats", "trends_cache.json")
+            if os.path.isfile(trend_cache_path):
+                with open(trend_cache_path, "r", encoding="utf-8") as fh:
+                    return _json.load(fh)
+        except Exception:
+            pass
+        return {}
 
     @staticmethod
     def _dot(color: str, label: str, value: str) -> str:

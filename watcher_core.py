@@ -2052,7 +2052,7 @@ class CloudSync:
 
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
-    SUMMARY_FILENAME = "session_latest.summary.json"  # kept for back-compat; new sessions use timestamped names
+    SUMMARY_FILENAME = "session_latest.summary.json"
     
     def __init__(self, cfg: AppConfig, bridge: "Bridge"):
         self.cfg = cfg
@@ -5162,7 +5162,6 @@ class Watcher:
             _awarded, _all_global, awarded_meta, retriggered_meta = self._evaluate_achievements(
                 self.current_rom, self.start_audits, end_audits, duration_sec
             )
-            log(self.cfg, f"[ACH] evaluate_achievements: awarded={len(awarded_meta)}, retriggered={len(retriggered_meta)}")
         except Exception as e:
             log(self.cfg, f"[ACH] eval failed: {e}", "WARN")
             awarded_meta = []
@@ -5171,7 +5170,6 @@ class Watcher:
         try:
             global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
             global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
-            log(self.cfg, f"[ACH] global hits={len(global_hits)}, retriggered={len(global_rt)}")
             if global_hits or global_rt:
                 self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
             if global_hits:
@@ -5181,7 +5179,6 @@ class Watcher:
 
         try:
             session_hits, session_rt = self._evaluate_player_session_achievements(1, self.current_rom)
-            log(self.cfg, f"[ACH] session hits={len(session_hits)}, retriggered={len(session_rt)}")
             if session_hits or session_rt:
                 self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
             if session_hits:
@@ -5741,6 +5738,7 @@ class Watcher:
 
     def _export_summary(self, end_audits: dict, duration_sec: int):
         from datetime import timezone
+        summary_path = os.path.join(p_highlights(self.cfg), self.SUMMARY_FILENAME)
         try:
             best_ball = None
             try:
@@ -5763,7 +5761,6 @@ class Watcher:
                 "events": p1.get("event_counts", {}) or {},
             }]
 
-            now_utc = datetime.now(timezone.utc)
             payload = {
                 "rom": self.current_rom,
                 "table": self.current_table,
@@ -5772,19 +5769,12 @@ class Watcher:
                 "players": players_out,
                 "end_audits": end_audits,
                 "global_deltas": global_deltas,
-                "end_timestamp": now_utc.isoformat(),
+                "end_timestamp": datetime.now(timezone.utc).isoformat(),
                 # Convenience fields for dashboard display
                 "score": int(best_ball.get("score", 0)) if isinstance(best_ball, dict) else None,
             }
 
-            # Use a unique per-session filename so previous sessions are preserved.
-            # Format: <rom>_<YYYYmmdd_HHMMSS>.summary.json
-            rom_safe = re.sub(r"[^\w\-]", "_", str(self.current_rom or "unknown"))
-            ts_tag = now_utc.strftime("%Y%m%d_%H%M%S")
-            filename = f"{rom_safe}_{ts_tag}.summary.json"
-            summary_path = os.path.join(p_highlights(self.cfg), filename)
             save_json(summary_path, payload)
-            log(self.cfg, f"[SUMMARY] saved {filename}")
 
         except Exception as e:
             log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
@@ -6213,14 +6203,11 @@ class Watcher:
                     already_shown.add(title)
                     try:
                         self.bridge.ach_toast_show.emit(title, self.current_rom or "", int(seconds))
-                        log(self.cfg, f"[ACH] toast emitted: '{title}'")
-                    except Exception as emit_err:
-                        log(self.cfg, f"[ACH] toast emit failed for '{title}': {emit_err}", "WARN")
-                elif title in already_shown:
-                    log(self.cfg, f"[ACH] toast skipped (already shown this session): '{title}'")
+                    except Exception:
+                        pass
             self._toasted_titles = already_shown
-        except Exception as e:
-            log(self.cfg, f"[ACH] _emit_achievement_toasts failed: {e}", "WARN")
+        except Exception:
+            pass  
   
     def _on_session_end_record_achievements(self, rom: str, session_titles: list, global_titles: list):
         try:
