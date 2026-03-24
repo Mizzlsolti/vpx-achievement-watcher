@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import html as _html
+import math as _math
 import os
 import json
+import statistics as _statistics
 import threading
 import urllib.parse as _urlparse
 from datetime import datetime
@@ -365,6 +367,437 @@ class CloudStatsMixin:
         rng = mx - mn if mx != mn else 1
         return "".join(blocks[min(7, int((v - mn) / rng * 7))] for v in values)
 
+    @staticmethod
+    def _pearson_r(x: list, y: list) -> float:
+        """Return the Pearson correlation coefficient for two equal-length lists."""
+        n = len(x)
+        if n < 3:
+            return 0.0
+        mx, my = sum(x) / n, sum(y) / n
+        num = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y))
+        dx = (sum((xi - mx) ** 2 for xi in x)) ** 0.5
+        dy = (sum((yi - my) ** 2 for yi in y)) ** 0.5
+        if dx == 0 or dy == 0:
+            return 0.0
+        return num / (dx * dy)
+
+    def _build_insights_html(self, sessions: list, _primary: str, _accent: str, _border: str) -> str:
+        """Build the 🧠 Insights panel HTML appended below the 3-column trends layout."""
+        esc = _html.escape
+        n = len(sessions)
+
+        def _bar(val: float, max_val: float = 100.0, width: int = 10) -> str:
+            if max_val <= 0:
+                return "░" * width
+            filled = max(0, min(width, int(round(val / max_val * width))))
+            return "█" * filled + "░" * (width - filled)
+
+        def _fmt_score(v: int) -> str:
+            return f"{int(v):,}".replace(",", ".")
+
+        # ── Lock state ──────────────────────────────────────────────────────
+        if n < 5:
+            pct = int(n / 5 * 100)
+            bar_str = _bar(pct, 100, 25)
+            return (
+                "<div class='insights-outer'>"
+                f"<h3>🧠 Insights</h3>"
+                "<div class='insights-section'>"
+                f"<p>🔒 Insights unlock after 5 sessions (you have {n}/5)</p>"
+                f"<div class='progress-bar-bg'>"
+                f"<div class='progress-bar-fill' style='width:{pct}%'></div>"
+                f"</div>"
+                f"<p><span class='skill-bar'>{bar_str}</span> {pct}%</p>"
+                "<p style='color:#bbb; font-size:0.9em;'>Keep playing to unlock learning curve, strategy tips,"
+                "<br>skill prediction and session optimization!</p>"
+                "</div>"
+                "</div>"
+            )
+
+        # ── Full panel ──────────────────────────────────────────────────────
+        scores_all = [s["score"] for s in sessions]
+        parts: list = [
+            "<div class='insights-outer'>",
+            "<h3>🧠 Insights</h3>",
+        ]
+
+        # ── Section 1: Session Report ────────────────────────────────────────
+        try:
+            avg_score = sum(scores_all) / len(scores_all)
+            last_score = scores_all[-1]
+            pct_diff = ((last_score - avg_score) / avg_score * 100) if avg_score else 0
+
+            if pct_diff >= 0:
+                score_cls = "up"
+                score_line = (
+                    f"Strong session! Your score of {_fmt_score(last_score)} is "
+                    f"+{pct_diff:.0f}% above your average."
+                )
+            else:
+                score_cls = "down"
+                score_line = (
+                    f"Below average session. Your score of {_fmt_score(last_score)} is "
+                    f"{pct_diff:.0f}% below your average."
+                )
+
+            delta_lines: list = []
+            try:
+                all_keys: set = set()
+                for s in sessions:
+                    all_keys.update(s.get("deltas", {}).keys())
+
+                best_key = best_val = best_pct = best_avg_dv = None
+                worst_key = worst_val = worst_pct = worst_avg_dv = None
+
+                for dk in all_keys:
+                    vals = [s.get("deltas", {}).get(dk, 0) for s in sessions]
+                    avg_dv = sum(vals) / len(vals) if vals else 0
+                    last_dv = sessions[-1].get("deltas", {}).get(dk, 0)
+                    if avg_dv == 0:
+                        continue
+                    dpct = (last_dv - avg_dv) / avg_dv * 100
+                    if best_pct is None or dpct > best_pct:
+                        best_pct, best_key, best_val, best_avg_dv = dpct, dk, last_dv, avg_dv
+                    if worst_pct is None or dpct < worst_pct:
+                        worst_pct, worst_key, worst_val, worst_avg_dv = dpct, dk, last_dv, avg_dv
+
+                if best_key is not None and best_pct is not None and best_pct > 0:
+                    delta_lines.append(
+                        f"Standout: {esc(best_key)} at {best_val} "
+                        f"(+{best_pct:.0f}% above avg of {best_avg_dv:.1f})."
+                    )
+                if worst_key is not None and worst_pct is not None and worst_pct < 0:
+                    delta_lines.append(
+                        f"⚠️ Watch: {esc(worst_key)} dropped to {worst_val}, "
+                        f"which is {worst_pct:.0f}% below your average of {worst_avg_dv:.1f}."
+                    )
+            except Exception:
+                pass
+
+            body = f"<p class='{score_cls}'>{score_line}</p>"
+            for dl in delta_lines:
+                body += f"<p>{dl}</p>"
+
+            parts.append(
+                "<div class='insights-section'>"
+                "<h4>📝 Session Report</h4>"
+                f"{body}"
+                "</div>"
+            )
+        except Exception:
+            pass
+
+        # ── Sections 2 + 3: Strategy + Skill (2-col) ────────────────────────
+        col_left = ""
+        col_right = ""
+
+        # Section 2: Strategy
+        try:
+            all_keys_s: set = set()
+            for s in sessions:
+                all_keys_s.update(s.get("deltas", {}).keys())
+
+            correlations: dict = {}
+            for dk in all_keys_s:
+                vals = [s.get("deltas", {}).get(dk, 0) for s in sessions]
+                count = sum(1 for v in vals if v != 0)
+                if count >= 3:
+                    r = self._pearson_r(vals, scores_all)
+                    correlations[dk] = r
+
+            sorted_corr = sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True)
+
+            strat_rows: list = []
+            for dk, r in sorted_corr[:5]:
+                dot = "🟢" if abs(r) >= 0.7 else ("🟡" if abs(r) >= 0.4 else "🔴")
+                bar_str = _bar(abs(r), 1.0, 10)
+                strat_rows.append(
+                    f"<tr><td>{dot} {esc(dk)}</td>"
+                    f"<td style='text-align:right; color:{_accent};'>r={r:.2f}</td>"
+                    f"<td><span class='skill-bar'>{bar_str}</span></td></tr>"
+                )
+
+            strat_html = ""
+            if strat_rows:
+                strat_html = (
+                    "<table style='width:100%; border-collapse:collapse;'>"
+                    + "".join(strat_rows)
+                    + "</table>"
+                )
+
+                if sorted_corr:
+                    top_key = sorted_corr[0][0]
+                    words = top_key.split()
+                    play_style = f"{words[0]}-Focused" if words else top_key
+                    strat_html += (
+                        f"<p><b style='color:{_primary};'>Play Style:</b> "
+                        f"<span style='color:{_accent};'>{esc(play_style)}</span></p>"
+                    )
+
+                gap_candidates = [(dk, r) for dk, r in sorted_corr if r > 0.3]
+                if gap_candidates:
+                    dk_avgs: dict = {}
+                    for dk, r in gap_candidates:
+                        vals = [s.get("deltas", {}).get(dk, 0) for s in sessions]
+                        dk_avgs[dk] = sum(vals) / len(vals) if vals else 0
+                    max_avg = max(dk_avgs.values()) if dk_avgs else 1
+                    if max_avg > 0:
+                        worst_dk = min(dk_avgs, key=lambda k: dk_avgs[k] / max_avg)
+                        strat_html += (
+                            f"<p><b style='color:{_primary};'>Biggest Gap:</b> "
+                            f"Improve your <span style='color:{_accent};'>{esc(worst_dk)}</span> "
+                            f"(avg {dk_avgs[worst_dk]:.1f}) for better scores.</p>"
+                        )
+
+                strength_best = None
+                strength_val = None
+                for dk in all_keys_s:
+                    vals = [s.get("deltas", {}).get(dk, 0) for s in sessions]
+                    avg_dv = sum(vals) / len(vals) if vals else 0
+                    last_dv = sessions[-1].get("deltas", {}).get(dk, 0)
+                    if avg_dv > 0:
+                        diff = last_dv - avg_dv
+                        if strength_val is None or diff > strength_val:
+                            strength_val = diff
+                            strength_best = dk
+                if strength_best is not None and strength_val is not None:
+                    strat_html += (
+                        f"<p><b style='color:{_primary};'>Strength:</b> "
+                        f"<span style='color:#00E676;'>{esc(strength_best)}</span> "
+                        f"(+{strength_val:.0f} above avg last session)</p>"
+                    )
+            else:
+                strat_html = (
+                    "<p style='color:#888; font-style:italic;'>Not enough delta data for correlation "
+                    "analysis (need ≥3 sessions per field).</p>"
+                )
+
+            col_left = "<h4>🎯 Strategy</h4>" + strat_html
+        except Exception:
+            pass
+
+        # Section 3: Skill Profile
+        try:
+            max_score = max(scores_all)
+            last_score_sp = scores_all[-1]
+            mean_score = sum(scores_all) / len(scores_all)
+
+            peak = min(100.0, last_score_sp / max_score * 100) if max_score > 0 else 0.0
+
+            if len(scores_all) >= 2:
+                std_dev = _statistics.stdev(scores_all)
+                cv = std_dev / mean_score if mean_score > 0 else 0.0
+                consistency = max(0.0, 100.0 - cv * 100.0)
+            else:
+                consistency = 100.0
+
+            n3 = min(3, len(scores_all))
+            early_avg = sum(scores_all[:n3]) / n3
+            recent_avg_sp = sum(scores_all[-n3:]) / n3
+            if early_avg > 0:
+                learn_rate = min(100.0, max(0.0, (recent_avg_sp - early_avg) / early_avg * 100.0))
+            else:
+                learn_rate = 0.0
+
+            skill = 0.35 * peak + 0.35 * consistency + 0.30 * learn_rate
+
+            skill_html = (
+                f"<p><b style='color:{_primary};'>Skill Rating:</b> "
+                f"<span class='skill-bar'>{_bar(skill)}</span>"
+                f" <span style='color:{_accent};'>{skill:.0f}/100</span></p>"
+                f"<table style='width:100%; font-size:0.9em; border-collapse:collapse;'>"
+                f"<tr><td>Peak Score</td>"
+                f"<td><span class='skill-bar'>{_bar(peak)}</span></td>"
+                f"<td style='text-align:right; color:{_accent};'>{peak:.0f}</td></tr>"
+                f"<tr><td>Consistency</td>"
+                f"<td><span class='skill-bar'>{_bar(consistency)}</span></td>"
+                f"<td style='text-align:right; color:{_accent};'>{consistency:.0f}</td></tr>"
+                f"<tr><td>Learn Rate</td>"
+                f"<td><span class='skill-bar'>{_bar(learn_rate)}</span></td>"
+                f"<td style='text-align:right; color:{_accent};'>{learn_rate:.0f}</td></tr>"
+                f"</table>"
+            )
+
+            if early_avg > 0:
+                if recent_avg_sp > early_avg * 1.3:
+                    curve = "Steep upward 📈"
+                elif recent_avg_sp > early_avg:
+                    curve = "Gradual improvement 📈"
+                elif recent_avg_sp >= early_avg * 0.9:
+                    curve = "Plateau detected ⚠️"
+                else:
+                    curve = "Declining – take a break? 📉"
+            else:
+                curve = "Not enough data"
+            skill_html += f"<p><b style='color:{_primary};'>Learning Curve:</b> {curve}</p>"
+
+            milestones_html = ""
+            if mean_score > 0 and len(scores_all) >= 3:
+                for mult in (2, 5, 10):
+                    target = mean_score * mult
+                    reached_idx = None
+                    for i, sc in enumerate(scores_all):
+                        if sc >= target:
+                            reached_idx = i + 1
+                            break
+                    if reached_idx is not None:
+                        milestones_html += (
+                            f"<br>✅ {_fmt_score(int(target))} – reached session {reached_idx}"
+                        )
+                    else:
+                        if early_avg > 0 and recent_avg_sp > early_avg:
+                            sessions_per_step = max(1, len(scores_all) // 2)
+                            growth_rate = (recent_avg_sp / early_avg) ** (1.0 / sessions_per_step)
+                            if growth_rate > 1.0 and last_score_sp > 0:
+                                try:
+                                    est = int(round(
+                                        (_math.log(target) - _math.log(last_score_sp))
+                                        / _math.log(growth_rate)
+                                    ))
+                                    est = max(1, est)
+                                    milestones_html += (
+                                        f"<br>🔄 {_fmt_score(int(target))} – est. ~{est} sessions"
+                                    )
+                                except Exception:
+                                    milestones_html += (
+                                        f"<br>🔄 {_fmt_score(int(target))} – est. unknown"
+                                    )
+                            else:
+                                milestones_html += (
+                                    f"<br>🔄 {_fmt_score(int(target))} – not trending up yet"
+                                )
+                        else:
+                            milestones_html += (
+                                f"<br>🔄 {_fmt_score(int(target))} – keep playing!"
+                            )
+
+            if milestones_html:
+                skill_html += (
+                    f"<p><b style='color:{_primary};'>Milestones:</b>{milestones_html}</p>"
+                )
+
+            if len(scores_all) >= 5:
+                last5 = scores_all[-5:]
+                m5 = sum(last5) / 5
+                if m5 > 0 and all(abs(v - m5) / m5 <= 0.10 for v in last5):
+                    skill_html += (
+                        "<p style='color:#FFA726;'>⚠️ Plateau detected – "
+                        "try varying your strategy</p>"
+                    )
+
+            col_right = "<h4>🔮 Skill Profile</h4>" + skill_html
+        except Exception:
+            pass
+
+        if col_left or col_right:
+            parts.append(
+                "<table class='insights-2col'><tr>"
+                f"<td class='insights-section'>{col_left}</td>"
+                f"<td class='insights-section'>{col_right}</td>"
+                "</tr></table>"
+            )
+
+        # ── Section 4: Session Optimizer ─────────────────────────────────────
+        try:
+            bucket_labels = ["0-10min", "10-20min", "20-30min", "30+min"]
+            bucket_spms: dict = {k: [] for k in bucket_labels}
+            for s in sessions:
+                pt_min = s["playtime_sec"] / 60.0
+                score = s["score"]
+                if pt_min <= 0:
+                    continue
+                spm = score / pt_min
+                if pt_min < 10:
+                    bucket_spms["0-10min"].append(spm)
+                elif pt_min < 20:
+                    bucket_spms["10-20min"].append(spm)
+                elif pt_min < 30:
+                    bucket_spms["20-30min"].append(spm)
+                else:
+                    bucket_spms["30+min"].append(spm)
+
+            bucket_avg: dict = {k: sum(v) / len(v) for k, v in bucket_spms.items() if v}
+
+            opt_html = ""
+            if bucket_avg:
+                best_bucket = max(bucket_avg, key=bucket_avg.get)
+                opt_html += (
+                    f"<p><b style='color:{_primary};'>Optimal Session Length:</b> "
+                    f"<span style='color:{_accent};'>{esc(best_bucket)}</span> "
+                    f"({bucket_avg[best_bucket]:,.0f} score/min)</p>"
+                )
+
+                long_avg = bucket_avg.get("30+min")
+                mid_avg = bucket_avg.get("10-20min") or bucket_avg.get("20-30min")
+                if long_avg is not None and mid_avg is not None and long_avg < mid_avg:
+                    opt_html += (
+                        "<p style='color:#FFA726;'>⚠️ Fatigue note: longer sessions (30+ min) "
+                        "show lower score efficiency.</p>"
+                    )
+
+            if n >= 10:
+                tod_buckets: dict = {
+                    "morning (6-12)": [],
+                    "afternoon (12-18)": [],
+                    "evening (18-24)": [],
+                    "night (0-6)": [],
+                }
+                for s in sessions:
+                    ts = s.get("ts")
+                    score = s["score"]
+                    if ts is not None:
+                        try:
+                            h = ts.hour
+                            if 6 <= h < 12:
+                                tod_buckets["morning (6-12)"].append(score)
+                            elif 12 <= h < 18:
+                                tod_buckets["afternoon (12-18)"].append(score)
+                            elif 18 <= h < 24:
+                                tod_buckets["evening (18-24)"].append(score)
+                            else:
+                                tod_buckets["night (0-6)"].append(score)
+                        except Exception:
+                            pass
+
+                tod_avgs: dict = {k: sum(v) / len(v) for k, v in tod_buckets.items() if v}
+                if len(tod_avgs) >= 2:
+                    best_tod = max(tod_avgs, key=tod_avgs.get)
+                    worst_tod = min(tod_avgs, key=tod_avgs.get)
+                    best_v = tod_avgs[best_tod]
+                    worst_v = tod_avgs[worst_tod]
+                    if worst_v > 0 and (best_v - worst_v) / worst_v > 0.15:
+                        opt_html += (
+                            f"<p><b style='color:{_primary};'>Best Time of Day:</b> "
+                            f"<span style='color:{_accent};'>{esc(best_tod)}</span> "
+                            f"(avg {_fmt_score(int(best_v))} vs "
+                            f"{_fmt_score(int(worst_v))} at {esc(worst_tod)})</p>"
+                        )
+
+            if bucket_avg:
+                best_b = max(bucket_avg, key=bucket_avg.get)
+                if best_b == bucket_labels[0]:
+                    rec = "💡 Recommendation: Short focused sessions under 10 min seem most effective."
+                elif best_b == bucket_labels[1]:
+                    rec = "💡 Recommendation: 2-3 sessions of 15 min with breaks instead of 1 long session."
+                elif best_b == bucket_labels[2]:
+                    rec = "💡 Recommendation: 20-30 min sessions are your sweet spot – aim for 1-2 per day."
+                else:
+                    rec = "💡 Recommendation: Long sessions work for you – take breaks to avoid fatigue."
+                opt_html += f"<p><b>{rec}</b></p>"
+
+            if opt_html:
+                parts.append(
+                    "<div class='insights-section'>"
+                    "<h4>⏱️ Session Optimizer</h4>"
+                    f"{opt_html}"
+                    "</div>"
+                )
+        except Exception:
+            pass
+
+        parts.append("</div>")
+        return "".join(parts)
+
     def _build_trends_html(self, rom: str, sessions: list) -> str:
         """Generate the full trends HTML for a ROM using a 3-column horizontal layout."""
         esc = _html.escape
@@ -419,6 +852,30 @@ class CloudStatsMixin:
             font-size:0.70em; font-weight:bold; border-radius:4px;
             padding:1px 5px; margin-right:5px; vertical-align:middle;
           }}
+          .insights-outer {{ margin-top: 24px; }}
+          .insights-outer > h3 {{ color:{_primary}; margin:0 0 12px 0; font-size:1.1em; }}
+          .insights-section {{
+            background: rgba(255,255,255,0.04);
+            border: 2px solid {_border};
+            border-left: 5px solid {_accent};
+            border-radius: 10px;
+            padding: 16px 18px 14px 18px;
+            margin-bottom: 14px;
+            vertical-align: top;
+          }}
+          .insights-section h4 {{
+            color: {_primary};
+            margin: 0 0 10px 0;
+            font-size: 1.0em;
+            border-bottom: 1px solid rgba(255,255,255,0.10);
+            padding-bottom: 8px;
+          }}
+          .insights-2col {{ width:100%; border-collapse:separate; border-spacing:14px 0; margin-bottom:14px; }}
+          .insights-2col td {{ width:50%; vertical-align:top; }}
+          .skill-bar {{ font-family:monospace; color:{_accent}; letter-spacing:1px; }}
+          .progress-bar-bg {{ background:rgba(255,255,255,0.1); border-radius:4px;
+                               height:12px; margin:6px 0; overflow:hidden; }}
+          .progress-bar-fill {{ background:{_accent}; border-radius:4px; height:12px; }}
         </style>
         """
 
@@ -558,6 +1015,9 @@ class CloudStatsMixin:
         lines.append("</td>")
 
         lines.append("</tr></table>")
+
+        # ── Insights panel ───────────────────────────────────────────────────
+        lines.append(self._build_insights_html(sessions, _primary, _accent, _border))
 
         return "".join(lines)
 
