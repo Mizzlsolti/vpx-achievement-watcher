@@ -2540,6 +2540,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.cfg.save()
         self.chk_sound_enabled.stateChanged.connect(_on_sound_enabled)
         row_enable.addWidget(self.chk_sound_enabled)
+        row_enable.addSpacing(20)
 
         lbl_vol = QLabel("Volume:")
         row_enable.addWidget(lbl_vol)
@@ -2595,8 +2596,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        tbl_sound.setColumnWidth(1, 60)
-        tbl_sound.setColumnWidth(2, 50)
+        tbl_sound.setColumnWidth(1, 65)
+        tbl_sound.setColumnWidth(2, 55)
+        tbl_sound.verticalHeader().setDefaultSectionSize(24)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tbl_sound.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
@@ -2618,6 +2620,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             chk_event = QCheckBox()
             chk_event.setChecked(bool(cur_events.get(event_id, True)))
             chk_event.setToolTip(f"Enable/disable sound for {event_label}")
+            chk_event.setStyleSheet(
+                "QCheckBox::indicator { width: 18px; height: 18px; }"
+                "QCheckBox::indicator:checked { background: #00E5FF; border: 1px solid #00B8D4; border-radius: 2px; }"
+                "QCheckBox::indicator:unchecked { background: #333; border: 1px solid #555; border-radius: 2px; }"
+            )
 
             def _make_event_handler(eid):
                 def _handler(state):
@@ -2637,6 +2644,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             btn_test = QPushButton("▶")
             btn_test.setFixedSize(28, 22)
             btn_test.setToolTip(f"Preview sound for {event_label}")
+            btn_test.setStyleSheet(
+                "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 12px; }"
+                "QPushButton:hover { background: #444; }"
+                "QPushButton:pressed { background: #555; }"
+            )
 
             def _make_preview(eid):
                 def _preview():
@@ -2652,6 +2664,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 2, cell_btn)
 
         tbl_sound.resizeRowsToContents()
+        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 26 + 30)
         sound_layout.addWidget(tbl_sound)
 
         sound_layout.addStretch(1)
