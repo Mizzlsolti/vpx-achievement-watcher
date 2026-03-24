@@ -2593,12 +2593,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
         tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
-        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        tbl_sound.setColumnWidth(1, 65)
-        tbl_sound.setColumnWidth(2, 55)
-        tbl_sound.verticalHeader().setDefaultSectionSize(24)
+        tbl_sound.setColumnWidth(1, 60)
+        tbl_sound.setColumnWidth(2, 50)
+        tbl_sound.setMaximumWidth(420)
+        tbl_sound.verticalHeader().setDefaultSectionSize(28)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tbl_sound.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
@@ -2642,10 +2643,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 1, cell_chk)
 
             btn_test = QPushButton("▶")
-            btn_test.setFixedSize(28, 22)
+            btn_test.setFixedSize(32, 24)
             btn_test.setToolTip(f"Preview sound for {event_label}")
             btn_test.setStyleSheet(
-                "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 12px; }"
+                "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 14px; padding: 0px; }"
                 "QPushButton:hover { background: #444; }"
                 "QPushButton:pressed { background: #555; }"
             )
@@ -2664,8 +2665,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 2, cell_btn)
 
         tbl_sound.resizeRowsToContents()
-        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 26 + 30)
-        sound_layout.addWidget(tbl_sound)
+        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 28 + 30)
+        sound_layout.addWidget(tbl_sound, alignment=Qt.AlignmentFlag.AlignLeft)
 
         sound_layout.addStretch(1)
         self._add_tab_help_button(sound_layout, "appearance_sound")
