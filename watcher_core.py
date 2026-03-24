@@ -5167,24 +5167,34 @@ class Watcher:
             awarded_meta = []
             retriggered_meta = []
 
+        # Filter awarded/retriggered to just the global_achievements-origin items once,
+        # so both the persist and toast steps share the same list reference.
+        global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
+        global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
         try:
-            global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-            global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
             if global_hits or global_rt:
                 self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
+        except Exception as e:
+            log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
+        try:
             if global_hits:
                 self._emit_achievement_toasts(global_hits, seconds=5)
         except Exception as e:
-            log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
+            log(self.cfg, f"[ACH] toast global failed: {e}", "WARN")
 
+        session_hits: list = []
+        session_rt: list = []
         try:
             session_hits, session_rt = self._evaluate_player_session_achievements(1, self.current_rom)
             if session_hits or session_rt:
                 self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
+        except Exception as e:
+            log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
+        try:
             if session_hits:
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
-            log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
+            log(self.cfg, f"[ACH] toast session failed: {e}", "WARN")
 
         try:
             if self.cfg.CLOUD_ENABLED:
@@ -5260,6 +5270,9 @@ class Watcher:
                 _mfr_cache[r] = self._get_manufacturer_from_rom(r)
             return _mfr_cache[r]
 
+        # Safe default so per-rule try blocks never raise NameError if the load below fails
+        already_global: set = set()
+
         # Check for rom_complete_set revocations before evaluating rules
         try:
             state_pre = _rom_state()
@@ -5267,6 +5280,7 @@ class Watcher:
                 str(e.get("title", "")).strip()
                 for entries in state_pre.get("global", {}).values()
                 for e in entries
+                if isinstance(e, dict)
             }
             roms_played_pre = set(state_pre.get("roms_played") or [])
             revoked = False
@@ -5319,14 +5333,11 @@ class Watcher:
                     need = int(cond.get("min", 1))
                     sv = int(self._nv_get_int_ci(start_audits, field, 0))
                     ev = int(self._nv_get_int_ci(end_audits, field, 0))
-                    if sv < need <= ev:
-                        if title in already_global:
-                            if title not in seen_rt:
-                                retriggered_meta.append({"title": title, "origin": origin})
-                                seen_rt.add(title)
-                        elif title not in seen_aw:
-                            awarded.append(title); seen_aw.add(title)
-                            awarded_meta.append({"title": title, "origin": origin})
+                    # Restore v2.5 behaviour: always award when the threshold is crossed this
+                    # session.  _ach_record_unlocks handles dedup so re-triggering is safe.
+                    if sv < need <= ev and title not in seen_aw:
+                        awarded.append(title); seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_delta":
                     field = cond.get("field")
                     if not field or is_excluded_field(field):
@@ -5337,14 +5348,12 @@ class Watcher:
                     d = de - ds
                     if d < 0:
                         d = 0
-                    if d >= need:
-                        if title in already_global:
-                            if title not in seen_rt:
-                                retriggered_meta.append({"title": title, "origin": origin})
-                                seen_rt.add(title)
-                        elif title not in seen_aw:
-                            awarded.append(title); seen_aw.add(title)
-                            awarded_meta.append({"title": title, "origin": origin})
+                    # Restore v2.5 behaviour: always award when the delta threshold is met,
+                    # regardless of prior history.  _ach_record_unlocks handles dedup so
+                    # re-triggering is safe and the toast fires on every qualifying session.
+                    if d >= need and title not in seen_aw:
+                        awarded.append(title); seen_aw.add(title)
+                        awarded_meta.append({"title": title, "origin": origin})
                 elif rtype == "nvram_tally":
                     field = cond.get("field")
                     if not field or is_excluded_field(field):
