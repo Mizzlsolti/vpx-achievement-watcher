@@ -63,6 +63,7 @@ from ui_vps import (
 )
 
 import notifications as _notif
+import sound
 
 from ui_overlay import (
     OverlayWindow,
@@ -1327,6 +1328,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _on_mini_info_show(self, rom: str, seconds: int = 10):
         msg = f"NVRAM map not found for {rom}."
+        try:
+            sound.play_sound(self.cfg, "toast_info")
+        except Exception:
+            pass
 
         def _player_visible() -> bool:
             try:
@@ -1384,6 +1389,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         return box.exec()
 
     def _on_challenge_timer_start(self, total_seconds: int):
+        try:
+            sound.play_sound(self.cfg, "challenge_start")
+        except Exception:
+            pass
         try:
             try:
                 if hasattr(self, "_challenge_timer_delay") and self._challenge_timer_delay:
@@ -2507,12 +2516,140 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._add_tab_help_button(theme_layout, "appearance_theme")
         appearance_subtabs.addTab(theme_tab, "🎨 Theme")
 
-        # ── Sound sub-tab (placeholder) ────────────────────────────────────────
+        # ── Sound sub-tab ──────────────────────────────────────────────────────
         sound_tab = QWidget()
-        sound_layout = QVBoxLayout(sound_tab)
-        sound_layout.addWidget(QLabel("Sound settings coming soon..."))
+        sound_outer = QVBoxLayout(sound_tab)
+        sound_scroll = QScrollArea()
+        sound_scroll.setWidgetResizable(True)
+        sound_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        sound_inner = QWidget()
+        sound_layout = QVBoxLayout(sound_inner)
+        sound_layout.setContentsMargins(8, 8, 8, 8)
+
+        # Title
+        lbl_sound_title = QLabel("🔊 Sound Effects")
+        lbl_sound_title.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF7F00; padding: 4px 0;")
+        sound_layout.addWidget(lbl_sound_title)
+
+        # Enable + Volume row
+        row_enable = QHBoxLayout()
+        self.chk_sound_enabled = QCheckBox("Enable Sound Effects")
+        self.chk_sound_enabled.setChecked(bool(self.cfg.OVERLAY.get("sound_enabled", True)))
+        def _on_sound_enabled(state):
+            self.cfg.OVERLAY["sound_enabled"] = bool(state)
+            self.cfg.save()
+        self.chk_sound_enabled.stateChanged.connect(_on_sound_enabled)
+        row_enable.addWidget(self.chk_sound_enabled)
+        row_enable.addStretch(1)
+
+        lbl_vol = QLabel("Volume:")
+        row_enable.addWidget(lbl_vol)
+        self.sld_sound_volume = QSlider(Qt.Orientation.Horizontal)
+        self.sld_sound_volume.setRange(0, 100)
+        self.sld_sound_volume.setValue(int(self.cfg.OVERLAY.get("sound_volume", sound.DEFAULT_VOLUME)))
+        self.sld_sound_volume.setFixedWidth(120)
+        self.lbl_sound_vol_pct = QLabel(f"{self.sld_sound_volume.value()}%")
+        self.lbl_sound_vol_pct.setMinimumWidth(36)
+        def _on_sound_volume(val):
+            self.lbl_sound_vol_pct.setText(f"{val}%")
+            self.cfg.OVERLAY["sound_volume"] = val
+            self.cfg.save()
+        self.sld_sound_volume.valueChanged.connect(_on_sound_volume)
+        row_enable.addWidget(self.sld_sound_volume)
+        row_enable.addWidget(self.lbl_sound_vol_pct)
+        sound_layout.addLayout(row_enable)
+
+        # Sound Pack
+        row_pack = QHBoxLayout()
+        lbl_pack = QLabel("Sound Pack:")
+        lbl_pack.setStyleSheet("font-weight: bold;")
+        row_pack.addWidget(lbl_pack)
+        self.cmb_sound_pack = QComboBox()
+        for pack_id, pack_name in sound.SOUND_PACKS.items():
+            self.cmb_sound_pack.addItem(pack_name, pack_id)
+        cur_pack = str(self.cfg.OVERLAY.get("sound_pack", "arcade"))
+        idx = self.cmb_sound_pack.findData(cur_pack)
+        if idx >= 0:
+            self.cmb_sound_pack.setCurrentIndex(idx)
+        def _on_sound_pack(idx):
+            self.cfg.OVERLAY["sound_pack"] = self.cmb_sound_pack.itemData(idx)
+            self.cfg.save()
+        self.cmb_sound_pack.currentIndexChanged.connect(_on_sound_pack)
+        row_pack.addWidget(self.cmb_sound_pack)
+        row_pack.addStretch(1)
+        sound_layout.addLayout(row_pack)
+
+        # Events group
+        lbl_events = QLabel("Events")
+        lbl_events.setStyleSheet("font-size: 11pt; font-weight: bold; color: #00E5FF; margin-top: 6px;")
+        sound_layout.addWidget(lbl_events)
+
+        tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
+        tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
+        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.verticalHeader().setVisible(False)
+        tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        tbl_sound.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        tbl_sound.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        tbl_sound.setShowGrid(False)
+        tbl_sound.setAlternatingRowColors(True)
+        tbl_sound.setStyleSheet(
+            "QTableWidget { background: #111; alternate-background-color: #1a1a1a; border: 1px solid #333; }"
+            "QTableWidget::item { padding: 2px 6px; }"
+        )
+
+        cur_events = self.cfg.OVERLAY.get("sound_events") or {}
+
+        for row, (event_id, event_label) in enumerate(sound.SOUND_EVENTS):
+            lbl_item = QTableWidgetItem(event_label)
+            lbl_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            tbl_sound.setItem(row, 0, lbl_item)
+
+            chk_event = QCheckBox()
+            chk_event.setChecked(bool(cur_events.get(event_id, True)))
+            chk_event.setToolTip(f"Enable/disable sound for {event_label}")
+
+            def _make_event_handler(eid):
+                def _handler(state):
+                    ev = self.cfg.OVERLAY.setdefault("sound_events", {})
+                    ev[eid] = bool(state)
+                    self.cfg.save()
+                return _handler
+
+            chk_event.stateChanged.connect(_make_event_handler(event_id))
+            cell_chk = QWidget()
+            cell_lay = QHBoxLayout(cell_chk)
+            cell_lay.setContentsMargins(0, 0, 0, 0)
+            cell_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cell_lay.addWidget(chk_event)
+            tbl_sound.setCellWidget(row, 1, cell_chk)
+
+            btn_test = QPushButton("▶")
+            btn_test.setFixedWidth(34)
+            btn_test.setToolTip(f"Preview sound for {event_label}")
+
+            def _make_preview(eid):
+                def _preview():
+                    sound.play_sound_preview(self.cfg, eid)
+                return _preview
+
+            btn_test.clicked.connect(_make_preview(event_id))
+            cell_btn = QWidget()
+            cell_btn_lay = QHBoxLayout(cell_btn)
+            cell_btn_lay.setContentsMargins(2, 1, 2, 1)
+            cell_btn_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cell_btn_lay.addWidget(btn_test)
+            tbl_sound.setCellWidget(row, 2, cell_btn)
+
+        tbl_sound.resizeRowsToContents()
+        sound_layout.addWidget(tbl_sound)
+
         sound_layout.addStretch(1)
         self._add_tab_help_button(sound_layout, "appearance_sound")
+        sound_scroll.setWidget(sound_inner)
+        sound_outer.addWidget(sound_scroll)
         appearance_subtabs.addTab(sound_tab, "🔊 Sound")
 
         self.main_tabs.addTab(tab, "🎨 Appearance")
@@ -5698,6 +5835,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._challenge_timer = None
 
     def _on_challenge_info_show(self, message: str, seconds: int, color_hex: str = "#FFFFFF"):
+        try:
+            msg_lower = str(message or "").lower()
+            col = str(color_hex or "").upper()
+            if "challenge complete" in msg_lower or "time's up" in msg_lower:
+                sound.play_sound(self.cfg, "challenge_complete")
+            elif col == "#FF3B30" or "aborted" in msg_lower or "fail" in msg_lower:
+                sound.play_sound(self.cfg, "challenge_fail")
+        except Exception:
+            pass
         try:
             if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                 self._mini_overlay = MiniInfoOverlay(self)

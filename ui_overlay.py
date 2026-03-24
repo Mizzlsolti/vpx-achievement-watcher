@@ -18,6 +18,11 @@ from PyQt6.QtGui import (
 
 from watcher_core import APP_DIR, register_raw_input_for_window
 
+try:
+    import sound as _sound_mod
+except Exception:
+    _sound_mod = None
+
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
                       radius: int = 18, color: QColor = None, layers: int = 3,
@@ -3976,6 +3981,8 @@ class AchToastManager(QObject):
         self._queue: list[tuple[str, str, int]] = []
         self._active = False
         self._active_window: Optional[AchToastWindow] = None
+        self._sound_played = False
+        self._levelup_sound_played = False
 
     def enqueue(self, title: str, rom: str, seconds: int = 5):
         """Fügt einen Toast in die Warteschlange ein."""
@@ -3993,13 +4000,28 @@ class AchToastManager(QObject):
         if not self._queue:
             self._active = False
             self._active_window = None
+            self._sound_played = False
+            self._levelup_sound_played = False
             return
-        
+
         self._active = True
         title, rom, seconds = self._queue.pop(0)
         win = AchToastWindow(self.parent_gui, title, rom, seconds)
         win.finished.connect(self._on_finished)
         self._active_window = win
+
+        if _sound_mod is not None:
+            try:
+                if rom == "__levelup__":
+                    if not self._levelup_sound_played:
+                        _sound_mod.play_sound(self.parent_gui.cfg, "level_up")
+                        self._levelup_sound_played = True
+                else:
+                    if not self._sound_played:
+                        _sound_mod.play_sound(self.parent_gui.cfg, "achievement_unlock")
+                        self._sound_played = True
+            except Exception:
+                pass
 
     def _on_finished(self):
         self._active_window = None
@@ -4039,13 +4061,23 @@ class ChallengeCountdownOverlay(QWidget):
         self._left -= 1
         if self._left <= 0:
             self._left = 0
+            if _sound_mod is not None:
+                try:
+                    _sound_mod.play_sound(self.parent_gui.cfg, "countdown_final")
+                except Exception:
+                    pass
             try:
                 self._timer.stop()
-                self._render_and_place()  
+                self._render_and_place()
             except Exception:
                 pass
             QTimer.singleShot(200, self.close)
             return
+        if _sound_mod is not None:
+            try:
+                _sound_mod.play_sound(self.parent_gui.cfg, "countdown_tick")
+            except Exception:
+                pass
         self._render_and_place()
 
     def _render_and_place(self):

@@ -229,13 +229,16 @@ DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page5_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
-DEFAULT_OVERLAY.setdefault("status_overlay_portrait", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
+DEFAULT_OVERLAY.setdefault("sound_enabled", True)
+DEFAULT_OVERLAY.setdefault("sound_volume", 70)
+DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
+DEFAULT_OVERLAY.setdefault("sound_events", {})
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -338,7 +341,8 @@ class AppConfig:
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
                 "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
                 "overlay_page2_enabled", "overlay_page3_enabled",
-                "overlay_page4_enabled", "overlay_page5_enabled"
+                "overlay_page4_enabled", "overlay_page5_enabled",
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -408,7 +412,8 @@ class AppConfig:
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
                 "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
                 "overlay_page2_enabled", "overlay_page3_enabled",
-                "overlay_page4_enabled", "overlay_page5_enabled"
+                "overlay_page4_enabled", "overlay_page5_enabled",
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
             ]
             
             for k in allowed_keys:
