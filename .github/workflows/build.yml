@@ -1,0 +1,54 @@
+name: Build Windows Installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 requests pywin32 pyinstaller
+
+    - name: Build Achievement_Watcher.exe with PyInstaller
+      run: |
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
+
+    - name: Install Inno Setup
+      run: choco install innosetup -y
+
+    - name: Build Installer with Inno Setup
+      run: |
+        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "2.6" }
+        iscc /DMyAppVersion="$version" installer.iss
+
+    - name: Upload Installer as Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: VPX-Achievement-Watcher-Setup
+        path: installer-output/VPX-Achievement-Watcher-Setup.exe
+
+    - name: Upload Installer to Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: installer-output/VPX-Achievement-Watcher-Setup.exe
