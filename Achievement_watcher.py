@@ -2540,14 +2540,18 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.cfg.save()
         self.chk_sound_enabled.stateChanged.connect(_on_sound_enabled)
         row_enable.addWidget(self.chk_sound_enabled)
-        row_enable.addStretch(1)
 
         lbl_vol = QLabel("Volume:")
         row_enable.addWidget(lbl_vol)
         self.sld_sound_volume = QSlider(Qt.Orientation.Horizontal)
         self.sld_sound_volume.setRange(0, 100)
         self.sld_sound_volume.setValue(int(self.cfg.OVERLAY.get("sound_volume", sound.DEFAULT_VOLUME)))
-        self.sld_sound_volume.setFixedWidth(120)
+        self.sld_sound_volume.setFixedWidth(180)
+        self.sld_sound_volume.setStyleSheet(
+            "QSlider::groove:horizontal { background: #333; height: 6px; border-radius: 3px; }"
+            "QSlider::handle:horizontal { background: #FF7F00; width: 14px; margin: -4px 0; border-radius: 7px; }"
+            "QSlider::sub-page:horizontal { background: #FF7F00; border-radius: 3px; }"
+        )
         self.lbl_sound_vol_pct = QLabel(f"{self.sld_sound_volume.value()}%")
         self.lbl_sound_vol_pct.setMinimumWidth(36)
         def _on_sound_volume(val):
@@ -2557,6 +2561,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.sld_sound_volume.valueChanged.connect(_on_sound_volume)
         row_enable.addWidget(self.sld_sound_volume)
         row_enable.addWidget(self.lbl_sound_vol_pct)
+        row_enable.addStretch(1)
         sound_layout.addLayout(row_enable)
 
         # Sound Pack
@@ -2565,6 +2570,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lbl_pack.setStyleSheet("font-weight: bold;")
         row_pack.addWidget(lbl_pack)
         self.cmb_sound_pack = QComboBox()
+        self.cmb_sound_pack.setFixedWidth(160)
         for pack_id, pack_name in sound.SOUND_PACKS.items():
             self.cmb_sound_pack.addItem(pack_name, pack_id)
         cur_pack = str(self.cfg.OVERLAY.get("sound_pack", "arcade"))
@@ -2587,8 +2593,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
         tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
         tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        tbl_sound.setColumnWidth(1, 60)
+        tbl_sound.setColumnWidth(2, 50)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tbl_sound.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
@@ -2627,7 +2635,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 1, cell_chk)
 
             btn_test = QPushButton("▶")
-            btn_test.setFixedWidth(34)
+            btn_test.setFixedSize(28, 22)
             btn_test.setToolTip(f"Preview sound for {event_label}")
 
             def _make_preview(eid):

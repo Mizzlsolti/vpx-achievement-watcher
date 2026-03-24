@@ -1516,7 +1516,7 @@ def _play_raw(wav_bytes: bytes) -> None:
             try:
                 winsound.PlaySound(
                     wav_bytes,
-                    winsound.SND_MEMORY | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+                    winsound.SND_MEMORY | winsound.SND_NODEFAULT,
                 )
             except Exception:
                 pass
