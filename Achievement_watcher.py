@@ -2206,7 +2206,21 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "&nbsp;&nbsp;&nbsp;– <b>Playtime Trend</b>: Session durations with average and trend indicator.<br>"
             "&nbsp;&nbsp;&nbsp;– <b>Last vs. Average</b>: Side-by-side comparison of your most recent session "
             "against your session average across all tracked metrics.<br>"
-            "Trends data is built from session summary files stored locally in the BASE folder."
+            "Trends data is built from session summary files stored locally in the BASE folder.<br><br>"
+            "<b>🧠 INSIGHTS</b> (unlocks after 5 sessions)<br><br>"
+            "• <b>Session Report</b> – Natural language summary of your last session: "
+            "what went well, what dropped, standout stats vs. your average.<br>"
+            "• <b>Strategy Guide</b> – Shows which NVRAM fields correlate most with "
+            "your score (Pearson correlation). Identifies your strengths "
+            "and biggest gaps for improvement.<br>"
+            "• <b>Skill Profile</b> – Skill rating 0-100 based on peak score, "
+            "consistency, and learning rate. Logarithmic milestone "
+            "predictions with session estimates.<br>"
+            "• <b>Session Optimizer</b> – Finds your optimal session length, "
+            "best time of day, and detects fatigue patterns. "
+            "Needs 10+ sessions for time-of-day analysis.<br><br>"
+            "All analysis runs locally on your session data. "
+            "No external services needed."
         ),
     }
 
