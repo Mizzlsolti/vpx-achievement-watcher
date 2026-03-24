@@ -342,7 +342,6 @@ class CloudStatsMixin:
     def _refresh_trends(self):
         """Rebuild the trends view for the currently selected ROM."""
         try:
-            self._populate_trends_rom_combo()
             rom = self.cmb_trends_rom.currentData()
             if not rom:
                 self.trends_view.setHtml("<p style='color:#888;'>No summary data found yet. Play a game first!</p>")
