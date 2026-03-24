@@ -273,6 +273,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._rarity_cache: dict = {}  # {rom: {"data": {...}, "ts": float, "total_players": int}}
 
         self._build_tab_dashboard()
+        self._build_tab_player()
         self._build_tab_appearance()
         self._build_tab_controls()
         self._build_tab_stats()
@@ -1792,19 +1793,24 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     _TAB_HELP = {
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
-            "The Dashboard gives you a quick overview of the watcher status, your player level, "
-            "badges, and the latest session information.<br><br>"
+            "The Dashboard gives you a quick overview of the watcher status and the latest session information.<br><br>"
             "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
+            "• <b>Session Summary</b>: Overview of the last and current play session including "
+            "score, achievements, and cloud status.<br>"
+            "• <b>Notifications</b>: System messages and event notifications.<br>"
+            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
+        ),
+        "player": (
+            "<b>👤 Player</b><br><br>"
+            "The Player tab shows your level progress and badge collection.<br><br>"
             "• <b>Player Level</b>: Your current level and progress bar based on unlocked achievements. "
             "Reach Prestige 1–5 by unlocking 2000 achievements per star.<br>"
+            "• <b>Level Table</b>: All levels from Rookie to VPX Elite with their achievement thresholds.<br>"
             "• <b>Badges</b>: 37 collectible badges earned through gameplay milestones. "
             "Earn badges by unlocking achievements, completing challenges, reaching levels, "
             "accumulating playtime, and more. "
             "Use the <b>Display Badge</b> dropdown to choose which badge icon appears next to "
-            "your name on cloud leaderboards.<br>"
-            "• <b>Session Summary</b>: Overview of the last and current play session including "
-            "score, achievements, and cloud status.<br>"
-            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
+            "your name on cloud leaderboards."
         ),
         "progress": (
             "<b>📈 Progress</b><br><br>"
@@ -1815,9 +1821,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• Click an achievement link to see more details.<br>"
             "• Use <b>🔄 Refresh</b> to reload the list."
         ),
-        "appearance": (
-            "<b>🎨 Appearance</b><br><br>"
-            "The Appearance tab lets you configure the visual style of all overlays.<br><br>"
+        "appearance_overlay": (
+            "<b>🖼 Overlay</b><br><br>"
+            "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
             "(Main Overlay, Toast, Challenge Menu, Timers & Counters, System Notifications, Heat Bar, Status Overlay).<br>"
@@ -1826,6 +1832,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay."
+        ),
+        "appearance_theme": (
+            "<b>🎨 Theme</b><br><br>"
+            "Theme settings coming soon."
+        ),
+        "appearance_sound": (
+            "<b>🔊 Sound</b><br><br>"
+            "Sound settings coming soon."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
@@ -1853,13 +1867,20 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
             "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM."
         ),
-        "system": (
-            "<b>⚙️ System</b><br><br>"
-            "The System tab is where you manage your player profile, directory paths, and "
-            "maintenance tools.<br><br>"
+        "system_general": (
+            "<b>⚙️ General</b><br><br>"
+            "The General sub-tab is where you manage your player profile, cloud sync, performance settings, "
+            "and feedback.<br><br>"
             "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
             "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
             "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
+            "• <b>Performance &amp; Animations</b>: Enable or disable overlay animations individually, "
+            "or activate Low Performance Mode to disable all animations at once.<br>"
+            "• <b>Feedback</b>: Report bugs or suggestions directly from here."
+        ),
+        "system_maintenance": (
+            "<b>🔧 Maintenance</b><br><br>"
+            "The Maintenance sub-tab lets you manage directories and perform maintenance operations.<br><br>"
             "• <b>Directory Setup</b>: Configure paths for BASE, NVRAM, and tables directories.<br>"
             "• <b>Maintenance</b>: Repair data folders, force the map cache, update databases, "
             "or install an app update."
@@ -1957,87 +1978,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
         lay_status.addWidget(self.status_label)
         layout.addWidget(grp_status)
-
-        grp_level = QGroupBox("👑 Player Level")
-        lay_level = QVBoxLayout(grp_level)
-
-        self.lbl_prestige_stars = QLabel("☆☆☆☆☆")
-        self.lbl_prestige_stars.setStyleSheet(
-            "font-size: 22pt; font-weight: bold; color: #FFD700; "
-            "padding: 4px 10px; letter-spacing: 8px;"
-        )
-        self.lbl_prestige_stars.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay_level.addWidget(self.lbl_prestige_stars)
-
-        self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
-        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
-        self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
-
-        self.bar_level = QProgressBar()
-        self.bar_level.setRange(0, 100)
-        self.bar_level.setValue(0)
-        self.bar_level.setTextVisible(False)
-        self.bar_level.setFixedHeight(18)
-        self.bar_level.setStyleSheet(
-            "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
-            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
-        )
-
-        row_level_info = QHBoxLayout()
-        self.lbl_level_count = QLabel("0 Achievements unlocked")
-        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
-        self.lbl_level_next = QLabel("")
-        self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
-        self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
-        row_level_info.addWidget(self.lbl_level_count)
-        row_level_info.addStretch(1)
-        row_level_info.addWidget(self.lbl_level_next)
-
-        lay_level.addWidget(self.lbl_level_icon_name)
-        lay_level.addWidget(self.bar_level)
-        lay_level.addLayout(row_level_info)
-
-        grp_level_table = QGroupBox("Level Table")
-        lay_level_table = QVBoxLayout(grp_level_table)
-        lv_browser = QTextBrowser()
-        lv_browser.setMinimumHeight(280)
-        lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
-        lay_level_table.addWidget(lv_browser)
-        self.lv_table_browser = lv_browser
-
-        # ── Badges (inside Player Level, side by side with Level Table) ───────
-        grp_badges = QGroupBox("🏅 Badges")
-        lay_badges = QVBoxLayout(grp_badges)
-
-        # Badge grid (flow of emoji icons)
-        self.wgt_badge_grid = QWidget()
-        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
-        self._badge_grid_layout.setSpacing(4)
-        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
-        lay_badges.addWidget(self.wgt_badge_grid)
-
-        # Badge count + selected badge display dropdown
-        row_badge_bottom = QHBoxLayout()
-        self.lbl_badge_count = QLabel("0 / 37 Badges")
-        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
-        row_badge_bottom.addWidget(self.lbl_badge_count)
-        row_badge_bottom.addStretch(1)
-        lbl_display_badge = QLabel("Display Badge:")
-        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
-        row_badge_bottom.addWidget(lbl_display_badge)
-        self.cmb_badge_select = QComboBox()
-        self.cmb_badge_select.setMinimumWidth(180)
-        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
-        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
-        row_badge_bottom.addWidget(self.cmb_badge_select)
-        lay_badges.addLayout(row_badge_bottom)
-
-        # Level Table (~40%) + Badges (~60%) side by side
-        row_level_badges = QHBoxLayout()
-        row_level_badges.addWidget(grp_level_table, 40)
-        row_level_badges.addWidget(grp_badges, 60)
-        lay_level.addLayout(row_level_badges)
-        layout.addWidget(grp_level)
 
         # ── Session Summary: Last Run & Run Status cards ────────────────────────────
         grp_run_cards = QGroupBox("Session Summary")
@@ -2148,7 +2088,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._add_tab_help_button(layout, "dashboard")
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
-        QTimer.singleShot(1500, self._refresh_level_display)
         QTimer.singleShot(1500, self._refresh_dashboard_cards)
         self._dashboard_refresh_timer = QTimer(self)
         self._dashboard_refresh_timer.setInterval(10000)
@@ -2163,12 +2102,114 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._highscore_poll_timer.start()
 
     # ==========================================
-    # TAB 2: APPEARANCE (Grid Layout)
+    # TAB 2: PLAYER
+    # ==========================================
+    def _build_tab_player(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        grp_level = QGroupBox("👑 Player Level")
+        lay_level = QVBoxLayout(grp_level)
+
+        self.lbl_prestige_stars = QLabel("☆☆☆☆☆")
+        self.lbl_prestige_stars.setStyleSheet(
+            "font-size: 22pt; font-weight: bold; color: #FFD700; "
+            "padding: 4px 10px; letter-spacing: 8px;"
+        )
+        self.lbl_prestige_stars.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay_level.addWidget(self.lbl_prestige_stars)
+
+        self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
+        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
+        self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
+
+        self.bar_level = QProgressBar()
+        self.bar_level.setRange(0, 100)
+        self.bar_level.setValue(0)
+        self.bar_level.setTextVisible(False)
+        self.bar_level.setFixedHeight(18)
+        self.bar_level.setStyleSheet(
+            "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
+            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
+        )
+
+        row_level_info = QHBoxLayout()
+        self.lbl_level_count = QLabel("0 Achievements unlocked")
+        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
+        self.lbl_level_next = QLabel("")
+        self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
+        self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
+        row_level_info.addWidget(self.lbl_level_count)
+        row_level_info.addStretch(1)
+        row_level_info.addWidget(self.lbl_level_next)
+
+        lay_level.addWidget(self.lbl_level_icon_name)
+        lay_level.addWidget(self.bar_level)
+        lay_level.addLayout(row_level_info)
+
+        grp_level_table = QGroupBox("Level Table")
+        lay_level_table = QVBoxLayout(grp_level_table)
+        lv_browser = QTextBrowser()
+        lv_browser.setMinimumHeight(280)
+        lv_browser.setStyleSheet("background: #111; border: 1px solid #333;")
+        lay_level_table.addWidget(lv_browser)
+        self.lv_table_browser = lv_browser
+
+        # ── Badges (inside Player Level, side by side with Level Table) ───────
+        grp_badges = QGroupBox("🏅 Badges")
+        lay_badges = QVBoxLayout(grp_badges)
+
+        # Badge grid (flow of emoji icons)
+        self.wgt_badge_grid = QWidget()
+        self._badge_grid_layout = QGridLayout(self.wgt_badge_grid)
+        self._badge_grid_layout.setSpacing(4)
+        self._badge_grid_layout.setContentsMargins(4, 4, 4, 4)
+        lay_badges.addWidget(self.wgt_badge_grid)
+
+        # Badge count + selected badge display dropdown
+        row_badge_bottom = QHBoxLayout()
+        self.lbl_badge_count = QLabel("0 / 37 Badges")
+        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
+        row_badge_bottom.addWidget(self.lbl_badge_count)
+        row_badge_bottom.addStretch(1)
+        lbl_display_badge = QLabel("Display Badge:")
+        lbl_display_badge.setStyleSheet("color: #CCC; font-size: 9pt;")
+        row_badge_bottom.addWidget(lbl_display_badge)
+        self.cmb_badge_select = QComboBox()
+        self.cmb_badge_select.setMinimumWidth(180)
+        self.cmb_badge_select.setToolTip("Choose which badge icon to display next to your name on leaderboards")
+        self.cmb_badge_select.currentIndexChanged.connect(self._on_badge_select_changed)
+        row_badge_bottom.addWidget(self.cmb_badge_select)
+        lay_badges.addLayout(row_badge_bottom)
+
+        # Level Table (~40%) + Badges (~60%) side by side
+        row_level_badges = QHBoxLayout()
+        row_level_badges.addWidget(grp_level_table, 40)
+        row_level_badges.addWidget(grp_badges, 60)
+        lay_level.addLayout(row_level_badges)
+        layout.addWidget(grp_level)
+
+        layout.addStretch(1)
+        self._add_tab_help_button(layout, "player")
+
+        self.main_tabs.addTab(tab, "👤 Player")
+        QTimer.singleShot(1500, self._refresh_level_display)
+
+    # ==========================================
+    # TAB 3: APPEARANCE (Grid Layout)
     # ==========================================
     def _build_tab_appearance(self):
         tab = QWidget()
         tab_layout = QVBoxLayout(tab)
         tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        appearance_subtabs = QTabWidget()
+        tab_layout.addWidget(appearance_subtabs)
+
+        # ── Overlay sub-tab ────────────────────────────────────────────────────
+        overlay_tab = QWidget()
+        overlay_tab_layout = QVBoxLayout(overlay_tab)
+        overlay_tab_layout.setContentsMargins(0, 0, 0, 0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -2177,7 +2218,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         inner = QWidget()
         layout = QVBoxLayout(inner)
         scroll.setWidget(inner)
-        tab_layout.addWidget(scroll)
+        overlay_tab_layout.addWidget(scroll)
 
         grp_style = QGroupBox("Global Styling")
         lay_style = QGridLayout(grp_style)
@@ -2308,8 +2349,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         layout.addWidget(grp_pos)
         layout.addStretch(1)
-        self._add_tab_help_button(layout, "appearance")
+        self._add_tab_help_button(layout, "appearance_overlay")
         self._update_switch_all_button_label()
+        appearance_subtabs.addTab(overlay_tab, "🖼 Overlay")
+
+        # ── Theme sub-tab (placeholder) ────────────────────────────────────────
+        theme_tab = QWidget()
+        theme_layout = QVBoxLayout(theme_tab)
+        theme_layout.addWidget(QLabel("Theme settings coming soon..."))
+        theme_layout.addStretch(1)
+        self._add_tab_help_button(theme_layout, "appearance_theme")
+        appearance_subtabs.addTab(theme_tab, "🎨 Theme")
+
+        # ── Sound sub-tab (placeholder) ────────────────────────────────────────
+        sound_tab = QWidget()
+        sound_layout = QVBoxLayout(sound_tab)
+        sound_layout.addWidget(QLabel("Sound settings coming soon..."))
+        sound_layout.addStretch(1)
+        self._add_tab_help_button(sound_layout, "appearance_sound")
+        appearance_subtabs.addTab(sound_tab, "🔊 Sound")
+
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
     def _portrait_checkboxes(self):
@@ -3304,7 +3363,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     # ==========================================
     def _build_tab_system(self):
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+
+        system_subtabs = QTabWidget()
+        tab_layout.addWidget(system_subtabs)
+
+        # ── General sub-tab ────────────────────────────────────────────────────
+        general_tab = QWidget()
+        layout = QVBoxLayout(general_tab)
 
         # --- 👤 Player Profile ---
         grp_profile = QGroupBox("👤 Player Profile")
@@ -3379,42 +3446,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         lay_cloud.addLayout(lay_cloud_btns)
         layout.addWidget(grp_cloud)
-
-        # --- 📁 Directory Setup ---
-        grp_paths = QGroupBox("📁 Directory Setup")
-        lay_paths = QGridLayout(grp_paths)
-        self.base_label = QLabel(f"BASE: {self.cfg.BASE}")
-        self.btn_base = QPushButton("Browse..."); self.btn_base.clicked.connect(self.change_base)
-        self.nvram_label = QLabel(f"NVRAM: {self.cfg.NVRAM_DIR}")
-        self.btn_nvram = QPushButton("Browse..."); self.btn_nvram.clicked.connect(self.change_nvram)
-        self.tables_label = QLabel(f"TABLES: {self.cfg.TABLES_DIR}")
-        self.btn_tables = QPushButton("Browse..."); self.btn_tables.clicked.connect(self.change_tables)
-        lay_paths.addWidget(self.btn_base, 0, 0); lay_paths.addWidget(self.base_label, 0, 1)
-        lay_paths.addWidget(self.btn_nvram, 1, 0); lay_paths.addWidget(self.nvram_label, 1, 1)
-        lay_paths.addWidget(self.btn_tables, 2, 0); lay_paths.addWidget(self.tables_label, 2, 1)
-        lay_paths.setColumnStretch(1, 1); layout.addWidget(grp_paths)
-
-        # --- 🔧 Maintenance & Updates ---
-        grp_maint = QGroupBox("🔧 Maintenance & Updates")
-        lay_maint = QVBoxLayout(grp_maint)
-        self.btn_repair = QPushButton("Repair Data Folders")
-        self.btn_repair.clicked.connect(self._repair_data_folders)
-        self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
-        self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
-        lay_maint.addWidget(self.btn_repair)
-        lay_maint.addWidget(self.btn_prefetch)
-
-        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
-        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
-        self.btn_update_dbs.clicked.connect(self._update_databases_now)
-        lay_maint.addWidget(self.btn_update_dbs)
-
-        self.btn_self_update = QPushButton("⬆️ Watcher Update")
-        self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
-        self.btn_self_update.clicked.connect(self._check_for_app_update)
-        lay_maint.addWidget(self.btn_self_update)
-
-        layout.addWidget(grp_maint)
 
         # --- ⚡ Performance & Animations ---
         grp_perf_anim = QGroupBox("⚡ Performance & Animations")
@@ -3504,7 +3535,53 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         layout.addWidget(grp_feedback)
 
         layout.addStretch(1)
-        self._add_tab_help_button(layout, "system")
+        self._add_tab_help_button(layout, "system_general")
+        system_subtabs.addTab(general_tab, "⚙️ General")
+
+        # ── Maintenance sub-tab ────────────────────────────────────────────────
+        maint_tab = QWidget()
+        maint_layout = QVBoxLayout(maint_tab)
+
+        # --- 📁 Directory Setup ---
+        grp_paths = QGroupBox("📁 Directory Setup")
+        lay_paths = QGridLayout(grp_paths)
+        self.base_label = QLabel(f"BASE: {self.cfg.BASE}")
+        self.btn_base = QPushButton("Browse..."); self.btn_base.clicked.connect(self.change_base)
+        self.nvram_label = QLabel(f"NVRAM: {self.cfg.NVRAM_DIR}")
+        self.btn_nvram = QPushButton("Browse..."); self.btn_nvram.clicked.connect(self.change_nvram)
+        self.tables_label = QLabel(f"TABLES: {self.cfg.TABLES_DIR}")
+        self.btn_tables = QPushButton("Browse..."); self.btn_tables.clicked.connect(self.change_tables)
+        lay_paths.addWidget(self.btn_base, 0, 0); lay_paths.addWidget(self.base_label, 0, 1)
+        lay_paths.addWidget(self.btn_nvram, 1, 0); lay_paths.addWidget(self.nvram_label, 1, 1)
+        lay_paths.addWidget(self.btn_tables, 2, 0); lay_paths.addWidget(self.tables_label, 2, 1)
+        lay_paths.setColumnStretch(1, 1); maint_layout.addWidget(grp_paths)
+
+        # --- 🔧 Maintenance & Updates ---
+        grp_maint = QGroupBox("🔧 Maintenance & Updates")
+        lay_maint = QVBoxLayout(grp_maint)
+        self.btn_repair = QPushButton("Repair Data Folders")
+        self.btn_repair.clicked.connect(self._repair_data_folders)
+        self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
+        self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
+        lay_maint.addWidget(self.btn_repair)
+        lay_maint.addWidget(self.btn_prefetch)
+
+        self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
+        self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
+        self.btn_update_dbs.clicked.connect(self._update_databases_now)
+        lay_maint.addWidget(self.btn_update_dbs)
+
+        self.btn_self_update = QPushButton("⬆️ Watcher Update")
+        self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
+        self.btn_self_update.clicked.connect(self._check_for_app_update)
+        lay_maint.addWidget(self.btn_self_update)
+
+        maint_layout.addWidget(grp_maint)
+
+        maint_layout.addStretch(1)
+        self._add_tab_help_button(maint_layout, "system_maintenance")
+        system_subtabs.addTab(maint_tab, "🔧 Maintenance")
+
         self.main_tabs.addTab(tab, "⚙️ System")
 
     # ==========================================
@@ -5924,12 +6001,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 w.deleteLater()
 
         # Tab indices (order matches addTab calls in __init__:
-        #   0=Dashboard, 1=Appearance, 2=Controls, 3=Records&Stats,
-        #   4=Progress, 5=Available Maps, 6=Cloud, 7=System)
+        #   0=Dashboard, 1=Player, 2=Appearance, 3=Controls, 4=Records&Stats,
+        #   5=Progress, 6=Available Maps, 7=Cloud, 8=System)
+        # Only tabs used as notification action_tab destinations are listed here.
         _TAB_MAP = {
-            "cloud": 6,
-            "system": 7,
-            "available_maps": 5,
+            "cloud": 7,
+            "system": 8,
+            "available_maps": 6,
         }
 
         if not display:
