@@ -5167,18 +5167,18 @@ class Watcher:
             awarded_meta = []
             retriggered_meta = []
 
-        # Filter awarded/retriggered to just the global_achievements-origin items once,
+        # Filter awarded/retriggered to include global_achievements, rom_specific, and custom origins,
         # so both the persist and toast steps share the same list reference.
-        global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-        global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
+        valid_hits = [m for m in (awarded_meta or []) if m.get("origin") in ("global_achievements", "rom_specific", "custom")]
+        valid_rt = [m for m in (retriggered_meta or []) if m.get("origin") in ("global_achievements", "rom_specific", "custom")]
         try:
-            if global_hits or global_rt:
-                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
+            if valid_hits or valid_rt:
+                self._ach_record_unlocks("global", self.current_rom, valid_hits, retriggered=valid_rt)
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
         try:
-            if global_hits:
-                self._emit_achievement_toasts(global_hits, seconds=5)
+            if valid_hits:
+                self._emit_achievement_toasts(valid_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] toast global failed: {e}", "WARN")
 
