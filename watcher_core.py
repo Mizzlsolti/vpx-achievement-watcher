@@ -224,6 +224,10 @@ DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
 DEFAULT_OVERLAY.setdefault("anim_toast", True)
 DEFAULT_OVERLAY.setdefault("anim_status", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge", True)
+DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page5_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_portrait", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
@@ -332,7 +336,9 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+                "overlay_page2_enabled", "overlay_page3_enabled",
+                "overlay_page4_enabled", "overlay_page5_enabled"
             ]
             
             for k in list(loaded_ov.keys()):
@@ -400,7 +406,9 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge"
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+                "overlay_page2_enabled", "overlay_page3_enabled",
+                "overlay_page4_enabled", "overlay_page5_enabled"
             ]
             
             for k in allowed_keys:
