@@ -4078,6 +4078,8 @@ class AchToastManager(QObject):
         win = AchToastWindow(self.parent_gui, title, rom, seconds)
         win.finished.connect(self._on_finished)
         self._active_window = win
+        win.show()
+        win.raise_()
 
     def _on_finished(self):
         self._active_window = None
