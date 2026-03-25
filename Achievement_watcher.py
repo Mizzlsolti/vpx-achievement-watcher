@@ -53,7 +53,7 @@ from watcher_core import (
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
-from theme import pinball_arcade_style
+from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
 from ui_cloud_stats import CloudStatsMixin
 
 from ui_vps import (
@@ -1939,13 +1939,68 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _apply_theme(self):
         app = QApplication.instance()
         # Fusion ist die beste Basis für starke Custom-Themes
-        app.setStyle("Fusion") 
-        
-        app.setStyleSheet(pinball_arcade_style)
+        app.setStyle("Fusion")
+
+        theme_id = (self.cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
+        app.setStyleSheet(generate_stylesheet(theme_id))
 
         self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
         self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
         self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
+
+    def _on_apply_theme(self):
+        theme_id = self.cmb_theme.currentData()
+        if not theme_id:
+            theme_id = DEFAULT_THEME
+        self.cfg.OVERLAY["theme"] = theme_id
+        self.cfg.save()
+        app = QApplication.instance()
+        app.setStyleSheet(generate_stylesheet(theme_id))
+        self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
+        self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
+        self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
+        self._update_theme_preview(theme_id)
+
+    def _on_theme_combo_changed(self, _index: int):
+        theme_id = self.cmb_theme.currentData()
+        if theme_id:
+            self._update_theme_preview(theme_id)
+
+    def _update_theme_preview(self, theme_id: str):
+        t = get_theme(theme_id)
+        primary = t.get("primary", "#00E5FF")
+        for key, swatch in getattr(self, "_theme_color_boxes", {}).items():
+            color = t.get(key, "#000000")
+            swatch.setStyleSheet(
+                f"background-color: {color}; border: 1px solid #555; border-radius: 4px;"
+            )
+        desc = t.get("description", "")
+        lbl_desc = getattr(self, "lbl_theme_description", None)
+        if lbl_desc is not None:
+            lbl_desc.setText(desc)
+            lbl_desc.setStyleSheet(f"color: {primary}; font-size: 9pt; font-style: italic;")
+        lbl_active = getattr(self, "lbl_active_theme", None)
+        if lbl_active is not None:
+            lbl_active.setStyleSheet(f"color: {primary}; font-weight: bold; font-size: 10pt;")
+        for dot in getattr(self, "_theme_dot_labels", []):
+            dot.setStyleSheet(f"color: {primary}; font-size: 14pt;")
+
+    def _on_theme_toast_test(self):
+        try:
+            sound.play_sound(self.cfg, "achievement_unlock")
+        except Exception:
+            pass
+        try:
+            self._ach_toast_mgr.enqueue("TEST – Achievement Unlock", "test_rom", 5)
+        except Exception:
+            pass
+
+    def _on_theme_timer_test(self):
+        try:
+            sound.play_sound(self.cfg, "challenge_start")
+        except Exception:
+            pass
+        self._on_ch_timer_test()
 
     # ==========================================
     # TAB HELP TEXTS & HELPERS
@@ -2552,13 +2607,174 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._update_switch_all_button_label()
         appearance_subtabs.addTab(overlay_tab, "🖼 Overlay")
 
-        # ── Theme sub-tab (placeholder) ────────────────────────────────────────
+        # ── Theme sub-tab ──────────────────────────────────────────────────────
         theme_tab = QWidget()
-        theme_layout = QVBoxLayout(theme_tab)
-        theme_layout.addWidget(QLabel("Theme settings coming soon..."))
+        theme_tab_outer = QVBoxLayout(theme_tab)
+
+        theme_scroll = QScrollArea()
+        theme_scroll.setWidgetResizable(True)
+        theme_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        theme_inner = QWidget()
+        theme_layout = QVBoxLayout(theme_inner)
+        theme_layout.setContentsMargins(8, 8, 8, 8)
+        theme_layout.setSpacing(10)
+        theme_scroll.setWidget(theme_inner)
+        theme_tab_outer.addWidget(theme_scroll)
+
+        # ── 1. Active Theme row ────────────────────────────────────────────────
+        row_active = QHBoxLayout()
+        self.lbl_active_theme = QLabel("Active theme:")
+        self.lbl_active_theme.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 10pt;")
+        row_active.addWidget(self.lbl_active_theme)
+
+        self.cmb_theme = QComboBox()
+        current_theme_id = (self.cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
+        for tid, tdata in list_themes():
+            self.cmb_theme.addItem(f"{tdata['icon']} {tdata['name']}", tid)
+        idx = next((i for i in range(self.cmb_theme.count())
+                    if self.cmb_theme.itemData(i) == current_theme_id), 0)
+        self.cmb_theme.setCurrentIndex(idx)
+        self.cmb_theme.currentIndexChanged.connect(self._on_theme_combo_changed)
+        row_active.addWidget(self.cmb_theme, 1)
+
+        self.btn_apply_theme = QPushButton("Apply Theme")
+        self.btn_apply_theme.setStyleSheet(
+            "QPushButton { background: #FF7F00; color: #000; font-weight: bold;"
+            " padding: 6px 16px; border-radius: 6px; }"
+            "QPushButton:hover { background: #FFA040; }"
+            "QPushButton:pressed { background: #CC6600; }"
+        )
+        self.btn_apply_theme.clicked.connect(self._on_apply_theme)
+        row_active.addWidget(self.btn_apply_theme)
+        theme_layout.addLayout(row_active)
+
+        # ── 2. Color Preview ───────────────────────────────────────────────────
+        grp_preview = QGroupBox("Color Preview")
+        lay_preview = QVBoxLayout(grp_preview)
+
+        row_colors = QHBoxLayout()
+        row_colors.setSpacing(12)
+        self._theme_color_boxes: dict[str, QLabel] = {}
+        for key, label_text in [("primary", "Primary"), ("accent", "Accent"),
+                                 ("border", "Border"), ("bg", "BG")]:
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            swatch = QLabel()
+            swatch.setFixedSize(60, 36)
+            swatch.setStyleSheet("border: 1px solid #555; border-radius: 4px;")
+            self._theme_color_boxes[key] = swatch
+            col.addWidget(swatch)
+            lbl_key = QLabel(label_text)
+            lbl_key.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            lbl_key.setStyleSheet("color: #AAA; font-size: 8pt;")
+            col.addWidget(lbl_key)
+            row_colors.addLayout(col)
+        row_colors.addStretch(1)
+        lay_preview.addLayout(row_colors)
+
+        self.lbl_theme_description = QLabel()
+        self.lbl_theme_description.setStyleSheet("color: #00E5FF; font-size: 9pt; font-style: italic;")
+        lay_preview.addWidget(self.lbl_theme_description)
+        theme_layout.addWidget(grp_preview)
+
+        # ── 3. Overlay Preview / Test ──────────────────────────────────────────
+        grp_ov_test = QGroupBox("Overlay Preview / Test")
+        lay_ov_test = QVBoxLayout(grp_ov_test)
+
+        lbl_ov_hint = QLabel(
+            "Preview how overlays look with the current theme. "
+            "System Notification and Status Overlay are not affected by themes."
+        )
+        lbl_ov_hint.setWordWrap(True)
+        lbl_ov_hint.setStyleSheet("color: #AAA; font-size: 9pt; font-style: italic;")
+        lay_ov_test.addWidget(lbl_ov_hint)
+
+        _btn_css = (
+            "QPushButton { background: #333; color: #CCC; border: 1px solid #555;"
+            " border-radius: 4px; padding: 3px 10px; font-size: 9pt; }"
+            "QPushButton:hover { border-color: #AAA; color: #FFF; }"
+        )
+        self._theme_dot_labels: list[QLabel] = []
+
+        def _make_ov_row(dot_color: str, name: str, desc: str,
+                         test_fn=None, track_dot: bool = False) -> QHBoxLayout:
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            dot = QLabel("●")
+            dot.setStyleSheet(f"color: {dot_color}; font-size: 14pt;")
+            dot.setFixedWidth(20)
+            if track_dot:
+                self._theme_dot_labels.append(dot)
+            row.addWidget(dot)
+            lbl_name = QLabel(f"<b>{name}</b>")
+            lbl_name.setStyleSheet("color: #E0E0E0;")
+            row.addWidget(lbl_name)
+            lbl_desc = QLabel(desc)
+            lbl_desc.setStyleSheet("color: #888; font-size: 9pt;")
+            row.addWidget(lbl_desc, 1)
+            if test_fn is not None:
+                btn = QPushButton("Test")
+                btn.setStyleSheet(_btn_css)
+                btn.setFixedWidth(52)
+                btn.clicked.connect(test_fn)
+                row.addWidget(btn)
+            return row
+
+        # theme-affected overlays (primary-color dot)
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Main Stats Overlay", "Full achievement list & stats",
+            self._on_overlay_test_clicked, track_dot=True))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Achievement Toast", "Pops up on each unlock",
+            self._on_theme_toast_test, track_dot=True))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Challenge Menu", "Choose Timed/Flip/Heat",
+            self._on_ch_ov_test, track_dot=True))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Challenge Timer", "Countdown during timed challenge",
+            self._on_theme_timer_test, track_dot=True))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Flip Counter", "Flip tally for flip challenge",
+            self._on_flip_counter_test, track_dot=True))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#00E5FF", "Heat Bar", "Heat barometer for heat challenge",
+            self._on_heat_bar_test, track_dot=True))
+        # fixed-style overlays (red dot – not theme-affected)
+        lay_ov_test.addLayout(_make_ov_row(
+            "#FF4444", "System Notification", "Error/info notices – fixed style",
+            self._on_mini_info_test))
+        lay_ov_test.addLayout(_make_ov_row(
+            "#FF4444", "Status Overlay", "Cloud sync badge – fixed style",
+            self._on_status_overlay_test))
+        theme_layout.addWidget(grp_ov_test)
+
+        # ── 4. Available Themes ────────────────────────────────────────────────
+        grp_themes = QGroupBox("Available Themes")
+        lay_themes = QVBoxLayout(grp_themes)
+
+        for tid, tdata in list_themes():
+            row = QHBoxLayout()
+            row.setSpacing(10)
+            lbl_icon = QLabel(tdata["icon"])
+            lbl_icon.setFixedWidth(28)
+            lbl_icon.setStyleSheet("font-size: 16pt;")
+            row.addWidget(lbl_icon)
+            lbl_tname = QLabel(f"<b>{tdata['name']}</b>")
+            lbl_tname.setStyleSheet("color: #FFFFFF; font-size: 10pt;")
+            lbl_tname.setFixedWidth(150)
+            row.addWidget(lbl_tname)
+            lbl_tdesc = QLabel(tdata.get("description", ""))
+            lbl_tdesc.setStyleSheet("color: #888888; font-size: 9pt;")
+            row.addWidget(lbl_tdesc, 1)
+            lay_themes.addLayout(row)
+        theme_layout.addWidget(grp_themes)
+
         theme_layout.addStretch(1)
-        self._add_tab_help_button(theme_layout, "appearance_theme")
+        self._add_tab_help_button(theme_tab_outer, "appearance_theme")
         appearance_subtabs.addTab(theme_tab, "🎨 Theme")
+
+        # Populate color preview for the initial theme
+        self._update_theme_preview(current_theme_id)
 
         # ── Sound sub-tab ──────────────────────────────────────────────────────
         sound_tab = QWidget()
