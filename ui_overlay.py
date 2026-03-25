@@ -38,15 +38,32 @@ def _theme_bg_rgba_css(cfg, alpha: int = 245) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-def _get_page_accent(cfg, idx: int) -> QColor:
-    """Return the page accent QColor for page *idx* from the active theme."""
+def _get_page_accents_list(cfg) -> list:
+    """Return the page accent hex strings for the active theme.
+
+    If the theme defines ``page_accents``, those are used directly.
+    Otherwise a four-entry fallback is derived from the theme's
+    primary/accent/border colours so the overlay always respects the
+    current theme rather than falling back to hardcoded Neon-Blue values.
+    """
     theme_id = (cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
     theme = get_theme(theme_id)
     accents = theme.get("page_accents", [])
-    if accents and 0 <= idx < len(accents):
-        h = accents[idx].lstrip("#")
-        return QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
-    return _OVERLAY_PAGE_ACCENTS[idx % len(_OVERLAY_PAGE_ACCENTS)]
+    if accents:
+        return accents
+    # Dynamic fallback: build four entries from the theme's own colours.
+    default = get_theme(DEFAULT_THEME)
+    primary = theme.get("primary", default["primary"])
+    accent  = theme.get("accent",  default["accent"])
+    border  = theme.get("border",  primary)
+    return [primary, accent, border, accent]
+
+
+def _get_page_accent(cfg, idx: int) -> QColor:
+    """Return the page accent QColor for page *idx* from the active theme."""
+    accents = _get_page_accents_list(cfg)
+    h = accents[idx % len(accents)].lstrip("#")
+    return QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
@@ -245,7 +262,7 @@ class OverlayEffectsWidget(QWidget):
         try:
             _initial_accent = QColor(get_theme_color(parent.parent_gui.cfg, "primary"))
         except Exception:
-            _initial_accent = QColor(0, 229, 255)
+            _initial_accent = QColor(get_theme(DEFAULT_THEME)["primary"])
         self._accent_color: QColor = _initial_accent
         self._target_accent: QColor = QColor(_initial_accent)
 
@@ -371,7 +388,11 @@ class OverlayEffectsWidget(QWidget):
                 pass
 
 
-# Per-page accent colours for the main overlay (cycles as user navigates)
+# Per-page accent colours for the main overlay – kept only as a last-resort
+# emergency fallback.  All themes now define their own ``page_accents`` list
+# and _get_page_accents_list() derives a dynamic fallback from the theme's
+# primary/accent/border colours, so this static list should rarely (if ever)
+# be reached in practice.
 _OVERLAY_PAGE_ACCENTS = [
     QColor(0, 229, 255),    # page 0: cyan (default/highlights)
     QColor(255, 127, 0),    # page 1: orange (achievement progress)
@@ -1625,7 +1646,7 @@ class OverlayWindow(QWidget):
             return
 
         # Advance page index for accent colour cycling
-        n = len(_OVERLAY_PAGE_ACCENTS)
+        n = len(_get_page_accents_list(self.parent_gui.cfg))
         if direction == 'left':
             self._page_index = (self._page_index + 1) % n
         else:
