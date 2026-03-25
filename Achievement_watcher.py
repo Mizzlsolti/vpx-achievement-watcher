@@ -413,6 +413,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if "player_id" not in self.cfg.OVERLAY:
             self.cfg.OVERLAY["player_id"] = str(uuid.uuid4())[:4]
             self.cfg.save()
+
+        # Last successfully validated player identity — used to revert fields on conflict.
+        self._validated_player_name = self.cfg.OVERLAY.get("player_name", "").strip()
+        self._validated_player_id = self.cfg.OVERLAY.get("player_id", "").strip()
             
         self.main_tabs = QTabWidget()
         self.setCentralWidget(self.main_tabs)
@@ -524,6 +528,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._status_badge_timer.start()
 
         self.watcher.start()
+
+        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            CloudSync.cleanup_legacy_progress(self.cfg)
 
         self._apply_theme()
         self._check_for_updates()
@@ -3971,12 +3978,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.txt_player_name = QLineEdit()
         self.txt_player_name.setText(self.cfg.OVERLAY.get("player_name", "Player"))
         self.txt_player_name.textChanged.connect(self._save_player_name)
+        self.txt_player_name.editingFinished.connect(self._on_player_name_editing_finished)
 
         self.txt_player_id = QLineEdit()
         self.txt_player_id.setText(self.cfg.OVERLAY.get("player_id", "0000"))
         self.txt_player_id.setMaxLength(4)
         self.txt_player_id.setFixedWidth(60)
         self.txt_player_id.textChanged.connect(self._save_player_id)
+        self.txt_player_id.editingFinished.connect(self._on_player_id_editing_finished)
 
         lay_profile.addWidget(QLabel("Display Name:"), 0, 0)
         lay_profile.addWidget(self.txt_player_name, 0, 1)
@@ -4219,6 +4228,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.chk_cloud_backup.setChecked(False)
                 self.cfg.CLOUD_BACKUP_ENABLED = False
                 self.cfg.save()
+        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            CloudSync.cleanup_legacy_progress(self.cfg)
 
     def _save_cloud_backup_settings(self):
         self.cfg.CLOUD_BACKUP_ENABLED = self.chk_cloud_backup.isChecked()
@@ -4269,6 +4280,77 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _save_player_id(self, player_id):
         self.cfg.OVERLAY["player_id"] = player_id.strip()
         self.cfg.save()
+
+    def _on_player_name_editing_finished(self):
+        """Triggered when the player-name field loses focus or the user presses Enter.
+        Performs an async cloud uniqueness check and reverts + shows a dialog on conflict."""
+        new_name = self.txt_player_name.text().strip()
+        old_name = self._validated_player_name
+        old_id = self._validated_player_id
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            self._validated_player_name = new_name
+            return
+        if new_name.lower() == old_name.lower():
+            return
+
+        def _check():
+            current_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            result = CloudSync.validate_player_identity(self.cfg, current_id, new_name)
+            QTimer.singleShot(0, self, lambda: self._handle_identity_result(result, old_name, old_id))
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _on_player_id_editing_finished(self):
+        """Triggered when the player-ID field loses focus or the user presses Enter.
+        Performs an async cloud uniqueness check and reverts + shows a dialog on conflict."""
+        new_id = self.txt_player_id.text().strip()
+        old_name = self._validated_player_name
+        old_id = self._validated_player_id
+        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+            self._validated_player_id = new_id
+            return
+        if new_id == old_id:
+            return
+
+        def _check():
+            current_name = self.cfg.OVERLAY.get("player_name", "").strip()
+            result = CloudSync.validate_player_identity(self.cfg, new_id, current_name)
+            QTimer.singleShot(0, self, lambda: self._handle_identity_result(result, old_name, old_id))
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _handle_identity_result(self, result: dict, old_name: str, old_id: str):
+        """Called on the main thread after an async identity validation check completes.
+        If validation passed, updates the stored validated identity.
+        If it failed, reverts the UI fields and shows a blocking conflict dialog.
+        """
+        if result.get("ok"):
+            self._validated_player_name = self.cfg.OVERLAY.get("player_name", "").strip()
+            self._validated_player_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            return
+
+        # Revert both fields to the last validated values.
+        self.txt_player_name.blockSignals(True)
+        self.txt_player_id.blockSignals(True)
+        try:
+            self.txt_player_name.setText(old_name)
+            self.txt_player_id.setText(old_id)
+            self.cfg.OVERLAY["player_name"] = old_name
+            self.cfg.OVERLAY["player_id"] = old_id
+            self.cfg.save()
+        finally:
+            self.txt_player_name.blockSignals(False)
+            self.txt_player_id.blockSignals(False)
+
+        reason = result.get("reason", "")
+        msg = result.get("msg", "Identity conflict detected.")
+        if reason == "id_conflict":
+            title = "⛔ Player ID Conflict"
+        elif reason == "name_conflict":
+            title = "⛔ Duplicate Player Name"
+        else:
+            title = "⛔ Identity Conflict"
+        self._msgbox_topmost("warn", title, msg)
 
     def _restore_achievements_from_cloud(self):
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:

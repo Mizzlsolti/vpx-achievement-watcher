@@ -463,6 +463,9 @@ def p_vps(cfg):          return os.path.join(cfg.BASE, "tools", "vps")
 def p_vps_img(cfg):      return os.path.join(p_vps(cfg), "img")
 def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
+def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
+    """Marker file indicating that the one-time legacy progress cleanup has already run."""
+    return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
 def f_progress_upload_log(cfg: "AppConfig") -> str:
     """Tracks which (rom, vps_id) combos have already had progress uploaded."""
     return os.path.join(p_achievements(cfg), "progress_upload_log.json")
@@ -1484,6 +1487,11 @@ class CloudSync:
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
     _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
 
+    # Once-per-session player identity conflict check state.
+    _identity_checked: bool = False
+    _identity_blocked: bool = False
+    _identity_check_lock = threading.Lock()
+
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
         """Returns True if player name is missing/default and upload should be skipped.
@@ -1535,6 +1543,157 @@ class CloudSync:
             bridge.status_overlay_show.emit(message, 0, "#FFA500")
         except Exception:
             pass
+
+    @staticmethod
+    def validate_player_identity(cfg: AppConfig, player_id: str, player_name: str) -> dict:
+        """Check whether player_id and player_name are unique in the cloud.
+
+        Returns ``{"ok": True}`` when the identity is valid, or
+        ``{"ok": False, "reason": "id_conflict"|"name_conflict", "msg": "..."}``
+        when a conflict is detected.
+
+        Scenarios:
+        - ID new + Name new → ok
+        - ID exists + stored name matches entered name → ok (Cloud Restore)
+        - ID exists + stored name does NOT match → id_conflict
+        - Name already used by a different ID → name_conflict
+        """
+        if not cfg.CLOUD_URL or not cfg.CLOUD_ENABLED:
+            return {"ok": True}
+
+        player_id = (player_id or "").strip()
+        player_name = (player_name or "").strip()
+
+        if not player_id or not player_name or player_name.lower() == "player":
+            return {"ok": True}
+
+        existing_ids = CloudSync.fetch_player_ids(cfg)
+
+        # Check 1: if this ID already exists, verify the stored name matches.
+        if player_id in existing_ids:
+            stored_name = CloudSync.fetch_node(cfg, f"players/{player_id}/achievements/name")
+            if not isinstance(stored_name, str) or not stored_name.strip():
+                # Fall back to a progress entry for the stored name.
+                try:
+                    progress = CloudSync.fetch_node(cfg, f"players/{player_id}/progress")
+                    if isinstance(progress, dict) and progress:
+                        first_entry = next(iter(progress.values()), None)
+                        if isinstance(first_entry, dict):
+                            stored_name = first_entry.get("name", "")
+                except Exception as _e:
+                    log(cfg, f"[CLOUD] validate_player_identity: progress fallback error for {player_id}: {_e}", "WARN")
+                    stored_name = ""
+
+            if isinstance(stored_name, str) and stored_name.strip():
+                if stored_name.strip().lower() != player_name.lower():
+                    return {
+                        "ok": False,
+                        "reason": "id_conflict",
+                        "msg": (
+                            "⛔ Player ID Conflict — This Player ID is already registered to a "
+                            "different player name. Please choose a different Player ID or enter "
+                            "the correct name."
+                        ),
+                    }
+
+        # Check 2: if the entered name is already used by a different player ID.
+        other_ids = [pid for pid in existing_ids if pid != player_id]
+        if other_ids:
+            paths = [f"players/{pid}/achievements/name" for pid in other_ids]
+            batch = CloudSync.fetch_parallel(cfg, paths, max_workers=20)
+            for _path, name_data in batch.items():
+                if isinstance(name_data, str) and name_data.strip().lower() == player_name.lower():
+                    return {
+                        "ok": False,
+                        "reason": "name_conflict",
+                        "msg": (
+                            "⛔ Duplicate Player Name — This player name is already in use by "
+                            "another player. Please choose a different name."
+                        ),
+                    }
+
+        return {"ok": True}
+
+    @staticmethod
+    def _check_identity_before_upload(cfg: AppConfig, bridge: Optional["Bridge"]) -> bool:
+        """Perform a once-per-session identity conflict check before the first cloud upload.
+
+        Returns True if the upload should be blocked (identity conflict detected).
+        The result is cached so subsequent calls return immediately without network I/O.
+        """
+        with CloudSync._identity_check_lock:
+            if CloudSync._identity_checked:
+                return CloudSync._identity_blocked
+            CloudSync._identity_checked = True
+
+        player_id = str(cfg.OVERLAY.get("player_id", "")).strip()
+        player_name = cfg.OVERLAY.get("player_name", "").strip()
+
+        result = CloudSync.validate_player_identity(cfg, player_id, player_name)
+        if not result.get("ok"):
+            log(cfg, f"[CLOUD] Identity conflict ({result.get('reason')}) — uploads blocked this session.", "WARN")
+            CloudSync._identity_blocked = True
+            CloudSync._notify_cloud_blocked(bridge, "Cloud Upload Blocked · Player identity conflict")
+            return True
+
+        return False
+
+    @staticmethod
+    def cleanup_legacy_progress(cfg: AppConfig) -> None:
+        """Delete cloud progress entries that lack a vps_id (legacy entries uploaded before
+        VPS mapping was mandatory).  Runs only once per installation, guarded by a marker file.
+        Executes in a background thread to avoid blocking the UI.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not cfg.CLOUD_BACKUP_ENABLED:
+            return
+
+        marker = f_legacy_cleanup_marker(cfg)
+        if os.path.isfile(marker):
+            return
+
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            return
+
+        def _task():
+            try:
+                # Write marker first so that a crash mid-cleanup doesn't re-run
+                # on restart (partial cleanup is better than an infinite loop).
+                try:
+                    ensure_dir(os.path.dirname(marker))
+                    with open(marker, "w", encoding="utf-8") as _f:
+                        _f.write("1")
+                except Exception as e:
+                    log(cfg, f"[CLOUD] cleanup_legacy_progress: could not write marker: {e}", "WARN")
+
+                progress_data = CloudSync.fetch_node(cfg, f"players/{pid}/progress")
+                if not isinstance(progress_data, dict):
+                    return
+
+                _url = cfg.CLOUD_URL.strip().rstrip('/')
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+                for rom, entry in progress_data.items():
+                    if not isinstance(entry, dict):
+                        continue
+                    vps_id = (entry.get("vps_id") or "").strip()
+                    if vps_id:
+                        continue
+                    # Delete legacy entry
+                    endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
+                    try:
+                        del_req = urllib.request.Request(endpoint, method="DELETE")
+                        with urllib.request.urlopen(del_req, timeout=5, context=ctx):
+                            pass
+                        log(cfg, f"[CLOUD] Deleted legacy progress entry for {rom}: missing vps_id")
+                    except Exception as e:
+                        log(cfg, f"[CLOUD] Failed to delete legacy progress for {rom}: {e}", "WARN")
+            except Exception as e:
+                log(cfg, f"[CLOUD] cleanup_legacy_progress error: {e}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
 
     @staticmethod
     def upload_score(cfg: AppConfig, category: str, rom: str, score: int, extra_data: dict = None, bridge: Optional["Bridge"] = None):
@@ -1627,6 +1786,8 @@ class CloudSync:
         endpoint = f"{url}/players/{pid}/scores/{category}/{rom_key}.json"
         
         def _task():
+            if CloudSync._check_identity_before_upload(cfg, bridge):
+                return
             try:
                 req = urllib.request.Request(endpoint)
                 with urllib.request.urlopen(req, timeout=5) as resp:
@@ -1707,6 +1868,8 @@ class CloudSync:
         endpoint = f"{url}/players/{pid}/progress/{rom}.json"
         
         def _task():
+            if CloudSync._check_identity_before_upload(cfg, bridge):
+                return
             percentage = round((unlocked / total) * 100, 1)
             payload = {
                 "name": pname,
