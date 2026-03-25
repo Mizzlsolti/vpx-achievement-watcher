@@ -17,6 +17,7 @@ from PyQt6.QtGui import (
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
+from theme import get_theme_color
 
 try:
     import sound as _sound_mod
@@ -168,7 +169,10 @@ class OverlayNavArrows(QWidget):
             cy = draw_h // 2
             pad = 16
             right_cx = draw_w - pad + int(wobble)
-            arrow_color = QColor("#00E5FF")
+            try:
+                arrow_color = QColor(get_theme_color(parent.parent_gui.cfg, "primary"))
+            except Exception:
+                arrow_color = QColor("#00E5FF")
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -214,8 +218,12 @@ class OverlayEffectsWidget(QWidget):
         self._particles: list = []
 
         # Per-page accent colour (smoothly lerped)
-        self._accent_color: QColor = QColor(0, 229, 255)
-        self._target_accent: QColor = QColor(0, 229, 255)
+        try:
+            _initial_accent = QColor(get_theme_color(parent.parent_gui.cfg, "primary"))
+        except Exception:
+            _initial_accent = QColor(0, 229, 255)
+        self._accent_color: QColor = _initial_accent
+        self._target_accent: QColor = QColor(_initial_accent)
 
         self._tick_timer = QTimer(self)
         self._tick_timer.setInterval(50)
@@ -672,13 +680,14 @@ class OverlayWindow(QWidget):
         self.container = QWidget(self)
         self.container.setObjectName("overlay_bg")
         self.container.setGeometry(0, 0, self.width(), self.height())
+        _primary = get_theme_color(self.parent_gui.cfg, "primary")
         if self.bg_url:
             css = ("QWidget#overlay_bg {"
                    f"border-image: url('{self.bg_url}') 0 0 0 0 stretch stretch;"
-                   "background:rgba(8,12,22,252);border:2px solid #00E5FF;border-radius:18px;}")
+                   f"background:rgba(8,12,22,252);border:2px solid {_primary};border-radius:18px;}}")
         else:
-            css = ("QWidget#overlay_bg {background:rgba(8,12,22,252);"
-                   "border:2px solid #00E5FF;border-radius:18px;}")
+            css = (f"QWidget#overlay_bg {{background:rgba(8,12,22,252);"
+                   f"border:2px solid {_primary};border-radius:18px;}}")
         self.container.setStyleSheet(css)
         self.text_container = QWidget(self)
         self.text_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -1273,16 +1282,26 @@ class OverlayWindow(QWidget):
                 if old_pct_target >= 0:
                     self._trigger_shine()
 
-        style = """
+        _tc_primary = get_theme_color(self.parent_gui.cfg, "primary")
+        _tc_accent = get_theme_color(self.parent_gui.cfg, "accent")
+        _tc_border = get_theme_color(self.parent_gui.cfg, "border")
+        # Parse primary RGB for rgba() usage
+        def _hex_to_rgb(h):
+            h = h.lstrip("#")
+            return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        _pr, _pg, _pb = _hex_to_rgb(_tc_primary)
+        _br, _ab, _bb = _hex_to_rgb(_tc_accent)
+
+        style = f"""
         <style>
-          table.hltable { border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }
-          .hltable th, .hltable td { padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }
-          .hltable th { text-align: center; background: rgba(0, 229, 255, 0.20); color: #00E5FF; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid rgba(0, 229, 255, 0.35); }
-          .hltable td.left { text-align: left; }
-          .hltable td.right { text-align: right; font-weight: bold; font-size: 1.15em; color: #FF7F00; }
-          .rom-title { text-align: center; font-size: 1.6em; font-weight: bold; color: #FF7F00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid rgba(0, 229, 255, 0.3); padding-bottom: 0.3em; }
-          .score-box { text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: #00E5FF; }
-          .divider { border-top: 1px solid rgba(255, 127, 0, 0.3); margin-top: 0.6em; padding-top: 0.6em; }
+          table.hltable {{ border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }}
+          .hltable th, .hltable td {{ padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }}
+          .hltable th {{ text-align: center; background: rgba({_pr}, {_pg}, {_pb}, 0.20); color: {_tc_primary}; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid rgba({_pr}, {_pg}, {_pb}, 0.35); }}
+          .hltable td.left {{ text-align: left; }}
+          .hltable td.right {{ text-align: right; font-weight: bold; font-size: 1.15em; color: {_tc_accent}; }}
+          .rom-title {{ text-align: center; font-size: 1.6em; font-weight: bold; color: {_tc_accent}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid rgba({_pr}, {_pg}, {_pb}, 0.3); padding-bottom: 0.3em; }}
+          .score-box {{ text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: {_tc_primary}; }}
+          .divider {{ border-top: 1px solid rgba({_br}, {_ab}, {_bb}, 0.3); margin-top: 0.6em; padding-top: 0.6em; }}
         </style>
         """
 
@@ -2001,7 +2020,7 @@ class FlipCounterOverlay(QWidget):
         body_pt = 15
         title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
 
-        title_color = QColor("#FF7F00")
+        title_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
         hi_color = QColor("#FFFFFF")
 
         title = f"Total flips: {int(self._total)}/{int(self._goal)}"
@@ -2043,7 +2062,8 @@ class FlipCounterOverlay(QWidget):
             if not self._check_low_perf():
                 amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
                 pulse_alpha = 40 + int(180 * amp)
-                pulse_pen = QPen(QColor(0, 229, 255, pulse_alpha))
+                _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+                pulse_pen = QPen(QColor(_pc.red(), _pc.green(), _pc.blue(), pulse_alpha))
                 pulse_pen.setWidth(5)
                 p.setPen(pulse_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
@@ -2210,10 +2230,10 @@ class FlipCounterPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Flip Counter\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2329,10 +2349,10 @@ class TimerPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Timer\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2467,10 +2487,10 @@ class ToastPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Achievement Toast\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2584,10 +2604,10 @@ class ChallengeOVPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2730,10 +2750,10 @@ class MiniInfoPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Mini Info\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2914,10 +2934,11 @@ class StatusOverlay(QWidget):
                 sweep_alpha = int(160 * max(0.0, 1.0 - abs(sweep_t - 0.5) * 3.0))
                 if sweep_alpha > 0:
                     from PyQt6.QtGui import QLinearGradient
+                    _sc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                     grad = QLinearGradient(float(sweep_x - 20), 0.0, float(sweep_x + 20), 0.0)
-                    grad.setColorAt(0.0, QColor(0, 229, 255, 0))
-                    grad.setColorAt(0.5, QColor(0, 229, 255, sweep_alpha))
-                    grad.setColorAt(1.0, QColor(0, 229, 255, 0))
+                    grad.setColorAt(0.0, QColor(_sc.red(), _sc.green(), _sc.blue(), 0))
+                    grad.setColorAt(0.5, QColor(_sc.red(), _sc.green(), _sc.blue(), sweep_alpha))
+                    grad.setColorAt(1.0, QColor(_sc.red(), _sc.green(), _sc.blue(), 0))
                     p.setBrush(grad)
                     p.drawRoundedRect(0, 0, W, H, self._RADIUS, self._RADIUS)
         finally:
@@ -3215,10 +3236,10 @@ class StatusOverlayPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Status Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3344,10 +3365,10 @@ class OverlayPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary"))); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Main Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3434,7 +3455,7 @@ class AchToastWindow(QWidget):
                     'vy': math.sin(angle) * speed,
                     'size': random.uniform(3, 6),
                     'alpha': 255,
-                    'color': QColor(random.choice([0xFFD700, 0xFF7F00, 0xFFA500])),
+                    'color': QColor(get_theme_color(self.parent_gui.cfg, "accent")),
                 })
             self._burst_elapsed = 0.0
             self._burst_active = True
@@ -3611,12 +3632,12 @@ class AchToastWindow(QWidget):
 
         is_level_up = (self._rom == "__levelup__")
         if is_level_up:
-            border_color = QColor("#00E5FF")
+            border_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
             line3 = ""
         else:
-            border_color = QColor("#555555")
+            border_color = QColor(get_theme_color(self.parent_gui.cfg, "border"))
             raw_title = self._title or "Achievement unlocked"
             rom = self._rom or ""
             line3 = ""
@@ -3656,10 +3677,10 @@ class AchToastWindow(QWidget):
         if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
             self._tw_full = line1
 
-        # Feste Theme-Farben
-        title_color = QColor("#FF7F00") # Orange
-        text_color = QColor("#FFFFFF")  # Weiß
-        levelup_color = QColor("#00E5FF")  # Cyan for level-up line1
+        # Theme-dynamic colors
+        title_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
+        text_color = QColor("#FFFFFF")  # White
+        levelup_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))  # primary for level-up line1
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
         title_for_size = line1  # always use full text for width calculation
@@ -3748,7 +3769,7 @@ class AchToastWindow(QWidget):
                              W - x_text - pad, fm_body.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, sub)
         if line3:
-            p.setPen(QColor("#00E5FF"))
+            p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "primary")))
             p.setFont(f_line3)
             line3_y = text_top + fm_title.height() + vgap + (fm_body.height() + vgap if sub_for_size else 0)
             p.drawText(QRect(x_text, line3_y, W - x_text - pad, fm_line3.height()),
@@ -3759,7 +3780,8 @@ class AchToastWindow(QWidget):
             flash_alpha = int(180 * (1.0 - flash_t))
             if flash_alpha > 0:
                 p.setPen(Qt.PenStyle.NoPen)
-                flash_color = QColor(0, 229, 255, flash_alpha)
+                _fc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+                flash_color = QColor(_fc.red(), _fc.green(), _fc.blue(), flash_alpha)
                 p.setBrush(flash_color)
                 p.drawRoundedRect(0, 0, W, H, radius, radius)
         p.end()
@@ -3798,7 +3820,8 @@ class AchToastWindow(QWidget):
                     r = int(ring['r'])
                     alp = int(max(0, min(255, ring['alpha'])))
                     if r > 0 and alp > 0:
-                        rc = QColor(0, 229, 255, alp)
+                        _rc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+                        rc = QColor(_rc.red(), _rc.green(), _rc.blue(), alp)
                         pen = QPen(rc)
                         pen.setWidth(3)
                         ep.setPen(pen)
@@ -4287,7 +4310,7 @@ class ChallengeSelectOverlay(QWidget):
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
 
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
 
         _CHALLENGE_LABELS = [
             ("⌛ Timed Challenge", "3:00 minutes playing time."),
@@ -4432,7 +4455,7 @@ class ChallengeSelectOverlay(QWidget):
             left_cx = pad_lr + max(12, int(round(24 * factor))) + int(-wobble)
             right_cx = w - pad_lr - max(12, int(round(24 * factor))) + int(wobble)
             
-            arrow_color = QColor("#00E5FF")
+            arrow_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -4592,7 +4615,7 @@ class FlipDifficultyOverlay(QWidget):
         scaled_body_pt = 20  # Flip difficulty overlay is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
 
         factor = scaled_body_pt / 20.0
         pad_lr = max(12, int(round(24 * factor)))
@@ -4683,14 +4706,16 @@ class FlipDifficultyOverlay(QWidget):
                 if selected:
                     amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
                     alpha = 40 + int(60 * amp)
-                    p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(255, 127, 0, alpha))
-                    p.setPen(QPen(QColor("#00E5FF"), 2))
+                    _ac = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
+                    p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(_ac.red(), _ac.green(), _ac.blue(), alpha))
+                    p.setPen(QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary")), 2))
                     if snap_flash_alpha > 0:
                         p.fillRect(draw_rect, QColor(255, 255, 255, snap_flash_alpha))
                 else:
                     p.setPen(QPen(QColor(255, 255, 255, 80), 1))
+                    _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                     if prev_fade_alpha > 0:
-                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(0, 229, 255, prev_fade_alpha))
+                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(_pc.red(), _pc.green(), _pc.blue(), prev_fade_alpha))
 
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRoundedRect(draw_rect, 10, 10)
@@ -4702,7 +4727,7 @@ class FlipDifficultyOverlay(QWidget):
                     name_pt -= 1
                     fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
                 name_h = fm_n.height()
-                p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
+                p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")) if selected else QColor("#FFFFFF"))
                 p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
                 if int(flips) == -1:
                     name_y = y0 + inner_pad + (box_h - name_h) // 2
@@ -5063,12 +5088,12 @@ class HeatBarPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF"))
+        pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary")))
         pen.setWidth(2)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
         p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         msg = "Heat Bar\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -5126,17 +5151,21 @@ class ChallengeStartCountdown(QWidget):
         self.setGeometry(geo)
 
         self._low_perf = False
+        _primary = '#00E5FF'
+        _accent = '#FF7F00'
         try:
             self._low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+            _primary = get_theme_color(parent.cfg, "primary")
+            _accent = get_theme_color(parent.cfg, "accent")
         except Exception:
             pass
 
-        # Countdown sequence: ('3', cyan), ('2', cyan), ('1', cyan), ('GO!', orange)
+        # Countdown sequence: ('3', primary), ('2', primary), ('1', primary), ('GO!', accent)
         self._steps = [
-            ('3',   QColor('#00E5FF'), 800, False),
-            ('2',   QColor('#00E5FF'), 800, False),
-            ('1',   QColor('#00E5FF'), 800, False),
-            ('GO!', QColor('#FF7F00'), 500, True),   # last step fades out
+            ('3',   QColor(_primary), 800, False),
+            ('2',   QColor(_primary), 800, False),
+            ('1',   QColor(_primary), 800, False),
+            ('GO!', QColor(_accent), 500, True),   # last step fades out
         ]
         self._step_idx = 0
         self._step_elapsed = 0.0
