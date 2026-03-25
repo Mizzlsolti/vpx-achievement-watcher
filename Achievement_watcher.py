@@ -53,6 +53,7 @@ from watcher_core import (
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
+from tutorial import TutorialWizardDialog
 from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
 from ui_cloud_stats import CloudStatsMixin
 
@@ -1512,7 +1513,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 os.path.join("tools", "NVRAM_Maps", "maps"),
                 "session_stats",
                 os.path.join("Achievements", "rom_specific_achievements"),
-                os.path.join("Achievements", "custom_achievements"),
             ]:
                 ensure_dir(os.path.join(self.cfg.BASE, sub))
             try:
@@ -2456,8 +2456,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         tab_layout = QVBoxLayout(tab)
         tab_layout.setContentsMargins(0, 0, 0, 0)
 
-        appearance_subtabs = QTabWidget()
-        tab_layout.addWidget(appearance_subtabs)
+        self.appearance_subtabs = QTabWidget()
+        tab_layout.addWidget(self.appearance_subtabs)
 
         # ── Overlay sub-tab ────────────────────────────────────────────────────
         overlay_tab = QWidget()
@@ -2640,7 +2640,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         layout.addStretch(1)
         self._add_tab_help_button(layout, "appearance_overlay")
         self._update_switch_all_button_label()
-        appearance_subtabs.addTab(overlay_tab, "🖼 Overlay")
+        self.appearance_subtabs.addTab(overlay_tab, "🖼 Overlay")
 
         # ── Theme sub-tab ──────────────────────────────────────────────────────
         theme_tab = QWidget()
@@ -2792,7 +2792,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         theme_layout.addStretch(1)
         self._add_tab_help_button(theme_tab_outer, "appearance_theme")
-        appearance_subtabs.addTab(theme_tab, "🎨 Theme")
+        self.appearance_subtabs.addTab(theme_tab, "🎨 Theme")
 
         # Populate color preview for the initial theme
         self._update_theme_preview(current_theme_id)
@@ -2957,7 +2957,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._add_tab_help_button(sound_layout, "appearance_sound")
         sound_scroll.setWidget(sound_inner)
         sound_outer.addWidget(sound_scroll)
-        appearance_subtabs.addTab(sound_tab, "🔊 Sound")
+        self.appearance_subtabs.addTab(sound_tab, "🔊 Sound")
 
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
@@ -7930,7 +7930,6 @@ def main():
         os.path.join("tools", "NVRAM_Maps", "maps"),
         os.path.join("session_stats", "Highlights"),
         os.path.join("Achievements", "rom_specific_achievements"),
-        os.path.join("Achievements", "custom_achievements"),
     ]:
         ensure_dir(os.path.join(cfg.BASE, sub))
     bridge = Bridge()
@@ -7947,7 +7946,12 @@ def main():
     if cfg.FIRST_RUN:
         cfg.FIRST_RUN = False
         cfg.save()
-    win.hide()
+    if not cfg.TUTORIAL_COMPLETED:
+        win.showNormal()
+        tutorial = TutorialWizardDialog(cfg, win)
+        tutorial.show()
+    else:
+        win.hide()
     code = app.exec()
     cfg.save()
     sys.exit(code)

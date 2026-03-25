@@ -212,7 +212,6 @@ class SetupWizardDialog(QDialog):
                 "session_stats",
                 os.path.join("session_stats", "Highlights"),
                 os.path.join("Achievements", "rom_specific_achievements"),
-                os.path.join("Achievements", "custom_achievements"),
             ]:
                 ensure_dir(os.path.join(self.cfg.BASE, sub))
         except Exception:

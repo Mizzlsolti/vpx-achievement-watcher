@@ -285,6 +285,7 @@ class AppConfig:
     TABLES_DIR: str = r"C:\vPinball\VisualPinball\Tables"
     OVERLAY: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_OVERLAY))
     FIRST_RUN: bool = True
+    TUTORIAL_COMPLETED: bool = False
     LOG_CTRL: bool = False
     LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
     CLOUD_ENABLED: bool = False
@@ -362,6 +363,7 @@ class AppConfig:
                 TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
                 OVERLAY=ov,
                 FIRST_RUN=bool(data.get("FIRST_RUN", False)),
+                TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
                 CLOUD_ENABLED=cloud_enabled,
                 CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             )
@@ -432,6 +434,7 @@ class AppConfig:
                 "CLOUD_ENABLED": cloud_enabled_val,
                 "CLOUD_BACKUP_ENABLED": cloud_backup_val,
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
+                "TUTORIAL_COMPLETED": getattr(self, "TUTORIAL_COMPLETED", False),
                 "OVERLAY": clean_overlay
             }
             
@@ -450,7 +453,6 @@ def p_session(cfg):      return os.path.join(cfg.BASE, "session_stats")
 def p_highlights(cfg):   return os.path.join(p_session(cfg), "Highlights")
 def p_achievements(cfg): return os.path.join(cfg.BASE, "Achievements")
 def p_rom_spec(cfg):     return os.path.join(p_achievements(cfg), "rom_specific_achievements")
-def p_custom(cfg):       return os.path.join(p_achievements(cfg), "custom_achievements")
 def f_global_ach(cfg):   return os.path.join(p_achievements(cfg), "global_achievements.json")
 def f_achievements_state(cfg: "AppConfig") -> str:
     return os.path.join(p_achievements(cfg), "achievements_state.json")
@@ -521,13 +523,6 @@ def _migrate_runtime_dirs(cfg):
     if os.path.isdir(old_rom_spec) and not os.path.isdir(new_rom_spec):
         ensure_dir(os.path.dirname(new_rom_spec))
         shutil.move(old_rom_spec, new_rom_spec)
-
-    # custom_achievements: root → Achievements/
-    old_custom = os.path.join(cfg.BASE, "custom_achievements")
-    new_custom = p_custom(cfg)
-    if os.path.isdir(old_custom) and not os.path.isdir(new_custom):
-        ensure_dir(os.path.dirname(new_custom))
-        shutil.move(old_custom, new_custom)
 
     # challenges: root → session_stats/challenges
     old_challenges = os.path.join(cfg.BASE, "challenges")
@@ -2855,7 +2850,6 @@ class Watcher:
             p_highlights(self.cfg),
             p_achievements(self.cfg),
             p_rom_spec(self.cfg),
-            p_custom(self.cfg),
         ]:
             ensure_dir(d)
 
@@ -4880,22 +4874,6 @@ class Watcher:
             if isinstance(data.get("rules"), list):
                 rules.extend(data["rules"])
 
-        cdir = p_custom(self.cfg)
-        placeholder = "put_your_custom_achievements_here_click_me.json"
-        if os.path.isdir(cdir):
-            for fn in os.listdir(cdir):
-                if not fn.lower().endswith(".json"):
-                    continue
-                if fn.lower() == placeholder:
-                    continue  # nur diese eine Datei ignorieren
-                data = load_json(os.path.join(cdir, fn), {}) or {}
-                if isinstance(data.get("rules"), list):
-                    rules.extend(data["rules"])
-                for ex in data.get("examples", []) or []:
-                    if isinstance(ex, dict) and ex.get("rom") == rom:
-                        achs = ex.get("achievements", [])
-                        if isinstance(achs, list):
-                            rules.extend(achs)
         out, seen = [], set()
         for r in rules:
             t = r.get("title") or "Achievement"
@@ -5556,40 +5534,6 @@ class Watcher:
                         r2 = dict(r)
                         r2["_origin"] = "rom_specific"
                         rules_out.append(r2)
-        cdir = p_custom(self.cfg)
-        placeholder = "put_your_custom_achievements_here_click_me.json"
-        if os.path.isdir(cdir):
-            for fn in os.listdir(cdir):
-                if not fn.lower().endswith(".json"):
-                    continue
-                if fn.lower() == placeholder:
-                    continue
-                fpath = os.path.join(cdir, fn)
-                data = load_json(fpath, {}) or {}
-
-                for r in (data.get("rules") or []):
-                    if not isinstance(r, dict):
-                        continue
-                    if self._is_rule_global(r, origin="custom"):
-                        t = (r.get("title") or "Achievement").strip()
-                        if t not in seen_titles:
-                            seen_titles.add(t)
-                            r2 = dict(r)
-                            r2["_origin"] = "custom"
-                            rules_out.append(r2)
-                for ex in (data.get("examples") or []):
-                    if not isinstance(ex, dict) or ex.get("rom") != rom:
-                        continue
-                    for r in (ex.get("achievements") or []):
-                        if not isinstance(r, dict):
-                            continue
-                        if self._is_rule_global(r, origin="custom"):
-                            t = (r.get("title") or "Achievement").strip()
-                            if t not in seen_titles:
-                                seen_titles.add(t)
-                                r2 = dict(r)
-                                r2["_origin"] = "custom"
-                                rules_out.append(r2)
         return rules_out     
         
     def _is_rule_global(self, rule: dict, origin: str) -> bool:
@@ -5629,55 +5573,6 @@ class Watcher:
             log(self.cfg, f"global_achievements.json created/refreshed with {len(rules)} rules")
         except Exception as e:
             log(self.cfg, f"[GLOBAL_ACH] generation failed: {e}", "WARN")
-
-    def _ensure_custom_placeholder(self):
-        path = os.path.join(p_custom(self.cfg), "PUT_YOUR_CUSTOM_ACHIEVEMENTS_HERE_CLICK_ME.json")
-        if not os.path.exists(path):
-            payload = {
-                "examples": [
-                    {
-                        "rom": "afm_113b",
-                        "achievements": [
-                            {
-                                "title": "AFM – First Game (Session)",
-                                "scope": "session",
-                                "condition": {
-                                    "type": "nvram_delta",
-                                    "field": "Games Started",
-                                    "min": 1
-                                }
-                            },
-                            {
-                                "title": "AFM – 10 Ramps (Session)",
-                                "scope": "session",
-                                "condition": {
-                                    "type": "nvram_delta",
-                                    "field": "Ramps Made",
-                                    "min": 10
-                                }
-                            },
-                            {
-                                "title": "AFM – 5 Minutes (Session)",
-                                "scope": "session",
-                                "condition": {
-                                    "type": "session_time",
-                                    "min_seconds": 300
-                                }
-                            },
-                            {
-                                "title": "AFM – 15 Minutes (Global)",
-                                "scope": "global",
-                                "condition": {
-                                    "type": "session_time",
-                                    "min_seconds": 900
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
-            save_json(path, payload)
-            log(self.cfg, "Custom placeholder created")
 
     def _export_summary(self, end_audits: dict, duration_sec: int):
         from datetime import timezone
@@ -6620,10 +6515,6 @@ class Watcher:
             self._ensure_global_ach()
         except Exception as e:
             log(self.cfg, f"[GLOBAL_ACH] ensure failed: {e}", "WARN")
-        try:
-            self._ensure_custom_placeholder()
-        except Exception as e:
-            log(self.cfg, f"[CUSTOM_PLACEHOLDER] ensure failed: {e}", "WARN")
         try:
             self.start_prefetch_background()
         except Exception as e:
