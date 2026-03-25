@@ -3161,7 +3161,8 @@ class Watcher:
                 seen.add(xl)
                 out.append(x)
         add(name)
-        base_rom = (self.ROMNAMES or {}).get(name)
+        rn = self.ROMNAMES or {}
+        base_rom = rn.get(name) or rn.get(name.lower())
         if base_rom and base_rom != name:
             add(base_rom)
         for c in self._family_rom_candidates(name):
