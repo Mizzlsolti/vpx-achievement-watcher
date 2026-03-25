@@ -394,7 +394,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.watcher = watcher
         self.bridge = bridge
         self.setWindowTitle("VPX Achievement Watcher")
-        self.resize(1606, 1145)
+        self.resize(1606, 1155)
         
         icon = self._get_icon()
         self.setWindowIcon(icon)
