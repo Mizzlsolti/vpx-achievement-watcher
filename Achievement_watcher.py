@@ -6924,8 +6924,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     @pyqtSlot()
     def _on_notif_clear_all(self):
-        """Clear all notifications and save dismissed keys so they won't reappear."""
-        _notif.dismiss_all(self.cfg)
+        """Clear all notifications."""
+        _notif.clear_all(self.cfg)
         self._refresh_notification_feed()
 
     @pyqtSlot(str)

@@ -2,7 +2,7 @@
 notifications.py – CRUD helpers for the Dashboard notification feed.
 
 Storage: {cfg.BASE}/Achievements/notifications.json  (Windows Hidden attribute set)
-Format:  JSON object – {"notifications": [...], "dismissed": [...]}
+Format:  JSON object – {"notifications": [...]}
          notifications are not scored data.
 """
 
@@ -39,7 +39,7 @@ def _notifications_path(cfg) -> str:
 # ── low-level I/O ─────────────────────────────────────────────────────────────
 
 def _load_store(cfg) -> dict:
-    """Return the raw store dict {"notifications": [...], "dismissed": [...]}."""
+    """Return the raw store dict {"notifications": [...]}."""
     path = _notifications_path(cfg)
     try:
         if os.path.isfile(path):
@@ -47,17 +47,15 @@ def _load_store(cfg) -> dict:
                 data = json.load(f)
             if isinstance(data, dict):
                 notifs = data.get("notifications", [])
-                dismissed = data.get("dismissed", [])
                 return {
                     "notifications": notifs if isinstance(notifs, list) else [],
-                    "dismissed": dismissed if isinstance(dismissed, list) else [],
                 }
             # Legacy: plain list (old notifications.json format)
             if isinstance(data, list):
-                return {"notifications": data, "dismissed": []}
+                return {"notifications": data}
     except Exception:
         pass
-    return {"notifications": [], "dismissed": []}
+    return {"notifications": []}
 
 
 def _save_store(cfg, store: dict):
@@ -88,7 +86,7 @@ def load_notifications(cfg) -> list:
 
 
 def save_notifications(cfg, items: list):
-    """Persist *items* to disk, preserving the dismissed array."""
+    """Persist *items* to disk."""
     store = _load_store(cfg)
     store["notifications"] = items
     _save_store(cfg, store)
@@ -99,7 +97,6 @@ def save_notifications(cfg, items: list):
 def migrate_notifications(cfg):
     """
     One-time migration:
-    - Import dismissed keys from old dismissed_keys.json into the new store.
     - Move old notifications.json content (at cfg.BASE) into the new store.
     - Remove old notifications.json and dismissed_keys.json.
     """
@@ -118,18 +115,6 @@ def migrate_notifications(cfg):
                 data = json.load(f)
             if isinstance(data, list):
                 store["notifications"] = data
-        except Exception:
-            pass
-
-    # Merge old dismissed keys
-    if os.path.isfile(old_dismissed):
-        try:
-            with open(old_dismissed, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if isinstance(data, list):
-                existing = set(store["dismissed"])
-                existing.update(data)
-                store["dismissed"] = sorted(existing)
         except Exception:
             pass
 
@@ -164,16 +149,9 @@ def add_notification(
     - ``vps_missing``:          replace any existing ``vps_missing`` entry (title may change).
     - ``update_available``:     skip if an entry with same type *and* same title already exists.
     - ``leaderboard_rank`` / ``achievement_beaten``:  deduplicated by the caller (per ROM).
-    - ``dedup_key`` dismissed:  skip creation if the key is in the dismissed array.
     """
     store = _load_store(cfg)
     items = store["notifications"]
-    dismissed = store["dismissed"]
-
-    # Check dismissed keys first
-    if dedup_key and dedup_key in dismissed:
-        return None
-
     if type == "vps_missing":
         items = [n for n in items if n.get("type") != "vps_missing"]
 
@@ -249,28 +227,5 @@ def unread_count(cfg) -> int:
 
 
 def dismiss_all(cfg):
-    """Add all current notification dedup_keys to the dismissed list, then clear."""
-    store = _load_store(cfg)
-    items = store["notifications"]
-    dismissed = set(store.get("dismissed", []))
-    for n in items:
-        dk = n.get("dedup_key")
-        if dk:
-            dismissed.add(dk)
-    store["dismissed"] = sorted(dismissed)
-    store["notifications"] = []
-    _save_store(cfg, store)
-
-
-# ── Backward-compatible stubs ─────────────────────────────────────────────────
-
-def load_dismissed_keys(cfg) -> set:
-    """Return the set of dismissed notification dedup keys."""
-    return set(_load_store(cfg).get("dismissed", []))
-
-
-def save_dismissed_keys(cfg, keys: set):
-    """Persist dismissed keys (stored inside the unified notifications store)."""
-    store = _load_store(cfg)
-    store["dismissed"] = sorted(keys)
-    _save_store(cfg, store)
+    """Clear all notifications. Kept for backward compatibility; delegates to clear_all()."""
+    clear_all(cfg)
