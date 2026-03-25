@@ -986,14 +986,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_mini_info_place.setText("Save position")
 
     _MINI_TEST_MESSAGES = [
-        ("CHALLENGE COMPLETE!<br>Score: 42.069.000", f"{tc().success}"),
-        ("TIME'S UP!<br>Score: 42.069.000", f"{tc().success}"),
+        ("CHALLENGE COMPLETE!<br>Score: 42.069.000", tc().success),
+        ("TIME'S UP!<br>Score: 42.069.000", tc().success),
         (
             "NVRAM map not found for afm_113b.",
-            f"{tc().danger}",
+            tc().danger,
         ),
-        ("Challenge Aborted!", f"{tc().danger}"),
-        ("Challenge can only be started in-game.", f"{tc().danger}"),
+        ("Challenge Aborted!", tc().danger),
+        ("Challenge can only be started in-game.", tc().danger),
     ]
 
     def _on_mini_info_test(self):
@@ -1066,11 +1066,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     # Agreed status states for the persistent status badge (traffic-light semantics)
     _STATUS_TEST_MESSAGES = [
-        ("Online · Tracking",  f"{tc().success}"),   # Green
+        ("Online · Tracking",  tc().success),   # Green
         ("Online · Pending",   "#FFA500"),   # Yellow
-        ("Online · Verified",  f"{tc().success}"),   # Green
+        ("Online · Verified",  tc().success),   # Green
         ("Offline · Local",    "#FFA500"),   # Yellow
-        ("Cloud Off · Local",  f"{tc().danger}"),   # Red
+        ("Cloud Off · Local",  tc().danger),   # Red
     ]
 
     def _on_status_overlay_test(self):
@@ -1092,7 +1092,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
         cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
         if not cloud_enabled or not cloud_url:
-            return ("Cloud Off · Local", f"{tc().danger}")
+            return ("Cloud Off · Local", tc().danger)
         w = getattr(self, "watcher", None)
         game_active = bool(w and getattr(w, "game_active", False))
         if not game_active:
@@ -1102,12 +1102,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if pending_state == "pending":
             return ("Online · Pending", "#FFA500")
         if pending_state == "verified":
-            return ("Online · Verified", f"{tc().success}")
+            return ("Online · Verified", tc().success)
         if pending_state == "flagged":
             return ("Online · Flagged", "#FFA500")
         if pending_state == "rejected":
-            return ("Online · Rejected", f"{tc().danger}")
-        return ("Online · Tracking", f"{tc().success}")
+            return ("Online · Rejected", tc().danger)
+        return ("Online · Tracking", tc().success)
 
     def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
         """Handle an externally-triggered status update.
@@ -1180,7 +1180,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
                     3,
-                    f"{tc().danger}"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -1193,7 +1193,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     self.bridge.challenge_info_show.emit(
                         "Challenges disabled: No NVRAM map found for this table.",
                         4,
-                        f"{tc().danger}"
+                        tc().danger
                     )
                     self.bridge.challenge_speak.emit("Challenge disabled. Map missing.")
                 except Exception:
@@ -1691,7 +1691,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
                     3,
-                    f"{tc().danger}"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -1713,7 +1713,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "No NVRAM map available. Challenges require a map for score.",
                     3,
-                    f"{tc().danger}"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -3531,11 +3531,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.maps_table.setItem(row, 0, _make_item(title))
             self.maps_table.setItem(row, 1, _make_item(rom, "#888"))
             self.maps_table.setItem(row, 2, _make_item("✅" if has_map else "❌",
-                                                        f"{tc().accent_secondary}" if has_map else "#555",
+                                                        tc().accent_secondary if has_map else "#555",
                                                         Qt.AlignmentFlag.AlignCenter))
             self.maps_table.setItem(row, 3, _make_item("🟠" if is_local else "",
                                                         align=Qt.AlignmentFlag.AlignCenter))
-            self.maps_table.setItem(row, 4, _make_item(vps_id, f"{tc().accent_secondary}" if vps_id else "#444"))
+            self.maps_table.setItem(row, 4, _make_item(vps_id, tc().accent_secondary if vps_id else "#444"))
 
             # Author column: look up authors from VPS DB when a VPS-ID is assigned
             author_text = ""
@@ -5887,7 +5887,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 try:
                     if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                         self._mini_overlay = MiniInfoOverlay(self)
-                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex=f"{tc().danger}")
+                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex=tc().danger)
                 except Exception:
                     pass
                 return
@@ -5965,7 +5965,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                 self._mini_overlay = MiniInfoOverlay(self)
-            self._mini_overlay.show_info(str(message), max(1, int(seconds)), color_hex=f"{tc().danger}")
+            self._mini_overlay.show_info(str(message), max(1, int(seconds)), color_hex=tc().danger)
             if not hasattr(self, "_ch_last_spoken"):
                 self._ch_last_spoken = {}
             now = time.time()
@@ -5999,7 +5999,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             col = str(color_hex or "").upper()
             if "challenge complete" in msg_lower or "time's up" in msg_lower:
                 sound.play_sound(self.cfg, "challenge_complete")
-            elif col == f"{tc().danger}" or "aborted" in msg_lower or "fail" in msg_lower:
+            elif col == tc().danger or "aborted" in msg_lower or "fail" in msg_lower:
                 sound.play_sound(self.cfg, "challenge_fail")
         except Exception:
             pass
@@ -6455,17 +6455,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     rs_lb = "Local only"
 
             # Table: green when active, red when no game
-            tbl_color = f"{tc().success}" if (game_active and current_rom) else f"{tc().danger}"
+            tbl_color = tc().success if (game_active and current_rom) else tc().danger
             # Session: green when active/counting, yellow when idle
-            ses_color = "#FFA500" if rs_session == "Idle" else f"{tc().success}"
+            ses_color = "#FFA500" if rs_session == "Idle" else tc().success
             # Cloud: green=online/verified, yellow=pending/offline, red=disabled
             cld_color = (
-                f"{tc().success}" if rs_cloud in ("Online", "Verified")
-                else f"{tc().danger}" if rs_cloud == "Disabled"
+                tc().success if rs_cloud in ("Online", "Verified")
+                else tc().danger if rs_cloud == "Disabled"
                 else "#FFA500"
             )
             # Leaderboard: green=ready, yellow=pending/local
-            lb_color = f"{tc().success}" if rs_lb == "Ready" else "#FFA500"
+            lb_color = tc().success if rs_lb == "Ready" else "#FFA500"
 
             self.lbl_rs_table.setText(self._dot(tbl_color, "Table:", rs_table))
             self.lbl_rs_session.setText(self._dot(ses_color, "Session:", rs_session))
@@ -7633,7 +7633,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._update_prefetch_label()
 
     def _update_prefetch_label(self):
-        color = f"{tc().danger}" if getattr(self, "_prefetch_blink_state", False) else "#333333"
+        color = tc().danger if getattr(self, "_prefetch_blink_state", False) else "#333333"
         html = (
             f"🔴 Watcher: PREFETCH IN PROGRESS - {self._prefetch_msg} "
             f"<span style='color:{color}; font-weight:bold;'>PLEASE WAIT</span>"

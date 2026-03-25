@@ -1758,7 +1758,7 @@ class MiniInfoOverlay(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         self._body_pt = 20
         self._font_family = ov.get("font_family", "Segoe UI")
-        self._red = f"{tc().danger}"                          
+        self._red = tc().danger                          
         self._hint = "#DDDDDD"                         
         self._bg_color = QColor(8, 12, 22, 245)
         self._radius = 16
@@ -2810,7 +2810,7 @@ class StatusOverlay(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         self._font_family = ov.get("font_family", "Segoe UI")
         # Traffic-light color for the dot indicator
-        self._color = f"{tc().success}"
+        self._color = tc().success
         # Status text (one of the 5 agreed states)
         self._status_text = ""
         self._bg_color = QColor(8, 12, 22, 230)
@@ -2837,8 +2837,8 @@ class StatusOverlay(QWidget):
         self._morph_active: bool = False
         self._morph_elapsed: float = 0.0
         self._morph_duration: float = 200.0
-        self._morph_from_color: str = f"{tc().success}"
-        self._morph_target_color: str = f"{tc().success}"
+        self._morph_from_color: str = tc().success
+        self._morph_target_color: str = tc().success
         self._morph_from_text: str = ""
         self._morph_target_text: str = ""
         # Combined animation timer
@@ -3042,14 +3042,14 @@ class StatusOverlay(QWidget):
         if self.isVisible():
             self._refresh_view()
 
-    def update_status(self, status_text: str, color_hex: str = f"{tc().success}"):
+    def update_status(self, status_text: str, color_hex: str = None):
         """Update the displayed status state and refresh the badge.
 
         This is the primary method for changing the badge content.  The badge
         remains visible after this call; use :meth:`hide_badge` to hide it.
         """
         new_text = str(status_text or "").strip()
-        new_color = str(color_hex or f"{tc().success}").strip()
+        new_color = str(color_hex or tc().success).strip()
         self._last_center = self._primary_center()
 
         if self._check_low_perf():
@@ -3104,7 +3104,7 @@ class StatusOverlay(QWidget):
         The ``seconds`` parameter is ignored; this overlay is persistent and
         does not auto-dismiss.  Use :meth:`hide_badge` to hide it explicitly.
         """
-        self.update_status(message, color_hex or f"{tc().success}")
+        self.update_status(message, color_hex or tc().success)
 
 
 class StatusOverlayPositionPicker(QWidget):
