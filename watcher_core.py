@@ -1487,11 +1487,6 @@ class CloudSync:
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
     _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
 
-    # Once-per-session player identity conflict check state.
-    _identity_checked: bool = False
-    _identity_blocked: bool = False
-    _identity_check_lock = threading.Lock()
-
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
         """Returns True if player name is missing/default and upload should be skipped.
@@ -1613,30 +1608,6 @@ class CloudSync:
                     }
 
         return {"ok": True}
-
-    @staticmethod
-    def _check_identity_before_upload(cfg: AppConfig, bridge: Optional["Bridge"]) -> bool:
-        """Perform a once-per-session identity conflict check before the first cloud upload.
-
-        Returns True if the upload should be blocked (identity conflict detected).
-        The result is cached so subsequent calls return immediately without network I/O.
-        """
-        with CloudSync._identity_check_lock:
-            if CloudSync._identity_checked:
-                return CloudSync._identity_blocked
-            CloudSync._identity_checked = True
-
-        player_id = str(cfg.OVERLAY.get("player_id", "")).strip()
-        player_name = cfg.OVERLAY.get("player_name", "").strip()
-
-        result = CloudSync.validate_player_identity(cfg, player_id, player_name)
-        if not result.get("ok"):
-            log(cfg, f"[CLOUD] Identity conflict ({result.get('reason')}) — uploads blocked this session.", "WARN")
-            CloudSync._identity_blocked = True
-            CloudSync._notify_cloud_blocked(bridge, "Cloud Upload Blocked · Player identity conflict")
-            return True
-
-        return False
 
     @staticmethod
     def cleanup_legacy_progress(cfg: AppConfig) -> None:
@@ -1786,8 +1757,6 @@ class CloudSync:
         endpoint = f"{url}/players/{pid}/scores/{category}/{rom_key}.json"
         
         def _task():
-            if CloudSync._check_identity_before_upload(cfg, bridge):
-                return
             try:
                 req = urllib.request.Request(endpoint)
                 with urllib.request.urlopen(req, timeout=5) as resp:
@@ -1868,8 +1837,6 @@ class CloudSync:
         endpoint = f"{url}/players/{pid}/progress/{rom}.json"
         
         def _task():
-            if CloudSync._check_identity_before_upload(cfg, bridge):
-                return
             percentage = round((unlocked / total) * 100, 1)
             payload = {
                 "name": pname,
