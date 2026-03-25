@@ -6137,6 +6137,11 @@ class Watcher:
                 if _current_vps_id and not stored_vps:
                     existing_entry["vps_id"] = _current_vps_id
                     updated += 1
+                    try:
+                        toast_title = f"{title}\n{rom}\nVPS-ID linked"
+                        self.bridge.ach_toast_show.emit(toast_title, rom, 5)
+                    except Exception:
+                        pass
 
         if added or updated:
             self._ach_state_save(state)

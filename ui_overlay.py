@@ -3614,34 +3614,43 @@ class AchToastWindow(QWidget):
             border_color = QColor("#00E5FF")
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
+            line3 = ""
         else:
             border_color = QColor("#555555")
             raw_title = self._title or "Achievement unlocked"
             rom = self._rom or ""
+            line3 = ""
 
-            # Strip ROM prefix from title (e.g. "cc_13 – GOLD MINE MB: 1" → "GOLD MINE MB: 1")
-            prefix = f"{rom} \u2013 "
-            if rom and raw_title.startswith(prefix):
-                line1 = raw_title[len(prefix):]
+            if '\n' in raw_title:
+                # Multi-line toast format (e.g. VPS-ID backfill): "title\nrom\nline3"
+                parts = raw_title.split('\n', 2)
+                line1 = parts[0].strip()
+                line2 = parts[1].strip() if len(parts) > 1 else (rom or "")
+                line3 = parts[2].strip() if len(parts) > 2 else ""
             else:
-                prefix2 = f"{rom} - "
-                if rom and raw_title.startswith(prefix2):
-                    line1 = raw_title[len(prefix2):]
+                # Strip ROM prefix from title (e.g. "cc_13 – GOLD MINE MB: 1" → "GOLD MINE MB: 1")
+                prefix = f"{rom} \u2013 "
+                if rom and raw_title.startswith(prefix):
+                    line1 = raw_title[len(prefix):]
                 else:
-                    line1 = raw_title
+                    prefix2 = f"{rom} - "
+                    if rom and raw_title.startswith(prefix2):
+                        line1 = raw_title[len(prefix2):]
+                    else:
+                        line1 = raw_title
 
-            # Resolve ROM to clean table name (without version number)
-            table_name = ""
-            try:
-                watcher = getattr(self.parent_gui, "watcher", None)
-                if watcher:
-                    romnames = getattr(watcher, "ROMNAMES", {}) or {}
-                    from watcher_core import _strip_version_from_name
-                    table_name = _strip_version_from_name(romnames.get(rom, ""))
-            except Exception:
-                pass
+                # Resolve ROM to clean table name (without version number)
+                table_name = ""
+                try:
+                    watcher = getattr(self.parent_gui, "watcher", None)
+                    if watcher:
+                        romnames = getattr(watcher, "ROMNAMES", {}) or {}
+                        from watcher_core import _strip_version_from_name
+                        table_name = _strip_version_from_name(romnames.get(rom, ""))
+                except Exception:
+                    pass
 
-            line2 = table_name if table_name else rom
+                line2 = table_name if table_name else rom
 
         # Set typewriter full text on first call (now applies to title/line1)
         if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
@@ -3664,19 +3673,23 @@ class AchToastWindow(QWidget):
         # Second line is always static (no typewriter)
         sub = line2
         sub_for_size = line2  # always use full text for width calculation
+        line3_pt = max(body_pt - 3, 10)
         f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
         f_body = QFont(font_family, body_pt, QFont.Weight.Bold if is_level_up else QFont.Weight.Normal)
+        f_line3 = QFont(font_family, line3_pt)
         fm_title = QFontMetrics(f_title)
         fm_body = QFontMetrics(f_body)
+        fm_line3 = QFontMetrics(f_line3)
         icon_sz = max(28, int(body_pt * 2.0))
         pad = max(12, int(body_pt * 0.8))
         gap = max(10, int(body_pt * 0.5))
         vgap = max(4, int(body_pt * 0.25))
         title_w = fm_title.horizontalAdvance(title_for_size)
         sub_w = fm_body.horizontalAdvance(sub_for_size) if sub_for_size else 0
-        text_w = max(title_w, sub_w)
+        line3_w = fm_line3.horizontalAdvance(line3) if line3 else 0
+        text_w = max(title_w, sub_w, line3_w)
         # Use full text sizes for height calculation to keep window stable during typewriter
-        text_h = fm_title.height() + (vgap + fm_body.height() if sub_for_size else 0)
+        text_h = fm_title.height() + (vgap + fm_body.height() if sub_for_size else 0) + (vgap + fm_line3.height() if line3 else 0)
         content_h = max(icon_sz, text_h)
         W = pad + icon_sz + gap + text_w + pad
         H = pad + content_h + pad
@@ -3734,6 +3747,12 @@ class AchToastWindow(QWidget):
             p.drawText(QRect(x_text, text_top + fm_title.height() + vgap,
                              W - x_text - pad, fm_body.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, sub)
+        if line3:
+            p.setPen(QColor("#00E5FF"))
+            p.setFont(f_line3)
+            line3_y = text_top + fm_title.height() + vgap + (fm_body.height() + vgap if sub_for_size else 0)
+            p.drawText(QRect(x_text, line3_y, W - x_text - pad, fm_line3.height()),
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, line3)
         # Energy flash overlay for level-up entry
         if is_level_up and getattr(self, '_flash_active', False):
             flash_t = min(1.0, getattr(self, '_flash_elapsed', 0.0) / max(1.0, self._flash_duration))
