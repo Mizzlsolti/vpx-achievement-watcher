@@ -20,26 +20,26 @@ DEFAULT_VOLUME = 70
 # ── Public metadata ───────────────────────────────────────────────────────────
 
 SOUND_PACKS = {
-    "arcade":          "Arcade",
-    "subtle":          "Subtle",
-    "sci_fi":          "Sci-Fi",
-    "retro_8bit":      "Retro 8-Bit",
-    "pinball_classic": "Pinball Classic",
-    "galactic_battle": "Galactic Battle",
-    "stage_magic":     "Stage Magic",
-    "neon_grid":       "Neon Grid",
-    "martian_assault": "Martian Assault",
-    "carnival_show":   "Carnival Show",
-    "medieval_quest":  "Medieval Quest",
-    "haunted_manor":   "Haunted Manor",
-    "deep_ocean":      "Deep Ocean",
-    "jukebox":         "Jukebox",
-    "showtime":        "Showtime",
-    "chrome_steel":    "Chrome Steel",
-    "treasure_hunt":   "Treasure Hunt",
-    "turbo_racer":     "Turbo Racer",
-    "neon_lounge":     "Neon Lounge",
-    "voltage":         "Voltage",
+    "zaptron":          "Zaptron",
+    "iron_basilisk":    "Iron Basilisk",
+    "voodoo_swamp":     "Voodoo Swamp",
+    "pixel_ghost":      "Pixel Ghost",
+    "solar_drift":      "Solar Drift",
+    "rokos_lair":       "Roko's Lair",
+    "thunderclap_rex":  "Thunderclap Rex",
+    "frostbite_hollow": "Frostbite Hollow",
+    "ratchet_circus":   "Ratchet Circus",
+    "lucky_stardust":   "Lucky Stardust",
+    "boneshaker":       "Boneshaker",
+    "vex_machina":      "Vex Machina",
+    "stormfront_jake":  "Stormfront Jake",
+    "nebula_drift":     "Nebula Drift",
+    "gideons_clock":    "Gideon's Clock",
+    "sapphire_specter": "Sapphire Specter",
+    "molten_core":      "Molten Core",
+    "zigzag_bandit":    "Zigzag Bandit",
+    "wildcat_hollow":   "Wildcat Hollow",
+    "crimson_flare":    "Crimson Flare",
 }
 
 SOUND_EVENTS = [
@@ -193,781 +193,886 @@ def _crackle(dur: float, sr: int = SAMPLE_RATE) -> List[float]:
 
 # ── Pack builders ──────────────────────────────────────────────────────────────
 
-def _build_arcade(event: str) -> List[float]:
+# Zaptron – pure square wave, fast staccato, mid-high pitch, sharp attack
+def _build_zaptron(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        return _envelope(_concat(
-            _square(440, 0.08, SR), _square(554, 0.08, SR),
-            _square(659, 0.08, SR), _square(880, 0.18, SR),
-        ), 0.01, 0.05, 0.7, 0.12, SR)
+        s = _concat(*[_square(f, 0.06, SR) for f in [523, 659, 784, 1046, 1319]])
+        return _envelope(s, 0.002, 0.02, 0.75, 0.08, SR)
     elif event == "challenge_start":
-        return _envelope(_concat(
-            _square(220, 0.09, SR), _square(330, 0.09, SR),
-            _silence(0.04, SR), _square(440, 0.22, SR),
-        ), 0.01, 0.07, 0.6, 0.12, SR)
+        s = _concat(_square(330, 0.05, SR), _silence(0.02, SR),
+                    _square(440, 0.05, SR), _silence(0.02, SR),
+                    _square(660, 0.12, SR))
+        return _envelope(s, 0.002, 0.02, 0.68, 0.08, SR)
     elif event == "challenge_complete":
-        return _envelope(_concat(
-            _square(523, 0.09, SR), _square(659, 0.09, SR),
-            _square(784, 0.09, SR), _square(1046, 0.22, SR),
-        ), 0.01, 0.05, 0.7, 0.15, SR)
+        s = _concat(*[_square(f, 0.055, SR) for f in [440, 554, 659, 880, 1108, 1319]])
+        return _envelope(s, 0.002, 0.018, 0.78, 0.1, SR)
     elif event == "challenge_fail":
-        return _envelope(_concat(
-            _square(440, 0.1, SR), _square(330, 0.1, SR),
-            _square(220, 0.18, SR),
-        ), 0.01, 0.05, 0.5, 0.18, SR)
+        s = _concat(*[_square(f, 0.07, SR) for f in [440, 370, 311, 247]])
+        return _envelope(s, 0.002, 0.02, 0.6, 0.12, SR)
     elif event == "level_up":
-        freqs = [262, 294, 330, 349, 392, 440, 494, 523]
-        s = _concat(*[_square(f, 0.07, SR) for f in freqs])
-        return _envelope(s, 0.01, 0.04, 0.8, 0.2, SR)
+        s = _concat(*[_square(f, 0.05, SR) for f in [262, 330, 392, 494, 587, 659, 784, 988, 1175, 1319]])
+        return _envelope(s, 0.002, 0.015, 0.82, 0.15, SR)
     elif event == "countdown_tick":
-        return _envelope(_square(440, 0.05, SR), 0.005, 0.02, 0.4, 0.03, SR)
+        return _envelope(_square(880, 0.035, SR), 0.001, 0.01, 0.5, 0.02, SR)
     elif event == "countdown_final":
-        return _envelope(_concat(
-            _square(880, 0.1, SR), _square(1100, 0.18, SR),
-        ), 0.005, 0.04, 0.7, 0.12, SR)
+        s = _concat(_square(1108, 0.07, SR), _square(1319, 0.12, SR))
+        return _envelope(s, 0.001, 0.015, 0.78, 0.1, SR)
 
 
-def _build_subtle(event: str) -> List[float]:
+# Iron Basilisk – heavy low square + noise, slow, bassy, deep
+def _build_iron_basilisk(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        return _envelope(_concat(
-            _sine(523, 0.1, SR), _sine(659, 0.1, SR), _sine(784, 0.2, SR),
-        ), 0.02, 0.08, 0.6, 0.2, SR)
+        hit = _mix(_square(55, 0.12, SR), _noise(0.12, SR))
+        hit = [s * 0.45 for s in hit]
+        tone = _envelope(_square(110, 0.3, SR), 0.02, 0.08, 0.55, 0.25, SR)
+        return _concat(_envelope(hit, 0.002, 0.04, 0.4, 0.1, SR), _silence(0.03, SR), tone)
     elif event == "challenge_start":
-        return _envelope(_concat(
-            _sine(392, 0.12, SR), _sine(523, 0.18, SR),
-        ), 0.02, 0.07, 0.6, 0.15, SR)
+        drum = _mix(_square(60, 0.15, SR), _noise(0.15, SR))
+        drum = [s * 0.5 for s in drum]
+        s = _concat(
+            _envelope(drum, 0.002, 0.05, 0.5, 0.12, SR),
+            _silence(0.05, SR),
+            _envelope(_square(110, 0.28, SR), 0.02, 0.07, 0.6, 0.22, SR),
+        )
+        return s
     elif event == "challenge_complete":
-        return _envelope(_concat(
-            _sine(523, 0.1, SR), _sine(659, 0.1, SR), _sine(784, 0.2, SR),
-        ), 0.02, 0.07, 0.65, 0.2, SR)
+        s = _concat(*[_envelope(_square(f, 0.1, SR), 0.01, 0.04, 0.6, 0.12, SR)
+                      for f in [110, 138, 165, 220]])
+        return s
     elif event == "challenge_fail":
-        return _envelope(_concat(
-            _sine(392, 0.12, SR), _sine(294, 0.2, SR),
-        ), 0.02, 0.08, 0.5, 0.2, SR)
+        s = _mix(_sweep(200, 40, 0.35, SR), _noise(0.35, SR))
+        return _envelope([x * 0.5 for x in s], 0.005, 0.06, 0.45, 0.28, SR)
     elif event == "level_up":
-        s = _concat(*[_sine(f, 0.08, SR) for f in [262, 330, 392, 523, 659, 784]])
-        return _envelope(s, 0.02, 0.06, 0.7, 0.25, SR)
+        s = _concat(*[_envelope(_mix(_square(f, 0.1, SR), _noise(0.1, SR)),
+                                0.005, 0.04, 0.55, 0.12, SR)
+                      for f in [55, 73, 88, 110, 138, 165, 220]])
+        return s
     elif event == "countdown_tick":
-        return _envelope(_sine(660, 0.06, SR), 0.005, 0.025, 0.4, 0.03, SR)
+        s = _mix(_square(80, 0.055, SR), _noise(0.055, SR))
+        return _envelope([x * 0.4 for x in s], 0.001, 0.02, 0.45, 0.03, SR)
     elif event == "countdown_final":
-        return _envelope(_sine(880, 0.22, SR), 0.01, 0.06, 0.7, 0.15, SR)
+        s = _mix(_sweep(120, 55, 0.15, SR), _noise(0.15, SR))
+        return _envelope([x * 0.55 for x in s], 0.003, 0.05, 0.6, 0.12, SR)
 
 
-def _build_sci_fi(event: str) -> List[float]:
+# Voodoo Swamp – low crackle + tremolo sine, murky, atmospheric
+def _build_voodoo_swamp(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        s = _sweep(300, 1200, 0.18, SR)
-        s2 = _sine(880, 0.2, SR)
-        return _envelope(_concat(s, s2), 0.01, 0.06, 0.65, 0.15, SR)
+        base = _tremolo(_sine(220, 0.3, SR), 4, 0.55, SR)
+        cr = _crackle(0.3, SR)
+        s = _mix(base, cr)
+        tone = _envelope(_tremolo(_sine(440, 0.2, SR), 3, 0.45, SR), 0.02, 0.08, 0.55, 0.22, SR)
+        return _concat(_envelope(s, 0.03, 0.1, 0.52, 0.25, SR), tone)
     elif event == "challenge_start":
-        s = _concat(_sweep(100, 600, 0.15, SR), _silence(0.04, SR), _sine(600, 0.2, SR))
-        return _envelope(s, 0.01, 0.06, 0.6, 0.15, SR)
+        s = _mix(_sweep(80, 220, 0.2, SR), _crackle(0.2, SR))
+        sting = _tremolo(_sine(330, 0.25, SR), 5, 0.5, SR)
+        return _concat(_envelope(s, 0.01, 0.06, 0.48, 0.18, SR),
+                       _silence(0.04, SR),
+                       _envelope(sting, 0.02, 0.07, 0.55, 0.22, SR))
     elif event == "challenge_complete":
-        s = _concat(_sweep(400, 1200, 0.15, SR), _sine(1200, 0.2, SR))
-        return _envelope(s, 0.01, 0.05, 0.7, 0.18, SR)
+        s = _mix(_sweep(200, 660, 0.25, SR), _tremolo(_sine(440, 0.25, SR), 4, 0.4, SR))
+        return _envelope(s, 0.02, 0.08, 0.58, 0.25, SR)
     elif event == "challenge_fail":
-        s = _sweep(800, 100, 0.3, SR)
-        return _envelope(s, 0.01, 0.05, 0.55, 0.2, SR)
+        s = _mix(_sweep(300, 60, 0.35, SR), _crackle(0.35, SR))
+        return _envelope(s, 0.005, 0.06, 0.42, 0.3, SR)
     elif event == "level_up":
-        s = _concat(_sweep(200, 800, 0.2, SR), _sweep(800, 1600, 0.15, SR), _sine(1200, 0.2, SR))
-        return _envelope(s, 0.01, 0.06, 0.75, 0.2, SR)
+        s = _mix(
+            _tremolo(_sine(110, 0.4, SR), 3, 0.5, SR),
+            _tremolo(_sine(220, 0.4, SR), 4, 0.4, SR),
+            _crackle(0.4, SR),
+        )
+        return _envelope(s, 0.04, 0.1, 0.6, 0.3, SR)
     elif event == "countdown_tick":
-        return _envelope(_sweep(600, 400, 0.06, SR), 0.005, 0.02, 0.4, 0.03, SR)
+        s = _mix(_sine(200, 0.06, SR), _crackle(0.06, SR))
+        return _envelope([x * 0.45 for x in s], 0.002, 0.02, 0.4, 0.04, SR)
     elif event == "countdown_final":
-        s = _concat(_sweep(300, 1200, 0.1, SR), _sine(1200, 0.18, SR))
-        return _envelope(s, 0.01, 0.04, 0.7, 0.15, SR)
+        s = _mix(_sweep(150, 500, 0.14, SR), _tremolo(_sine(330, 0.18, SR), 5, 0.45, SR))
+        return _envelope(s, 0.01, 0.06, 0.62, 0.2, SR)
 
 
-def _build_retro_8bit(event: str) -> List[float]:
+# Pixel Ghost – square + ring mod, retro ghostly, mid-range
+def _build_pixel_ghost(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        s = _concat(*[_square(f, 0.07, SR) for f in [523, 659, 784, 1046]])
-        n = _mix(_envelope(s, 0.005, 0.04, 0.7, 0.12, SR),
-                 _envelope(_concat(*[_square(f * 2, 0.07, SR) for f in [523, 659, 784, 1046]]),
-                            0.005, 0.04, 0.3, 0.12, SR))
-        return n
+        s = _ring(_concat(*[_square(f, 0.07, SR) for f in [370, 466, 554, 740]]), 180, SR)
+        return _envelope(s, 0.005, 0.03, 0.68, 0.15, SR)
     elif event == "challenge_start":
-        s = _concat(_square(220, 0.07, SR), _silence(0.03, SR),
-                    _square(294, 0.07, SR), _silence(0.03, SR),
-                    _square(440, 0.18, SR))
-        return _envelope(s, 0.005, 0.04, 0.65, 0.12, SR)
+        s = _ring(_concat(_square(220, 0.08, SR), _silence(0.03, SR),
+                          _square(294, 0.08, SR), _silence(0.03, SR),
+                          _square(440, 0.18, SR)), 140, SR)
+        return _envelope(s, 0.005, 0.03, 0.62, 0.15, SR)
     elif event == "challenge_complete":
-        s = _concat(*[_square(f, 0.07, SR) for f in [392, 523, 659, 784, 1046]])
-        return _envelope(s, 0.005, 0.04, 0.72, 0.15, SR)
+        s = _ring(_concat(*[_square(f, 0.065, SR) for f in [370, 466, 554, 740, 932]]), 200, SR)
+        return _envelope(s, 0.005, 0.025, 0.72, 0.15, SR)
     elif event == "challenge_fail":
-        s = _concat(*[_square(f, 0.09, SR) for f in [440, 370, 311, 220]])
-        return _envelope(s, 0.005, 0.04, 0.55, 0.18, SR)
+        s = _ring(_concat(*[_square(f, 0.08, SR) for f in [440, 370, 311, 247]]), 120, SR)
+        return _envelope(s, 0.003, 0.03, 0.55, 0.18, SR)
     elif event == "level_up":
-        freqs = [262, 294, 330, 392, 440, 494, 523, 587, 659, 784]
-        s = _concat(*[_square(f, 0.06, SR) for f in freqs])
-        return _envelope(s, 0.005, 0.03, 0.8, 0.2, SR)
+        s = _ring(_concat(*[_square(f, 0.058, SR)
+                            for f in [247, 294, 370, 440, 554, 659, 740, 932, 1108]]), 160, SR)
+        return _envelope(s, 0.003, 0.02, 0.75, 0.2, SR)
     elif event == "countdown_tick":
-        return _envelope(_square(440, 0.04, SR), 0.002, 0.015, 0.45, 0.025, SR)
+        s = _ring(_square(440, 0.04, SR), 160, SR)
+        return _envelope(s, 0.001, 0.015, 0.45, 0.025, SR)
     elif event == "countdown_final":
-        s = _concat(_square(880, 0.08, SR), _square(1108, 0.15, SR))
+        s = _ring(_concat(_square(740, 0.08, SR), _square(932, 0.14, SR)), 200, SR)
         return _envelope(s, 0.002, 0.03, 0.72, 0.12, SR)
 
 
-def _build_pinball_classic(event: str) -> List[float]:
+# Solar Drift – smooth pure sine + slow sweeps, gentle fade-in, ethereal
+def _build_solar_drift(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        bump = _mix(_sine(220, 0.06, SR), _noise(0.06, SR))
-        bump = [s * 0.4 for s in bump]
+        rise = _sweep(300, 900, 0.2, SR)
+        tone = _sine(900, 0.3, SR)
+        return _envelope(_concat(rise, tone), 0.06, 0.12, 0.6, 0.3, SR)
+    elif event == "challenge_start":
+        s = _concat(_sine(392, 0.15, SR), _sweep(392, 660, 0.15, SR), _sine(660, 0.22, SR))
+        return _envelope(s, 0.05, 0.1, 0.62, 0.28, SR)
+    elif event == "challenge_complete":
+        s = _concat(_sweep(440, 1100, 0.2, SR), _sine(1100, 0.3, SR))
+        return _envelope(s, 0.06, 0.1, 0.68, 0.3, SR)
+    elif event == "challenge_fail":
+        s = _concat(_sine(440, 0.15, SR), _sweep(440, 200, 0.28, SR))
+        return _envelope(s, 0.04, 0.1, 0.48, 0.3, SR)
+    elif event == "level_up":
         s = _concat(
-            _envelope(bump, 0.002, 0.03, 0.4, 0.05, SR),
-            _silence(0.02, SR),
-            _envelope(_sine(880, 0.18, SR), 0.01, 0.06, 0.6, 0.18, SR),
+            _sweep(220, 660, 0.18, SR),
+            _sweep(660, 1100, 0.15, SR),
+            _sweep(1100, 1760, 0.12, SR),
+            _sine(1760, 0.25, SR),
+        )
+        return _envelope(s, 0.06, 0.1, 0.72, 0.3, SR)
+    elif event == "countdown_tick":
+        return _envelope(_sine(660, 0.07, SR), 0.01, 0.03, 0.42, 0.04, SR)
+    elif event == "countdown_final":
+        s = _concat(_sweep(440, 1320, 0.14, SR), _sine(1320, 0.22, SR))
+        return _envelope(s, 0.04, 0.08, 0.72, 0.25, SR)
+
+
+# Roko's Lair – deep low sine, very long sustain, ominous dungeon
+def _build_rokos_lair(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        bass = _envelope(_sine(80, 0.4, SR), 0.05, 0.1, 0.5, 0.3, SR)
+        mid = _envelope(_sine(160, 0.35, SR), 0.04, 0.1, 0.45, 0.28, SR)
+        bright = _envelope(_sine(640, 0.25, SR), 0.02, 0.08, 0.6, 0.22, SR)
+        return _mix(bass, mid, bright)
+    elif event == "challenge_start":
+        pulse = _concat(*[_envelope(_sine(80, 0.1, SR), 0.005, 0.04, 0.5, 0.08, SR),
+                          _silence(0.05, SR)] * 2)
+        sting = _envelope(_sine(320, 0.3, SR), 0.04, 0.1, 0.55, 0.28, SR)
+        return _concat(pulse, _silence(0.04, SR), sting)
+    elif event == "challenge_complete":
+        s = _mix(
+            _envelope(_sine(80, 0.45, SR), 0.05, 0.1, 0.5, 0.35, SR),
+            _envelope(_sine(480, 0.35, SR), 0.03, 0.09, 0.6, 0.28, SR),
         )
         return s
+    elif event == "challenge_fail":
+        s = _concat(_sine(160, 0.12, SR), _sweep(160, 55, 0.4, SR))
+        return _envelope(s, 0.04, 0.1, 0.45, 0.35, SR)
+    elif event == "level_up":
+        layers = [_envelope(_sine(f, 0.5, SR), 0.04, 0.1, 0.5, 0.38, SR)
+                  for f in [55, 110, 220, 440]]
+        return _mix(*layers)
+    elif event == "countdown_tick":
+        return _envelope(_sine(160, 0.08, SR), 0.005, 0.03, 0.45, 0.05, SR)
+    elif event == "countdown_final":
+        s = _mix(
+            _envelope(_sine(80, 0.35, SR), 0.04, 0.1, 0.55, 0.3, SR),
+            _envelope(_sine(320, 0.28, SR), 0.03, 0.09, 0.62, 0.25, SR),
+        )
+        return s
+
+
+# Thunderclap Rex – noise transients + short sweeps, percussive, powerful
+def _build_thunderclap_rex(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        crack = _mix(_noise(0.05, SR), _sweep(600, 200, 0.05, SR))
+        crack = [s * 0.6 for s in crack]
+        boom = _mix(_sweep(400, 60, 0.22, SR), _noise(0.22, SR))
+        boom = [s * 0.5 for s in boom]
+        high = _envelope(_sine(1200, 0.2, SR), 0.005, 0.05, 0.6, 0.18, SR)
+        return _concat(_envelope(crack, 0.001, 0.02, 0.5, 0.04, SR),
+                       _envelope(boom, 0.003, 0.06, 0.48, 0.2, SR), high)
     elif event == "challenge_start":
-        flipper = _mix(_sine(80, 0.1, SR), _noise(0.1, SR))
-        flipper = [s * 0.5 for s in flipper]
+        hits = _concat(*[
+            _envelope(_mix(_noise(0.06, SR), _sweep(300 + i * 100, 80, 0.06, SR)),
+                      0.001, 0.02, 0.5, 0.04, SR)
+            for i in range(3)
+        ])
+        s = _concat(hits, _silence(0.04, SR),
+                    _envelope(_mix(_sweep(200, 900, 0.2, SR), _noise(0.2, SR)),
+                              0.003, 0.06, 0.55, 0.18, SR))
+        return s
+    elif event == "challenge_complete":
         s = _concat(
-            _envelope(flipper, 0.005, 0.04, 0.5, 0.08, SR),
+            _envelope(_mix(_noise(0.06, SR), _sweep(800, 1600, 0.06, SR)),
+                      0.001, 0.02, 0.55, 0.05, SR),
+            _envelope(_mix(_sweep(300, 1400, 0.18, SR), _noise(0.18, SR)),
+                      0.003, 0.05, 0.58, 0.18, SR),
+        )
+        return s
+    elif event == "challenge_fail":
+        s = _mix(_sweep(800, 50, 0.35, SR), _noise(0.35, SR))
+        return _envelope([x * 0.55 for x in s], 0.003, 0.06, 0.45, 0.3, SR)
+    elif event == "level_up":
+        beats = _concat(*[
+            _concat(_envelope(_mix(_noise(0.05, SR), _sweep(200 + i * 80, 60, 0.05, SR)),
+                              0.001, 0.02, 0.52, 0.04, SR), _silence(0.03, SR))
+            for i in range(4)
+        ])
+        finale = _envelope(_mix(_sweep(200, 1600, 0.25, SR), _noise(0.25, SR)),
+                           0.003, 0.06, 0.6, 0.22, SR)
+        return _concat(beats, finale)
+    elif event == "countdown_tick":
+        s = _mix(_noise(0.04, SR), _sweep(400, 200, 0.04, SR))
+        return _envelope([x * 0.45 for x in s], 0.001, 0.012, 0.42, 0.025, SR)
+    elif event == "countdown_final":
+        s = _mix(_noise(0.06, SR), _sweep(600, 1400, 0.06, SR))
+        boom = _mix(_sweep(300, 80, 0.18, SR), _noise(0.18, SR))
+        return _concat(_envelope([x * 0.55 for x in s], 0.001, 0.02, 0.55, 0.05, SR),
+                       _envelope([x * 0.55 for x in boom], 0.003, 0.06, 0.55, 0.15, SR))
+
+
+# Frostbite Hollow – very high frequency tremolo sine, crystalline pings
+def _build_frostbite_hollow(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        pings = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.1, SR), 8, 0.35, SR), 0.005, 0.03, 0.65, 0.12, SR)
+            for f in [1319, 1568, 1760, 2093, 2637]
+        ])
+        return pings
+    elif event == "challenge_start":
+        s = _concat(
+            _envelope(_tremolo(_sine(1047, 0.12, SR), 7, 0.3, SR), 0.005, 0.03, 0.6, 0.1, SR),
             _silence(0.03, SR),
-            _envelope(_sine(660, 0.2, SR), 0.01, 0.06, 0.65, 0.15, SR),
+            _envelope(_tremolo(_sine(1568, 0.22, SR), 6, 0.32, SR), 0.01, 0.05, 0.65, 0.2, SR),
         )
         return s
     elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_sine(f, 0.1, SR), 0.005, 0.05, 0.65, 0.1, SR)
-            for f in [523, 659, 784, 1046]
+        pings = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.09, SR), 9, 0.3, SR), 0.004, 0.025, 0.68, 0.12, SR)
+            for f in [1047, 1319, 1568, 1760, 2093, 2637]
         ])
-        return s
+        return pings
     elif event == "challenge_fail":
-        drain = _mix(_sweep(300, 60, 0.25, SR), _noise(0.25, SR))
-        drain = [s * 0.4 for s in drain]
-        return _envelope(drain, 0.005, 0.05, 0.4, 0.2, SR)
-    elif event == "level_up":
-        s = _concat(*[
-            _envelope(_sine(f, 0.09, SR), 0.005, 0.04, 0.7, 0.1, SR)
-            for f in [392, 494, 587, 698, 784, 988]
-        ])
-        return s
-    elif event == "countdown_tick":
-        click = _mix(_sine(300, 0.04, SR), _noise(0.04, SR))
-        click = [s * 0.3 for s in click]
-        return _envelope(click, 0.002, 0.015, 0.4, 0.025, SR)
-    elif event == "countdown_final":
         s = _concat(
-            _envelope(_sine(880, 0.12, SR), 0.005, 0.04, 0.7, 0.1, SR),
-            _envelope(_sine(1100, 0.18, SR), 0.005, 0.05, 0.72, 0.15, SR),
+            _envelope(_tremolo(_sine(1568, 0.12, SR), 7, 0.4, SR), 0.005, 0.03, 0.62, 0.1, SR),
+            _envelope(_tremolo(_sweep(1568, 400, 0.3, SR), 6, 0.35, SR), 0.01, 0.06, 0.48, 0.28, SR),
         )
         return s
+    elif event == "level_up":
+        pings = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.08, SR), 10, 0.28, SR), 0.003, 0.02, 0.7, 0.1, SR)
+            for f in [784, 988, 1175, 1319, 1568, 1760, 2093, 2349, 2637, 3136]
+        ])
+        return pings
+    elif event == "countdown_tick":
+        return _envelope(_tremolo(_sine(2093, 0.05, SR), 10, 0.25, SR), 0.002, 0.015, 0.45, 0.03, SR)
+    elif event == "countdown_final":
+        s = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.08, SR), 8, 0.3, SR), 0.003, 0.025, 0.68, 0.1, SR)
+            for f in [1568, 1760, 2093]
+        ])
+        return s
 
 
-def _build_galactic_battle(event: str) -> List[float]:
+# Ratchet Circus – mechanical staccato noise + square bursts, carnival machine
+def _build_ratchet_circus(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        s = _concat(_sweep(200, 1000, 0.15, SR), _silence(0.03, SR), _sine(1000, 0.22, SR))
-        laser = _ring(s[:int(0.1 * SR)], 180, SR)
-        return _envelope(_concat(laser, s[int(0.1 * SR):]), 0.01, 0.05, 0.68, 0.18, SR)
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.025, SR), _square(f, 0.025, SR)),
+                              0.001, 0.008, 0.5, 0.02, SR), _silence(0.015, SR))
+            for f in [440, 554, 659, 880, 1108]
+        ])
+        return mech
     elif event == "challenge_start":
-        alarm = _concat(*[_sine(440 if i % 2 == 0 else 550, 0.07, SR) for i in range(4)])
-        s = _concat(alarm, _silence(0.04, SR), _sweep(300, 900, 0.15, SR))
-        return _envelope(s, 0.005, 0.04, 0.65, 0.15, SR)
+        ratchet = _concat(*[
+            _concat(_envelope(_mix(_noise(0.03, SR), _square(220, 0.03, SR)),
+                              0.001, 0.01, 0.45, 0.02, SR), _silence(0.02, SR))
+            for _ in range(4)
+        ])
+        call = _envelope(_mix(_square(523, 0.18, SR), _square(659, 0.18, SR)),
+                         0.005, 0.03, 0.65, 0.15, SR)
+        return _concat(ratchet, _silence(0.03, SR), call)
     elif event == "challenge_complete":
-        s = _concat(_sweep(400, 1400, 0.18, SR), _sine(1400, 0.22, SR))
-        return _envelope(s, 0.01, 0.05, 0.72, 0.18, SR)
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.022, SR), _square(f, 0.022, SR)),
+                              0.001, 0.008, 0.52, 0.018, SR), _silence(0.012, SR))
+            for f in [392, 494, 587, 784, 988, 1175]
+        ])
+        return mech
     elif event == "challenge_fail":
-        s = _mix(_sweep(600, 60, 0.28, SR), _noise(0.28, SR))
-        return _envelope(s, 0.005, 0.04, 0.5, 0.22, SR)
+        wind_down = _concat(*[
+            _envelope(_mix(_noise(0.04, SR), _square(f, 0.04, SR)),
+                      0.001, 0.015, 0.5, 0.035, SR)
+            for f in [440, 392, 330, 262, 196]
+        ])
+        return wind_down
+    elif event == "level_up":
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.02, SR), _square(f, 0.02, SR)),
+                              0.001, 0.007, 0.55, 0.015, SR), _silence(0.01, SR))
+            for f in [262, 330, 392, 494, 587, 659, 784, 880, 988, 1175, 1319, 1568]
+        ])
+        return mech
+    elif event == "countdown_tick":
+        s = _mix(_noise(0.03, SR), _square(440, 0.03, SR))
+        return _envelope([x * 0.45 for x in s], 0.001, 0.01, 0.42, 0.02, SR)
+    elif event == "countdown_final":
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.025, SR), _square(f, 0.025, SR)),
+                              0.001, 0.008, 0.55, 0.02, SR), _silence(0.01, SR))
+            for f in [659, 784, 988]
+        ])
+        return mech
+
+
+# Lucky Stardust – fast bright high sine arpeggios, glittery, sparkly
+def _build_lucky_stardust(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        s = _concat(*[_envelope(_sine(f, 0.045, SR), 0.002, 0.015, 0.7, 0.045, SR)
+                      for f in [1047, 1319, 1568, 1760, 2093, 2349, 2793, 3136]])
+        return s
+    elif event == "challenge_start":
+        s = _concat(*[_envelope(_sine(f, 0.05, SR), 0.003, 0.018, 0.65, 0.05, SR)
+                      for f in [784, 988, 1175, 1568]])
+        return _concat(s, _silence(0.03, SR),
+                       _envelope(_sine(1760, 0.22, SR), 0.01, 0.06, 0.68, 0.2, SR))
+    elif event == "challenge_complete":
+        s = _concat(*[_envelope(_sine(f, 0.04, SR), 0.002, 0.012, 0.72, 0.04, SR)
+                      for f in [880, 1108, 1319, 1568, 1760, 2093, 2349, 2793]])
+        return s
+    elif event == "challenge_fail":
+        s = _concat(*[_envelope(_sine(f, 0.06, SR), 0.003, 0.02, 0.58, 0.06, SR)
+                      for f in [1319, 1108, 880, 698, 554]])
+        return s
+    elif event == "level_up":
+        s = _concat(*[_envelope(_sine(f, 0.038, SR), 0.001, 0.01, 0.75, 0.038, SR)
+                      for f in [523, 659, 784, 988, 1175, 1319, 1568, 1760, 2093, 2349,
+                                 2637, 3136]])
+        return s
+    elif event == "countdown_tick":
+        return _envelope(_sine(2093, 0.03, SR), 0.001, 0.008, 0.55, 0.022, SR)
+    elif event == "countdown_final":
+        s = _concat(*[_envelope(_sine(f, 0.045, SR), 0.002, 0.015, 0.72, 0.045, SR)
+                      for f in [1568, 1760, 2093]])
+        return s
+
+
+# Boneshaker – short rattling noise + low square bursts, percussive skeleton
+def _build_boneshaker(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        rattle = _concat(*[
+            _concat(_envelope(_noise(0.03, SR), 0.001, 0.01, 0.5, 0.025, SR),
+                    _silence(0.02, SR))
+            for _ in range(4)
+        ])
+        bone = _concat(*[_envelope(_mix(_noise(0.04, SR), _square(f, 0.04, SR)),
+                                   0.001, 0.015, 0.55, 0.04, SR)
+                         for f in [196, 247, 294, 392]])
+        return _concat(rattle, bone)
+    elif event == "challenge_start":
+        march = _concat(*[
+            _concat(_envelope(_mix(_noise(0.04, SR), _square(110, 0.04, SR)),
+                              0.001, 0.015, 0.5, 0.035, SR), _silence(0.03, SR))
+            for _ in range(3)
+        ])
+        crack = _envelope(_mix(_noise(0.08, SR), _square(220, 0.08, SR)),
+                          0.001, 0.025, 0.55, 0.07, SR)
+        return _concat(march, _silence(0.03, SR), crack)
+    elif event == "challenge_complete":
+        s = _concat(*[_envelope(_mix(_noise(0.035, SR), _square(f, 0.035, SR)),
+                                0.001, 0.012, 0.55, 0.03, SR)
+                      for f in [196, 247, 294, 370, 440, 554]])
+        return s
+    elif event == "challenge_fail":
+        s = _concat(*[_envelope(_mix(_noise(0.05, SR), _square(f, 0.05, SR)),
+                                0.001, 0.018, 0.48, 0.045, SR)
+                      for f in [330, 262, 196, 147]])
+        return s
+    elif event == "level_up":
+        s = _concat(*[
+            _concat(_envelope(_mix(_noise(0.028, SR), _square(f, 0.028, SR)),
+                              0.001, 0.01, 0.55, 0.025, SR), _silence(0.015, SR))
+            for f in [110, 138, 165, 196, 247, 294, 370, 440, 554, 659]
+        ])
+        return s
+    elif event == "countdown_tick":
+        s = _mix(_noise(0.035, SR), _square(196, 0.035, SR))
+        return _envelope([x * 0.45 for x in s], 0.001, 0.012, 0.42, 0.022, SR)
+    elif event == "countdown_final":
+        rattle = _concat(*[
+            _concat(_envelope(_noise(0.025, SR), 0.001, 0.008, 0.5, 0.02, SR),
+                    _silence(0.015, SR))
+            for _ in range(3)
+        ])
+        boom = _envelope(_mix(_noise(0.1, SR), _square(110, 0.1, SR)),
+                         0.001, 0.03, 0.55, 0.09, SR)
+        return _concat(rattle, boom)
+
+
+# Vex Machina – ring mod + metallic sweeps, steampunk gears
+def _build_vex_machina(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        s = _ring(_concat(_sweep(200, 800, 0.12, SR), _sine(800, 0.22, SR)), 320, SR)
+        return _envelope(s, 0.005, 0.04, 0.68, 0.2, SR)
+    elif event == "challenge_start":
+        gears = _concat(*[
+            _ring(_sine(200 + i * 80, 0.065, SR), 100 + i * 40, SR)
+            for i in range(3)
+        ])
+        s = _concat(gears, _silence(0.04, SR),
+                    _ring(_sweep(300, 1200, 0.22, SR), 240, SR))
+        return _envelope(s, 0.005, 0.04, 0.65, 0.18, SR)
+    elif event == "challenge_complete":
+        s = _mix(
+            _ring(_sweep(400, 1600, 0.2, SR), 280, SR),
+            _ring(_sine(800, 0.2, SR), 320, SR),
+        )
+        return _envelope(_concat(s, _ring(_sine(1600, 0.15, SR), 400, SR)),
+                         0.008, 0.05, 0.7, 0.2, SR)
+    elif event == "challenge_fail":
+        s = _mix(_ring(_sweep(600, 60, 0.3, SR), 180, SR),
+                 _ring(_noise(0.3, SR), 100, SR))
+        return _envelope([x * 0.52 for x in s], 0.004, 0.05, 0.42, 0.26, SR)
     elif event == "level_up":
         s = _concat(
-            _sweep(100, 600, 0.15, SR), _sweep(600, 1200, 0.12, SR),
-            _sweep(1200, 1800, 0.1, SR), _sine(1800, 0.2, SR),
+            _ring(_sweep(100, 600, 0.14, SR), 160, SR),
+            _ring(_sweep(600, 1200, 0.12, SR), 240, SR),
+            _ring(_sweep(1200, 2000, 0.1, SR), 320, SR),
+            _mix(_ring(_sine(2000, 0.22, SR), 400, SR), _sine(1000, 0.22, SR)),
         )
-        return _envelope(s, 0.01, 0.05, 0.75, 0.2, SR)
+        return _envelope(s, 0.008, 0.05, 0.72, 0.22, SR)
     elif event == "countdown_tick":
-        return _envelope(_sweep(500, 300, 0.06, SR), 0.002, 0.02, 0.4, 0.03, SR)
+        s = _ring(_sine(440, 0.05, SR), 220, SR)
+        return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
     elif event == "countdown_final":
-        s = _concat(_sweep(200, 1200, 0.1, SR), _sine(1200, 0.2, SR))
-        return _envelope(s, 0.005, 0.04, 0.72, 0.15, SR)
+        s = _concat(
+            _ring(_sweep(300, 1400, 0.1, SR), 200, SR),
+            _mix(_ring(_sine(1400, 0.2, SR), 350, SR), _sine(700, 0.2, SR)),
+        )
+        return _envelope(s, 0.004, 0.04, 0.72, 0.18, SR)
 
 
-def _build_stage_magic(event: str) -> List[float]:
+# Stormfront Jake – wide dramatic sweeps + noise gusts, stormy western
+def _build_stormfront_jake(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        gust = [s * 0.3 for s in _noise(0.12, SR)]
+        s = _concat(
+            _envelope(gust, 0.04, 0.08, 0.35, 0.08, SR),
+            _envelope(_sweep(200, 1400, 0.22, SR), 0.01, 0.06, 0.65, 0.2, SR),
+        )
+        return s
+    elif event == "challenge_start":
+        wind = [s * 0.28 for s in _noise(0.18, SR)]
+        s = _concat(
+            _envelope(wind, 0.05, 0.1, 0.32, 0.12, SR),
+            _silence(0.04, SR),
+            _envelope(_sweep(150, 900, 0.25, SR), 0.01, 0.06, 0.62, 0.22, SR),
+        )
+        return s
+    elif event == "challenge_complete":
+        s = _mix(
+            _sweep(300, 1600, 0.25, SR),
+            [x * 0.25 for x in _noise(0.25, SR)],
+        )
+        return _envelope(s, 0.01, 0.07, 0.65, 0.22, SR)
+    elif event == "challenge_fail":
+        s = _mix(_sweep(1200, 80, 0.35, SR), [x * 0.35 for x in _noise(0.35, SR)])
+        return _envelope(s, 0.01, 0.07, 0.45, 0.3, SR)
+    elif event == "level_up":
+        gusts = _concat(
+            _envelope([s * 0.3 for s in _noise(0.1, SR)], 0.04, 0.06, 0.3, 0.08, SR),
+            _silence(0.03, SR),
+            _envelope([s * 0.3 for s in _noise(0.1, SR)], 0.04, 0.06, 0.32, 0.08, SR),
+            _silence(0.03, SR),
+        )
+        finale = _envelope(_mix(_sweep(200, 2000, 0.3, SR),
+                                [x * 0.3 for x in _noise(0.3, SR)]),
+                           0.01, 0.07, 0.68, 0.28, SR)
+        return _concat(gusts, finale)
+    elif event == "countdown_tick":
+        s = _mix(_sweep(400, 200, 0.055, SR), [x * 0.2 for x in _noise(0.055, SR)])
+        return _envelope(s, 0.002, 0.02, 0.42, 0.03, SR)
+    elif event == "countdown_final":
+        s = _mix(_sweep(200, 1400, 0.14, SR), [x * 0.3 for x in _noise(0.14, SR)])
+        return _envelope(s, 0.01, 0.06, 0.7, 0.18, SR)
+
+
+# Nebula Drift – very long, slow tremolo/vibrato sine waves, deep ambient space
+def _build_nebula_drift(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        low = _tremolo(_sine(110, 0.5, SR), 1.2, 0.55, SR)
+        mid = _tremolo(_sine(220, 0.45, SR), 1.8, 0.45, SR)
+        bright = _vibrato(_sine(880, 0.3, SR), 2, 8, SR)
+        return _mix(
+            _envelope(low, 0.08, 0.15, 0.5, 0.35, SR),
+            _envelope(mid, 0.06, 0.12, 0.45, 0.3, SR),
+            _envelope(bright, 0.04, 0.1, 0.6, 0.25, SR),
+        )
+    elif event == "challenge_start":
+        low = _tremolo(_sine(130, 0.4, SR), 1.5, 0.5, SR)
+        rise = _sweep(200, 600, 0.3, SR)
+        return _mix(
+            _envelope(low, 0.07, 0.12, 0.48, 0.3, SR),
+            _envelope(rise, 0.05, 0.1, 0.55, 0.28, SR),
+        )
+    elif event == "challenge_complete":
+        s = _mix(
+            _envelope(_tremolo(_sine(110, 0.5, SR), 1.5, 0.5, SR), 0.07, 0.14, 0.52, 0.38, SR),
+            _envelope(_vibrato(_sine(660, 0.4, SR), 2.5, 6, SR), 0.04, 0.1, 0.65, 0.32, SR),
+        )
+        return s
+    elif event == "challenge_fail":
+        s = _mix(
+            _tremolo(_sweep(400, 55, 0.5, SR), 1.2, 0.55, SR),
+            _envelope(_sine(220, 0.45, SR), 0.05, 0.12, 0.42, 0.38, SR),
+        )
+        return _envelope(s, 0.06, 0.12, 0.42, 0.38, SR)
+    elif event == "level_up":
+        layers = [
+            _envelope(_tremolo(_sine(f, 0.55, SR), 1.0 + i * 0.3, 0.45, SR),
+                      0.06 + i * 0.01, 0.12, 0.5, 0.4, SR)
+            for i, f in enumerate([55, 110, 220, 440, 880])
+        ]
+        return _mix(*layers)
+    elif event == "countdown_tick":
+        return _envelope(_tremolo(_sine(440, 0.1, SR), 2, 0.35, SR), 0.008, 0.03, 0.42, 0.06, SR)
+    elif event == "countdown_final":
+        s = _mix(
+            _envelope(_tremolo(_sine(220, 0.4, SR), 1.5, 0.5, SR), 0.05, 0.1, 0.55, 0.32, SR),
+            _envelope(_vibrato(_sine(880, 0.32, SR), 2, 7, SR), 0.03, 0.08, 0.65, 0.28, SR),
+        )
+        return s
+
+
+# Gideon's Clock – precise staccato square bursts, clockwork timing
+def _build_gideons_clock(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.055, SR), 0.002, 0.02, 0.65, 0.06, SR),
+                    _silence(0.03, SR))
+            for f in [659, 784, 880, 988, 1175, 1319]
+        ])
+        return chime
+    elif event == "challenge_start":
+        ticks = _concat(*[
+            _concat(_envelope(_square(523, 0.04, SR), 0.001, 0.014, 0.55, 0.035, SR),
+                    _silence(0.04, SR))
+            for _ in range(3)
+        ])
+        alarm = _envelope(_square(784, 0.22, SR), 0.002, 0.025, 0.7, 0.18, SR)
+        return _concat(ticks, _silence(0.03, SR), alarm)
+    elif event == "challenge_complete":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.05, SR), 0.001, 0.018, 0.68, 0.055, SR),
+                    _silence(0.025, SR))
+            for f in [523, 659, 784, 880, 1047, 1319, 1568]
+        ])
+        return chime
+    elif event == "challenge_fail":
+        s = _concat(*[
+            _concat(_envelope(_square(f, 0.06, SR), 0.001, 0.022, 0.55, 0.06, SR),
+                    _silence(0.035, SR))
+            for f in [523, 494, 440, 392, 330]
+        ])
+        return s
+    elif event == "level_up":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.045, SR), 0.001, 0.015, 0.72, 0.05, SR),
+                    _silence(0.02, SR))
+            for f in [392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047, 1175]
+        ])
+        return chime
+    elif event == "countdown_tick":
+        return _envelope(_square(784, 0.032, SR), 0.001, 0.01, 0.52, 0.022, SR)
+    elif event == "countdown_final":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.05, SR), 0.001, 0.018, 0.72, 0.055, SR),
+                    _silence(0.02, SR))
+            for f in [880, 1047, 1319]
+        ])
+        return chime
+
+
+# Sapphire Specter – soft vibrato sine, high harmonic shimmer, spectral beauty
+def _build_sapphire_specter(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
         shimmer = _concat(*[
-            _envelope(_sine(f, 0.07, SR), 0.005, 0.03, 0.6, 0.07, SR)
+            _envelope(_vibrato(_mix(_sine(f, 0.1, SR), _sine(f * 2, 0.1, SR)), 4, 5, SR),
+                      0.01, 0.04, 0.62, 0.12, SR)
             for f in [784, 988, 1175, 1568, 1975]
         ])
         return shimmer
     elif event == "challenge_start":
-        drum = _mix(_sine(80, 0.15, SR), _noise(0.15, SR))
-        drum = [s * 0.45 for s in drum]
-        s = _concat(
-            _envelope(drum, 0.002, 0.04, 0.4, 0.1, SR),
-            _silence(0.04, SR),
-            _envelope(_sine(660, 0.22, SR), 0.01, 0.06, 0.65, 0.15, SR),
-        )
-        return s
+        s = _concat(*[
+            _envelope(_vibrato(_sine(f, 0.12, SR), 3, 4, SR), 0.01, 0.04, 0.58, 0.12, SR)
+            for f in [494, 659, 784]
+        ])
+        sustain = _envelope(_vibrato(_mix(_sine(784, 0.28, SR), _sine(988, 0.28, SR)), 3.5, 5, SR),
+                            0.02, 0.07, 0.62, 0.25, SR)
+        return _concat(s, _silence(0.03, SR), sustain)
     elif event == "challenge_complete":
         s = _concat(*[
-            _envelope(_sine(f, 0.09, SR), 0.005, 0.04, 0.68, 0.1, SR)
-            for f in [523, 659, 784, 988, 1175]
+            _envelope(_vibrato(_mix(_sine(f, 0.09, SR), _sine(f * 2, 0.09, SR)), 4, 4, SR),
+                      0.008, 0.035, 0.65, 0.1, SR)
+            for f in [523, 659, 784, 988, 1175, 1568]
         ])
         return s
     elif event == "challenge_fail":
-        return _envelope(_concat(_sine(440, 0.12, SR), _sine(330, 0.2, SR)), 0.01, 0.06, 0.5, 0.2, SR)
+        s = _concat(*[
+            _envelope(_vibrato(_sine(f, 0.12, SR), 3, 5, SR), 0.01, 0.04, 0.52, 0.12, SR)
+            for f in [784, 659, 523, 415, 330]
+        ])
+        return s
     elif event == "level_up":
         s = _concat(*[
-            _envelope(_sine(f, 0.08, SR), 0.005, 0.035, 0.72, 0.1, SR)
-            for f in [262, 330, 392, 523, 659, 784, 1046, 1319]
+            _envelope(_vibrato(_mix(_sine(f, 0.08, SR), _sine(f * 2, 0.08, SR)), 4, 4, SR),
+                      0.007, 0.03, 0.68, 0.1, SR)
+            for f in [330, 415, 494, 659, 784, 988, 1175, 1319, 1568, 1975]
         ])
         return s
     elif event == "countdown_tick":
-        return _envelope(_sine(1046, 0.06, SR), 0.003, 0.02, 0.45, 0.04, SR)
+        s = _vibrato(_mix(_sine(1047, 0.048, SR), _sine(2093, 0.048, SR)), 5, 3, SR)
+        return _envelope(s, 0.002, 0.018, 0.45, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(*[
-            _envelope(_sine(f, 0.09, SR), 0.003, 0.035, 0.65, 0.09, SR)
+            _envelope(_vibrato(_mix(_sine(f, 0.09, SR), _sine(f * 2, 0.09, SR)), 4, 5, SR),
+                      0.006, 0.03, 0.68, 0.1, SR)
             for f in [880, 1108, 1319]
         ])
         return s
 
 
-def _build_neon_grid(event: str) -> List[float]:
+# Molten Core – deep low rumbling sweeps, industrial, heavy
+def _build_molten_core(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        s = _mix(_sweep(220, 880, 0.18, SR), _sine(440, 0.18, SR))
-        return _envelope(_ring(s, 80, SR), 0.01, 0.05, 0.65, 0.18, SR)
-    elif event == "challenge_start":
-        s = _concat(_sweep(80, 440, 0.12, SR), _silence(0.04, SR), _sine(440, 0.2, SR))
-        return _envelope(_ring(s, 55, SR), 0.005, 0.04, 0.62, 0.15, SR)
-    elif event == "challenge_complete":
-        s = _mix(_sweep(440, 1320, 0.18, SR), _sine(660, 0.18, SR))
-        return _envelope(s, 0.01, 0.05, 0.68, 0.18, SR)
-    elif event == "challenge_fail":
-        s = _mix(_sweep(440, 55, 0.28, SR), _noise(0.28, SR))
-        return _envelope([x * 0.6 for x in s], 0.005, 0.05, 0.45, 0.22, SR)
-    elif event == "level_up":
-        s = _mix(
-            _sweep(110, 880, 0.3, SR),
-            _sweep(220, 1760, 0.3, SR),
-            _sine(440, 0.3, SR),
+        rumble = _tremolo(_mix(_sine(55, 0.35, SR), _sine(110, 0.35, SR)), 2.5, 0.6, SR)
+        rise = _sweep(80, 600, 0.25, SR)
+        return _mix(
+            _envelope(rumble, 0.06, 0.12, 0.48, 0.3, SR),
+            _envelope(rise, 0.02, 0.08, 0.6, 0.22, SR),
         )
-        return _envelope(s, 0.01, 0.07, 0.72, 0.22, SR)
-    elif event == "countdown_tick":
-        s = _ring(_sine(440, 0.055, SR), 120, SR)
-        return _envelope(s, 0.002, 0.02, 0.4, 0.03, SR)
-    elif event == "countdown_final":
-        s = _mix(_sine(880, 0.2, SR), _ring(_sine(880, 0.2, SR), 110, SR))
-        return _envelope(s, 0.005, 0.04, 0.7, 0.15, SR)
-
-
-def _build_martian_assault(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        alien = _ring(_sweep(150, 900, 0.2, SR), 220, SR)
-        s = _concat(alien, _sine(900, 0.18, SR))
-        return _envelope(s, 0.01, 0.05, 0.65, 0.18, SR)
     elif event == "challenge_start":
-        blaster = _concat(*[_ring(_sine(220 + i * 40, 0.06, SR), 140, SR) for i in range(3)])
-        s = _concat(blaster, _silence(0.04, SR), _sweep(300, 700, 0.18, SR))
-        return _envelope(s, 0.005, 0.04, 0.62, 0.15, SR)
-    elif event == "challenge_complete":
-        s = _concat(_sweep(300, 1200, 0.15, SR), _ring(_sine(1200, 0.22, SR), 200, SR))
-        return _envelope(s, 0.01, 0.05, 0.68, 0.18, SR)
-    elif event == "challenge_fail":
-        s = _mix(_sweep(500, 50, 0.28, SR), _ring(_noise(0.28, SR), 80, SR))
-        return _envelope([x * 0.55 for x in s], 0.005, 0.04, 0.45, 0.22, SR)
-    elif event == "level_up":
-        s = _concat(
-            _ring(_sweep(100, 600, 0.12, SR), 160, SR),
-            _ring(_sweep(600, 1400, 0.12, SR), 200, SR),
-            _ring(_sine(1400, 0.22, SR), 220, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.72, 0.2, SR)
-    elif event == "countdown_tick":
-        s = _ring(_sine(400, 0.055, SR), 140, SR)
-        return _envelope(s, 0.002, 0.02, 0.38, 0.03, SR)
-    elif event == "countdown_final":
-        s = _ring(_concat(_sweep(200, 1100, 0.1, SR), _sine(1100, 0.18, SR)), 180, SR)
-        return _envelope(s, 0.005, 0.04, 0.7, 0.15, SR)
-
-
-def _build_carnival_show(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        s = _concat(*[
-            _envelope(_sine(f, 0.075, SR), 0.005, 0.025, 0.65, 0.08, SR)
-            for f in [523, 659, 784, 880, 1046, 1319]
-        ])
-        return s
-    elif event == "challenge_start":
-        roll = _concat(*[_envelope(_noise(0.04, SR), 0.001, 0.01, 0.4, 0.03, SR) for _ in range(3)])
-        fanfare = _envelope(_sine(784, 0.22, SR), 0.01, 0.06, 0.68, 0.15, SR)
-        return _concat(roll, _silence(0.04, SR), fanfare)
-    elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_sine(f, 0.08, SR), 0.004, 0.03, 0.68, 0.09, SR)
-            for f in [523, 659, 784, 659, 784, 1046]
-        ])
-        return s
-    elif event == "challenge_fail":
-        s = _concat(*[
-            _envelope(_sine(f, 0.1, SR), 0.005, 0.04, 0.5, 0.1, SR)
-            for f in [440, 392, 349, 294]
-        ])
-        return s
-    elif event == "level_up":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.25, 0.07, SR)), 0.004, 0.03, 0.72, 0.09, SR)
-            for f in [262, 330, 392, 523, 659, 784, 880, 1046]
-        ])
-        return s
-    elif event == "countdown_tick":
-        return _envelope(_mix(_sine(880, 0.04, SR), _noise(0.04, SR)), 0.001, 0.015, 0.4, 0.025, SR)
-    elif event == "countdown_final":
-        s = _concat(*[
-            _envelope(_sine(f, 0.07, SR), 0.003, 0.03, 0.68, 0.08, SR)
-            for f in [784, 988, 1175]
-        ])
-        return s
-
-
-def _build_medieval_quest(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        horn = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.5, 0.1, SR)), 0.01, 0.04, 0.65, 0.1, SR)
-            for f in [392, 523, 659, 784]
-        ])
-        return horn
-    elif event == "challenge_start":
-        drums = _concat(*[_envelope(_mix(_sine(60, 0.08, SR), _noise(0.08, SR)),
-                                    0.001, 0.03, 0.45, 0.06, SR) for _ in range(2)])
-        fanfare = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.5, 0.1, SR)), 0.01, 0.04, 0.65, 0.1, SR)
-            for f in [330, 440, 523]
-        ])
-        return _concat(drums, _silence(0.04, SR), fanfare)
-    elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)), 0.008, 0.035, 0.68, 0.1, SR)
-            for f in [392, 494, 587, 784, 988]
-        ])
-        return s
-    elif event == "challenge_fail":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.25, 0.1, SR)), 0.008, 0.04, 0.5, 0.12, SR)
-            for f in [330, 262, 220, 196]
-        ])
-        return s
-    elif event == "level_up":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.5, 0.08, SR)), 0.008, 0.032, 0.72, 0.1, SR)
-            for f in [262, 330, 392, 494, 587, 659, 784, 988, 1175]
-        ])
-        return s
-    elif event == "countdown_tick":
-        s = _mix(_sine(330, 0.05, SR), _sine(495, 0.05, SR))
-        return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
-    elif event == "countdown_final":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.005, 0.035, 0.68, 0.1, SR)
-            for f in [523, 659, 784]
-        ])
-        return s
-
-
-def _build_haunted_manor(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        s = _mix(_sweep(300, 600, 0.22, SR), _crackle(0.22, SR))
-        tone = _tremolo(_sine(600, 0.18, SR), 5, 0.4, SR)
-        return _envelope(_concat(s, tone), 0.02, 0.08, 0.55, 0.22, SR)
-    elif event == "challenge_start":
-        creak = _mix(_sweep(100, 200, 0.18, SR), _crackle(0.18, SR))
-        sting = _tremolo(_sine(440, 0.22, SR), 6, 0.45, SR)
-        return _envelope(_concat(creak, _silence(0.04, SR), sting), 0.01, 0.06, 0.55, 0.2, SR)
-    elif event == "challenge_complete":
-        s = _mix(_sweep(300, 900, 0.22, SR), _tremolo(_sine(600, 0.22, SR), 5, 0.3, SR))
-        return _envelope(s, 0.02, 0.07, 0.58, 0.22, SR)
-    elif event == "challenge_fail":
-        s = _mix(_sweep(500, 80, 0.32, SR), _crackle(0.32, SR))
-        return _envelope(s, 0.005, 0.05, 0.42, 0.28, SR)
-    elif event == "level_up":
-        s = _mix(
-            _sweep(150, 600, 0.35, SR),
-            _tremolo(_sine(300, 0.35, SR), 4, 0.45, SR),
-            _crackle(0.35, SR),
-        )
-        return _envelope(s, 0.02, 0.08, 0.62, 0.25, SR)
-    elif event == "countdown_tick":
-        s = _mix(_sine(220, 0.06, SR), _crackle(0.06, SR))
-        return _envelope(s, 0.002, 0.02, 0.38, 0.04, SR)
-    elif event == "countdown_final":
-        s = _mix(_sweep(180, 600, 0.12, SR), _tremolo(_sine(400, 0.2, SR), 5, 0.4, SR))
-        return _envelope(s, 0.008, 0.05, 0.62, 0.2, SR)
-
-
-def _build_deep_ocean(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        s = _tremolo(_sine(220, 0.35, SR), 3, 0.4, SR)
-        ping = _envelope(_sine(880, 0.18, SR), 0.01, 0.08, 0.6, 0.18, SR)
-        return _concat(_envelope(s, 0.04, 0.1, 0.55, 0.25, SR), _silence(0.02, SR), ping)
-    elif event == "challenge_start":
-        s = _tremolo(_sine(180, 0.28, SR), 2.5, 0.45, SR)
-        ping = _envelope(_sine(660, 0.22, SR), 0.01, 0.07, 0.62, 0.2, SR)
-        return _concat(_envelope(s, 0.03, 0.08, 0.52, 0.2, SR), ping)
-    elif event == "challenge_complete":
-        s = _concat(
-            _envelope(_tremolo(_sine(220, 0.2, SR), 3, 0.38, SR), 0.03, 0.08, 0.55, 0.18, SR),
-            _envelope(_sine(880, 0.22, SR), 0.01, 0.07, 0.65, 0.2, SR),
-        )
-        return s
-    elif event == "challenge_fail":
-        s = _tremolo(_sweep(300, 60, 0.35, SR), 2, 0.4, SR)
-        return _envelope(s, 0.02, 0.07, 0.42, 0.28, SR)
-    elif event == "level_up":
-        s = _mix(
-            _tremolo(_sine(110, 0.4, SR), 2, 0.45, SR),
-            _tremolo(_sine(220, 0.4, SR), 3, 0.35, SR),
-        )
-        pings = _concat(*[
-            _envelope(_sine(f, 0.1, SR), 0.008, 0.04, 0.65, 0.12, SR)
-            for f in [440, 550, 660, 880]
-        ])
-        return _concat(_envelope(s, 0.04, 0.1, 0.58, 0.28, SR), pings)
-    elif event == "countdown_tick":
-        s = _tremolo(_sine(660, 0.07, SR), 4, 0.2, SR)
-        return _envelope(s, 0.005, 0.025, 0.42, 0.04, SR)
-    elif event == "countdown_final":
-        s = _concat(
-            _envelope(_sine(660, 0.1, SR), 0.008, 0.04, 0.68, 0.1, SR),
-            _envelope(_tremolo(_sine(880, 0.22, SR), 3, 0.3, SR), 0.01, 0.07, 0.7, 0.2, SR),
-        )
-        return s
-
-
-def _build_jukebox(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)), 0.008, 0.035, 0.68, 0.1, SR)
-            for f in [392, 494, 587, 784, 988]
-        ])
-        return s
-    elif event == "challenge_start":
-        roll = _concat(*[_envelope(_mix(_noise(0.03, SR), _sine(100, 0.03, SR)),
-                                   0.001, 0.012, 0.4, 0.025, SR) for _ in range(4)])
-        call = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.008, 0.035, 0.65, 0.1, SR)
-            for f in [330, 440, 523]
-        ])
-        return _concat(roll, _silence(0.04, SR), call)
-    elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR)), 0.007, 0.03, 0.68, 0.1, SR)
-            for f in [392, 494, 587, 698, 784]
-        ])
-        return s
-    elif event == "challenge_fail":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.25, 0.1, SR)), 0.007, 0.04, 0.5, 0.12, SR)
-            for f in [440, 392, 330, 277]
-        ])
-        return s
-    elif event == "level_up":
-        notes = [262, 294, 330, 370, 392, 440, 494, 523, 587, 659]
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.25, 0.07, SR),
-                           _sine(f * 1.5, 0.07, SR)), 0.005, 0.028, 0.72, 0.09, SR)
-            for f in notes
-        ])
-        return s
-    elif event == "countdown_tick":
-        s = _mix(_sine(440, 0.045, SR), _sine(550, 0.045, SR))
-        return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
-    elif event == "countdown_final":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR)), 0.005, 0.03, 0.7, 0.1, SR)
-            for f in [523, 659, 784]
-        ])
-        return s
-
-
-def _build_showtime(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        fanfare = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR),
-                           _sine(f * 2, 0.09, SR)), 0.008, 0.035, 0.7, 0.1, SR)
-            for f in [392, 523, 659, 784, 1046]
-        ])
-        return fanfare
-    elif event == "challenge_start":
-        drums = _concat(*[_envelope(_mix(_sine(80, 0.07, SR), _noise(0.07, SR)),
-                                    0.001, 0.025, 0.5, 0.05, SR) for _ in range(3)])
-        fanfare = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 2, 0.09, SR)), 0.007, 0.035, 0.68, 0.1, SR)
-            for f in [330, 440, 523, 659]
-        ])
-        return _concat(drums, _silence(0.04, SR), fanfare)
-    elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.5, 0.08, SR),
-                           _sine(f * 2, 0.08, SR)), 0.007, 0.03, 0.7, 0.1, SR)
-            for f in [392, 523, 659, 784, 988, 1175]
-        ])
-        return s
-    elif event == "challenge_fail":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.25, 0.1, SR)), 0.008, 0.04, 0.52, 0.12, SR)
-            for f in [330, 277, 247, 220]
-        ])
-        return s
-    elif event == "level_up":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.075, SR), _sine(f * 1.25, 0.075, SR),
-                           _sine(f * 2, 0.075, SR)), 0.006, 0.028, 0.75, 0.1, SR)
-            for f in [262, 330, 392, 494, 587, 659, 784, 880, 988, 1175, 1319]
-        ])
-        return s
-    elif event == "countdown_tick":
-        s = _mix(_sine(660, 0.045, SR), _sine(825, 0.045, SR))
-        return _envelope(s, 0.002, 0.018, 0.45, 0.03, SR)
-    elif event == "countdown_final":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.5, 0.08, SR),
-                           _sine(f * 2, 0.08, SR)), 0.005, 0.032, 0.72, 0.1, SR)
-            for f in [523, 659, 784, 1046]
-        ])
-        return s
-
-
-def _build_chrome_steel(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        metal = _ring(_sine(660, 0.22, SR), 440, SR)
-        s = _concat(_sweep(200, 800, 0.1, SR), metal)
-        return _envelope(s, 0.005, 0.04, 0.65, 0.2, SR)
-    elif event == "challenge_start":
-        clank = _mix(_ring(_sine(200, 0.12, SR), 160, SR), _noise(0.12, SR))
-        clank = [s * 0.5 for s in clank]
-        s = _concat(
-            _envelope(clank, 0.002, 0.04, 0.45, 0.1, SR),
+        rumble = _tremolo(_sine(60, 0.3, SR), 2, 0.55, SR)
+        slam = _mix(_sweep(100, 400, 0.2, SR), [x * 0.3 for x in _noise(0.2, SR)])
+        return _concat(
+            _envelope(rumble, 0.05, 0.1, 0.45, 0.25, SR),
             _silence(0.04, SR),
-            _envelope(_ring(_sine(660, 0.22, SR), 330, SR), 0.01, 0.06, 0.65, 0.18, SR),
+            _envelope(slam, 0.01, 0.06, 0.6, 0.18, SR),
         )
-        return s
     elif event == "challenge_complete":
-        s = _concat(
-            _sweep(300, 1200, 0.12, SR),
-            _ring(_sine(1200, 0.22, SR), 400, SR),
+        s = _mix(
+            _tremolo(_sine(55, 0.45, SR), 2, 0.55, SR),
+            _sweep(100, 800, 0.3, SR),
+            _envelope(_sine(400, 0.28, SR), 0.02, 0.08, 0.55, 0.22, SR),
         )
-        return _envelope(s, 0.01, 0.05, 0.68, 0.2, SR)
+        return _envelope(s, 0.05, 0.12, 0.55, 0.32, SR)
     elif event == "challenge_fail":
-        s = _mix(_sweep(600, 60, 0.3, SR), _ring(_noise(0.3, SR), 100, SR))
-        return _envelope([x * 0.55 for x in s], 0.005, 0.04, 0.42, 0.25, SR)
+        s = _mix(
+            _tremolo(_sweep(300, 40, 0.45, SR), 2, 0.6, SR),
+            [x * 0.3 for x in _noise(0.45, SR)],
+        )
+        return _envelope(s, 0.04, 0.1, 0.42, 0.38, SR)
     elif event == "level_up":
-        s = _concat(
-            _sweep(100, 800, 0.18, SR),
-            _ring(_sweep(800, 1600, 0.18, SR), 200, SR),
-            _ring(_sine(1600, 0.22, SR), 400, SR),
-        )
-        return _envelope(s, 0.01, 0.05, 0.72, 0.22, SR)
+        layers = [
+            _envelope(_tremolo(_sine(f, 0.5, SR), 2.0 + i * 0.2, 0.55, SR),
+                      0.05, 0.12, 0.5, 0.38, SR)
+            for i, f in enumerate([40, 55, 80, 110, 220])
+        ]
+        sweep_layer = _envelope(_sweep(80, 1200, 0.4, SR), 0.03, 0.1, 0.58, 0.32, SR)
+        return _mix(*layers, sweep_layer)
     elif event == "countdown_tick":
-        s = _ring(_sine(500, 0.055, SR), 250, SR)
-        return _envelope(s, 0.002, 0.02, 0.4, 0.03, SR)
+        s = _mix(_sine(80, 0.06, SR), [x * 0.2 for x in _noise(0.06, SR)])
+        return _envelope(s, 0.002, 0.02, 0.48, 0.04, SR)
     elif event == "countdown_final":
-        s = _concat(
-            _ring(_sweep(300, 1200, 0.1, SR), 200, SR),
-            _ring(_sine(1200, 0.2, SR), 300, SR),
+        s = _mix(
+            _tremolo(_sine(55, 0.38, SR), 2, 0.55, SR),
+            _sweep(100, 700, 0.28, SR),
         )
-        return _envelope(s, 0.005, 0.04, 0.7, 0.18, SR)
+        return _envelope(s, 0.04, 0.1, 0.58, 0.3, SR)
 
 
-def _build_treasure_hunt(event: str) -> List[float]:
+# Zigzag Bandit – rapidly alternating high/low square notes, erratic and fun
+def _build_zigzag_bandit(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
-        coins = _concat(*[
-            _envelope(_mix(_sine(f, 0.06, SR), _sine(f * 2, 0.06, SR)), 0.003, 0.02, 0.62, 0.08, SR)
-            for f in [880, 1100, 1320, 1760]
-        ])
-        return coins
+        zz = _concat(*[_square(880 if i % 2 == 0 else 440, 0.04, SR) for i in range(8)])
+        s = _concat(zz, _square(1760, 0.18, SR))
+        return _envelope(s, 0.002, 0.02, 0.72, 0.12, SR)
     elif event == "challenge_start":
-        drum = _envelope(_mix(_sine(80, 0.1, SR), _noise(0.1, SR)), 0.001, 0.03, 0.45, 0.08, SR)
-        trumpet = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR)), 0.007, 0.03, 0.65, 0.09, SR)
+        zz = _concat(*[_square(660 if i % 2 == 0 else 330, 0.045, SR) for i in range(6)])
+        s = _concat(zz, _silence(0.03, SR), _square(880, 0.22, SR))
+        return _envelope(s, 0.002, 0.02, 0.68, 0.15, SR)
+    elif event == "challenge_complete":
+        zz = _concat(*[_square(1046 if i % 2 == 0 else 523, 0.038, SR) for i in range(10)])
+        s = _concat(zz, _square(2093, 0.15, SR))
+        return _envelope(s, 0.002, 0.018, 0.75, 0.12, SR)
+    elif event == "challenge_fail":
+        zz = _concat(*[_square(440 if i % 2 == 0 else 220, 0.055, SR) for i in range(6)])
+        return _envelope(zz, 0.002, 0.02, 0.62, 0.15, SR)
+    elif event == "level_up":
+        pairs = [(330, 660), (392, 784), (440, 880), (494, 988),
+                 (523, 1046), (587, 1175), (659, 1319), (784, 1568)]
+        zz = _concat(*[_square(hi if i % 2 == 0 else lo, 0.035, SR)
+                       for lo, hi in pairs for i in range(2)])
+        return _envelope(zz, 0.002, 0.015, 0.8, 0.18, SR)
+    elif event == "countdown_tick":
+        s = _concat(_square(880, 0.02, SR), _square(440, 0.02, SR))
+        return _envelope(s, 0.001, 0.008, 0.55, 0.02, SR)
+    elif event == "countdown_final":
+        zz = _concat(*[_square(1319 if i % 2 == 0 else 659, 0.04, SR) for i in range(4)])
+        s = _concat(zz, _square(2637, 0.14, SR))
+        return _envelope(s, 0.001, 0.015, 0.78, 0.12, SR)
+
+
+# Wildcat Hollow – warm sine + mild crackle, rustic country charm
+def _build_wildcat_hollow(event: str) -> List[float]:
+    SR = SAMPLE_RATE
+    if event == "achievement_unlock":
+        twang = _concat(*[
+            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.005, 0.03, 0.62, 0.12, SR)
+            for f in [392, 494, 587, 784, 988]
+        ])
+        total_dur = 5 * (0.09 + 0.12)
+        cr_n = int(total_dur * SR)
+        cr = [s * 0.12 for s in _crackle(total_dur, SR)]
+        tw_n = len(twang)
+        cr = (cr + [0.0] * tw_n)[:tw_n]
+        return _mix(twang, cr)
+    elif event == "challenge_start":
+        drum = _envelope(_mix(_sine(80, 0.12, SR), _noise(0.12, SR)),
+                         0.001, 0.035, 0.48, 0.1, SR)
+        call = _concat(*[
+            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)),
+                      0.006, 0.03, 0.62, 0.1, SR)
             for f in [330, 440, 523]
         ])
-        return _concat(drum, _silence(0.04, SR), trumpet)
+        return _concat(drum, _silence(0.04, SR), call)
     elif event == "challenge_complete":
         s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 2, 0.08, SR)), 0.006, 0.03, 0.68, 0.1, SR)
-            for f in [392, 494, 587, 784, 988]
+            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.5, 0.08, SR)),
+                      0.005, 0.028, 0.65, 0.1, SR)
+            for f in [392, 494, 587, 784, 988, 1175]
         ])
         return s
     elif event == "challenge_fail":
         s = _concat(*[
-            _envelope(_sine(f, 0.1, SR), 0.007, 0.04, 0.5, 0.12, SR)
+            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 0.5, 0.1, SR)),
+                      0.006, 0.04, 0.48, 0.12, SR)
             for f in [330, 277, 247, 196]
         ])
         return s
     elif event == "level_up":
+        notes = [262, 330, 392, 494, 587, 659, 784, 880, 1046, 1319]
         s = _concat(*[
-            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 2, 0.07, SR)), 0.005, 0.026, 0.72, 0.09, SR)
-            for f in [262, 330, 392, 494, 587, 659, 784, 880, 1046, 1319]
+            _envelope(_mix(_sine(f, 0.07, SR), _sine(f * 1.25, 0.07, SR),
+                           _sine(f * 1.5, 0.07, SR)), 0.004, 0.025, 0.7, 0.09, SR)
+            for f in notes
         ])
         return s
     elif event == "countdown_tick":
-        return _envelope(_mix(_sine(880, 0.04, SR), _sine(1760, 0.04, SR)), 0.002, 0.015, 0.42, 0.025, SR)
+        return _envelope(_sine(440, 0.045, SR), 0.002, 0.016, 0.42, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 2, 0.08, SR)), 0.004, 0.03, 0.7, 0.1, SR)
+            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR)),
+                      0.004, 0.028, 0.68, 0.1, SR)
             for f in [659, 784, 988]
         ])
         return s
 
 
-def _build_turbo_racer(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        engine = _sweep(200, 1600, 0.18, SR)
-        s = _concat(engine, _sine(1600, 0.12, SR))
-        return _envelope(s, 0.01, 0.04, 0.68, 0.15, SR)
-    elif event == "challenge_start":
-        rev = _concat(*[_sweep(200 + i * 200, 400 + i * 200, 0.07, SR) for i in range(3)])
-        go = _concat(_silence(0.04, SR), _sweep(300, 1800, 0.2, SR))
-        return _envelope(_concat(rev, go), 0.01, 0.04, 0.65, 0.15, SR)
-    elif event == "challenge_complete":
-        s = _concat(_sweep(400, 2000, 0.18, SR), _sine(2000, 0.15, SR))
-        return _envelope(s, 0.01, 0.04, 0.7, 0.15, SR)
-    elif event == "challenge_fail":
-        s = _concat(_sweep(800, 100, 0.18, SR), _noise(0.15, SR))
-        return _envelope([x * 0.55 for x in s], 0.005, 0.04, 0.45, 0.2, SR)
-    elif event == "level_up":
-        s = _concat(
-            _sweep(100, 600, 0.1, SR),
-            _sweep(600, 1200, 0.1, SR),
-            _sweep(1200, 2400, 0.1, SR),
-            _sine(2400, 0.18, SR),
-        )
-        return _envelope(s, 0.01, 0.04, 0.72, 0.2, SR)
-    elif event == "countdown_tick":
-        return _envelope(_sweep(500, 300, 0.055, SR), 0.002, 0.02, 0.4, 0.03, SR)
-    elif event == "countdown_final":
-        s = _concat(_sweep(300, 2000, 0.12, SR), _sine(2000, 0.15, SR))
-        return _envelope(s, 0.005, 0.04, 0.72, 0.15, SR)
-
-
-def _build_neon_lounge(event: str) -> List[float]:
-    SR = SAMPLE_RATE
-    if event == "achievement_unlock":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.5, 0.1, SR)), 0.01, 0.04, 0.62, 0.12, SR)
-            for f in [330, 415, 494, 659, 784]
-        ])
-        return s
-    elif event == "challenge_start":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 1.5, 0.1, SR)), 0.01, 0.04, 0.62, 0.12, SR)
-            for f in [220, 294, 370]
-        ])
-        beat = _concat(
-            _silence(0.04, SR),
-            _envelope(_mix(_sine(200, 0.12, SR), _noise(0.12, SR)), 0.001, 0.04, 0.45, 0.1, SR),
-        )
-        return _concat(s, beat)
-    elif event == "challenge_complete":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR),
-                           _sine(f * 1.5, 0.09, SR)), 0.008, 0.035, 0.65, 0.1, SR)
-            for f in [330, 415, 523, 659, 784]
-        ])
-        return s
-    elif event == "challenge_fail":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.11, SR), _sine(f * 1.25, 0.11, SR)), 0.01, 0.045, 0.5, 0.12, SR)
-            for f in [330, 277, 247, 220]
-        ])
-        return s
-    elif event == "level_up":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.25, 0.08, SR),
-                           _sine(f * 1.5, 0.08, SR)), 0.007, 0.03, 0.7, 0.1, SR)
-            for f in [220, 277, 330, 415, 494, 587, 659, 784, 880, 1047]
-        ])
-        return s
-    elif event == "countdown_tick":
-        s = _mix(_sine(494, 0.045, SR), _sine(740, 0.045, SR))
-        return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
-    elif event == "countdown_final":
-        s = _concat(*[
-            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)), 0.006, 0.035, 0.68, 0.1, SR)
-            for f in [523, 659, 784]
-        ])
-        return s
-
-
-def _build_voltage(event: str) -> List[float]:
+# Crimson Flare – ring mod dramatic rises, intense cinematic build-up
+def _build_crimson_flare(event: str) -> List[float]:
     SR = SAMPLE_RATE
     if event == "achievement_unlock":
         s = _concat(
-            _ring(_sweep(200, 1000, 0.12, SR), 120, SR),
-            _mix(_sine(1000, 0.2, SR), _ring(_sine(1000, 0.2, SR), 200, SR)),
+            _ring(_sweep(200, 1200, 0.14, SR), 130, SR),
+            _mix(_ring(_sine(1200, 0.25, SR), 260, SR), _sine(600, 0.25, SR)),
         )
-        return _envelope(s, 0.005, 0.04, 0.68, 0.18, SR)
+        return _envelope(s, 0.01, 0.05, 0.7, 0.22, SR)
     elif event == "challenge_start":
-        zap = _concat(*[
-            _ring(_sine(200 + i * 100, 0.06, SR), 100 + i * 30, SR)
+        build = _concat(*[
+            _ring(_sine(200 + i * 120, 0.07, SR), 80 + i * 50, SR)
             for i in range(3)
         ])
-        s = _concat(zap, _silence(0.04, SR), _ring(_sweep(300, 1200, 0.2, SR), 150, SR))
-        return _envelope(s, 0.005, 0.04, 0.65, 0.15, SR)
+        flare = _ring(_sweep(400, 1400, 0.22, SR), 180, SR)
+        return _envelope(_concat(build, _silence(0.04, SR), flare),
+                         0.008, 0.05, 0.67, 0.18, SR)
     elif event == "challenge_complete":
         s = _mix(
-            _ring(_sweep(400, 1600, 0.2, SR), 200, SR),
-            _sine(800, 0.2, SR),
+            _ring(_sweep(300, 1800, 0.22, SR), 220, SR),
+            _ring(_sine(900, 0.22, SR), 300, SR),
         )
-        return _envelope(_concat(s, _sine(1600, 0.15, SR)), 0.01, 0.05, 0.7, 0.18, SR)
+        return _envelope(_concat(s, _ring(_sine(1800, 0.18, SR), 400, SR)),
+                         0.01, 0.05, 0.72, 0.2, SR)
     elif event == "challenge_fail":
-        s = _mix(_ring(_sweep(600, 60, 0.3, SR), 80, SR), _noise(0.3, SR))
-        return _envelope([x * 0.5 for x in s], 0.005, 0.04, 0.42, 0.25, SR)
+        s = _mix(
+            _ring(_sweep(1200, 80, 0.32, SR), 160, SR),
+            _ring(_noise(0.32, SR), 90, SR),
+        )
+        return _envelope([x * 0.52 for x in s], 0.005, 0.05, 0.42, 0.28, SR)
     elif event == "level_up":
         s = _concat(
-            _ring(_sweep(100, 800, 0.15, SR), 120, SR),
-            _ring(_sweep(800, 1600, 0.12, SR), 160, SR),
-            _mix(_sine(1600, 0.22, SR), _ring(_sine(1600, 0.22, SR), 300, SR)),
+            _ring(_sweep(100, 600, 0.13, SR), 110, SR),
+            _ring(_sweep(600, 1200, 0.11, SR), 180, SR),
+            _ring(_sweep(1200, 2000, 0.09, SR), 260, SR),
+            _mix(_ring(_sine(2000, 0.25, SR), 360, SR), _sine(1000, 0.25, SR)),
         )
-        return _envelope(s, 0.01, 0.05, 0.72, 0.22, SR)
+        return _envelope(s, 0.01, 0.05, 0.75, 0.22, SR)
     elif event == "countdown_tick":
-        s = _ring(_sine(500, 0.055, SR), 150, SR)
-        return _envelope(s, 0.002, 0.02, 0.38, 0.03, SR)
+        s = _ring(_sine(550, 0.052, SR), 180, SR)
+        return _envelope(s, 0.002, 0.018, 0.42, 0.03, SR)
     elif event == "countdown_final":
         s = _concat(
-            _ring(_sweep(200, 1400, 0.1, SR), 150, SR),
-            _mix(_sine(1400, 0.2, SR), _ring(_sine(1400, 0.2, SR), 280, SR)),
+            _ring(_sweep(250, 1600, 0.12, SR), 160, SR),
+            _mix(_ring(_sine(1600, 0.22, SR), 320, SR), _sine(800, 0.22, SR)),
         )
-        return _envelope(s, 0.005, 0.04, 0.72, 0.18, SR)
+        return _envelope(s, 0.006, 0.05, 0.74, 0.2, SR)
+
+
 # ── Pack registry ─────────────────────────────────────────────────────────────
 
 _PACK_BUILDERS = {
-    "arcade":          _build_arcade,
-    "subtle":          _build_subtle,
-    "sci_fi":          _build_sci_fi,
-    "retro_8bit":      _build_retro_8bit,
-    "pinball_classic": _build_pinball_classic,
-    "galactic_battle": _build_galactic_battle,
-    "stage_magic":     _build_stage_magic,
-    "neon_grid":       _build_neon_grid,
-    "martian_assault": _build_martian_assault,
-    "carnival_show":   _build_carnival_show,
-    "medieval_quest":  _build_medieval_quest,
-    "haunted_manor":   _build_haunted_manor,
-    "deep_ocean":      _build_deep_ocean,
-    "jukebox":         _build_jukebox,
-    "showtime":        _build_showtime,
-    "chrome_steel":    _build_chrome_steel,
-    "treasure_hunt":   _build_treasure_hunt,
-    "turbo_racer":     _build_turbo_racer,
-    "neon_lounge":     _build_neon_lounge,
-    "voltage":         _build_voltage,
+    "zaptron":          _build_zaptron,
+    "iron_basilisk":    _build_iron_basilisk,
+    "voodoo_swamp":     _build_voodoo_swamp,
+    "pixel_ghost":      _build_pixel_ghost,
+    "solar_drift":      _build_solar_drift,
+    "rokos_lair":       _build_rokos_lair,
+    "thunderclap_rex":  _build_thunderclap_rex,
+    "frostbite_hollow": _build_frostbite_hollow,
+    "ratchet_circus":   _build_ratchet_circus,
+    "lucky_stardust":   _build_lucky_stardust,
+    "boneshaker":       _build_boneshaker,
+    "vex_machina":      _build_vex_machina,
+    "stormfront_jake":  _build_stormfront_jake,
+    "nebula_drift":     _build_nebula_drift,
+    "gideons_clock":    _build_gideons_clock,
+    "sapphire_specter": _build_sapphire_specter,
+    "molten_core":      _build_molten_core,
+    "zigzag_bandit":    _build_zigzag_bandit,
+    "wildcat_hollow":   _build_wildcat_hollow,
+    "crimson_flare":    _build_crimson_flare,
 }
+
 
 # ── Volume / cache / playback ─────────────────────────────────────────────────
 
@@ -981,7 +1086,7 @@ def _volume_scale(cfg_volume) -> float:
 
 @lru_cache(maxsize=256)
 def _get_wav(pack_id: str, event: str, volume: int) -> bytes:
-    builder = _PACK_BUILDERS.get(pack_id) or _PACK_BUILDERS["arcade"]
+    builder = _PACK_BUILDERS.get(pack_id) or _PACK_BUILDERS["zaptron"]
     samples = builder(event)
     scale = _volume_scale(volume)
     if scale != 1.0:
@@ -1009,9 +1114,9 @@ def _play_raw(wav_bytes: bytes) -> None:
 
 
 def _resolve_pack_id(ov: dict) -> str:
-    pack_id = str(ov.get("sound_pack", "arcade")).strip()
+    pack_id = str(ov.get("sound_pack", "zaptron")).strip()
     if pack_id not in _PACK_BUILDERS:
-        pack_id = "arcade"
+        pack_id = "zaptron"
     return pack_id
 
 

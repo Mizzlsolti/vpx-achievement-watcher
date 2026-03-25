@@ -2629,7 +2629,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.cmb_sound_pack.setFixedWidth(160)
         for pack_id, pack_name in sound.SOUND_PACKS.items():
             self.cmb_sound_pack.addItem(pack_name, pack_id)
-        cur_pack = str(self.cfg.OVERLAY.get("sound_pack", "arcade"))
+        cur_pack = str(self.cfg.OVERLAY.get("sound_pack", "zaptron"))
         idx = self.cmb_sound_pack.findData(cur_pack)
         if idx >= 0:
             self.cmb_sound_pack.setCurrentIndex(idx)
@@ -2648,12 +2648,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
         tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
-        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         tbl_sound.setColumnWidth(1, 60)
         tbl_sound.setColumnWidth(2, 50)
-        tbl_sound.setMaximumWidth(420)
         tbl_sound.verticalHeader().setDefaultSectionSize(28)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -2721,7 +2720,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         tbl_sound.resizeRowsToContents()
         tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 28 + 30)
-        sound_layout.addWidget(tbl_sound, alignment=Qt.AlignmentFlag.AlignLeft)
+        sound_layout.addWidget(tbl_sound)
 
         sound_layout.addStretch(1)
         self._add_tab_help_button(sound_layout, "appearance_sound")
