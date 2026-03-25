@@ -4301,7 +4301,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _check():
             result = CloudSync.validate_player_identity(self.cfg, new_id, new_name)
-            QTimer.singleShot(0, self, lambda: self._handle_save_identity_result(result, new_name, new_id))
+            QTimer.singleShot(0, lambda: self._handle_save_identity_result(result, new_name, new_id))
 
         threading.Thread(target=_check, daemon=True).start()
 
