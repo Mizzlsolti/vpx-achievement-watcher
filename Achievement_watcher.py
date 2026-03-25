@@ -2648,11 +2648,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
         tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
-        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        tbl_sound.setColumnWidth(1, 60)
-        tbl_sound.setColumnWidth(2, 50)
+        tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        tbl_sound.horizontalHeader().setStretchLastSection(False)
         tbl_sound.verticalHeader().setDefaultSectionSize(28)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -2719,6 +2718,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 2, cell_btn)
 
         tbl_sound.resizeRowsToContents()
+        tbl_sound.resizeColumnsToContents()
+        _total_w = (sum(tbl_sound.columnWidth(c) for c in range(3))
+                    + tbl_sound.frameWidth() * 2 + 20)
+        tbl_sound.setMaximumWidth(_total_w)
         tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 28 + 30)
         sound_layout.addWidget(tbl_sound)
 
