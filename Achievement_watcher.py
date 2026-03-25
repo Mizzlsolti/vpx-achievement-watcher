@@ -53,7 +53,7 @@ from watcher_core import (
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
-from theme import pinball_arcade_style
+from theme import tc, get_stylesheet, set_active_theme, PRESET_THEMES, THEME_DISPLAY_NAMES
 from ui_cloud_stats import CloudStatsMixin
 
 from ui_vps import (
@@ -240,7 +240,7 @@ class AchievementBeatenDialog(QDialog):
         layout.setSpacing(10)
 
         # Header
-        lbl_hdr = QLabel("<b style='font-size:14px; color:#FF7F00;'>🎯 Achievement-Progress Beaten!</b>")
+        lbl_hdr = QLabel(f"<b style='font-size:14px; color:{tc().accent_primary};'>🎯 Achievement-Progress Beaten!</b>")
         lbl_hdr.setWordWrap(True)
         layout.addWidget(lbl_hdr)
 
@@ -306,15 +306,15 @@ class AchievementBeatenDialog(QDialog):
         card_lines = []
         if table_name:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
             )
         if rom:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
             )
         if vps_id:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
             )
         if card_lines:
             card_html = "<br>".join(card_lines)
@@ -336,14 +336,14 @@ class AchievementBeatenDialog(QDialog):
         score_grid.setHorizontalSpacing(12)
         score_grid.setVerticalSpacing(6)
 
-        lbl_your_txt = QLabel("<span style='font-size:13px; color:#FF7F00;'>↓ Your Progress</span>")
-        lbl_your_pct = QLabel(f"<b style='font-size:14px; color:#FF3B30;'>{your_score:.1f}%</b>")
+        lbl_your_txt = QLabel(f"<span style='font-size:13px; color:{tc().accent_primary};'>↓ Your Progress</span>")
+        lbl_your_pct = QLabel(f"<b style='font-size:14px; color:{tc().danger};'>{your_score:.1f}%</b>")
         lbl_your_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         score_grid.addWidget(lbl_your_txt, 0, 0)
         score_grid.addWidget(lbl_your_pct, 0, 1)
 
-        lbl_leader_txt = QLabel(f"<span style='font-size:13px; color:#00C853;'>↑ New Leader: {leader_display}</span>")
-        lbl_leader_pct = QLabel(f"<b style='font-size:14px; color:#00C853;'>{new_leader_score:.1f}%</b>")
+        lbl_leader_txt = QLabel(f"<span style='font-size:13px; color:{tc().success};'>↑ New Leader: {leader_display}</span>")
+        lbl_leader_pct = QLabel(f"<b style='font-size:14px; color:{tc().success};'>{new_leader_score:.1f}%</b>")
         lbl_leader_pct.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         score_grid.addWidget(lbl_leader_txt, 1, 0)
         score_grid.addWidget(lbl_leader_pct, 1, 1)
@@ -353,7 +353,7 @@ class AchievementBeatenDialog(QDialog):
         # Close button
         btn_close = QPushButton("Close")
         btn_close.setStyleSheet(
-            "background:#00E5FF; color:#000; font-weight:bold; padding:4px 16px; border-radius:3px;"
+            f"background:{tc().accent_secondary}; color:#000; font-weight:bold; padding:4px 16px; border-radius:3px;"
         )
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
@@ -363,15 +363,15 @@ class AchievementBeatenDialog(QDialog):
         card_lines = []
         if table_name:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🎮 Table:</b></span> <span style='color:#DDD;'>{table_name}</span>"
             )
         if rom:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🔧 ROM:</b></span> <span style='color:#DDD;'>{rom}</span>"
             )
         if vps_id:
             card_lines.append(
-                f"<span style='color:#FF7F00;'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
+                f"<span style='color:{tc().accent_primary};'><b>🆔 VPS ID:</b></span> <span style='color:#DDD;'>{vps_id}</span>"
             )
         if card_lines:
             card_html = "<br>".join(card_lines)
@@ -984,23 +984,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._mini_info_picker = MiniInfoPositionPicker(self, width_hint=420, height_hint=100)
         self.btn_mini_info_place.setText("Save position")
 
-    _MINI_TEST_MESSAGES = [
-        ("CHALLENGE COMPLETE!<br>Score: 42.069.000", "#00C853"),
-        ("TIME'S UP!<br>Score: 42.069.000", "#00C853"),
-        (
-            "NVRAM map not found for afm_113b.",
-            "#FF3B30",
-        ),
-        ("Challenge Aborted!", "#FF3B30"),
-        ("Challenge can only be started in-game.", "#FF3B30"),
-    ]
+    @staticmethod
+    def _mini_test_messages():
+        return [
+            ("CHALLENGE COMPLETE!<br>Score: 42.069.000", tc().success),
+            ("TIME'S UP!<br>Score: 42.069.000", tc().success),
+            (
+                "NVRAM map not found for afm_113b.",
+                tc().danger,
+            ),
+            ("Challenge Aborted!", tc().danger),
+            ("Challenge can only be started in-game.", tc().danger),
+        ]
 
     def _on_mini_info_test(self):
         # Ruft das Fenster direkt auf, ohne auf ein offenes Spiel zu warten!
         if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
             self._mini_overlay = MiniInfoOverlay(self)
-        msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
-        self._mini_test_idx = (self._mini_test_idx + 1) % len(self._MINI_TEST_MESSAGES)
+        messages = self._mini_test_messages()
+        msg, color = messages[self._mini_test_idx % len(messages)]
+        self._mini_test_idx = (self._mini_test_idx + 1) % len(messages)
         self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
 
     # ------------------------------------------------------------------
@@ -1064,20 +1067,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_status_overlay_place.setText("Save position")
 
     # Agreed status states for the persistent status badge (traffic-light semantics)
-    _STATUS_TEST_MESSAGES = [
-        ("Online · Tracking",  "#00C853"),   # Green
-        ("Online · Pending",   "#FFA500"),   # Yellow
-        ("Online · Verified",  "#00C853"),   # Green
-        ("Offline · Local",    "#FFA500"),   # Yellow
-        ("Cloud Off · Local",  "#FF3B30"),   # Red
-    ]
+    @staticmethod
+    def _status_test_messages():
+        return [
+            ("Online · Tracking",  tc().success),   # Green
+            ("Online · Pending",   "#FFA500"),       # Yellow
+            ("Online · Verified",  tc().success),   # Green
+            ("Offline · Local",    "#FFA500"),       # Yellow
+            ("Cloud Off · Local",  tc().danger),    # Red
+        ]
 
     def _on_status_overlay_test(self):
         """Cycle through the agreed status states for visual testing."""
         if not hasattr(self, "_status_overlay") or self._status_overlay is None:
             self._status_overlay = StatusOverlay(self)
-        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
-        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
+        messages = self._status_test_messages()
+        msg, color = messages[self._status_overlay_test_idx % len(messages)]
+        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(messages)
         self._status_overlay.update_status(msg, color)
 
     def _determine_status_state(self) -> tuple[str, str]:
@@ -1091,7 +1097,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
         cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
         if not cloud_enabled or not cloud_url:
-            return ("Cloud Off · Local", "#FF3B30")
+            return ("Cloud Off · Local", tc().danger)
         w = getattr(self, "watcher", None)
         game_active = bool(w and getattr(w, "game_active", False))
         if not game_active:
@@ -1101,12 +1107,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         if pending_state == "pending":
             return ("Online · Pending", "#FFA500")
         if pending_state == "verified":
-            return ("Online · Verified", "#00C853")
+            return ("Online · Verified", tc().success)
         if pending_state == "flagged":
             return ("Online · Flagged", "#FFA500")
         if pending_state == "rejected":
-            return ("Online · Rejected", "#FF3B30")
-        return ("Online · Tracking", "#00C853")
+            return ("Online · Rejected", tc().danger)
+        return ("Online · Tracking", tc().success)
 
     def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
         """Handle an externally-triggered status update.
@@ -1179,7 +1185,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
                     3,
-                    "#FF3B30"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -1192,7 +1198,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     self.bridge.challenge_info_show.emit(
                         "Challenges disabled: No NVRAM map found for this table.",
                         4,
-                        "#FF3B30"
+                        tc().danger
                     )
                     self.bridge.challenge_speak.emit("Challenge disabled. Map missing.")
                 except Exception:
@@ -1690,7 +1696,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
                     3,
-                    "#FF3B30"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -1712,7 +1718,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 self.bridge.challenge_info_show.emit(
                     "No NVRAM map available. Challenges require a map for score.",
                     3,
-                    "#FF3B30"
+                    tc().danger
                 )
             except Exception:
                 pass
@@ -1949,10 +1955,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _apply_theme(self):
         app = QApplication.instance()
-        # Fusion ist die beste Basis für starke Custom-Themes
-        app.setStyle("Fusion") 
-        
-        app.setStyleSheet(pinball_arcade_style)
+        # Fusion is the best base for strong custom themes
+        app.setStyle("Fusion")
+
+        theme_key = self.cfg.OVERLAY.get("theme", "dmd_classic")
+        set_active_theme(theme_key)
+        app.setStyleSheet(get_stylesheet(theme_key))
 
         self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
         self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
@@ -2009,7 +2017,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         ),
         "appearance_theme": (
             "<b>🎨 Theme</b><br><br>"
-            "Theme settings coming soon."
+            "Select a color theme for the entire application.<br><br>"
+            "• <b>Select Theme</b>: Choose from preset themes using the dropdown.<br>"
+            "• <b>Preview</b>: See a live preview of the theme's accent colors before applying.<br>"
+            "• <b>Apply Theme</b>: Click the Apply button to activate the selected theme immediately.<br><br>"
+            "The selected theme is saved and restored automatically on the next launch."
         ),
         "appearance_sound": (
             "<b>🔊 Sound</b><br><br>"
@@ -2077,9 +2089,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn.setFixedSize(28, 28)
         btn.setToolTip("Show help for this tab")
         btn.setStyleSheet(
-            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            f"QPushButton {{ background: #1a1a1a; color: {tc().accent_primary}; border: 1px solid {tc().accent_primary}; "
             "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
-            "QPushButton:hover { background: #FF7F00; color: #000; }"
+            f"QPushButton:hover {{ background: {tc().accent_primary}; color: #000; }}"
         )
         btn.clicked.connect(lambda: self._show_tab_help(help_key))
         row.addWidget(btn)
@@ -2149,7 +2161,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         grp_status = QGroupBox("System Status")
         lay_status = QVBoxLayout(grp_status)
         self.status_label = QLabel("🟢 Watcher: RUNNING...")
-        self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
+        self.status_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {tc().accent_secondary}; padding: 10px;")
         lay_status.addWidget(self.status_label)
         layout.addWidget(grp_status)
 
@@ -2245,11 +2257,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Legend
         lbl_legend = QLabel(
-            "<span style='color:#00C853;'>●</span> Green = online/verified"
+            f"<span style='color:{tc().success};'>●</span> Green = online/verified"
             "&nbsp;&nbsp;&nbsp;"
             "<span style='color:#FFA500;'>●</span> Yellow = pending/local"
             "&nbsp;&nbsp;&nbsp;"
-            "<span style='color:#FF3B30;'>●</span> Red = cloud off and table off"
+            f"<span style='color:{tc().danger};'>●</span> Red = cloud off and table off"
         )
         lbl_legend.setTextFormat(Qt.TextFormat.RichText)
         lbl_legend.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -2294,7 +2306,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_level.addWidget(self.lbl_prestige_stars)
 
         self.lbl_level_icon_name = QLabel("🪙  <b>Rookie</b>   Level 1")
-        self.lbl_level_icon_name.setStyleSheet("font-size: 16pt; font-weight: bold; color: #FF7F00; padding: 6px 10px;")
+        self.lbl_level_icon_name.setStyleSheet(f"font-size: 16pt; font-weight: bold; color: {tc().accent_primary}; padding: 6px 10px;")
         self.lbl_level_icon_name.setTextFormat(Qt.TextFormat.RichText)
 
         self.bar_level = QProgressBar()
@@ -2304,12 +2316,12 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.bar_level.setFixedHeight(18)
         self.bar_level.setStyleSheet(
             "QProgressBar { border: 1px solid #444; border-radius: 4px; background: #222; }"
-            "QProgressBar::chunk { background: #FF7F00; border-radius: 3px; }"
+            f"QProgressBar::chunk {{ background: {tc().accent_primary}; border-radius: 3px; }}"
         )
 
         row_level_info = QHBoxLayout()
         self.lbl_level_count = QLabel("0 Achievements unlocked")
-        self.lbl_level_count.setStyleSheet("color: #00E5FF; font-size: 10pt;")
+        self.lbl_level_count.setStyleSheet(f"color: {tc().accent_secondary}; font-size: 10pt;")
         self.lbl_level_next = QLabel("")
         self.lbl_level_next.setStyleSheet("color: #888; font-size: 9pt;")
         self.lbl_level_next.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -2343,7 +2355,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         # Badge count + selected badge display dropdown
         row_badge_bottom = QHBoxLayout()
         self.lbl_badge_count = QLabel("0 / 37 Badges")
-        self.lbl_badge_count.setStyleSheet("color: #FF7F00; font-size: 10pt; font-weight: bold;")
+        self.lbl_badge_count.setStyleSheet(f"color: {tc().accent_primary}; font-size: 10pt; font-weight: bold;")
         row_badge_bottom.addWidget(self.lbl_badge_count)
         row_badge_bottom.addStretch(1)
         lbl_display_badge = QLabel("Display Badge:")
@@ -2432,7 +2444,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         self.btn_switch_all_orientation = QPushButton("🔄 Switch All → Portrait")
         self.btn_switch_all_orientation.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #000; font-weight: bold; padding: 6px 16px; border-radius: 6px; font-size: 10pt; }"
+            f"QPushButton {{ background: {tc().accent_primary}; color: #000; font-weight: bold; padding: 6px 16px; border-radius: 6px; font-size: 10pt; }}"
             "QPushButton:hover { background: #FFA040; }"
         )
         self.btn_switch_all_orientation.clicked.connect(self._on_switch_all_portrait_landscape)
@@ -2528,7 +2540,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_pages = QVBoxLayout(grp_pages)
 
         lbl_page1 = QLabel("Page 1 (Highlights & Score) is always active.")
-        lbl_page1.setStyleSheet("color: #FF7F00; font-size: 9pt;")
+        lbl_page1.setStyleSheet(f"color: {tc().accent_primary}; font-size: 9pt;")
         lay_pages.addWidget(lbl_page1)
 
         lbl_hint = QLabel("Disable pages you don't need — they will be skipped when cycling through the overlay.")
@@ -2563,10 +2575,85 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._update_switch_all_button_label()
         appearance_subtabs.addTab(overlay_tab, "🖼 Overlay")
 
-        # ── Theme sub-tab (placeholder) ────────────────────────────────────────
+        # ── Theme sub-tab ─────────────────────────────────────────────────────
         theme_tab = QWidget()
         theme_layout = QVBoxLayout(theme_tab)
-        theme_layout.addWidget(QLabel("Theme settings coming soon..."))
+        theme_layout.setContentsMargins(16, 16, 16, 8)
+        theme_layout.setSpacing(12)
+
+        lbl_theme_title = QLabel("🎨 UI Theme")
+        lbl_theme_title.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {tc().accent_primary}; padding: 4px 0;")
+        theme_layout.addWidget(lbl_theme_title)
+
+        # Selector row
+        sel_row = QHBoxLayout()
+        sel_row.addWidget(QLabel("Select Theme:"))
+        self._theme_combo = QComboBox()
+        current_theme_key = self.cfg.OVERLAY.get("theme", "dmd_classic")
+        for key, display in THEME_DISPLAY_NAMES.items():
+            self._theme_combo.addItem(display, key)
+        # Set current selection
+        for i in range(self._theme_combo.count()):
+            if self._theme_combo.itemData(i) == current_theme_key:
+                self._theme_combo.setCurrentIndex(i)
+                break
+        sel_row.addWidget(self._theme_combo, 1)
+        theme_layout.addLayout(sel_row)
+
+        # Live preview group
+        from PyQt6.QtWidgets import QProgressBar as _QProgressBar
+        preview_group = QGroupBox("Preview")
+        preview_layout = QVBoxLayout(preview_group)
+        preview_layout.setSpacing(8)
+
+        self._preview_lbl_accent = QLabel("● Accent Primary — main labels, tab titles, progress")
+        self._preview_lbl_secondary = QLabel("● Accent Secondary — group titles, focus borders, cyan elements")
+        self._preview_lbl_stats = QLabel("● Stats Text — score readouts, numeric values")
+        self._preview_progress = _QProgressBar()
+        self._preview_progress.setValue(65)
+        self._preview_progress.setTextVisible(False)
+        self._preview_progress.setFixedHeight(10)
+        self._preview_btn = QPushButton("Apply Theme")
+
+        preview_layout.addWidget(self._preview_lbl_accent)
+        preview_layout.addWidget(self._preview_lbl_secondary)
+        preview_layout.addWidget(self._preview_lbl_stats)
+        preview_layout.addWidget(self._preview_progress)
+        preview_layout.addWidget(self._preview_btn)
+        theme_layout.addWidget(preview_group)
+
+        def _update_theme_preview(index: int):
+            key = self._theme_combo.itemData(index)
+            c = PRESET_THEMES.get(key, PRESET_THEMES["dmd_classic"])
+            self._preview_lbl_accent.setStyleSheet(f"color: {c.accent_primary}; font-weight: bold;")
+            self._preview_lbl_secondary.setStyleSheet(f"color: {c.accent_secondary}; font-weight: bold;")
+            self._preview_lbl_stats.setStyleSheet(f"color: {c.stats_text};")
+            self._preview_progress.setStyleSheet(
+                f"QProgressBar {{border: 1px solid {c.border_medium}; border-radius:3px; background:{c.bg_input};}}"
+                f"QProgressBar::chunk {{background:{c.accent_primary}; border-radius:2px;}}"
+            )
+            self._preview_btn.setStyleSheet(
+                f"background:{c.accent_primary}; color:#000; font-weight:bold;"
+            )
+
+        # Initial preview
+        _update_theme_preview(self._theme_combo.currentIndex())
+        self._theme_combo.currentIndexChanged.connect(_update_theme_preview)
+
+        def _apply_selected_theme():
+            key = self._theme_combo.itemData(self._theme_combo.currentIndex())
+            self.cfg.OVERLAY["theme"] = key
+            self.cfg.save()
+            set_active_theme(key)
+            QApplication.instance().setStyleSheet(get_stylesheet(key))
+            self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
+            self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
+            self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
+            # Refresh the preview colors after apply
+            _update_theme_preview(self._theme_combo.currentIndex())
+
+        self._preview_btn.clicked.connect(_apply_selected_theme)
+
         theme_layout.addStretch(1)
         self._add_tab_help_button(theme_layout, "appearance_theme")
         appearance_subtabs.addTab(theme_tab, "🎨 Theme")
@@ -2583,7 +2670,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Title
         lbl_sound_title = QLabel("🔊 Sound Effects")
-        lbl_sound_title.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF7F00; padding: 4px 0;")
+        lbl_sound_title.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {tc().accent_primary}; padding: 4px 0;")
         sound_layout.addWidget(lbl_sound_title)
 
         # Enable + Volume row
@@ -2605,8 +2692,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.sld_sound_volume.setFixedWidth(180)
         self.sld_sound_volume.setStyleSheet(
             "QSlider::groove:horizontal { background: #333; height: 6px; border-radius: 3px; }"
-            "QSlider::handle:horizontal { background: #FF7F00; width: 14px; margin: -4px 0; border-radius: 7px; }"
-            "QSlider::sub-page:horizontal { background: #FF7F00; border-radius: 3px; }"
+            f"QSlider::handle:horizontal {{ background: {tc().accent_primary}; width: 14px; margin: -4px 0; border-radius: 7px; }}"
+            f"QSlider::sub-page:horizontal {{ background: {tc().accent_primary}; border-radius: 3px; }}"
         )
         self.lbl_sound_vol_pct = QLabel(f"{self.sld_sound_volume.value()}%")
         self.lbl_sound_vol_pct.setMinimumWidth(36)
@@ -2643,7 +2730,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Events group
         lbl_events = QLabel("Events")
-        lbl_events.setStyleSheet("font-size: 11pt; font-weight: bold; color: #00E5FF; margin-top: 6px;")
+        lbl_events.setStyleSheet(f"font-size: 11pt; font-weight: bold; color: {tc().accent_secondary}; margin-top: 6px;")
         sound_layout.addWidget(lbl_events)
 
         tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
@@ -2677,7 +2764,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             chk_event.setToolTip(f"Enable/disable sound for {event_label}")
             chk_event.setStyleSheet(
                 "QCheckBox::indicator { width: 18px; height: 18px; }"
-                "QCheckBox::indicator:checked { background: #00E5FF; border: 1px solid #00B8D4; border-radius: 2px; }"
+                f"QCheckBox::indicator:checked {{ background: {tc().accent_secondary}; border: 1px solid #00B8D4; border-radius: 2px; }}"
                 "QCheckBox::indicator:unchecked { background: #333; border: 1px solid #555; border-radius: 2px; }"
             )
 
@@ -2700,7 +2787,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             btn_test.setFixedSize(32, 24)
             btn_test.setToolTip(f"Preview sound for {event_label}")
             btn_test.setStyleSheet(
-                "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 14px; padding: 0px; }"
+                f"QPushButton {{ background: #333; color: {tc().accent_secondary}; border: 1px solid #555; border-radius: 3px; font-size: 14px; padding: 0px; }}"
                 "QPushButton:hover { background: #444; }"
                 "QPushButton:pressed { background: #555; }"
             )
@@ -2835,11 +2922,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         row.addWidget(self.cmb_progress_rom)
 
         self.lbl_progress_rom_name = QLabel("")
-        self.lbl_progress_rom_name.setStyleSheet("color:#00E5FF; font-weight:bold; margin-left: 10px;")
+        self.lbl_progress_rom_name.setStyleSheet(f"color:{tc().accent_secondary}; font-weight:bold; margin-left: 10px;")
         row.addWidget(self.lbl_progress_rom_name)
         
         btn_refresh = QPushButton("🔄 Refresh")
-        btn_refresh.setStyleSheet("background:#00E5FF; color:black; font-weight:bold;")
+        btn_refresh.setStyleSheet(f"background:{tc().accent_secondary}; color:black; font-weight:bold;")
         btn_refresh.clicked.connect(self._refresh_progress_roms)
         row.addWidget(btn_refresh)
         lay.addLayout(row)
@@ -2987,9 +3074,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         
         if not all_rules:
             if rom == "Global":
-                self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No global achievements defined.</div>")
+                self.progress_view.setHtml(f"<div style='color:{tc().accent_primary}; text-align:center;'>No global achievements defined.</div>")
             else:
-                self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No specific achievements defined for this ROM.</div>")
+                self.progress_view.setHtml(f"<div style='color:{tc().accent_primary}; text-align:center;'>No specific achievements defined for this ROM.</div>")
             return
             
         global_tally = state.get("global_tally", {}) if rom == "Global" else {}
@@ -3013,7 +3100,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 _live_nvram_cache[field] = val
             return _live_nvram_cache[field]
 
-        html = ["<style>table {border-collapse:collapse;} td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} .unlocked {color:#00E5FF; font-weight:bold;} .locked {color:#666; font-size:0.85em;}</style>"]
+        html = [f"<style>table {{border-collapse:collapse;}} td {{width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;}} .unlocked {{color:{tc().accent_secondary}; font-weight:bold;}} .locked {{color:#666; font-size:0.85em;}}</style>"]
 
         def _tooltip_for_rule(rule, unlocked=False):
             cond = rule.get("condition", {}) or {}
@@ -3059,7 +3146,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             # Build ℹ️ info link for ROM-specific achievements only
             if rom != "Global":
                 encoded = _urlparse.quote(title, safe="")
-                info_link = f" <a href='achinfo://{rom}/{encoded}' style='color:#00E5FF; text-decoration:none;'>ℹ️</a>"
+                info_link = f" <a href='achinfo://{rom}/{encoded}' style='color:{tc().accent_secondary}; text-decoration:none;'>ℹ️</a>"
             else:
                 info_link = ""
 
@@ -3091,13 +3178,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                         progress = max(cached_progress, live_progress)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_label}</td>"
+                            f"<span style='font-size:0.75em;color:{tc().accent_primary};'>{progress}/{need}</span>{rarity_label}</td>"
                         )
                     else:
                         progress, need = self._get_manufacturer_progress_for_display(cond, global_tally, title)
                         cells.append(
                             f"<td class='locked' title='{tooltip}'>🔒 {clean_title}<br>"
-                            f"<span style='font-size:0.75em;color:#FF7F00;'>{progress}/{need}</span>{rarity_label}</td>"
+                            f"<span style='font-size:0.75em;color:{tc().accent_primary};'>{progress}/{need}</span>{rarity_label}</td>"
                         )
                 else:
                     cells.append(f"<td class='locked' title='{tooltip}'>🔒 {clean_title}{rarity_label}</td>")
@@ -3112,7 +3199,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             rom_label = clean_rom
         html.append(f"<div style='font-size:1.1em; color:#FFFFFF; text-align:center; margin-bottom:5px; font-weight:bold;'>{rom_label}</div>")
 
-        html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
+        html.append(f"<div style='font-size:1.0em; color:{tc().accent_primary}; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
 
         # ── Rarity legend ──────────────────────────────────────────────────────
         if rarity_map:
@@ -3237,8 +3324,8 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._map_search_completer.popup().setStyleSheet(
             "QListView {"
             "  background: #222; color: #e0e0e0;"
-            "  border: 1px solid #FF7F00;"
-            "  selection-background-color: #FF7F00;"
+            f"  border: 1px solid {tc().accent_primary};"
+            f"  selection-background-color: {tc().accent_primary};"
             "  selection-color: #000;"
             "  font-size: 10pt;"
             "}"
@@ -3247,7 +3334,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         row.addWidget(self.txt_map_search)
 
         btn_refresh = QPushButton("🔄 Load List")
-        btn_refresh.setStyleSheet("background:#FF7F00; color:black; font-weight:bold;")
+        btn_refresh.setStyleSheet(f"background:{tc().accent_primary}; color:black; font-weight:bold;")
         btn_refresh.clicked.connect(self._refresh_available_maps)
         row.addWidget(btn_refresh)
 
@@ -3255,14 +3342,14 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_nvram_filter.setCheckable(True)
         self.btn_nvram_filter.setChecked(False)
         self.btn_nvram_filter.setStyleSheet(
-            "QPushButton {background:#222; color:#FF7F00; border:1px solid #FF7F00;} "
-            "QPushButton:checked {background:#3D2600; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold;}"
+            f"QPushButton {{background:#222; color:{tc().accent_primary}; border:1px solid {tc().accent_primary};}} "
+            f"QPushButton:checked {{background:#3D2600; color:{tc().accent_primary}; border:1px solid {tc().accent_primary}; font-weight:bold;}}"
         )
         self.btn_nvram_filter.toggled.connect(self._filter_available_maps)
         row.addWidget(self.btn_nvram_filter)
 
         btn_auto = QPushButton("⚡ Auto-Match All")
-        btn_auto.setStyleSheet("background:#003333; color:#00E5FF; border:1px solid #00E5FF;")
+        btn_auto.setStyleSheet(f"background:#003333; color:{tc().accent_secondary}; border:1px solid {tc().accent_secondary};")
         btn_auto.clicked.connect(self._on_vps_auto_match_all)
         row.addWidget(btn_auto)
 
@@ -3290,7 +3377,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.maps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.maps_table.setStyleSheet(
             "QTableWidget {background:#111; color:#DDD; gridline-color:#333;} "
-            "QHeaderView::section {background:#1a1a1a; color:#FF7F00; padding:4px; border-bottom:2px solid #555;} "
+            f"QHeaderView::section {{background:#1a1a1a; color:{tc().accent_primary}; padding:4px; border-bottom:2px solid #555;}} "
             "QTableWidget::item:selected {background:#003D00;}"
         )
         lay.addWidget(self.maps_table)
@@ -3304,7 +3391,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn_rules.setFixedSize(140, 28)
         btn_rules.setToolTip("Show Cloud Leaderboard rules")
         btn_rules.setStyleSheet(
-            "QPushButton { background: #FF3B30; color: #FFFFFF; border: 1px solid #FF3B30; "
+            f"QPushButton {{ background: {tc().danger}; color: #FFFFFF; border: 1px solid {tc().danger}; "
             "border-radius: 14px; font-size: 10pt; font-weight: bold; padding: 0 8px; }"
             "QPushButton:hover { background: #CC2F27; color: #FFF; }"
         )
@@ -3315,9 +3402,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         btn_help.setFixedSize(28, 28)
         btn_help.setToolTip("Show help for this tab")
         btn_help.setStyleSheet(
-            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            f"QPushButton {{ background: #1a1a1a; color: {tc().accent_primary}; border: 1px solid {tc().accent_primary}; "
             "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
-            "QPushButton:hover { background: #FF7F00; color: #000; }"
+            f"QPushButton:hover {{ background: {tc().accent_primary}; color: #000; }}"
         )
         btn_help.clicked.connect(lambda: self._show_tab_help("available_maps"))
         row.addWidget(btn_help)
@@ -3350,7 +3437,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.maps_table.setRowCount(0)
         self.maps_table.setRowCount(1)
         info_item = QTableWidgetItem("⏳ Loading… Please wait.")
-        info_item.setForeground(QColor("#00E5FF"))
+        info_item.setForeground(QColor(tc().accent_secondary))
         self.maps_table.setItem(0, 0, info_item)
 
         self._maps_progress_dlg = QProgressDialog("Scanning tables…", "Cancel", 0, 0, self)
@@ -3448,11 +3535,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.maps_table.setItem(row, 0, _make_item(title))
             self.maps_table.setItem(row, 1, _make_item(rom, "#888"))
             self.maps_table.setItem(row, 2, _make_item("✅" if has_map else "❌",
-                                                        "#00E5FF" if has_map else "#555",
+                                                        tc().accent_secondary if has_map else "#555",
                                                         Qt.AlignmentFlag.AlignCenter))
             self.maps_table.setItem(row, 3, _make_item("🟠" if is_local else "",
                                                         align=Qt.AlignmentFlag.AlignCenter))
-            self.maps_table.setItem(row, 4, _make_item(vps_id, "#00E5FF" if vps_id else "#444"))
+            self.maps_table.setItem(row, 4, _make_item(vps_id, tc().accent_secondary if vps_id else "#444"))
 
             # Author column: look up authors from VPS DB when a VPS-ID is assigned
             author_text = ""
@@ -3478,7 +3565,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 btn = QPushButton("+")
                 btn.setFixedSize(30, 28)
                 btn.setStyleSheet(
-                    "QPushButton {background:#2a1800; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; font-size:16px;} "
+                    f"QPushButton {{background:#2a1800; color:{tc().accent_primary}; border:1px solid {tc().accent_primary}; font-weight:bold; font-size:16px;}} "
                     "QPushButton:hover {background:#4a2e00;}"
                 )
                 btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
@@ -3758,7 +3845,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "Please write it down or save it somewhere safe!"
         )
         lbl_id_warning.setWordWrap(True)
-        lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
+        lbl_id_warning.setStyleSheet(f"color: {tc().accent_primary}; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid {tc().accent_primary}; border-radius: 5px;")
         lay_profile.addWidget(lbl_id_warning, 1, 0, 1, 4)
 
         layout.addWidget(grp_profile)
@@ -3882,11 +3969,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "Found a bug or have a suggestion? Report it directly here!"
         )
         lbl_feedback.setWordWrap(True)
-        lbl_feedback.setStyleSheet("color: #00E5FF; font-size: 9pt;")
+        lbl_feedback.setStyleSheet(f"color: {tc().accent_secondary}; font-size: 9pt;")
         lay_feedback.addWidget(lbl_feedback)
         btn_feedback = QPushButton("🐛 Report Bug / Suggestion")
         btn_feedback.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            f"QPushButton {{ background: {tc().accent_primary}; color: #fff; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
             "QPushButton:hover { background: #e06d00; }"
         )
@@ -5298,9 +5385,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "<style>"
             "table{width:100%;border-collapse:collapse;}"
             "td{font-size:0.9em;padding:4px 6px;border-bottom:1px solid #333;}"
-            ".unlocked{color:#00E5FF;font-weight:bold;}"
+            f".unlocked{{color:{tc().accent_secondary};font-weight:bold;}}"
             ".locked{color:#555;}"
-            ".hdr{color:#FF7F00;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}"
+            f".hdr{{color:{tc().accent_primary};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}}"
             ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
             "</style>"
         )
@@ -5375,7 +5462,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         header_html = (
             f"<div class='hdr'>{esc(header)}</div>"
-            + (f"<div style='color:#FF7F00;font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
+            + (f"<div style='color:{tc().accent_primary};font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
             + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
         )
 
@@ -5399,7 +5486,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         try:
             return self._build_challenges_results_html()
         except Exception:
-            return "<div style='color:#FF3B30;text-align:center;'>(Error loading challenge leaderboard)</div>"
+            return f"<div style='color:{tc().danger};text-align:center;'>(Error loading challenge leaderboard)</div>"
 
     def _overlay_page4_show(self):
         """Show Page 4: Cloud Leaderboard. Fetches data in the background."""
@@ -5426,15 +5513,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         cloud_sync_msg = ""
         if not self.cfg.CLOUD_ENABLED:
             cloud_sync_msg = (
-                "<div style='color:#FF7F00;font-weight:bold;font-size:1.05em;"
-                "text-align:center;padding:8px 12px;border:1px solid #FF7F00;"
+                f"<div style='color:{tc().accent_primary};font-weight:bold;font-size:1.05em;"
+                f"text-align:center;padding:8px 12px;border:1px solid {tc().accent_primary};"
                 "border-radius:6px;margin-bottom:10px;'>"
                 "If you want to participate, enable cloud sync."
                 "</div>"
             )
 
         header_html = (
-            f"<div style='color:#FF7F00;font-size:1.15em;font-weight:bold;"
+            f"<div style='color:{tc().accent_primary};font-size:1.15em;font-weight:bold;"
             f"text-align:center;padding:6px 0;margin-bottom:4px;'>"
             f"{_html_mod.escape(header_title)}</div>"
             + cloud_sync_msg
@@ -5504,7 +5591,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
                 if not data:
                     final_html = header_html + (
-                        "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
+                        f"<div style='color:{tc().danger};text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
                     )
                 else:
                     cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff, include_info_badges=False)
@@ -5518,7 +5605,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception as e:
                 print(f"[CLOUD OVERLAY] fetch failed: {e}")
                 error_html = header_html + (
-                    "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
+                    f"<div style='color:{tc().danger};text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
                 )
                 QMetaObject.invokeMethod(
                     self, "_overlay_set_cloud_html",
@@ -5651,7 +5738,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         # Zeige Ladebildschirm an
         loading_html = (
-            f"<div style='color:#00E5FF;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
+            f"<div style='color:{tc().accent_secondary};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
             f"VPC Weekly Challenge</div>"
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
@@ -5804,7 +5891,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 try:
                     if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                         self._mini_overlay = MiniInfoOverlay(self)
-                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex="#FF3B30")
+                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex=tc().danger)
                 except Exception:
                     pass
                 return
@@ -5882,7 +5969,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                 self._mini_overlay = MiniInfoOverlay(self)
-            self._mini_overlay.show_info(str(message), max(1, int(seconds)), color_hex="#FF3B30")
+            self._mini_overlay.show_info(str(message), max(1, int(seconds)), color_hex=tc().danger)
             if not hasattr(self, "_ch_last_spoken"):
                 self._ch_last_spoken = {}
             now = time.time()
@@ -5916,7 +6003,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             col = str(color_hex or "").upper()
             if "challenge complete" in msg_lower or "time's up" in msg_lower:
                 sound.play_sound(self.cfg, "challenge_complete")
-            elif col == "#FF3B30" or "aborted" in msg_lower or "fail" in msg_lower:
+            elif col == tc().danger or "aborted" in msg_lower or "fail" in msg_lower:
                 sound.play_sound(self.cfg, "challenge_fail")
         except Exception:
             pass
@@ -6042,7 +6129,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     "font-size: 22pt; font-weight: bold; color: #FFD700; "
                     "padding: 4px 10px; letter-spacing: 8px; "
                     "background: qlineargradient(x1:0,y1:0,x2:1,y2:0, "
-                    "stop:0 #FF7F00, stop:0.5 #FFD700, stop:1 #FF7F00); "
+                    f"stop:0 {tc().accent_primary}, stop:0.5 #FFD700, stop:1 {tc().accent_primary}); "
                     "border-radius: 6px;"
                 )
             else:
@@ -6075,9 +6162,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 rows_html += f"<tr{cls}><td>{lvl}</td><td>{name}{marker}</td><td>{threshold}</td></tr>"
             self.lv_table_browser.setHtml(
                 "<style>table{border-collapse:collapse;width:100%}"
-                "th{color:#FF7F00;font-weight:bold;padding:4px 8px;border-bottom:2px solid #555;background:#111;text-align:left}"
+                f"th{{color:{tc().accent_primary};font-weight:bold;padding:4px 8px;border-bottom:2px solid #555;background:#111;text-align:left}}"
                 "td{padding:3px 8px;border-bottom:1px solid #2a2a2a;color:#CCC}"
-                ".current td{color:#00E5FF;font-weight:bold;background:#152015}"
+                f".current td{{color:{tc().accent_secondary};font-weight:bold;background:#152015}}"
                 "</style>"
                 + "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
                 + rows_html + "</table>"
@@ -6116,7 +6203,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 lbl.setToolTip(f"{'✅ ' if is_earned else '🔒 '}{name}: {desc}")
                 if is_earned:
                     lbl.setStyleSheet(
-                        "font-size: 18pt; background: #1a1a1a; border: 1px solid #FF7F00; "
+                        f"font-size: 18pt; background: #1a1a1a; border: 1px solid {tc().accent_primary}; "
                         "border-radius: 6px;"
                     )
                 else:
@@ -6372,17 +6459,17 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     rs_lb = "Local only"
 
             # Table: green when active, red when no game
-            tbl_color = "#00C853" if (game_active and current_rom) else "#FF3B30"
+            tbl_color = tc().success if (game_active and current_rom) else tc().danger
             # Session: green when active/counting, yellow when idle
-            ses_color = "#FFA500" if rs_session == "Idle" else "#00C853"
+            ses_color = "#FFA500" if rs_session == "Idle" else tc().success
             # Cloud: green=online/verified, yellow=pending/offline, red=disabled
             cld_color = (
-                "#00C853" if rs_cloud in ("Online", "Verified")
-                else "#FF3B30" if rs_cloud == "Disabled"
+                tc().success if rs_cloud in ("Online", "Verified")
+                else tc().danger if rs_cloud == "Disabled"
                 else "#FFA500"
             )
             # Leaderboard: green=ready, yellow=pending/local
-            lb_color = "#00C853" if rs_lb == "Ready" else "#FFA500"
+            lb_color = tc().success if rs_lb == "Ready" else "#FFA500"
 
             self.lbl_rs_table.setText(self._dot(tbl_color, "Table:", rs_table))
             self.lbl_rs_session.setText(self._dot(ses_color, "Session:", rs_session))
@@ -7550,13 +7637,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._update_prefetch_label()
 
     def _update_prefetch_label(self):
-        color = "#FF3B30" if getattr(self, "_prefetch_blink_state", False) else "#333333"
+        color = tc().danger if getattr(self, "_prefetch_blink_state", False) else "#333333"
         html = (
             f"🔴 Watcher: PREFETCH IN PROGRESS - {self._prefetch_msg} "
             f"<span style='color:{color}; font-weight:bold;'>PLEASE WAIT</span>"
         )
         self.status_label.setText(html)
-        self.status_label.setStyleSheet("font-size: 12pt; color: #FF7F00; padding: 10px;")
+        self.status_label.setStyleSheet(f"font-size: 12pt; color: {tc().accent_primary}; padding: 10px;")
 
     def _on_prefetch_finished(self, msg: str):
         try:
@@ -7581,7 +7668,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _reset_status_label(self):
         self.status_label.setText("🟢 Watcher: RUNNING...")
-        self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
+        self.status_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {tc().accent_secondary}; padding: 10px;")
 
     def _restart_watcher(self):
         if getattr(self, "_restarting", False):
@@ -7630,7 +7717,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         except Exception as e:
             log(self.cfg, f"[RESTART] Failed to start new watcher: {e}", "WARN")
             self.status_label.setText("❌ Watcher: RESTART FAILED")
-            self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF3B30; padding: 10px;")
+            self.status_label.setStyleSheet(f"font-size: 14pt; font-weight: bold; color: {tc().danger}; padding: 10px;")
         finally:
             self._restarting = False
             self.btn_restart.setEnabled(True)

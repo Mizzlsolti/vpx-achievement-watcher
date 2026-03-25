@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir
+from theme import tc
 
 
 _REPO_ISSUES_URL = "https://github.com/Mizzlsolti/vpx-achievement-watcher/issues/new"
@@ -27,7 +28,7 @@ class FeedbackDialog(QDialog):
         self.setStyleSheet(
             "QDialog { background: #1a1a1a; color: #e0e0e0; }"
             "QLabel { color: #e0e0e0; }"
-            "QGroupBox { color: #FF7F00; border: 1px solid #444; margin-top: 8px; }"
+            f"QGroupBox {{ color: {tc().accent_primary}; border: 1px solid #444; margin-top: 8px; }}"
             "QGroupBox::title { subcontrol-origin: margin; left: 8px; }"
             "QLineEdit, QTextEdit, QComboBox {"
             "  background: #222; color: #e0e0e0; border: 1px solid #555; padding: 4px; }"
@@ -44,7 +45,7 @@ class FeedbackDialog(QDialog):
             "Fill in the details – your browser will open with a pre-filled GitHub issue."
         )
         lbl_info.setWordWrap(True)
-        lbl_info.setStyleSheet("color: #00E5FF; font-size: 9pt;")
+        lbl_info.setStyleSheet(f"color: {tc().accent_secondary}; font-size: 9pt;")
         main.addWidget(lbl_info)
 
         # Type selector
@@ -82,7 +83,7 @@ class FeedbackDialog(QDialog):
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_submit = QPushButton("📤 Submit")
         self.btn_submit.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            f"QPushButton {{ background: {tc().accent_primary}; color: #fff; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
             "QPushButton:hover { background: #e06d00; }"
             "QPushButton:disabled { background: #555; color: #999; }"
