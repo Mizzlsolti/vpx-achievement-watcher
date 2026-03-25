@@ -566,6 +566,13 @@ def _migrate_runtime_dirs(cfg):
                 except Exception:
                     pass
 
+    # Migrate notifications: merge old files into new unified store
+    try:
+        import notifications as _notif
+        _notif.migrate_notifications(cfg)
+    except Exception:
+        pass
+
 GITHUB_BASE = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/475fa3619134f5aa732ccd80244e1613e7e6e9a1"
 INDEX_URL = f"{GITHUB_BASE}/index.json"
 ROMNAMES_URL = f"{GITHUB_BASE}/romnames.json"
@@ -800,6 +807,14 @@ ROLLING_HISTORY_PER_ROM = 10
 
 def ensure_dir(path): os.makedirs(path, exist_ok=True)
 def _ts(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def _set_folder_hidden(path: str):
+    """Set Windows FILE_ATTRIBUTE_HIDDEN on *path*. No-op on non-Windows."""
+    try:
+        FILE_ATTRIBUTE_HIDDEN = 0x02
+        ctypes.windll.kernel32.SetFileAttributesW(str(path), FILE_ATTRIBUTE_HIDDEN)
+    except Exception:
+        pass
 
 DEFAULT_LOG_SUPPRESS = [
     "[SNAP] pregame player_count detected",
@@ -2982,6 +2997,9 @@ class Watcher:
             p_rom_spec(self.cfg),
         ]:
             ensure_dir(d)
+
+        _set_folder_hidden(p_session(self.cfg))
+        _set_folder_hidden(p_achievements(self.cfg))
 
         def ensure_file(path, url):
             if os.path.exists(path):
