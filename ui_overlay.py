@@ -3681,18 +3681,22 @@ class AchToastWindow(QWidget):
                     else:
                         line1 = raw_title
 
-                # Resolve ROM to clean table name (without version number)
-                table_name = ""
-                try:
-                    watcher = getattr(self.parent_gui, "watcher", None)
-                    if watcher:
-                        romnames = getattr(watcher, "ROMNAMES", {}) or {}
-                        from watcher_core import _strip_version_from_name
-                        table_name = _strip_version_from_name(romnames.get(rom, ""))
-                except Exception:
-                    pass
+                if not rom:
+                    # Global achievement – no table name in toast
+                    line2 = ""
+                else:
+                    # Resolve ROM to clean table name (without version number)
+                    table_name = ""
+                    try:
+                        watcher = getattr(self.parent_gui, "watcher", None)
+                        if watcher:
+                            romnames = getattr(watcher, "ROMNAMES", {}) or {}
+                            from watcher_core import _strip_version_from_name
+                            table_name = _strip_version_from_name(romnames.get(rom, ""))
+                    except Exception:
+                        pass
 
-                line2 = table_name if table_name else rom
+                    line2 = table_name if table_name else rom
 
         # Set typewriter full text on first call (now applies to title/line1)
         if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):

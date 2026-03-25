@@ -5242,7 +5242,7 @@ class Watcher:
             if global_hits or global_rt:
                 self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
             if global_hits:
-                self._emit_achievement_toasts(global_hits, seconds=5)
+                self._emit_achievement_toasts(global_hits, seconds=5, rom_override="")
         except Exception as e:
             log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
 
@@ -6179,7 +6179,7 @@ class Watcher:
             except Exception:
                 pass
   
-    def _emit_achievement_toasts(self, titles, seconds: int = 5):
+    def _emit_achievement_toasts(self, titles, seconds: int = 5, rom_override: str | None = None):
         try:
             already_shown = getattr(self, "_toasted_titles", set())
             for t in titles or []:
@@ -6192,9 +6192,10 @@ class Watcher:
 
                 if title and title not in already_shown:
                     already_shown.add(title)
-                    log(self.cfg, f"[ACH] Emitting toast: '{title}' rom='{self.current_rom or ''}'")
+                    rom_value = rom_override if rom_override is not None else (self.current_rom or "")
+                    log(self.cfg, f"[ACH] Emitting toast: '{title}' rom='{rom_value}'")
                     try:
-                        self.bridge.ach_toast_show.emit(title, self.current_rom or "", int(seconds))
+                        self.bridge.ach_toast_show.emit(title, rom_value, int(seconds))
                     except Exception as e:
                         log(self.cfg, f"[ACH] Toast emit failed: {e}", "WARN")
             self._toasted_titles = already_shown
