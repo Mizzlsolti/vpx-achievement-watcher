@@ -3240,7 +3240,7 @@ class Watcher:
                 if fields:
                     return fields, local2
 
-            entry = (self.INDEX or {}).get(rom)
+            entry = (self.INDEX or {}).get(rom) or (self.INDEX or {}).get(rom.lower())
             if entry:
                 rel = entry if isinstance(entry, str) else (entry.get("path") or entry.get("file"))
                 if rel:
