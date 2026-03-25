@@ -239,7 +239,6 @@ DEFAULT_OVERLAY.setdefault("sound_enabled", True)
 DEFAULT_OVERLAY.setdefault("sound_volume", 70)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
 DEFAULT_OVERLAY.setdefault("sound_events", {})
-DEFAULT_OVERLAY.setdefault("theme", "dmd_classic")
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -344,7 +343,6 @@ class AppConfig:
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
-                "theme",
             ]
             
             for k in list(loaded_ov.keys()):
@@ -416,7 +414,6 @@ class AppConfig:
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
-                "theme",
             ]
             
             for k in allowed_keys:

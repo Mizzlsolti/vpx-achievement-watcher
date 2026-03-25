@@ -20,7 +20,6 @@ from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QFont
-from theme import tc
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QWidget, QFrame, QScrollArea, QSizePolicy, QProgressBar,
@@ -63,10 +62,7 @@ _VPS_FEATURE_COLORS: dict[str, tuple[str, str, str]] = {
     "POPPER":       ("#1A0A00",  "#FFAA44",  "#BB6600"),   # Popper integration       – warm orange
 }
 
-def _vps_feature_default():
-    """Return the generic VPS feature color fallback using the active theme."""
-    c = tc().accent_secondary
-    return ("#003333", c, c)
+_VPS_FEATURE_DEFAULT = ("#003333", "#00E5FF", "#00E5FF")  # generic cyan fallback
 
 
 def _vps_feature_stylesheet(tag: str) -> str:
@@ -75,7 +71,7 @@ def _vps_feature_stylesheet(tag: str) -> str:
     Falls back to the generic cyan style when the tag is not in the palette.
     """
     key = tag.upper().strip()
-    bg, fg, border = _VPS_FEATURE_COLORS.get(key, _vps_feature_default())
+    bg, fg, border = _VPS_FEATURE_COLORS.get(key, _VPS_FEATURE_DEFAULT)
     return (
         f"QLabel {{ background:{bg}; color:{fg}; font-size:9px;"
         f" border:1px solid {border}; border-radius:3px; padding:1px 4px; }}"
@@ -488,11 +484,8 @@ class VpsCardWidget(QFrame):
     card_double_clicked = pyqtSignal(object, object)  # (table, table_file)
 
     _STYLE_NORMAL   = "VpsCardWidget{background:#1e1e1e;border:1px solid #333;border-radius:6px;}"
+    _STYLE_SELECTED = "VpsCardWidget{background:#0d2a33;border:2px solid #00E5FF;border-radius:6px;}"
     _STYLE_HOVER    = "VpsCardWidget{background:#252525;border:1px solid #555;border-radius:6px;}"
-
-    @property
-    def _STYLE_SELECTED(self):
-        return f"VpsCardWidget{{background:#0d2a33;border:2px solid {tc().accent_secondary};border-radius:6px;}}"
 
     def __init__(self, table: dict, table_file: dict, rom_match: bool, img_dir: str, parent=None):
         super().__init__(parent)
@@ -876,7 +869,7 @@ class VpsPickerDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_remove = QPushButton("❌ Remove Assignment")
         btn_remove.setStyleSheet(
-            f"background:#3D0000; color:{tc().danger}; border:1px solid {tc().danger};"
+            "background:#3D0000; color:#FF3B30; border:1px solid #FF3B30;"
             " padding:6px 14px; border-radius:4px;"
         )
         btn_remove.clicked.connect(self._remove_assignment)
@@ -897,8 +890,8 @@ class VpsPickerDialog(QDialog):
 
         btn_ok = QPushButton("✅ Select")
         btn_ok.setStyleSheet(
-            f"background:#003D00; color:{tc().accent_secondary}; font-weight:bold;"
-            f" border:1px solid {tc().accent_secondary}; padding:6px 14px; border-radius:4px;"
+            "background:#003D00; color:#00E5FF; font-weight:bold;"
+            " border:1px solid #00E5FF; padding:6px 14px; border-radius:4px;"
         )
         btn_ok.clicked.connect(self._accept_selection)
         btn_row.addWidget(btn_ok)
@@ -1034,7 +1027,7 @@ class VpsAchievementInfoDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Header
-        lbl_title = QLabel(f"<b style='font-size:14px; color:{tc().accent_secondary};'>🏆 {title}</b>")
+        lbl_title = QLabel(f"<b style='font-size:14px; color:#00E5FF;'>🏆 {title}</b>")
         lbl_title.setWordWrap(True)
         layout.addWidget(lbl_title)
 
@@ -1075,7 +1068,7 @@ class VpsAchievementInfoDialog(QDialog):
                 name = vps_entry.get("name", "")
                 mfr = vps_entry.get("manufacturer", "")
                 year = vps_entry.get("year", "")
-                right_lay.addWidget(QLabel(f"<b style='color:{tc().accent_primary}; font-size:13px;'>{name}</b>"))
+                right_lay.addWidget(QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{name}</b>"))
                 right_lay.addWidget(QLabel(f"<span style='color:#999;'>{mfr} · {year}</span>"))
                 if tf_entry:
                     tf_version = tf_entry.get("version", "")
@@ -1093,8 +1086,8 @@ class VpsAchievementInfoDialog(QDialog):
             lbl_no = QLabel("No VPS-ID at unlock time")
             lbl_no.setStyleSheet("color:#666;")
             right_lay.addWidget(lbl_no)
-            lbl_hint = QLabel(f"<a href='#available_maps' style='color:{tc().accent_secondary};'>→ Assign in 'Available Maps' tab</a>")
-            lbl_hint.setStyleSheet(f"color:{tc().accent_secondary};")
+            lbl_hint = QLabel("<a href='#available_maps' style='color:#00E5FF;'>→ Assign in 'Available Maps' tab</a>")
+            lbl_hint.setStyleSheet("color:#00E5FF;")
             lbl_hint.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
             lbl_hint.setOpenExternalLinks(False)
             lbl_hint.linkActivated.connect(lambda _href: (self.navigate_to_available_maps.emit(), self.accept()))
@@ -1104,7 +1097,7 @@ class VpsAchievementInfoDialog(QDialog):
 
         # Achievement details
         if rule:
-            right_lay.addWidget(QLabel(f"<b style='color:#DDD;'>ROM:</b>  <span style='color:{tc().accent_secondary};'>{rom}</span>"))
+            right_lay.addWidget(QLabel(f"<b style='color:#DDD;'>ROM:</b>  <span style='color:#00E5FF;'>{rom}</span>"))
             cond = rule.get("condition", {}) or {}
             rtype = str(cond.get("type", "")).lower()
             field = cond.get("field", "")
@@ -1114,7 +1107,7 @@ class VpsAchievementInfoDialog(QDialog):
             if field:
                 right_lay.addWidget(QLabel(f"<b style='color:#DDD;'>Field:</b>  <span style='color:#999;'>{field}</span>"))
             if target:
-                right_lay.addWidget(QLabel(f"<b style='color:#DDD;'>Target:</b>  <span style='color:{tc().accent_primary};'>{target}</span>"))
+                right_lay.addWidget(QLabel(f"<b style='color:#DDD;'>Target:</b>  <span style='color:#FF7F00;'>{target}</span>"))
 
         # Unlock date
         if unlock_entry is not None:
@@ -1127,13 +1120,13 @@ class VpsAchievementInfoDialog(QDialog):
                     dt = datetime.fromtimestamp(float(ts), tz=timezone.utc).astimezone()
                     date_str = dt.strftime("%Y-%m-%d  %H:%M")
                     right_lay.addSpacing(4)
-                    right_lay.addWidget(QLabel(f"✅ <b style='color:{tc().accent_secondary};'>Unlocked on:</b>"))
+                    right_lay.addWidget(QLabel(f"✅ <b style='color:#00E5FF;'>Unlocked on:</b>"))
                     right_lay.addWidget(QLabel(f"📅 <span style='color:#DDD;'>{date_str}</span>"))
                 except Exception:
-                    right_lay.addWidget(QLabel(f"✅ <span style='color:{tc().accent_secondary};'>Unlocked</span>"))
+                    right_lay.addWidget(QLabel("✅ <span style='color:#00E5FF;'>Unlocked</span>"))
             else:
                 right_lay.addSpacing(4)
-                right_lay.addWidget(QLabel(f"✅ <span style='color:{tc().accent_secondary};'>Unlocked</span>"))
+                right_lay.addWidget(QLabel("✅ <span style='color:#00E5FF;'>Unlocked</span>"))
         else:
             right_lay.addSpacing(4)
             right_lay.addWidget(QLabel("🔒 <span style='color:#666;'>Not yet unlocked</span>"))
@@ -1183,7 +1176,7 @@ class CloudProgressVpsInfoDialog(QDialog):
         layout.setSpacing(10)
 
         # Header
-        lbl_hdr = QLabel(f"<b style='font-size:14px; color:{tc().accent_secondary};'>🎰 Cloud Progress — Table Info</b>")
+        lbl_hdr = QLabel("<b style='font-size:14px; color:#00E5FF;'>🎰 Cloud Progress — Table Info</b>")
         lbl_hdr.setWordWrap(True)
         layout.addWidget(lbl_hdr)
 
@@ -1310,7 +1303,7 @@ class CloudProgressVpsInfoDialog(QDialog):
     def _add_unknown_table_info(self, layout: QVBoxLayout, vps_id: str, table_name: str) -> None:
         """Fallback: show plain text when the vps_id is not in the local cache."""
         if table_name:
-            lbl = QLabel(f"<b style='color:{tc().accent_primary}; font-size:13px;'>{table_name}</b>")
+            lbl = QLabel(f"<b style='color:#FF7F00; font-size:13px;'>{table_name}</b>")
             lbl.setWordWrap(True)
             layout.addWidget(lbl)
         if vps_id:
@@ -1331,7 +1324,7 @@ class CloudProgressVpsInfoDialog(QDialog):
 
         # Percentage row
         pct_row = QHBoxLayout()
-        pct_label = QLabel(f"<b style='color:{tc().accent_secondary}; font-size:13px;'>{pct:.1f}%</b>")
+        pct_label = QLabel(f"<b style='color:#00E5FF; font-size:13px;'>{pct:.1f}%</b>")
         pct_row.addWidget(pct_label)
         pct_row.addStretch()
         vbox.addLayout(pct_row)
@@ -1344,7 +1337,7 @@ class CloudProgressVpsInfoDialog(QDialog):
         bar.setFixedHeight(6)
         bar.setStyleSheet(
             "QProgressBar{background:#333; border-radius:3px; border:none;}"
-            f"QProgressBar::chunk{{background:{tc().accent_secondary}; border-radius:3px;}}"
+            "QProgressBar::chunk{background:#00E5FF; border-radius:3px;}"
         )
         vbox.addWidget(bar)
 
