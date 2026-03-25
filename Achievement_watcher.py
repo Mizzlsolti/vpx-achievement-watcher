@@ -121,6 +121,9 @@ class _AvailableMapsWorker(QThread):
                     if fname.lower().endswith(".vpx"):
                         vpx_files.append((root, fname))
 
+        # Build a lowercase-to-original-key map once for O(1) case-insensitive lookups
+        entries_lower: dict = {k.lower(): k for k in entries}
+
         total = len(vpx_files)
         for i, (root, fname) in enumerate(vpx_files):
             if self._cancel:
@@ -133,9 +136,15 @@ class _AvailableMapsWorker(QThread):
                 rom = None
             if not rom:
                 continue
-            if rom not in entries:
-                title = romnames.get(rom, fname.rsplit(".", 1)[0])
+            # Normalize ROM to lowercase for case-insensitive matching against cloud index
+            rom_lower = rom.lower()
+            matched_key = entries_lower.get(rom_lower)
+            if matched_key:
+                rom = matched_key
+            elif rom not in entries:
+                title = romnames.get(rom) or romnames.get(rom_lower) or fname.rsplit(".", 1)[0]
                 entries[rom] = {"rom": rom, "title": title, "has_map": False, "is_local": False, "vps_id": "", "vpx_path": ""}
+                entries_lower[rom_lower] = rom
             entries[rom]["is_local"] = True
             entries[rom]["vpx_path"] = vpx_path   # store path for later author extraction
 
@@ -167,7 +176,7 @@ class _AvailableMapsWorker(QThread):
         # Load current VPS mappings
         mapping = _load_vps_mapping(self.cfg)
         for rom, entry in entries.items():
-            entry["vps_id"] = mapping.get(rom, "")
+            entry["vps_id"] = mapping.get(rom, mapping.get(rom.lower(), ""))
 
         result = sorted(entries.values(), key=lambda e: e["title"].lower())
         self.finished.emit(result)
