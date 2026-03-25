@@ -4285,18 +4285,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _on_save_player_identity(self):
         """Validate and save the Player Name and Player ID.
 
-        When cloud is enabled, runs an async uniqueness check first and shows a
-        blocking popup dialog on conflict — the save is blocked until resolved.
-        When cloud is disabled, saves immediately without any network check.
+        When cloud sync is enabled (button is ON), runs an async uniqueness check
+        first and shows a blocking popup dialog on conflict — the save is blocked
+        until resolved.  On success a confirmation popup is shown.
+        When cloud sync is disabled, saves immediately and shows a confirmation popup.
         """
         new_name = self.txt_player_name.text().strip()
         new_id = self.txt_player_id.text().strip()
 
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
+        cloud_on = (
+            getattr(self, "chk_cloud_enabled", None) is not None
+            and self.chk_cloud_enabled.isChecked()
+            and bool(self.cfg.CLOUD_URL)
+        )
+
+        if not cloud_on:
             self._save_player_name(new_name)
             self._save_player_id(new_id)
             self._validated_player_name = new_name
             self._validated_player_id = new_id
+            self._msgbox_topmost("info", "✅ Player Name saved!", "✅ Player Name saved!")
             return
 
         def _check():
@@ -4308,25 +4316,29 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _handle_save_identity_result(self, result: dict, new_name: str, new_id: str):
         """Called on the main thread after the async identity validation for save completes.
 
-        On success: persists both fields and updates the validated-identity cache.
-        On conflict: shows a blocking popup dialog — fields are left unchanged so
-        the user can correct them and click Save again.
+        On success: persists both fields, updates the validated-identity cache, and
+        shows a confirmation popup.
+        On conflict: shows a warning popup — fields are left unchanged so the user
+        can correct them and click Save again.
         """
         if result.get("ok"):
             self._save_player_name(new_name)
             self._save_player_id(new_id)
             self._validated_player_name = new_name
             self._validated_player_id = new_id
+            self._msgbox_topmost("info", "✅ Player Name saved!", "✅ Player Name saved!")
             return
 
         reason = result.get("reason", "")
-        msg = result.get("msg", "Identity conflict detected.")
         if reason == "id_conflict":
-            title = "⛔ Player ID Conflict"
+            title = "⛔ Player ID already taken!"
+            msg = "⛔ Player ID already taken!"
         elif reason == "name_conflict":
-            title = "⛔ Duplicate Player Name"
+            title = "⛔ Player Name already taken!"
+            msg = "⛔ Player Name already taken!"
         else:
             title = "⛔ Identity Conflict"
+            msg = result.get("msg", "Identity conflict detected.")
         self._msgbox_topmost("warn", title, msg)
 
     def _restore_achievements_from_cloud(self):
