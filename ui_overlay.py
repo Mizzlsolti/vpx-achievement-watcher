@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
-from theme import get_theme_color
+from theme import get_theme_color, get_theme, DEFAULT_THEME
 
 try:
     import sound as _sound_mod
@@ -36,6 +36,17 @@ def _theme_bg_rgba_css(cfg, alpha: int = 245) -> str:
     h = get_theme_color(cfg, "bg").lstrip("#")
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
     return f"rgba({r},{g},{b},{alpha})"
+
+
+def _get_page_accent(cfg, idx: int) -> QColor:
+    """Return the page accent QColor for page *idx* from the active theme."""
+    theme_id = (cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
+    theme = get_theme(theme_id)
+    accents = theme.get("page_accents", [])
+    if accents and 0 <= idx < len(accents):
+        h = accents[idx].lstrip("#")
+        return QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    return _OVERLAY_PAGE_ACCENTS[idx % len(_OVERLAY_PAGE_ACCENTS)]
 
 
 def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
@@ -1620,7 +1631,7 @@ class OverlayWindow(QWidget):
         else:
             self._page_index = (self._page_index - 1) % n
         if hasattr(self, '_effects_widget'):
-            self._effects_widget.set_accent(_OVERLAY_PAGE_ACCENTS[self._page_index])
+            self._effects_widget.set_accent(_get_page_accent(self.parent_gui.cfg, self._page_index))
 
         # Pause the page-2 scroll timer for the duration of the transition so it
         # cannot update content mid-animation and cause flicker.
