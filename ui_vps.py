@@ -222,7 +222,20 @@ def _vps_find(tables: List[dict], search_term: str, rom: Optional[str] = None) -
         term = term[:term.rfind(" ")].strip()
         results = _find_internal(tables, term, manufacturer, year)
 
-    # 3. If still no results, try using the ROM identifier prefix as a name search
+    # 3. Fallback: try with/without "The " prefix
+    if not results:
+        term_lower = _normalize_term(search_term)
+        if term_lower.startswith("the "):
+            alt_term = term_lower[4:].strip()
+        else:
+            alt_term = "the " + term_lower
+        if alt_term:
+            results = _find_internal(tables, alt_term, manufacturer, year)
+            while not results and " " in alt_term:
+                alt_term = alt_term[:alt_term.rfind(" ")].strip()
+                results = _find_internal(tables, alt_term, manufacturer, year)
+
+    # 4. If still no results, try using the ROM identifier prefix as a name search
     #    (e.g., "acd_170h" → "acd") to handle tables missing ROM file listings
     if not results and rom:
         prefix = re.split(r"[_\d]+", rom.lower())[0].strip()
