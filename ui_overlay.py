@@ -17,6 +17,7 @@ from PyQt6.QtGui import (
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window
+from theme import tc
 
 try:
     import sound as _sound_mod
@@ -29,7 +30,7 @@ def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
                       low_perf: bool = False):
     """Draw a multi-layer neon glow border for a modern sci-fi look."""
     if color is None:
-        color = QColor("#00E5FF")
+        color = QColor(tc().accent_secondary)
     if not low_perf:
         # Outer glow layers
         for i in range(layers, 0, -1):
@@ -168,7 +169,7 @@ class OverlayNavArrows(QWidget):
             cy = draw_h // 2
             pad = 16
             right_cx = draw_w - pad + int(wobble)
-            arrow_color = QColor("#00E5FF")
+            arrow_color = QColor(tc().accent_secondary)
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -340,12 +341,14 @@ class OverlayEffectsWidget(QWidget):
 
 
 # Per-page accent colours for the main overlay (cycles as user navigates)
-_OVERLAY_PAGE_ACCENTS = [
-    QColor(0, 229, 255),    # page 0: cyan (default/highlights)
-    QColor(255, 127, 0),    # page 1: orange (achievement progress)
-    QColor(0, 200, 110),    # page 2: green (other views)
-    QColor(180, 80, 255),   # page 3: purple (cloud/VPS)
-]
+def _get_overlay_page_accents():
+    """Return per-page accent colours based on the active theme."""
+    return [
+        QColor(tc().accent_secondary),   # page 0: secondary accent (cyan in DMD Classic)
+        QColor(tc().accent_primary),      # page 1: primary accent (orange in DMD Classic)
+        QColor(0, 200, 110),             # page 2: green (other views)
+        QColor(180, 80, 255),            # page 3: purple (cloud/VPS)
+    ]
 
 
 class _OverlayShineWidget(QWidget):
@@ -675,10 +678,10 @@ class OverlayWindow(QWidget):
         if self.bg_url:
             css = ("QWidget#overlay_bg {"
                    f"border-image: url('{self.bg_url}') 0 0 0 0 stretch stretch;"
-                   "background:rgba(8,12,22,252);border:2px solid #00E5FF;border-radius:18px;}")
+                   f"background:rgba(8,12,22,252);border:2px solid {tc().accent_secondary};border-radius:18px;" + "}")
         else:
             css = ("QWidget#overlay_bg {background:rgba(8,12,22,252);"
-                   "border:2px solid #00E5FF;border-radius:18px;}")
+                   f"border:2px solid {tc().accent_secondary};border-radius:18px;" + "}")
         self.container.setStyleSheet(css)
         self.text_container = QWidget(self)
         self.text_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -1273,16 +1276,16 @@ class OverlayWindow(QWidget):
                 if old_pct_target >= 0:
                     self._trigger_shine()
 
-        style = """
+        style = f"""
         <style>
-          table.hltable { border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }
-          .hltable th, .hltable td { padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }
-          .hltable th { text-align: center; background: rgba(0, 229, 255, 0.20); color: #00E5FF; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid rgba(0, 229, 255, 0.35); }
-          .hltable td.left { text-align: left; }
-          .hltable td.right { text-align: right; font-weight: bold; font-size: 1.15em; color: #FF7F00; }
-          .rom-title { text-align: center; font-size: 1.6em; font-weight: bold; color: #FF7F00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid rgba(0, 229, 255, 0.3); padding-bottom: 0.3em; }
-          .score-box { text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: #00E5FF; }
-          .divider { border-top: 1px solid rgba(255, 127, 0, 0.3); margin-top: 0.6em; padding-top: 0.6em; }
+          table.hltable {{ border-collapse: collapse; margin: 0 auto; width: 100%; font-size: 1.1em; }}
+          .hltable th, .hltable td {{ padding: 0.35em 0.65em; border-bottom: 1px solid rgba(255,255,255,0.15); color: #E0E0E0; overflow-wrap: break-word; }}
+          .hltable th {{ text-align: center; background: {tc().accent_secondary_rgba(0.20)}; color: {tc().accent_secondary}; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid {tc().accent_secondary_rgba(0.35)}; }}
+          .hltable td.left {{ text-align: left; }}
+          .hltable td.right {{ text-align: right; font-weight: bold; font-size: 1.15em; color: {tc().accent_primary}; }}
+          .rom-title {{ text-align: center; font-size: 1.6em; font-weight: bold; color: {tc().accent_primary}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid {tc().accent_secondary_rgba(0.3)}; padding-bottom: 0.3em; }}
+          .score-box {{ text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: {tc().accent_secondary}; }}
+          .divider {{ border-top: 1px solid {tc().accent_primary_rgba(0.3)}; margin-top: 0.6em; padding-top: 0.6em; }}
         </style>
         """
 
@@ -1324,9 +1327,9 @@ class OverlayWindow(QWidget):
                 <div style='text-align: center; color: #FFFFFF; font-weight: bold; font-size: 1.15em; margin-bottom: 0.3em;'>
                     {unlocked_total} / {total_achs} ({pct}%)
                 </div>
-                <table align='center' width='75%' style='border: 1px solid rgba(0, 229, 255, 0.25); background: #0D1117; margin-bottom: 1.5em; border-radius: 6px; overflow: hidden;' cellpadding='0' cellspacing='0'>
+                <table align='center' width='75%' style='border: 1px solid {tc().accent_secondary_rgba(0.25)}; background: #0D1117; margin-bottom: 1.5em; border-radius: 6px; overflow: hidden;' cellpadding='0' cellspacing='0'>
                     <tr>
-                        <td width='{safe_pct}%' style='background: #FF9020; height: 12px; border-radius: 4px;'>&nbsp;</td>
+                        <td width='{safe_pct}%' style='background: {tc().accent_primary}; height: 12px; border-radius: 4px;'>&nbsp;</td>
                         <td width='{rem_pct}%' style='height: 12px;'>&nbsp;</td>
                     </tr>
                 </table>
@@ -1578,13 +1581,14 @@ class OverlayWindow(QWidget):
             return
 
         # Advance page index for accent colour cycling
-        n = len(_OVERLAY_PAGE_ACCENTS)
+        accents = _get_overlay_page_accents()
+        n = len(accents)
         if direction == 'left':
             self._page_index = (self._page_index + 1) % n
         else:
             self._page_index = (self._page_index - 1) % n
         if hasattr(self, '_effects_widget'):
-            self._effects_widget.set_accent(_OVERLAY_PAGE_ACCENTS[self._page_index])
+            self._effects_widget.set_accent(accents[self._page_index])
 
         # Pause the page-2 scroll timer for the duration of the transition so it
         # cannot update content mid-animation and cause flicker.
@@ -1754,7 +1758,7 @@ class MiniInfoOverlay(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         self._body_pt = 20
         self._font_family = ov.get("font_family", "Segoe UI")
-        self._red = "#FF3B30"                          
+        self._red = f"{tc().danger}"                          
         self._hint = "#DDDDDD"                         
         self._bg_color = QColor(8, 12, 22, 245)
         self._radius = 16
@@ -2001,7 +2005,7 @@ class FlipCounterOverlay(QWidget):
         body_pt = 15
         title_pt = max(body_pt + 2, int(round(body_pt * 1.35)))
 
-        title_color = QColor("#FF7F00")
+        title_color = QColor(tc().accent_primary)
         hi_color = QColor("#FFFFFF")
 
         title = f"Total flips: {int(self._total)}/{int(self._goal)}"
@@ -2210,10 +2214,10 @@ class FlipCounterPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Flip Counter\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2329,10 +2333,10 @@ class TimerPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Timer\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2467,10 +2471,10 @@ class ToastPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Achievement Toast\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2584,10 +2588,10 @@ class ChallengeOVPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Challenge Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2681,13 +2685,13 @@ class MiniInfoPositionPicker(QWidget):
         max_text_width = 520
         html = (
             f"<div style='font-size:{body_pt}pt;font-family:\"{font_family}\";'>"
-            f"<span style='color:#FF3B30;'>NVRAM file not found or not readable</span>"
+            f"<span style='color:{tc().danger};'>NVRAM file not found or not readable</span>"
             f"<br><span style='color:#DDDDDD;'>closing in 5…</span>"
             f"</div>"
         )
         tmp = QLabel()
         tmp.setTextFormat(Qt.TextFormat.RichText)
-        tmp.setStyleSheet("color:#FF3B30;background:transparent;")
+        tmp.setStyleSheet(f"color:{tc().danger};background:transparent;")
         tmp.setFont(QFont(font_family, body_pt))
         tmp.setWordWrap(True)
         tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -2730,10 +2734,10 @@ class MiniInfoPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Mini Info\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -2806,7 +2810,7 @@ class StatusOverlay(QWidget):
         ov = self.parent_gui.cfg.OVERLAY or {}
         self._font_family = ov.get("font_family", "Segoe UI")
         # Traffic-light color for the dot indicator
-        self._color = "#00C853"
+        self._color = f"{tc().success}"
         # Status text (one of the 5 agreed states)
         self._status_text = ""
         self._bg_color = QColor(8, 12, 22, 230)
@@ -2833,8 +2837,8 @@ class StatusOverlay(QWidget):
         self._morph_active: bool = False
         self._morph_elapsed: float = 0.0
         self._morph_duration: float = 200.0
-        self._morph_from_color: str = "#00C853"
-        self._morph_target_color: str = "#00C853"
+        self._morph_from_color: str = f"{tc().success}"
+        self._morph_target_color: str = f"{tc().success}"
         self._morph_from_text: str = ""
         self._morph_target_text: str = ""
         # Combined animation timer
@@ -3038,14 +3042,14 @@ class StatusOverlay(QWidget):
         if self.isVisible():
             self._refresh_view()
 
-    def update_status(self, status_text: str, color_hex: str = "#00C853"):
+    def update_status(self, status_text: str, color_hex: str = f"{tc().success}"):
         """Update the displayed status state and refresh the badge.
 
         This is the primary method for changing the badge content.  The badge
         remains visible after this call; use :meth:`hide_badge` to hide it.
         """
         new_text = str(status_text or "").strip()
-        new_color = str(color_hex or "#00C853").strip()
+        new_color = str(color_hex or f"{tc().success}").strip()
         self._last_center = self._primary_center()
 
         if self._check_low_perf():
@@ -3100,7 +3104,7 @@ class StatusOverlay(QWidget):
         The ``seconds`` parameter is ignored; this overlay is persistent and
         does not auto-dismiss.  Use :meth:`hide_badge` to hide it explicitly.
         """
-        self.update_status(message, color_hex or "#00C853")
+        self.update_status(message, color_hex or f"{tc().success}")
 
 
 class StatusOverlayPositionPicker(QWidget):
@@ -3167,7 +3171,7 @@ class StatusOverlayPositionPicker(QWidget):
         status_text = "Online · Tracking"
         html = (
             f"<span style='font-size:{badge_font_pt}pt;font-family:\"{font_family}\";'>"
-            f"<span style='color:#00C853;'>&#9679;</span>"
+            f"<span style='color:{tc().success};'>&#9679;</span>"
             f"&nbsp;<span style='color:#EEEEEE;'>{status_text}</span>"
             f"</span>"
         )
@@ -3215,10 +3219,10 @@ class StatusOverlayPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Status Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3344,10 +3348,10 @@ class OverlayPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF")); pen.setWidth(2)
+        pen = QPen(QColor(tc().accent_secondary)); pen.setWidth(2)
         p.setPen(pen); p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         msg = "Main Overlay\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -3611,7 +3615,7 @@ class AchToastWindow(QWidget):
 
         is_level_up = (self._rom == "__levelup__")
         if is_level_up:
-            border_color = QColor("#00E5FF")
+            border_color = QColor(tc().accent_secondary)
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
         else:
@@ -3648,9 +3652,9 @@ class AchToastWindow(QWidget):
             self._tw_full = line1
 
         # Feste Theme-Farben
-        title_color = QColor("#FF7F00") # Orange
+        title_color = QColor(tc().accent_primary) # Orange
         text_color = QColor("#FFFFFF")  # Weiß
-        levelup_color = QColor("#00E5FF")  # Cyan for level-up line1
+        levelup_color = QColor(tc().accent_secondary)  # Cyan for level-up line1
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
         title_for_size = line1  # always use full text for width calculation
@@ -4268,7 +4272,7 @@ class ChallengeSelectOverlay(QWidget):
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
 
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(tc().accent_primary)
 
         _CHALLENGE_LABELS = [
             ("⌛ Timed Challenge", "3:00 minutes playing time."),
@@ -4413,7 +4417,7 @@ class ChallengeSelectOverlay(QWidget):
             left_cx = pad_lr + max(12, int(round(24 * factor))) + int(-wobble)
             right_cx = w - pad_lr - max(12, int(round(24 * factor))) + int(wobble)
             
-            arrow_color = QColor("#00E5FF")
+            arrow_color = QColor(tc().accent_secondary)
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
@@ -4573,7 +4577,7 @@ class FlipDifficultyOverlay(QWidget):
         scaled_body_pt = 20  # Flip difficulty overlay is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
         text_color = QColor("#FFFFFF")
-        hi_color = QColor("#FF7F00")
+        hi_color = QColor(tc().accent_primary)
 
         factor = scaled_body_pt / 20.0
         pad_lr = max(12, int(round(24 * factor)))
@@ -4665,7 +4669,7 @@ class FlipDifficultyOverlay(QWidget):
                     amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
                     alpha = 40 + int(60 * amp)
                     p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(255, 127, 0, alpha))
-                    p.setPen(QPen(QColor("#00E5FF"), 2))
+                    p.setPen(QPen(QColor(tc().accent_secondary), 2))
                     if snap_flash_alpha > 0:
                         p.fillRect(draw_rect, QColor(255, 255, 255, snap_flash_alpha))
                 else:
@@ -4683,7 +4687,7 @@ class FlipDifficultyOverlay(QWidget):
                     name_pt -= 1
                     fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
                 name_h = fm_n.height()
-                p.setPen(QColor("#FF7F00") if selected else QColor("#FFFFFF"))
+                p.setPen(QColor(tc().accent_primary) if selected else QColor("#FFFFFF"))
                 p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
                 if int(flips) == -1:
                     name_y = y0 + inner_pad + (box_h - name_h) // 2
@@ -5044,12 +5048,12 @@ class HeatBarPositionPicker(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(0, 0, self._w, self._h, QColor(8, 12, 22, 245))
-        pen = QPen(QColor("#00E5FF"))
+        pen = QPen(QColor(tc().accent_secondary))
         pen.setWidth(2)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, self._w - 2, self._h - 2, 18, 18)
-        p.setPen(QColor("#FF7F00"))
+        p.setPen(QColor(tc().accent_primary))
         p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         msg = "Heat Bar\nDrag to position. Click the button again to save"
         if self._portrait:
@@ -5114,10 +5118,10 @@ class ChallengeStartCountdown(QWidget):
 
         # Countdown sequence: ('3', cyan), ('2', cyan), ('1', cyan), ('GO!', orange)
         self._steps = [
-            ('3',   QColor('#00E5FF'), 800, False),
-            ('2',   QColor('#00E5FF'), 800, False),
-            ('1',   QColor('#00E5FF'), 800, False),
-            ('GO!', QColor('#FF7F00'), 500, True),   # last step fades out
+            ('3',   QColor(tc().accent_secondary), 800, False),
+            ('2',   QColor(tc().accent_secondary), 800, False),
+            ('1',   QColor(tc().accent_secondary), 800, False),
+            ('GO!', QColor(tc().accent_primary), 500, True),   # last step fades out
         ]
         self._step_idx = 0
         self._step_elapsed = 0.0
