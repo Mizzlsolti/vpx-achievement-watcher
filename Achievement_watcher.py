@@ -2067,8 +2067,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "• <b>Color Preview</b>: Shows the four main colors of the selected theme "
             "(Primary, Accent, Border, Background).<br>"
             "• <b>Overlay Preview / Test</b>: Preview each overlay with the current theme. "
-            "Click <b>Test</b> to open a live preview. System Notification and Status Overlay "
-            "use a fixed style and are not affected by themes.<br>"
+            "Click <b>Test</b> to open a live preview.<br>"
             "• <b>Available Themes</b>: Browse all 15 built-in themes with their color schemes and descriptions.<br><br>"
             "Theme changes affect the main application window, all overlay windows, achievement toasts, "
             "and challenge UI elements. The default theme is <b>Neon Blue</b> (cyan + orange)."
@@ -2718,8 +2717,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_ov_test = QVBoxLayout(grp_ov_test)
 
         lbl_ov_hint = QLabel(
-            "Preview how overlays look with the current theme. "
-            "System Notification and Status Overlay are not affected by themes."
+            "Preview how overlays look with the current theme."
         )
         lbl_ov_hint.setWordWrap(True)
         lbl_ov_hint.setStyleSheet("color: #AAA; font-size: 9pt; font-style: italic;")
@@ -2769,13 +2767,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         lay_ov_test.addLayout(_make_ov_row(
             "#00E5FF", "Heat Bar", "Heat barometer for heat challenge",
             self._on_heat_bar_test, track_dot=True))
-        # fixed-style overlays (red dot – not theme-affected)
-        lay_ov_test.addLayout(_make_ov_row(
-            "#FF4444", "System Notification", "Error/info notices",
-            self._on_mini_info_test))
-        lay_ov_test.addLayout(_make_ov_row(
-            "#FF4444", "Status Overlay", "Cloud sync badge",
-            self._on_status_overlay_test))
         theme_layout.addWidget(grp_ov_test)
 
         # ── 4. Available Themes ────────────────────────────────────────────────
@@ -2908,10 +2899,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
             chk_event = QCheckBox()
             chk_event.setChecked(bool(cur_events.get(event_id, False)))
+            chk_event.setFixedSize(20, 20)
             chk_event.setToolTip(f"Enable/disable sound for {event_label}")
             chk_event.setStyleSheet(
-                "QCheckBox::indicator { width: 18px; height: 18px; }"
-                "QCheckBox::indicator:checked { background: #00E5FF; border: 1px solid #00B8D4; border-radius: 2px; }"
+                "QCheckBox::indicator { width: 16px; height: 16px; }"
+                "QCheckBox::indicator:checked { background: #00E5FF; border: 1px solid #00E5FF; border-radius: 2px; }"
                 "QCheckBox::indicator:unchecked { background: #333; border: 1px solid #555; border-radius: 2px; }"
             )
 
@@ -2931,12 +2923,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 1, cell_chk)
 
             btn_test = QPushButton("▶")
-            btn_test.setFixedSize(36, 28)
+            btn_test.setFixedSize(28, 22)
             btn_test.setToolTip(f"Preview sound for {event_label}")
             btn_test.setStyleSheet(
-                "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 14px; padding: 0px; }"
-                "QPushButton:hover { background: #444; }"
-                "QPushButton:pressed { background: #555; }"
+                "QPushButton { background: #00E5FF; color: #000; border: none; "
+                "border-radius: 3px; font-size: 10pt; font-weight: bold; "
+                "padding: 0px; text-align: center; }"
+                "QPushButton:hover { background: #33EEFF; }"
             )
 
             def _make_preview(eid):

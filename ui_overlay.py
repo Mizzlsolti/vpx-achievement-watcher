@@ -968,6 +968,7 @@ class OverlayWindow(QWidget):
                 # sharp inner border into the snapshot so the two borders don't stack visually.
                 # When animations are off, bake the full multi-layer glow into the snapshot.
                 _draw_glow_border(p_final, 0, 0, W, H, radius=18,
+                                   color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                                    low_perf=(_snap_low_perf or _snap_anim_glow))
             finally:
                 p_final.end()
@@ -2053,6 +2054,7 @@ class FlipCounterOverlay(QWidget):
             p.drawRoundedRect(0, 0, content_w, content_h, radius, radius)
 
             _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
+                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
             # Breathing glow ring: pulsates with _pulse_t when animation is enabled.
@@ -4167,6 +4169,7 @@ class ChallengeCountdownOverlay(QWidget):
         p.setBrush(QColor(8, 12, 22, 245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
         _draw_glow_border(p, 0, 0, w, h, radius=16,
+                          color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                           low_perf=bool(ov.get("low_performance_mode", False)))
         # Turn red when 10 seconds or fewer remain
         if self._left <= 10:
@@ -4345,6 +4348,7 @@ class ChallengeSelectOverlay(QWidget):
             p.drawRoundedRect(0, 0, w, h, radius, radius)
 
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
+                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
             title_pt = scaled_body_pt + 6
@@ -4671,6 +4675,7 @@ class FlipDifficultyOverlay(QWidget):
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
+                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
             p.setPen(hi_color)
@@ -4895,6 +4900,7 @@ class HeatBarometerOverlay(QWidget):
             # border with glow
             ov = self.parent_gui.cfg.OVERLAY or {}
             _draw_glow_border(p, 0, 0, w, h, radius=10,
+                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
             # bar background (track)
