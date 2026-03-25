@@ -4029,7 +4029,7 @@ class AchToastManager(QObject):
         self._levelup_sound_played = False
 
     def enqueue(self, title: str, rom: str, seconds: int = 5):
-        """Fügt einen Toast in die Warteschlange ein."""
+        """Add a toast to the queue."""
         self._queue.append((title, rom, seconds))
         if not self._active:
             self._show_next()
