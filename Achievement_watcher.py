@@ -55,7 +55,7 @@ from watcher_core import (
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
 from tutorial import TutorialWizardDialog
-from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
+from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
 from ui_cloud_stats import CloudStatsMixin
 
 from ui_vps import (
@@ -5599,13 +5599,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         else:
             header = "No recent play data available"
 
+        _tc_primary = get_theme_color(self.cfg, "primary")
+        _tc_accent = get_theme_color(self.cfg, "accent")
         css = (
             "<style>"
             "table{width:100%;border-collapse:collapse;}"
             "td{font-size:0.9em;padding:4px 6px;border-bottom:1px solid #333;}"
-            ".unlocked{color:#00E5FF;font-weight:bold;}"
+            f".unlocked{{color:{_tc_primary};font-weight:bold;}}"
             ".locked{color:#555;}"
-            ".hdr{color:#FF7F00;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}"
+            f".hdr{{color:{_tc_accent};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}}"
             ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
             "</style>"
         )
@@ -5680,7 +5682,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         header_html = (
             f"<div class='hdr'>{esc(header)}</div>"
-            + (f"<div style='color:#FF7F00;font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
+            + (f"<div style='color:{_tc_accent};font-size:0.9em;text-align:center;margin-bottom:2px;'>{esc(level_badge)}</div>" if level_badge else "")
             + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
         )
 
@@ -5728,18 +5730,19 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         else:
             header_title = table_name if table_name else (rom.upper() if rom else "Cloud Leaderboard")
 
+        _tc_accent = get_theme_color(self.cfg, "accent")
         cloud_sync_msg = ""
         if not self.cfg.CLOUD_ENABLED:
             cloud_sync_msg = (
-                "<div style='color:#FF7F00;font-weight:bold;font-size:1.05em;"
-                "text-align:center;padding:8px 12px;border:1px solid #FF7F00;"
+                f"<div style='color:{_tc_accent};font-weight:bold;font-size:1.05em;"
+                f"text-align:center;padding:8px 12px;border:1px solid {_tc_accent};"
                 "border-radius:6px;margin-bottom:10px;'>"
                 "If you want to participate, enable cloud sync."
                 "</div>"
             )
 
         header_html = (
-            f"<div style='color:#FF7F00;font-size:1.15em;font-weight:bold;"
+            f"<div style='color:{_tc_accent};font-size:1.15em;font-weight:bold;"
             f"text-align:center;padding:6px 0;margin-bottom:4px;'>"
             f"{_html_mod.escape(header_title)}</div>"
             + cloud_sync_msg
@@ -5954,9 +5957,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         signals = VpcWorkerSignals()
         signals.update_ui.connect(self.overlay.set_html_fullsize)
 
-        # Zeige Ladebildschirm an
+        # Show loading screen
+        _tc_primary = get_theme_color(self.cfg, "primary")
         loading_html = (
-            f"<div style='color:#00E5FF;font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
+            f"<div style='color:{_tc_primary};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
             f"VPC Weekly Challenge</div>"
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
