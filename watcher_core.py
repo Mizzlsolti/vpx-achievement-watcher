@@ -1790,23 +1790,28 @@ class CloudSync:
             return []
         url = cfg.CLOUD_URL.strip().rstrip('/')
         endpoint = f"{url}/{node_path}.json"
-        try:
-            import urllib.request
-            import ssl
-            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
-                raw_data = resp.read().decode('utf-8')
-                data = json.loads(raw_data)
-            if not data: return []
-            if isinstance(data, dict): return list(data.values())
-            elif isinstance(data, list): return [x for x in data if x is not None]
-            return []
-        except Exception as e:
-            log(cfg, f"[CLOUD] Fetch error for {endpoint}: {e}", "ERROR")
-            return []
+        _MAX_RETRIES = 3
+        for _attempt in range(_MAX_RETRIES):
+            try:
+                import urllib.request
+                import ssl
+                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                    raw_data = resp.read().decode('utf-8')
+                    data = json.loads(raw_data)
+                if not data: return []
+                if isinstance(data, dict): return list(data.values())
+                elif isinstance(data, list): return [x for x in data if x is not None]
+                return []
+            except Exception as e:
+                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
+                    time.sleep(1 * (_attempt + 1))
+                    continue
+                log(cfg, f"[CLOUD] Fetch error for {endpoint}: {e}", "ERROR")
+                return []
 
     @staticmethod
     def fetch_player_ids(cfg: AppConfig) -> list:
@@ -1815,21 +1820,26 @@ class CloudSync:
             return []
         url = cfg.CLOUD_URL.strip().rstrip('/')
         endpoint = f"{url}/players.json?shallow=true"
-        try:
-            import urllib.request
-            import ssl
-            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-            if isinstance(data, dict):
-                return list(data.keys())
-            return []
-        except Exception as e:
-            log(cfg, f"[CLOUD] fetch_player_ids error: {e}", "ERROR")
-            return []
+        _MAX_RETRIES = 3
+        for _attempt in range(_MAX_RETRIES):
+            try:
+                import urllib.request
+                import ssl
+                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                if isinstance(data, dict):
+                    return list(data.keys())
+                return []
+            except Exception as e:
+                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
+                    time.sleep(1 * (_attempt + 1))
+                    continue
+                log(cfg, f"[CLOUD] fetch_player_ids error: {e}", "ERROR")
+                return []
 
     @staticmethod
     def fetch_node(cfg: AppConfig, node_path: str):
@@ -1838,18 +1848,23 @@ class CloudSync:
             return None
         url = cfg.CLOUD_URL.strip().rstrip('/')
         endpoint = f"{url}/{node_path}.json"
-        try:
-            import urllib.request
-            import ssl
-            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
-                return json.loads(resp.read().decode('utf-8'))
-        except Exception as e:
-            log(cfg, f"[CLOUD] fetch_node error for {endpoint}: {e}", "ERROR")
-            return None
+        _MAX_RETRIES = 3
+        for _attempt in range(_MAX_RETRIES):
+            try:
+                import urllib.request
+                import ssl
+                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                    return json.loads(resp.read().decode('utf-8'))
+            except Exception as e:
+                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
+                    time.sleep(1 * (_attempt + 1))
+                    continue
+                log(cfg, f"[CLOUD] fetch_node error for {endpoint}: {e}", "ERROR")
+                return None
 
     @staticmethod
     def fetch_parallel(cfg: AppConfig, node_paths: list, max_workers: int = 10) -> dict:
