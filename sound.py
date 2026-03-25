@@ -15,7 +15,7 @@ from functools import lru_cache
 from typing import List
 
 SAMPLE_RATE = 22050
-DEFAULT_VOLUME = 70
+DEFAULT_VOLUME = 20
 
 # ── Public metadata ───────────────────────────────────────────────────────────
 
@@ -1124,10 +1124,10 @@ def play_sound(cfg, event_name: str) -> None:
     """Play a sound if the feature is enabled and the event is not muted."""
     try:
         ov = getattr(cfg, "OVERLAY", {}) or {}
-        if not bool(ov.get("sound_enabled", True)):
+        if not bool(ov.get("sound_enabled", False)):
             return
         events = ov.get("sound_events") or {}
-        if isinstance(events, dict) and not bool(events.get(event_name, True)):
+        if isinstance(events, dict) and not bool(events.get(event_name, False)):
             return
         pack_id = _resolve_pack_id(ov)
         volume = int(ov.get("sound_volume", DEFAULT_VOLUME))

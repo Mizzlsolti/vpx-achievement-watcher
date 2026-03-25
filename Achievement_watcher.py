@@ -2727,12 +2727,6 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                          test_fn=None, track_dot: bool = False) -> QHBoxLayout:
             row = QHBoxLayout()
             row.setSpacing(8)
-            dot = QLabel("●")
-            dot.setStyleSheet(f"color: {dot_color}; font-size: 14pt;")
-            dot.setFixedWidth(20)
-            if track_dot:
-                self._theme_dot_labels.append(dot)
-            row.addWidget(dot)
             lbl_name = QLabel(f"<b>{name}</b>")
             lbl_name.setStyleSheet("color: #E0E0E0;")
             row.addWidget(lbl_name)
@@ -2768,10 +2762,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self._on_heat_bar_test, track_dot=True))
         # fixed-style overlays (red dot – not theme-affected)
         lay_ov_test.addLayout(_make_ov_row(
-            "#FF4444", "System Notification", "Error/info notices – fixed style",
+            "#FF4444", "System Notification", "Error/info notices",
             self._on_mini_info_test))
         lay_ov_test.addLayout(_make_ov_row(
-            "#FF4444", "Status Overlay", "Cloud sync badge – fixed style",
+            "#FF4444", "Status Overlay", "Cloud sync badge",
             self._on_status_overlay_test))
         theme_layout.addWidget(grp_ov_test)
 
@@ -2821,7 +2815,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         # Enable + Volume row
         row_enable = QHBoxLayout()
         self.chk_sound_enabled = QCheckBox("Enable Sound Effects")
-        self.chk_sound_enabled.setChecked(bool(self.cfg.OVERLAY.get("sound_enabled", True)))
+        self.chk_sound_enabled.setChecked(bool(self.cfg.OVERLAY.get("sound_enabled", False)))
         def _on_sound_enabled(state):
             self.cfg.OVERLAY["sound_enabled"] = bool(state)
             self.cfg.save()
@@ -2884,16 +2878,16 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         tbl_sound.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         tbl_sound.horizontalHeader().setStretchLastSection(False)
-        tbl_sound.verticalHeader().setDefaultSectionSize(28)
+        tbl_sound.verticalHeader().setDefaultSectionSize(32)
         tbl_sound.verticalHeader().setVisible(False)
         tbl_sound.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         tbl_sound.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         tbl_sound.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         tbl_sound.setShowGrid(False)
-        tbl_sound.setAlternatingRowColors(True)
+        tbl_sound.setAlternatingRowColors(False)
         tbl_sound.setStyleSheet(
-            "QTableWidget { background: #111; alternate-background-color: #1a1a1a; border: 1px solid #333; }"
-            "QTableWidget::item { padding: 2px 6px; }"
+            "QTableWidget { background: #111; alternate-background-color: #111; border: 1px solid #333; gridline-color: transparent; }"
+            "QTableWidget::item { padding: 4px 6px; border: none; }"
         )
 
         cur_events = self.cfg.OVERLAY.get("sound_events") or {}
@@ -2904,7 +2898,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setItem(row, 0, lbl_item)
 
             chk_event = QCheckBox()
-            chk_event.setChecked(bool(cur_events.get(event_id, True)))
+            chk_event.setChecked(bool(cur_events.get(event_id, False)))
             chk_event.setToolTip(f"Enable/disable sound for {event_label}")
             chk_event.setStyleSheet(
                 "QCheckBox::indicator { width: 18px; height: 18px; }"
@@ -2928,7 +2922,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             tbl_sound.setCellWidget(row, 1, cell_chk)
 
             btn_test = QPushButton("▶")
-            btn_test.setFixedSize(32, 24)
+            btn_test.setFixedSize(36, 28)
             btn_test.setToolTip(f"Preview sound for {event_label}")
             btn_test.setStyleSheet(
                 "QPushButton { background: #333; color: #00E5FF; border: 1px solid #555; border-radius: 3px; font-size: 14px; padding: 0px; }"
@@ -2954,7 +2948,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         _total_w = (sum(tbl_sound.columnWidth(c) for c in range(3))
                     + tbl_sound.frameWidth() * 2 + 20)
         tbl_sound.setMaximumWidth(_total_w)
-        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 28 + 30)
+        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 32 + 30)
         sound_layout.addWidget(tbl_sound)
 
         sound_layout.addStretch(1)
