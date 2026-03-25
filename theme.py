@@ -28,6 +28,7 @@ THEMES: dict[str, dict] = {
         "border": "#33FF33",
         "bg": "#0A0A0A",
         "description": "Green & yellow on black – CRT monitor feel",
+        "page_accents": ["#33FF33", "#FFFF00", "#FF9900", "#00CCFF"],
     },
     "classic_pinball": {
         "name": "Classic Pinball",
@@ -37,6 +38,7 @@ THEMES: dict[str, dict] = {
         "border": "#FFD700",
         "bg": "#1A0A00",
         "description": "Gold & red on warm dark – classic machine glow",
+        "page_accents": ["#FFD700", "#FF4040", "#FF8C00", "#FFAA00"],
     },
     "stealth": {
         "name": "Stealth",
@@ -46,6 +48,7 @@ THEMES: dict[str, dict] = {
         "border": "#666666",
         "bg": "#0D0D0D",
         "description": "Muted grays – minimal and unobtrusive",
+        "page_accents": ["#999999", "#CCCCCC", "#777777", "#AAAAAA"],
     },
     "synthwave": {
         "name": "Synthwave",
@@ -55,6 +58,7 @@ THEMES: dict[str, dict] = {
         "border": "#FF44FF",
         "bg": "#0D001A",
         "description": "Hot pink & cyan – 80s retrowave neon",
+        "page_accents": ["#FF44FF", "#00FFFF", "#FF00AA", "#9900FF"],
     },
     "lava": {
         "name": "Lava",
@@ -64,6 +68,7 @@ THEMES: dict[str, dict] = {
         "border": "#FF4500",
         "bg": "#1A0800",
         "description": "Orange & gold on ember – volcanic heat",
+        "page_accents": ["#FF6633", "#FFD700", "#FF4500", "#FF9900"],
     },
     "arctic": {
         "name": "Arctic",
@@ -73,6 +78,7 @@ THEMES: dict[str, dict] = {
         "border": "#87CEEB",
         "bg": "#0A1520",
         "description": "Ice blue & frost white – cold and clear",
+        "page_accents": ["#87CEEB", "#E0F0FF", "#5BB8D4", "#B0D8F0"],
     },
     "royal_purple": {
         "name": "Royal Purple",
@@ -82,6 +88,7 @@ THEMES: dict[str, dict] = {
         "border": "#9B59B6",
         "bg": "#120A1A",
         "description": "Lavender & gold – regal and elegant",
+        "page_accents": ["#BB77DD", "#F1C40F", "#9B59B6", "#CC88EE"],
     },
     "toxic_green": {
         "name": "Toxic Green",
@@ -91,6 +98,7 @@ THEMES: dict[str, dict] = {
         "border": "#39FF14",
         "bg": "#0A0F0A",
         "description": "Neon green & red – radioactive glow",
+        "page_accents": ["#39FF14", "#FF073A", "#CCFF00", "#00FF88"],
     },
     "cyberpunk": {
         "name": "Cyberpunk",
@@ -100,6 +108,7 @@ THEMES: dict[str, dict] = {
         "border": "#F6E716",
         "bg": "#0D0221",
         "description": "Electric yellow & neon pink – high contrast future",
+        "page_accents": ["#F6E716", "#FF003C", "#00FFCC", "#FF6600"],
     },
     "ocean": {
         "name": "Ocean",
@@ -109,6 +118,7 @@ THEMES: dict[str, dict] = {
         "border": "#0077B6",
         "bg": "#03111A",
         "description": "Light blue harmony – deep sea calm",
+        "page_accents": ["#48CAE4", "#90E0EF", "#0077B6", "#00B4D8"],
     },
     "midnight_gold": {
         "name": "Midnight Gold",
@@ -118,6 +128,7 @@ THEMES: dict[str, dict] = {
         "border": "#DAA520",
         "bg": "#0A0A14",
         "description": "Gold & amber on midnight – luxury feel",
+        "page_accents": ["#FFD700", "#FFA500", "#DAA520", "#FFCC00"],
     },
     "cherry_blossom": {
         "name": "Cherry Blossom",
@@ -127,6 +138,7 @@ THEMES: dict[str, dict] = {
         "border": "#FF69B4",
         "bg": "#1A0A12",
         "description": "Soft pink & rose – delicate and warm",
+        "page_accents": ["#FFB7C5", "#FF69B4", "#FF99BB", "#FFD0DD"],
     },
     "forest": {
         "name": "Forest",
@@ -136,6 +148,7 @@ THEMES: dict[str, dict] = {
         "border": "#2E8B57",
         "bg": "#0A120A",
         "description": "Deep green & leaf – natural woodland",
+        "page_accents": ["#228B22", "#90EE90", "#2E8B57", "#66CC44"],
     },
     "sunset": {
         "name": "Sunset",
@@ -145,6 +158,7 @@ THEMES: dict[str, dict] = {
         "border": "#FF4500",
         "bg": "#1A0A05",
         "description": "Tomato red & gold – warm evening glow",
+        "page_accents": ["#FF6347", "#FFD700", "#FF4500", "#FF8C00"],
     },
 }
 
