@@ -5,6 +5,7 @@ import configparser
 import random
 import subprocess
 import hashlib
+import copy
 import os, sys, time, json, re, glob, threading, uuid
 import urllib.parse as _urlparse
 from datetime import datetime, timedelta, timezone
@@ -4308,7 +4309,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return
 
         def _check():
-            result = CloudSync.validate_player_identity(self.cfg, new_id, new_name)
+            cfg_snap = copy.copy(self.cfg)
+            cfg_snap.CLOUD_ENABLED = True
+            result = CloudSync.validate_player_identity(cfg_snap, new_id, new_name)
             QTimer.singleShot(0, lambda: self._handle_save_identity_result(result, new_name, new_id))
 
         threading.Thread(target=_check, daemon=True).start()
