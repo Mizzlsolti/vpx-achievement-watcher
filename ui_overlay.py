@@ -1292,6 +1292,7 @@ class OverlayWindow(QWidget):
             return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
         _pr, _pg, _pb = _hex_to_rgb(_tc_primary)
         _br, _ab, _bb = _hex_to_rgb(_tc_accent)
+        _bdr_r, _bdr_g, _bdr_b = _hex_to_rgb(_tc_border)
 
         style = f"""
         <style>
@@ -1344,9 +1345,9 @@ class OverlayWindow(QWidget):
                 <div style='text-align: center; color: #FFFFFF; font-weight: bold; font-size: 1.15em; margin-bottom: 0.3em;'>
                     {unlocked_total} / {total_achs} ({pct}%)
                 </div>
-                <table align='center' width='75%' style='border: 1px solid rgba(0, 229, 255, 0.25); background: #0D1117; margin-bottom: 1.5em; border-radius: 6px; overflow: hidden;' cellpadding='0' cellspacing='0'>
+                <table align='center' width='75%' style='border: 1px solid rgba({_bdr_r}, {_bdr_g}, {_bdr_b}, 0.25); background: #0D1117; margin-bottom: 1.5em; border-radius: 6px; overflow: hidden;' cellpadding='0' cellspacing='0'>
                     <tr>
-                        <td width='{safe_pct}%' style='background: #FF9020; height: 12px; border-radius: 4px;'>&nbsp;</td>
+                        <td width='{safe_pct}%' style='background: {_tc_accent}; height: 12px; border-radius: 4px;'>&nbsp;</td>
                         <td width='{rem_pct}%' style='height: 12px;'>&nbsp;</td>
                     </tr>
                 </table>
