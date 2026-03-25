@@ -1265,20 +1265,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             except Exception:
                 pass
             self._mini_overlay = None
-        if hasattr(self, '_ach_toast_mgr'):
-            try:
-                mgr = self._ach_toast_mgr
-                mgr._queue.clear()
-                if mgr._active_window is not None:
-                    try:
-                        mgr._active_window.close()
-                        mgr._active_window.deleteLater()
-                    except Exception:
-                        pass
-                    mgr._active_window = None
-                mgr._active = False
-            except Exception:
-                pass
+        # NOTE: _ach_toast_mgr is intentionally NOT cleared here.
+        # Achievement toasts are post-game notifications that must survive VPX exit,
+        # because _persist_and_toast_achievements() runs AFTER the session ends.
 
     def _refresh_challenge_select_overlay(self):
         ovw = getattr(self, "_challenge_select", None)

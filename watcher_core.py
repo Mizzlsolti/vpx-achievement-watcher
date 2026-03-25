@@ -2809,54 +2809,6 @@ class Watcher:
             else:
                 log(self.cfg, f"[ROM_SPEC] created {path} with {len(rules)} session-only rules (included priority fields)")
 
-    def _ach_persist_after_session(self, end_audits: dict, duration_sec: int, nplayers: int):
-        if not self.current_rom or not self._has_any_map(self.current_rom):
-            return
-            
-        try:
-            _awarded, _all_global, awarded_meta, retriggered_meta = self._evaluate_achievements(
-                self.current_rom, self.start_audits, end_audits, duration_sec
-            )
-        except Exception as e:
-            log(self.cfg, f"[ACH] eval failed: {e}", "WARN")
-            awarded_meta = []
-            retriggered_meta = []
-
-        try:
-            from_ga = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-            from_ga_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
-            if from_ga or from_ga_rt:
-                self._ach_record_unlocks("global", self.current_rom, from_ga, retriggered=from_ga_rt)
-                try:
-                    if from_ga:
-                        self._emit_achievement_toasts(from_ga, seconds=5)
-                except Exception:
-                    pass
-        except Exception as e:
-            log(self.cfg, f"[ACH] persist global failed: {e}", "WARN")
-
-        try:
-            sess_achs_p1, sess_rt_p1 = self._evaluate_player_session_achievements(1, self.current_rom)
-            if sess_achs_p1 or sess_rt_p1:
-                self._ach_record_unlocks("session", self.current_rom, list(sess_achs_p1), retriggered=list(sess_rt_p1))
-                try:
-                    if sess_achs_p1:
-                        self._emit_achievement_toasts(sess_achs_p1, seconds=5)
-                except Exception:
-                    pass
-        except Exception as e:
-            log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
-
-        try:
-            from PyQt6.QtCore import QTimer
-            from PyQt6.QtWidgets import QApplication
-            app = QApplication.instance()
-            if app:
-                log(self.cfg, "[OVERLAY] auto-show triggered (postgame)")
-                QTimer.singleShot(500, lambda: self.bridge.overlay_show.emit())
-        except Exception as e:
-            log(self.cfg, f"[OVERLAY] auto-show failed: {e}", "WARN")
-    
     def _unique_title(self, title: str, seen: set[str]) -> str:
         base = title.strip()
         if base not in seen:
@@ -5116,6 +5068,8 @@ class Watcher:
             log(self.cfg, f"[ACH] Evaluation skipped: No NVRAM map found for '{self.current_rom}'")
             return
 
+        log(self.cfg, f"[ACH] Starting achievement evaluation for '{self.current_rom}'")
+
         # Track roms_played in achievements_state (Anti-Cheat protected)
         try:
             rom_state = self._ach_state_load()
@@ -5137,6 +5091,8 @@ class Watcher:
             log(self.cfg, f"[ACH] eval failed: {e}", "WARN")
             awarded_meta = []
             retriggered_meta = []
+
+        log(self.cfg, f"[ACH] Evaluation result: {len(awarded_meta) if awarded_meta else 0} awarded, {len(retriggered_meta) if retriggered_meta else 0} retriggered")
 
         try:
             global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
@@ -6177,13 +6133,14 @@ class Watcher:
 
                 if title and title not in already_shown:
                     already_shown.add(title)
+                    log(self.cfg, f"[ACH] Emitting toast: '{title}' rom='{self.current_rom or ''}'")
                     try:
                         self.bridge.ach_toast_show.emit(title, self.current_rom or "", int(seconds))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log(self.cfg, f"[ACH] Toast emit failed: {e}", "WARN")
             self._toasted_titles = already_shown
-        except Exception:
-            pass  
+        except Exception as e:
+            log(self.cfg, f"[ACH] _emit_achievement_toasts error: {e}", "WARN")
   
     def _on_session_end_record_achievements(self, rom: str, session_titles: list, global_titles: list):
         try:
