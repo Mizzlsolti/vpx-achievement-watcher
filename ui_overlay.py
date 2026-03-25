@@ -3042,7 +3042,7 @@ class StatusOverlay(QWidget):
         if self.isVisible():
             self._refresh_view()
 
-    def update_status(self, status_text: str, color_hex: str = None):
+    def update_status(self, status_text: str, color_hex: Optional[str] = None):
         """Update the displayed status state and refresh the badge.
 
         This is the primary method for changing the badge content.  The badge

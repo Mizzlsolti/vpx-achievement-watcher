@@ -53,7 +53,6 @@ from watcher_core import (
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
-import theme as _theme_mod
 from theme import tc, get_stylesheet, set_active_theme, PRESET_THEMES, THEME_DISPLAY_NAMES
 from ui_cloud_stats import CloudStatsMixin
 
@@ -985,23 +984,26 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._mini_info_picker = MiniInfoPositionPicker(self, width_hint=420, height_hint=100)
         self.btn_mini_info_place.setText("Save position")
 
-    _MINI_TEST_MESSAGES = [
-        ("CHALLENGE COMPLETE!<br>Score: 42.069.000", tc().success),
-        ("TIME'S UP!<br>Score: 42.069.000", tc().success),
-        (
-            "NVRAM map not found for afm_113b.",
-            tc().danger,
-        ),
-        ("Challenge Aborted!", tc().danger),
-        ("Challenge can only be started in-game.", tc().danger),
-    ]
+    @staticmethod
+    def _mini_test_messages():
+        return [
+            ("CHALLENGE COMPLETE!<br>Score: 42.069.000", tc().success),
+            ("TIME'S UP!<br>Score: 42.069.000", tc().success),
+            (
+                "NVRAM map not found for afm_113b.",
+                tc().danger,
+            ),
+            ("Challenge Aborted!", tc().danger),
+            ("Challenge can only be started in-game.", tc().danger),
+        ]
 
     def _on_mini_info_test(self):
         # Ruft das Fenster direkt auf, ohne auf ein offenes Spiel zu warten!
         if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
             self._mini_overlay = MiniInfoOverlay(self)
-        msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
-        self._mini_test_idx = (self._mini_test_idx + 1) % len(self._MINI_TEST_MESSAGES)
+        messages = self._mini_test_messages()
+        msg, color = messages[self._mini_test_idx % len(messages)]
+        self._mini_test_idx = (self._mini_test_idx + 1) % len(messages)
         self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
 
     # ------------------------------------------------------------------
@@ -1065,20 +1067,23 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.btn_status_overlay_place.setText("Save position")
 
     # Agreed status states for the persistent status badge (traffic-light semantics)
-    _STATUS_TEST_MESSAGES = [
-        ("Online · Tracking",  tc().success),   # Green
-        ("Online · Pending",   "#FFA500"),   # Yellow
-        ("Online · Verified",  tc().success),   # Green
-        ("Offline · Local",    "#FFA500"),   # Yellow
-        ("Cloud Off · Local",  tc().danger),   # Red
-    ]
+    @staticmethod
+    def _status_test_messages():
+        return [
+            ("Online · Tracking",  tc().success),   # Green
+            ("Online · Pending",   "#FFA500"),       # Yellow
+            ("Online · Verified",  tc().success),   # Green
+            ("Offline · Local",    "#FFA500"),       # Yellow
+            ("Cloud Off · Local",  tc().danger),    # Red
+        ]
 
     def _on_status_overlay_test(self):
         """Cycle through the agreed status states for visual testing."""
         if not hasattr(self, "_status_overlay") or self._status_overlay is None:
             self._status_overlay = StatusOverlay(self)
-        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
-        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
+        messages = self._status_test_messages()
+        msg, color = messages[self._status_overlay_test_idx % len(messages)]
+        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(messages)
         self._status_overlay.update_status(msg, color)
 
     def _determine_status_state(self) -> tuple[str, str]:
@@ -2619,8 +2624,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         def _update_theme_preview(index: int):
             key = self._theme_combo.itemData(index)
-            from theme import PRESET_THEMES as _PT
-            c = _PT.get(key, _PT["dmd_classic"])
+            c = PRESET_THEMES.get(key, PRESET_THEMES["dmd_classic"])
             self._preview_lbl_accent.setStyleSheet(f"color: {c.accent_primary}; font-weight: bold;")
             self._preview_lbl_secondary.setStyleSheet(f"color: {c.accent_secondary}; font-weight: bold;")
             self._preview_lbl_stats.setStyleSheet(f"color: {c.stats_text};")
@@ -6158,9 +6162,9 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                 rows_html += f"<tr{cls}><td>{lvl}</td><td>{name}{marker}</td><td>{threshold}</td></tr>"
             self.lv_table_browser.setHtml(
                 "<style>table{border-collapse:collapse;width:100%}"
-                f"th{color:{tc().accent_primary};font-weight:bold;padding:4px 8px;border-bottom:2px solid #555;background:#111;text-align:left}"
+                f"th{{color:{tc().accent_primary};font-weight:bold;padding:4px 8px;border-bottom:2px solid #555;background:#111;text-align:left}}"
                 "td{padding:3px 8px;border-bottom:1px solid #2a2a2a;color:#CCC}"
-                f".current td{color:{tc().accent_secondary};font-weight:bold;background:#152015}"
+                f".current td{{color:{tc().accent_secondary};font-weight:bold;background:#152015}}"
                 "</style>"
                 + "<table><tr><th>Lvl</th><th>Name</th><th>Achievements</th></tr>"
                 + rows_html + "</table>"
