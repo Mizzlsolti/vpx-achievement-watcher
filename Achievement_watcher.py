@@ -3984,15 +3984,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self.txt_player_id.setMaxLength(4)
         self.txt_player_id.setFixedWidth(60)
 
-        btn_save_identity = QPushButton("💾 Save")
-        btn_save_identity.setToolTip("Validate and save Player Name and Player ID")
-        btn_save_identity.clicked.connect(self._on_save_player_identity)
+        self.btn_save_identity = QPushButton("💾 Save")
+        self.btn_save_identity.setToolTip("Validate and save Player Name and Player ID")
+        self.btn_save_identity.clicked.connect(self._on_save_player_identity)
 
         lay_profile.addWidget(QLabel("Display Name:"), 0, 0)
         lay_profile.addWidget(self.txt_player_name, 0, 1)
         lay_profile.addWidget(QLabel("Player ID (Restore):"), 0, 2)
         lay_profile.addWidget(self.txt_player_id, 0, 3)
-        lay_profile.addWidget(btn_save_identity, 0, 4)
+        lay_profile.addWidget(self.btn_save_identity, 0, 4)
 
         lbl_id_warning = QLabel(
             "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
@@ -4048,6 +4048,10 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
         lay_cloud.addLayout(lay_cloud_btns)
         layout.addWidget(grp_cloud)
+
+        # Lock player identity fields on startup if Cloud Sync is already enabled
+        if self.cfg.CLOUD_ENABLED:
+            self._lock_player_identity_fields(True)
 
         # --- ⚡ Performance & Animations ---
         grp_perf_anim = QGroupBox("⚡ Performance & Animations")
@@ -4194,9 +4198,13 @@ class MainWindow(QMainWindow, CloudStatsMixin):
 
     def _apply_cloud_settings(self):
         if self.chk_cloud_enabled.isChecked():
-            pname = self.txt_player_name.text().strip().lower()
-            if not pname or pname == "player":
-                self._msgbox_topmost("warn", "Cloud Sync", "Please enter a valid player name in the profile first!")
+            # Cloud Sync checkbox must only be enabled via the Save button flow.
+            # If the user tries to enable it manually, validate the fields and reject.
+            pname = self.txt_player_name.text().strip()
+            pid = self.txt_player_id.text().strip()
+            name_invalid = not pname or pname.lower() == "player"
+            id_invalid = not pid or len(pid) != 4
+            if name_invalid or id_invalid:
                 self.chk_cloud_enabled.blockSignals(True)
                 self.chk_cloud_enabled.setChecked(False)
                 self.chk_cloud_enabled.blockSignals(False)
@@ -4210,9 +4218,30 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     self.chk_cloud_backup.setChecked(False)
                     self.cfg.CLOUD_BACKUP_ENABLED = False
                 self.cfg.save()
+                if name_invalid and id_invalid:
+                    self._msgbox_topmost(
+                        "warn",
+                        "⛔ Invalid Player Profile",
+                        "Please enter a valid display name and a valid 4-character Player ID before enabling Cloud Sync.",
+                    )
+                elif name_invalid:
+                    self._msgbox_topmost(
+                        "warn",
+                        "⛔ Invalid Player Name",
+                        "Please enter a valid display name. The default name 'Player' is not allowed.",
+                    )
+                else:
+                    self._msgbox_topmost(
+                        "warn",
+                        "⛔ Invalid Player ID",
+                        "Please enter a valid 4-character Player ID.",
+                    )
                 return
         self.cfg.CLOUD_ENABLED = self.chk_cloud_enabled.isChecked()
         self.cfg.save()
+        # Unlock player identity fields whenever Cloud Sync is turned off
+        if not self.cfg.CLOUD_ENABLED:
+            self._lock_player_identity_fields(False)
         # Start/stop the highscore polling timer based on cloud state
         if hasattr(self, "_highscore_poll_timer"):
             if self.cfg.CLOUD_ENABLED:
@@ -4271,43 +4300,60 @@ class MainWindow(QMainWindow, CloudStatsMixin):
     def _save_player_name(self, name):
         self.cfg.OVERLAY["player_name"] = name.strip()
         self.cfg.save()
-        if not name.strip() or name.strip().lower() == "player":
-            if getattr(self, "chk_cloud_enabled", None) and self.chk_cloud_enabled.isChecked():
-                self.chk_cloud_enabled.blockSignals(True)
-                self.chk_cloud_enabled.setChecked(False)
-                self.chk_cloud_enabled.blockSignals(False)
-                self.cfg.CLOUD_ENABLED = False
-                self.cfg.save()
 
     def _save_player_id(self, player_id):
         self.cfg.OVERLAY["player_id"] = player_id.strip()
         self.cfg.save()
 
-    def _on_save_player_identity(self):
-        """Validate and save the Player Name and Player ID.
+    def _lock_player_identity_fields(self, locked: bool):
+        """Disable or enable the Player Name, Player ID, and Save button fields."""
+        for widget in (
+            getattr(self, "txt_player_name", None),
+            getattr(self, "txt_player_id", None),
+            getattr(self, "btn_save_identity", None),
+        ):
+            if widget is not None:
+                widget.setEnabled(not locked)
 
-        When cloud sync is enabled (button is ON), runs an async uniqueness check
-        first and shows a blocking popup dialog on conflict — the save is blocked
-        until resolved.  On success a confirmation popup is shown.
-        When cloud sync is disabled, saves immediately and shows a confirmation popup.
+    def _on_save_player_identity(self):
+        """Validate the Player Name and Player ID, run a cloud uniqueness check,
+        and — if everything passes — save both fields, enable Cloud Sync, and lock
+        the fields so the user cannot change them while Cloud Sync is active.
         """
         new_name = self.txt_player_name.text().strip()
         new_id = self.txt_player_id.text().strip()
 
-        cloud_on = (
-            getattr(self, "chk_cloud_enabled", None) is not None
-            and self.chk_cloud_enabled.isChecked()
-            and bool(self.cfg.CLOUD_URL)
-        )
+        name_invalid = not new_name or new_name.lower() == "player"
+        id_invalid = not new_id or len(new_id) != 4
 
-        if not cloud_on:
-            self._save_player_name(new_name)
-            self._save_player_id(new_id)
-            self._validated_player_name = new_name
-            self._validated_player_id = new_id
-            self._msgbox_topmost("info", "✅ Player Name saved!", "✅ Player Name saved!")
+        # Both name and ID are invalid
+        if name_invalid and id_invalid:
+            self._msgbox_topmost(
+                "warn",
+                "⛔ Invalid Player Profile",
+                "Please enter a valid display name and a valid 4-character Player ID before enabling Cloud Sync.",
+            )
             return
 
+        # Name is invalid
+        if name_invalid:
+            self._msgbox_topmost(
+                "warn",
+                "⛔ Invalid Player Name",
+                "Please enter a valid display name. The default name 'Player' is not allowed.",
+            )
+            return
+
+        # Player ID is invalid
+        if id_invalid:
+            self._msgbox_topmost(
+                "warn",
+                "⛔ Invalid Player ID",
+                "Please enter a valid 4-character Player ID.",
+            )
+            return
+
+        # Both locally valid — run cloud uniqueness check asynchronously
         def _check():
             cfg_snap = copy.copy(self.cfg)
             cfg_snap.CLOUD_ENABLED = True
@@ -4317,28 +4363,47 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         threading.Thread(target=_check, daemon=True).start()
 
     def _handle_save_identity_result(self, result: dict, new_name: str, new_id: str):
-        """Called on the main thread after the async identity validation for save completes.
+        """Called on the main thread after the async identity validation completes.
 
-        On success: persists both fields, updates the validated-identity cache, and
-        shows a confirmation popup.
-        On conflict: shows a warning popup — fields are left unchanged so the user
-        can correct them and click Save again.
+        On success: persists both fields, enables Cloud Sync, locks the identity
+        fields, and shows a confirmation popup.
+        On conflict: shows a warning popup — fields stay unlocked so the user can
+        correct them and click Save again.
         """
         if result.get("ok"):
             self._save_player_name(new_name)
             self._save_player_id(new_id)
             self._validated_player_name = new_name
             self._validated_player_id = new_id
-            self._msgbox_topmost("info", "✅ Player Name saved!", "✅ Player Name saved!")
+            # Enable Cloud Sync automatically
+            self.chk_cloud_enabled.blockSignals(True)
+            self.chk_cloud_enabled.setChecked(True)
+            self.chk_cloud_enabled.blockSignals(False)
+            self.cfg.CLOUD_ENABLED = True
+            self.cfg.save()
+            # Show cloud-related widgets
+            if getattr(self, "btn_backup_cloud", None):
+                self.btn_backup_cloud.setVisible(True)
+            if getattr(self, "btn_restore_cloud", None):
+                self.btn_restore_cloud.setVisible(True)
+            if getattr(self, "chk_cloud_backup", None):
+                self.chk_cloud_backup.setVisible(True)
+            # Lock the identity fields so they cannot be edited while Cloud Sync is on
+            self._lock_player_identity_fields(True)
+            self._msgbox_topmost(
+                "info",
+                "✅ Player Profile saved!",
+                "Your player profile has been saved and Cloud Sync has been enabled.",
+            )
             return
 
         reason = result.get("reason", "")
         if reason == "id_conflict":
             title = "⛔ Player ID already taken!"
-            msg = "⛔ Player ID already taken!"
+            msg = "This Player ID is already registered to another player. Please choose a different 4-character ID."
         elif reason == "name_conflict":
             title = "⛔ Player Name already taken!"
-            msg = "⛔ Player Name already taken!"
+            msg = "This display name is already in use by another player. Please choose a different name."
         else:
             title = "⛔ Identity Conflict"
             msg = result.get("msg", "Identity conflict detected.")
