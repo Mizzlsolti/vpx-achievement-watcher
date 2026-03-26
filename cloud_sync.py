@@ -12,7 +12,7 @@ from config import (
     f_achievements_state, f_vps_mapping, f_progress_upload_log,
     f_legacy_cleanup_marker,
     _load_progress_upload_log, _save_progress_upload_log,
-    compute_rarity, WATCHER_VERSION,
+    compute_rarity, WATCHER_VERSION, ensure_dir,
 )
 try:
     import requests
