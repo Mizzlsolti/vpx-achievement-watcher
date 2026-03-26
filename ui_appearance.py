@@ -5,11 +5,12 @@ import os
 import threading
 
 from PyQt6.QtCore import Qt, QRect, QTimer
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFontComboBox, QFrame, QGridLayout,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton,
-    QScrollArea, QSlider, QSpinBox, QTabWidget, QTableWidget, QVBoxLayout,
-    QWidget,
+    QScrollArea, QSlider, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 try:
@@ -26,7 +27,7 @@ from ui_overlay import (
     StatusOverlay, TimerPositionPicker, ToastPositionPicker,
 )
 from theme import DEFAULT_THEME, generate_stylesheet, get_theme, get_theme_color, list_themes
-from watcher_core import ensure_dir, log, vk_to_name_en
+from watcher_core import ensure_dir, log, sanitize_filename, vk_to_name_en
 import sound
 
 

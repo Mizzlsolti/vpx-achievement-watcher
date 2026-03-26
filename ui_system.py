@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import os
 import subprocess
 import threading
@@ -13,8 +14,8 @@ from PyQt6.QtWidgets import (
 )
 
 from watcher_core import (
-    APP_DIR, CloudSync, ensure_dir, log, resource_path, secure_load_json,
-    secure_save_json,
+    APP_DIR, CloudSync, ensure_dir, log, resource_path, sanitize_filename,
+    secure_load_json, secure_save_json,
 )
 from ui_dialogs import FeedbackDialog
 
