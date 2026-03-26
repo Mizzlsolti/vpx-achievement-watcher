@@ -1556,25 +1556,39 @@ class CloudSync:
 
     @staticmethod
     def validate_player_identity(cfg: AppConfig, player_id: str, player_name: str) -> dict:
-        """Check whether player_id and player_name are unique in the cloud.
+        """Check whether player_id and player_name are valid and unique in the cloud.
 
         Returns ``{"ok": True}`` when the identity is valid, or
-        ``{"ok": False, "reason": "id_conflict"|"name_conflict", "msg": "..."}``
-        when a conflict is detected.
+        ``{"ok": False, "reason": "name_reserved"|"id_conflict"|"name_conflict", "msg": "..."}``
+        when validation fails.
 
         Scenarios:
+        - Name is "Player" or "player" (case-insensitive) → name_reserved (always, even when cloud is off)
         - ID new + Name new → ok
         - ID exists + stored name matches entered name → ok (Cloud Restore)
         - ID exists + stored name does NOT match → id_conflict
         - Name already used by a different ID → name_conflict
+        - Cloud URL missing or cloud disabled → server checks skipped (ok), but name_reserved still checked
         """
-        if not cfg.CLOUD_URL or not cfg.CLOUD_ENABLED:
-            return {"ok": True}
-
         player_id = (player_id or "").strip()
         player_name = (player_name or "").strip()
 
-        if not player_id or not player_name or player_name.lower() == "player":
+        # Always block the reserved default name, regardless of cloud state.
+        if player_name.lower() == "player":
+            return {
+                "ok": False,
+                "reason": "name_reserved",
+                "msg": (
+                    "⛔ Reserved Name — The name 'Player' cannot be used. "
+                    "Please choose a different name."
+                ),
+            }
+
+        if not player_id or not player_name:
+            return {"ok": True}
+
+        # Server-side checks require a reachable cloud and cloud sync enabled.
+        if not cfg.CLOUD_URL or not cfg.CLOUD_ENABLED:
             return {"ok": True}
 
         existing_ids = CloudSync.fetch_player_ids(cfg)
