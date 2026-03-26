@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
                           QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
-                          QThread, QUrl, QStringListModel)
+                          QThread, QUrl, QStringListModel, QMetaObject, Q_ARG)
 from PyQt6.QtGui import (QIcon, QColor, QFont, QTransform, QPixmap,
                          QPainter, QImage, QPen)
 
@@ -4231,12 +4231,25 @@ class MainWindow(QMainWindow, CloudStatsMixin):
                     )
                 return
 
-            # Both locally valid — run cloud uniqueness check asynchronously
+            # Both locally valid — run cloud uniqueness check asynchronously.
+            # Use QMetaObject.invokeMethod (QueuedConnection) to safely deliver the
+            # result from the background thread back to the GUI thread.
             def _check():
-                cfg_snap = copy.copy(self.cfg)
-                cfg_snap.CLOUD_ENABLED = True
-                result = CloudSync.validate_player_identity(cfg_snap, pid, pname)
-                QTimer.singleShot(0, lambda: self._handle_cloud_sync_enable_result(result, pname, pid))
+                try:
+                    cfg_snap = copy.copy(self.cfg)
+                    cfg_snap.CLOUD_ENABLED = True
+                    result = CloudSync.validate_player_identity(cfg_snap, pid, pname)
+                except Exception as _exc:
+                    result = {"ok": False, "reason": "error", "msg": f"⛔ Cloud check failed: {_exc}"}
+                QMetaObject.invokeMethod(
+                    self, "_on_cloud_validate_done",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(bool, bool(result.get("ok", False))),
+                    Q_ARG(str, str(result.get("reason", ""))),
+                    Q_ARG(str, str(result.get("msg", ""))),
+                    Q_ARG(str, pname),
+                    Q_ARG(str, pid),
+                )
 
             threading.Thread(target=_check, daemon=True).start()
             return
@@ -4256,6 +4269,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             self.chk_cloud_backup.setChecked(False)
             self.cfg.CLOUD_BACKUP_ENABLED = False
             self.cfg.save()
+
+    @pyqtSlot(bool, str, str, str, str)
+    def _on_cloud_validate_done(self, ok: bool, reason: str, msg: str, new_name: str, new_id: str):
+        """Slot invoked on the GUI thread after the background cloud-identity check finishes."""
+        self._handle_cloud_sync_enable_result({"ok": ok, "reason": reason, "msg": msg}, new_name, new_id)
 
     def _handle_cloud_sync_enable_result(self, result: dict, new_name: str, new_id: str):
         """Called on the main thread after the async cloud identity validation completes.
