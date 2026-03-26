@@ -1,0 +1,835 @@
+{
+  "rules": [
+    {
+      "title": "dh_lx2 – Play 5 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 300
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Play 10 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 600
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Play 15 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 900
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Play 20 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1200
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Play 30 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1800
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Play 45 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 2700
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BUY-IN EX. BALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BUY-IN EX. BALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BUY-IN EX. BALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BUY-IN EX. BALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MULTIBALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIBALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MULTIBALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIBALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – GAME BALL SAVES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GAME BALL SAVES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – GAME BALL SAVES: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GAME BALL SAVES",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MODES STARTED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MODES STARTED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MODES STARTED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MODES STARTED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CHIEFS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHIEFS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CHIEFS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHIEFS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – PLAYFIELD PROMO: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PLAYFIELD PROMO",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – PLAYFIELD PROMO: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PLAYFIELD PROMO",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CHAMP CREDITS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHAMP CREDITS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CHAMP CREDITS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHAMP CREDITS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BALL SEARCHES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL SEARCHES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BALL SEARCHES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL SEARCHES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – 5 BALL SEARCHES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "5 BALL SEARCHES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – 5 BALL SEARCHES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "5 BALL SEARCHES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MAGAZINE EX BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MAGAZINE EX BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – MAGAZINE EX BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MAGAZINE EX BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – FL LUCKY EX BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "FL LUCKY EX BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – FL LUCKY EX BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "FL LUCKY EX BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SAFEHSE EX BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SAFEHSE EX BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SAFEHSE EX BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SAFEHSE EX BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CONTRA EX BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CONTRA EX BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CONTRA EX BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CONTRA EX BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LEFT RAMPS MADE: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT RAMPS MADE",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LEFT RAMPS MADE: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT RAMPS MADE",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RIGHT RAMPS MADE: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT RAMPS MADE",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RIGHT RAMPS MADE: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT RAMPS MADE",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SAFEHOUSE AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SAFEHOUSE AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SAFEHOUSE AWARDS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SAFEHOUSE AWARDS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LEFT LOOPS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LOOPS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LEFT LOOPS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LOOPS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RIGHT LOOPS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LOOPS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RIGHT LOOPS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LOOPS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RANSOMS MADE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RANSOMS MADE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RANSOMS MADE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RANSOMS MADE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RICOCHETS MADE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RICOCHETS MADE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – RICOCHETS MADE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RICOCHETS MADE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SUPER JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SUPER JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – 0 JACKPOT MBALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "0 JACKPOT MBALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – 0 JACKPOT MBALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "0 JACKPOT MBALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – WAREHOUSE MBALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WAREHOUSE MBALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – WAREHOUSE MBALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WAREHOUSE MBALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – WAREHOUSE JPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WAREHOUSE JPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – WAREHOUSE JPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WAREHOUSE JPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – ALCATRAZ: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALCATRAZ",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – ALCATRAZ: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALCATRAZ",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – ALCATRAZ JPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALCATRAZ JPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – ALCATRAZ JPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALCATRAZ JPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – OFFICERS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OFFICERS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – OFFICERS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OFFICERS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SERGEANTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SERGEANTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SERGEANTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SERGEANTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – DETECTIVES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DETECTIVES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – DETECTIVES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DETECTIVES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LIEUTENANTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LIEUTENANTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – LIEUTENANTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LIEUTENANTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CAPTAINS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CAPTAINS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – CAPTAINS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CAPTAINS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BANK RBR HUP HIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BANK RBR HUP HIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – BANK RBR HUP HIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BANK RBR HUP HIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SUPER LOOPS HIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER LOOPS HIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SUPER LOOPS HIT: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER LOOPS HIT",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 1: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 1",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 1: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 1",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 2: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 2",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 2: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 2",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 3: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 3",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SKILL CHOICE 3: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL CHOICE 3",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SHOOTOUTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SHOOTOUTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SHOOTOUTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SHOOTOUTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SPECIAL MODES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SPECIAL MODES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – SPECIAL MODES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SPECIAL MODES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Extra Balls: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – Extra Balls: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – TOTAL PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – TOTAL PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – EXTRA BALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – EXTRA BALLS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – TOTAL FREE PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – TOTAL FREE PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "dh_lx2 – REPLAY AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "REPLAY AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    }
+  ]
+}

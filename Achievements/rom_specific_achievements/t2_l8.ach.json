@@ -1,0 +1,817 @@
+{
+  "rules": [
+    {
+      "title": "t2_l8 – Play 5 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 300
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Play 10 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 600
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Play 15 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 900
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Play 20 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1200
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Play 30 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1800
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Play 45 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 2700
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SKILL SHOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL SHOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SKILL SHOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SKILL SHOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SECURITY LEVELS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SECURITY LEVELS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SECURITY LEVELS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SECURITY LEVELS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – PAYBACK TIMES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PAYBACK TIMES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – PAYBACK TIMES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PAYBACK TIMES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – PAYBACK AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PAYBACK AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – PAYBACK AWARDS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PAYBACK AWARDS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – DATABASES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DATABASES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – DATABASES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DATABASES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOP 5 MIL.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOP 5 MIL.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOP 5 MIL.: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOP 5 MIL.",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOP COMBO: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOP COMBO",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOP COMBO: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOP COMBO",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOPS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOPS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CHASE LOOPS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHASE LOOPS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – RAMP COMBOS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAMP COMBOS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – RAMP COMBOS: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAMP COMBOS",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIPLIERS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIPLIERS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIPLIERS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIPLIERS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIPLIER MAXED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIPLIER MAXED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIPLIER MAXED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIPLIER MAXED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – AUTOFIRE SAVES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "AUTOFIRE SAVES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – AUTOFIRE SAVES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "AUTOFIRE SAVES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL AUTOFIRES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL AUTOFIRES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL AUTOFIRES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL AUTOFIRES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 1X JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "1X JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 1X JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "1X JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 2X JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "2X JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 2X JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "2X JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 3X JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3X JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 3X JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3X JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SUPER JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – SUPER JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 10 MILLIONS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "10 MILLIONS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – 10 MILLIONS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "10 MILLIONS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – BONUS HELD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS HELD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – BONUS HELD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS HELD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UP LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UP LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UP LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UP LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UPS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UPS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UPS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UPS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UP AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UP AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – HURRY UP AWARDS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HURRY UP AWARDS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – ADV. ESCAPE ROUTE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ADV. ESCAPE ROUTE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – ADV. ESCAPE ROUTE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ADV. ESCAPE ROUTE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – ESCAPE ROUTES: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ESCAPE ROUTES",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – ESCAPE ROUTES: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ESCAPE ROUTES",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – KICKBACK RELIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "KICKBACK RELIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – KICKBACK RELIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "KICKBACK RELIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – KICKBACKS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "KICKBACKS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – KICKBACKS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "KICKBACKS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIBALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIBALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – MULTIBALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MULTIBALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – POPPER SHOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "POPPER SHOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – POPPER SHOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "POPPER SHOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – GUN LOADED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GUN LOADED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – GUN LOADED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GUN LOADED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – GUN HITS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GUN HITS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – GUN HITS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GUN HITS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – LIT CONSOL. BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LIT CONSOL. BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – LIT CONSOL. BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LIT CONSOL. BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CONSOLATION BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CONSOLATION BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – CONSOLATION BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CONSOLATION BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE END: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE END",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – VIDEO MODE END: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "VIDEO MODE END",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE EX. BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE EX. BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE EX. BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE EX. BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE HURRY UP: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE HURRY UP",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE HURRY UP: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE HURRY UP",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE VIDEO MODE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE VIDEO MODE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – D.BASE VIDEO MODE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "D.BASE VIDEO MODE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Extra Balls: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – Extra Balls: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – EXTRA BALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – EXTRA BALLS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL FREE PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – TOTAL FREE PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "t2_l8 – REPLAY AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "REPLAY AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    }
+  ]
+}

@@ -1,0 +1,1735 @@
+{
+  "rules": [
+    {
+      "title": "ij_l7 – Play 5 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 300
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Play 10 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 600
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Play 15 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 900
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Play 20 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1200
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Play 30 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 1800
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Play 45 Minutes",
+      "condition": {
+        "type": "session_time",
+        "min_seconds": 2700
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MODE STARTED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MODE STARTED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MODE STARTED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MODE STARTED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ALL MODES LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALL MODES LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ALL MODES LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ALL MODES LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GET IDOL FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GET IDOL FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO FIND: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO FIND",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO FIND: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO FIND",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO GUN TR.: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO GUN TR.",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO GUN TR.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO GUN TR.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO GUN EJ.: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO GUN EJ.",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ST. CARIO GUN EJ.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ST. CARIO GUN EJ.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – WELL SOUL START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WELL SOUL START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – WELL SOUL START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WELL SOUL START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – WELL SOUL AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WELL SOUL AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – WELL SOUL AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "WELL SOUL AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RAVEN BAR FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RAVEN BAR FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MNKY. BRAIN START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MNKY. BRAIN START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MNKY. BRAIN START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MNKY. BRAIN START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MNKY. BRAIN AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MNKY. BRAIN AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MNKY. BRAIN AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MNKY. BRAIN AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STNE. START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STNE. START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STNE. START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STNE. START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STONES PATH ENT.: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STONES PATH ENT.",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STONES PATH ENT.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STONES PATH ENT.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STNE. AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STNE. AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STNE. AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STNE. AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STN. FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STN. FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STEAL STN. FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STEAL STN. FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – MINE CART FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "MINE CART FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDGE. START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDGE. START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDGE. START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDGE. START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDGE. AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDGE. AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDGE. AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDGE. AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDG. FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDG. FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ROPE BRDG. FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ROPE BRDG. FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GRN. START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GRN. START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GRN. START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GRN. START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GRN. AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GRN. AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GRN. AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GRN. AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GR. FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GR. FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CASTLE GR. FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CASTLE GR. FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHASE START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHASE START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHASE START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHASE START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHASE AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHASE AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHASE AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHASE AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHSE. FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHSE. FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TANK CHSE. FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TANK CHSE. FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHAL. PATH ENT.: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHAL. PATH ENT.",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHAL. PATH ENT.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHAL. PATH ENT.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. FINISH: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. FINISH",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 CHALL. FINISH: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 CHALL. FINISH",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CHOSE WISE START: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHOSE WISE START",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CHOSE WISE START: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHOSE WISE START",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CHOOSE WISE WIN: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHOOSE WISE WIN",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – CHOOSE WISE WIN: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "CHOOSE WISE WIN",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BALL 1 LOCKED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL 1 LOCKED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BALL 1 LOCKED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL 1 LOCKED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BALL 2 LOCKED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL 2 LOCKED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BALL 2 LOCKED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BALL 2 LOCKED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3BALL MULTI: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3BALL MULTI",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3BALL MULTI: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3BALL MULTI",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL JK. LIT RAMP: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL JK. LIT RAMP",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL JK. LIT RAMP: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL JK. LIT RAMP",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOL JK. LIT CNTER.: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOL JK. LIT CNTER.",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOL JK. LIT CNTER.: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOL JK. LIT CNTER.",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ARK JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ARK JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ARK JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ARK JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STONE JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STONE JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – STONE JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "STONE JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GRAIL JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GRAIL JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – GRAIL JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "GRAIL JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – SUPER JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – SUPER JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 2X JKPT. LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 2X JKPT. LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 2X JKPT. LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 2X JKPT. LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 2X JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 2X JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 2X JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 2X JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3X JKPT. LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3X JKPT. LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3X JKPT. LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3X JKPT. LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3X JACKPOT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3X JACKPOT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL 3X JACKPOT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL 3X JACKPOT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTEM MULTI LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTEM MULTI LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTEM MULTI LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTEM MULTI LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTEM 2B. MULTI: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTEM 2B. MULTI",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTEM 2B. MULTI: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTEM 2B. MULTI",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOST TREASURE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOST TREASURE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOST TREASURE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOST TREASURE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH OF ADV. LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH OF ADV. LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH OF ADV. LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH OF ADV. LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH ADV. RELIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH ADV. RELIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH ADV. RELIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH ADV. RELIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH ENTERED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH ENTERED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH ENTERED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH ENTERED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH CONT ENTER: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH CONT ENTER",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH CONT ENTER: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH CONT ENTER",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH COMPLETED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH COMPLETED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH COMPLETED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH COMPLETED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT BIGGER: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT BIGGER",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT BIGGER: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT BIGGER",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH PIT AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH PIT AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH EX. BALL LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH EX. BALL LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH EX. BALL LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH EX. BALL LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH EXTRA BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH EXTRA BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – PATH EXTRA BALL: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "PATH EXTRA BALL",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – HAND OF FATE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HAND OF FATE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – HAND OF FATE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "HAND OF FATE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOGFIGHT LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOGFIGHT LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOGFIGHT LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOGFIGHT LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOGFIGHT AWARD: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOGFIGHT AWARD",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – DOGFIGHT AWARD: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "DOGFIGHT AWARD",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RIGHT LIT LOOP: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LIT LOOP",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RIGHT LIT LOOP: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LIT LOOP",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LEFT LIT LOOP: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LIT LOOP",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LEFT LIT LOOP: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LIT LOOP",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RIGHT LIT RAMP: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LIT RAMP",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – RIGHT LIT RAMP: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "RIGHT LIT RAMP",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LEFT LIT RAMP: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LIT RAMP",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LEFT LIT RAMP: 10",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LEFT LIT RAMP",
+        "min": 10
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – SUPER JETS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JETS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – SUPER JETS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "SUPER JETS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – NARROW ESCAPE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "NARROW ESCAPE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – NARROW ESCAPE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "NARROW ESCAPE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL SNEAK IN: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL SNEAK IN",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – IDOL SNEAK IN: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "IDOL SNEAK IN",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ETERNAL LIFE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ETERNAL LIFE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – ETERNAL LIFE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "ETERNAL LIFE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 2 BALL ETRN. LIFE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "2 BALL ETRN. LIFE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 2 BALL ETRN. LIFE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "2 BALL ETRN. LIFE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 BALL ETRN. LIFE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 BALL ETRN. LIFE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – 3 BALL ETRN. LIFE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "3 BALL ETRN. LIFE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 2X: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 2X",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 2X: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 2X",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 4X: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 4X",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 4X: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 4X",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 6X: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 6X",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS 6X: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS 6X",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BON. 8X/LT. EX.BALL: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BON. 8X/LT. EX.BALL",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BON. 8X/LT. EX.BALL: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BON. 8X/LT. EX.BALL",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS X MAXED: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS X MAXED",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BONUS X MAXED: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BONUS X MAXED",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOOP JACKPOT LIT: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOOP JACKPOT LIT",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOOP JACKPOT LIT: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOOP JACKPOT LIT",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOOP JACKPOTS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOOP JACKPOTS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – LOOP JACKPOTS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "LOOP JACKPOTS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BUY-IN EX. BALLS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BUY-IN EX. BALLS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – BUY-IN EX. BALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "BUY-IN EX. BALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – N PLAYER BUY-IN: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "N PLAYER BUY-IN",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – N PLAYER BUY-IN: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "N PLAYER BUY-IN",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – OUTLANE TRG. SAVE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OUTLANE TRG. SAVE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – OUTLANE TRG. SAVE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OUTLANE TRG. SAVE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – OUTLNE IDOL SAVE: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OUTLNE IDOL SAVE",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – OUTLNE IDOL SAVE: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "OUTLNE IDOL SAVE",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Extra Balls: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – Extra Balls: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "Extra Balls",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTAL PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTAL PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – EXTRA BALLS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – EXTRA BALLS: 5",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "EXTRA BALLS",
+        "min": 5
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTAL FREE PLAYS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 1
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – TOTAL FREE PLAYS: 3",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "TOTAL FREE PLAYS",
+        "min": 3
+      },
+      "scope": "session"
+    },
+    {
+      "title": "ij_l7 – REPLAY AWARDS: 1",
+      "condition": {
+        "type": "nvram_delta",
+        "field": "REPLAY AWARDS",
+        "min": 1
+      },
+      "scope": "session"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "rom": "twenty4_150",
+  "table": "(ROM only: twenty4_150)",
+  "duration_sec": 38,
+  "best_ball": null,
+  "players": [
+    {
+      "player": 1,
+      "playtime_sec": 38,
+      "deltas": {},
+      "events": {}
+    }
+  ],
+  "end_audits": {},
+  "global_deltas": {},
+  "end_timestamp": "2026-03-26T16:30:08.964147+00:00",
+  "score": null,
+  "_signature": "ff19bf7a694a25749cfeb1fb98815eb4c05b7e8af0f5b12cffbbb63d60425836"
+}
