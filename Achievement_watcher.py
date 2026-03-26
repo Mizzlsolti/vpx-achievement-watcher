@@ -4309,10 +4309,15 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             return
 
         def _check():
-            cfg_snap = copy.copy(self.cfg)
-            cfg_snap.CLOUD_ENABLED = True
-            result = CloudSync.validate_player_identity(cfg_snap, new_id, new_name)
-            QTimer.singleShot(0, lambda: self._handle_save_identity_result(result, new_name, new_id))
+            try:
+                cfg_snap = copy.copy(self.cfg)
+                cfg_snap.CLOUD_ENABLED = True
+                result = CloudSync.validate_player_identity(cfg_snap, new_id, new_name)
+            except Exception as exc:
+                log(self.cfg, f"[UI] validate_player_identity failed (saving anyway): {exc}", "WARN")
+                # Cloud errors/timeouts must not block local saves; treat as ok per spec.
+                result = {"ok": True}
+            QTimer.singleShot(0, lambda r=result: self._handle_save_identity_result(r, new_name, new_id))
 
         threading.Thread(target=_check, daemon=True).start()
 
@@ -4335,13 +4340,11 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         reason = result.get("reason", "")
         if reason == "id_conflict":
             title = "⛔ Player ID already taken!"
-            msg = "⛔ Player ID already taken!"
         elif reason == "name_conflict":
             title = "⛔ Player Name already taken!"
-            msg = "⛔ Player Name already taken!"
         else:
             title = "⛔ Identity Conflict"
-            msg = result.get("msg", "Identity conflict detected.")
+        msg = result.get("msg", "Identity conflict detected.")
         self._msgbox_topmost("warn", title, msg)
 
     def _restore_achievements_from_cloud(self):
