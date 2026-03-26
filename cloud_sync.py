@@ -1,5 +1,7 @@
 from __future__ import annotations
 from typing import Optional
+import os
+import ssl
 import threading
 import json
 import time
@@ -8,6 +10,7 @@ from datetime import datetime, timezone
 from config import (
     AppConfig, log, load_json, save_json, secure_load_json,
     f_achievements_state, f_vps_mapping, f_progress_upload_log,
+    f_legacy_cleanup_marker,
     _load_progress_upload_log, _save_progress_upload_log,
     compute_rarity, WATCHER_VERSION,
 )

@@ -14,7 +14,7 @@ from config import (
     p_local_maps, p_maps, p_achievements, ensure_dir,
     is_excluded_field, MANUFACTURER_EMOJI, TABLE_EMOJI_KEYWORDS,
     BADGE_LOOKUP, evaluate_badges, compute_rarity,
-    RARITY_TIERS, sanitize_filename, write_text,
+    RARITY_TIERS, sanitize_filename, write_text, run_vpxtool_get_rom,
 )
 from cloud_sync import CloudSync
 
