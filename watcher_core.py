@@ -6571,14 +6571,15 @@ class Watcher:
                             self._last_logged_rom = rom
                     except Exception:
                         pass
+                else:
+                    try:
+                        log(self.cfg, f"[ROM] vpxtool failed for table '{vpx_filename}'", "WARN")
+                    except Exception:
+                        pass
 
         clean_table = table_fragment[:-4] if table_fragment.lower().endswith(".vpx") else table_fragment
 
         if not rom:
-            try:
-                log(self.cfg, f"[ROM] vpxtool failed for table '{vpx_filename}'", "WARN")
-            except Exception:
-                pass
             return None
 
         return {"table": clean_table, "rom": rom, "vpx_file": vpx_path or ""}
