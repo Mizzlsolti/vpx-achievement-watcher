@@ -57,6 +57,7 @@ from ui_dialogs import SetupWizardDialog, FeedbackDialog
 from tutorial import TutorialWizardDialog
 from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
 from ui_cloud_stats import CloudStatsMixin
+from aweditor import AWEditorMixin
 
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog, CloudProgressVpsInfoDialog,
@@ -394,7 +395,7 @@ class AchievementBeatenDialog(QDialog):
             layout.addWidget(lbl_card)
 
 
-class MainWindow(QMainWindow, CloudStatsMixin):
+class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
     CURRENT_VERSION = "2.7"
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
     _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
@@ -459,6 +460,7 @@ class MainWindow(QMainWindow, CloudStatsMixin):
         self._build_tab_available_maps()   
         self._build_tab_cloud() 
         self._build_tab_system()
+        self._build_tab_aweditor()
 
         self.register_flip_counter_handlers()
         self.register_heat_bar_handlers()
@@ -2153,6 +2155,62 @@ class MainWindow(QMainWindow, CloudStatsMixin):
             "across all players.<br>"
             "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
             "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest challenge results."
+        ),
+        "aweditor": (
+            "<b>🎯 AWEditor – Custom Achievement System for Non-ROM Tables</b><br><br>"
+            "<b>OVERVIEW</b><br>"
+            "The AWEditor lets you create custom achievements for tables that don't use VPinMAME ROMs "
+            "(Non-ROM or Original tables). Since these tables have no NVRAM data, achievements are "
+            "triggered via a file-drop mechanism: the table's VBScript writes a small trigger file, "
+            "and the Achievement Watcher detects it instantly.<br><br>"
+
+            "<b>Step 1 – SELECT A TABLE</b><br>"
+            "Use the dropdown to select a .vpx table. Only tables WITHOUT an NVRAM map are shown. "
+            "Click 🔄 to re-scan your Tables directory.<br><br>"
+
+            "<b>Step 2 – ANALYZE THE TABLE SCRIPT</b><br>"
+            "Click '🔍 Analyze Script' to read the table's VBScript. The editor uses vpxtool to "
+            "extract the script and scans for common game events: Multiball, Jackpot, Wizard Mode, "
+            "Extra Ball, Mission, Ramp/Loop combos, and more. Detected events appear with their "
+            "Sub name and line number.<br><br>"
+
+            "<b>Step 3 – SELECT EVENTS AS ACHIEVEMENTS</b><br>"
+            "Check the box next to any detected event you want to turn into an achievement. "
+            "Each checked event becomes an achievement with an auto-generated title.<br><br>"
+
+            "<b>Step 4 – ADD CUSTOM ACHIEVEMENTS (OPTIONAL)</b><br>"
+            "Click [+ Add Achievement] to create your own. Fill in:<br>"
+            "• <b>Title</b>: The name shown in the toast notification (e.g. 'Ramp Combo King')<br>"
+            "• <b>Description</b>: A short text explaining what to do<br>"
+            "• <b>Event Name</b>: A unique identifier, no spaces, lowercase only (e.g. 'ramp_combo_5x')<br><br>"
+
+            "<b>Step 5 – EXPORT</b><br>"
+            "Click [💾 Export VBS + JSON] to generate two files in tools/AWeditor/:<br>"
+            "• <b>aw_{TableName}.vbs</b> – VBScript with the FireAchievement Sub<br>"
+            "• <b>{TableName}.custom.json</b> – Achievement rule definitions<br><br>"
+
+            "<b>INSTALLATION</b><br>"
+            "1. Copy aw_{TableName}.vbs next to your .vpx file.<br>"
+            "2. Open the table in VPX Editor (File → Open).<br>"
+            "3. Open Script Editor (View → Script or F12).<br>"
+            "4. Add near the top: <code>LoadScript \"aw_YourTableName.vbs\"</code><br>"
+            "5. Find the Subs for each event and add: <code>FireAchievement \"your_event_name\"</code><br><br>"
+
+            "<b>⚠️ IMPORTANT – DO NOT name the .vbs file the same as the table!</b><br>"
+            "If 'MyTable.vbs' exists next to 'MyTable.vpx', VPX REPLACES the entire table script "
+            "and breaks the table. The 'aw_' prefix prevents this conflict.<br><br>"
+
+            "<b>HOW THE TRIGGER MECHANISM WORKS</b><br>"
+            "1. During gameplay, FireAchievement \"multiball\" is called.<br>"
+            "2. It writes 'multiball.trigger' into the AWEditor/custom_events/ folder using "
+            "the standard Windows Scripting.FileSystemObject (no external DLLs needed).<br>"
+            "3. The Achievement Watcher detects the file, matches it against your .custom.json rules, "
+            "shows a toast 🏆, and deletes the trigger file automatically.<br><br>"
+
+            "<b>FILE LOCATIONS</b><br>"
+            "• Generated scripts &amp; JSON: {BASE}/tools/AWeditor/<br>"
+            "• Trigger files: {BASE}/tools/AWeditor/custom_events/<br>"
+            "• Copy the aw_*.vbs to: Your Tables directory (next to .vpx)"
         ),
     }
 
