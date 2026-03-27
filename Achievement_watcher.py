@@ -1964,9 +1964,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         theme_id = (self.cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
         app.setStyleSheet(generate_stylesheet(theme_id))
 
-        self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
-        self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
-        self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
+        self._style(getattr(self, "btn_minimize", None), "QPushButton { background-color:#005c99; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
+        self._style(getattr(self, "btn_quit", None), "QPushButton { background-color:#8a2525; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
+        self._style(getattr(self, "btn_restart", None), "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
 
     def _on_apply_theme(self):
         theme_id = self.cmb_theme.currentData()
@@ -1976,9 +1976,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.cfg.save()
         app = QApplication.instance()
         app.setStyleSheet(generate_stylesheet(theme_id))
-        self._style(getattr(self, "btn_minimize", None), "background:#005c99; color:white; border:none;")
-        self._style(getattr(self, "btn_quit", None), "background:#8a2525; color:white; border:none;")
-        self._style(getattr(self, "btn_restart", None), "background:#008040; color:white; border:none;")
+        self._style(getattr(self, "btn_minimize", None), "QPushButton { background-color:#005c99; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
+        self._style(getattr(self, "btn_quit", None), "QPushButton { background-color:#8a2525; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
+        self._style(getattr(self, "btn_restart", None), "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._update_theme_preview(theme_id)
 
     def _on_theme_combo_changed(self, _index: int):
@@ -2344,9 +2344,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         btn_notif_clear = QPushButton("🗑️ Clear All")
         btn_notif_clear.setFixedHeight(22)
         btn_notif_clear.setStyleSheet(
-            "QPushButton { background: #3a1a1a; color: #CC4444; border: 1px solid #5a2a2a; "
+            "QPushButton { background-color: #3a1a1a; color: #CC4444; border: 1px solid #5a2a2a; "
             "border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
-            "QPushButton:hover { background: #5a2a2a; }"
+            "QPushButton:hover { background-color: #5a2a2a; }"
         )
         btn_notif_clear.clicked.connect(self._on_notif_clear_all)
         row_notif_header.addWidget(btn_notif_clear)
