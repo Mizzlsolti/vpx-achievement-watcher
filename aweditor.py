@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import threading  # noqa: F401 – available for subclasses
+from datetime import datetime
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -208,11 +209,17 @@ class AWEditorMixin:
             "QComboBox::drop-down { border:0; }"
             "QComboBox QAbstractItemView { background:#222; color:#E0E0E0; selection-background-color:#444; }"
         )
+        self._aw_cmb_tables.setToolTip(
+            "Select a table without a ROM / NVRAM map to create custom achievements for"
+        )
         row_table.addWidget(self._aw_cmb_tables, stretch=1)
 
         self._aw_btn_scan = QPushButton("🔄 Scan")
         self._aw_btn_scan.setFixedWidth(80)
         self._aw_btn_scan.setStyleSheet(self._aw_btn_style())
+        self._aw_btn_scan.setToolTip(
+            "Rescan the Tables directory for .vpx files without a ROM or NVRAM map (refreshes cache)"
+        )
         self._aw_btn_scan.clicked.connect(self._aw_scan_tables)
         row_table.addWidget(self._aw_btn_scan)
 
@@ -221,6 +228,9 @@ class AWEditorMixin:
         # ── Analyze button ────────────────────────────────────────────────
         self._aw_btn_analyze = QPushButton("🔍 Analyze Script")
         self._aw_btn_analyze.setStyleSheet(self._aw_btn_style())
+        self._aw_btn_analyze.setToolTip(
+            "Extract the VBScript from the selected table and detect common event Subs"
+        )
         self._aw_btn_analyze.clicked.connect(self._aw_analyze_script)
         outer.addWidget(self._aw_btn_analyze)
 
@@ -257,6 +267,9 @@ class AWEditorMixin:
 
         self._aw_btn_add = QPushButton("+ Add Achievement")
         self._aw_btn_add.setStyleSheet(self._aw_btn_style())
+        self._aw_btn_add.setToolTip(
+            "Add a new custom achievement row with title, description and event name"
+        )
         self._aw_btn_add.clicked.connect(self._aw_add_row)
         custom_outer.addWidget(self._aw_btn_add)
 
@@ -293,6 +306,9 @@ class AWEditorMixin:
             " font-weight:bold; border-radius:5px; padding:5px 12px; }}"
             f"QPushButton:hover {{ background:{get_theme_color(self.cfg, 'accent')}; }}"
         )
+        self._aw_btn_export.setToolTip(
+            "Export the VBS trigger script and JSON achievement definitions to the AWEditor folder"
+        )
         self._aw_btn_export.clicked.connect(self._aw_export)
         btn_row.addWidget(self._aw_btn_export)
 
@@ -308,8 +324,8 @@ class AWEditorMixin:
 
         self.main_tabs.addTab(tab, "🎯 AWEditor")
 
-        # Kick off initial scan
-        self._aw_scan_tables()
+        # Load from cache or kick off initial scan
+        self._aw_init_tables()
 
     # ------------------------------------------------------------------
     # Styling helpers
@@ -363,6 +379,61 @@ class AWEditorMixin:
             self._aw_status_lbl.setText("No Non-ROM tables found. Check Tables directory in System tab.")
         self._aw_btn_scan.setEnabled(True)
         self._aw_btn_scan.setText("🔄 Scan")
+        self._aw_save_cache(tables)
+
+    # ------------------------------------------------------------------
+    # Cache helpers
+    # ------------------------------------------------------------------
+
+    def _aw_cache_path(self) -> str:
+        return os.path.join(p_aweditor(self.cfg), "aweditor_scan_cache.json")
+
+    def _aw_load_cache(self) -> list[str] | None:
+        """Return the cached table list if it matches the current tables_dir, else None."""
+        tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
+        try:
+            with open(self._aw_cache_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("tables_dir") == tables_dir and isinstance(data.get("results"), list):
+                return data["results"]
+        except Exception:
+            pass
+        return None
+
+    def _aw_save_cache(self, tables: list[str]) -> None:
+        """Persist scan results to the cache file."""
+        tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
+        path = self._aw_cache_path()
+        try:
+            ensure_dir(os.path.dirname(path))
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "tables_dir": tables_dir,
+                        "results": tables,
+                        "cached_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                    },
+                    f,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+        except Exception:
+            pass
+
+    def _aw_init_tables(self) -> None:
+        """On startup: populate the dropdown from cache if available, else run a full scan."""
+        cached = self._aw_load_cache()
+        if cached is not None:
+            self._aw_cmb_tables.clear()
+            if cached:
+                self._aw_cmb_tables.addItems(cached)
+                self._aw_status_lbl.setText(f"Found {len(cached)} table(s) (cached).")
+            else:
+                self._aw_status_lbl.setText(
+                    "No Non-ROM tables found (cached). Check Tables directory in System tab."
+                )
+        else:
+            self._aw_scan_tables()
 
     # ------------------------------------------------------------------
     # Script analysis
@@ -416,6 +487,7 @@ class AWEditorMixin:
                 chk = QCheckBox()
                 chk.setChecked(default_checked)
                 chk.setStyleSheet("QCheckBox { color:#E0E0E0; }")
+                chk.setToolTip("Check to include this event as an achievement trigger")
                 row_h.addWidget(chk)
 
                 lbl = QLabel(
@@ -460,6 +532,7 @@ class AWEditorMixin:
         ed_title = QLineEdit(title)
         ed_title.setPlaceholderText("e.g. Ramp Combo King")
         ed_title.setStyleSheet(self._aw_lineedit_style())
+        ed_title.setToolTip("Achievement title shown in the toast notification")
         h.addWidget(ed_title, stretch=2)
 
         lbl_d = QLabel("📝 Desc:")
@@ -469,6 +542,7 @@ class AWEditorMixin:
         ed_desc = QLineEdit(desc)
         ed_desc.setPlaceholderText("e.g. Hit 5 ramps in a row")
         ed_desc.setStyleSheet(self._aw_lineedit_style())
+        ed_desc.setToolTip("Short description of how to unlock this achievement")
         h.addWidget(ed_desc, stretch=2)
 
         lbl_e = QLabel("🎯 Event:")
@@ -478,6 +552,7 @@ class AWEditorMixin:
         ed_event = QLineEdit(event)
         ed_event.setPlaceholderText("e.g. ramp_combo_5x")
         ed_event.setStyleSheet(self._aw_lineedit_style())
+        ed_event.setToolTip("Unique event identifier (lowercase, a-z, 0-9, underscores only)")
         ed_event.setMaximumWidth(160)
         h.addWidget(ed_event)
 
