@@ -3175,7 +3175,18 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         state = self.watcher._ach_state_load()
         roms.update(state.get("global", {}).keys())
         roms.update(state.get("session", {}).keys())
-        
+
+        # Include ROMs from roms_played (populated after cloud restore)
+        roms_played = state.get("roms_played") or []
+        roms.update(roms_played)
+
+        # Include ROMs that have a .ach.json file (generated after cloud restore)
+        ach_dir = os.path.join(self.cfg.BASE, "Achievements", "rom_specific_achievements")
+        if os.path.isdir(ach_dir):
+            for fn in os.listdir(ach_dir):
+                if fn.lower().endswith(".ach.json"):
+                    roms.add(fn[:-len(".ach.json")])
+
         stats_dir = os.path.join(self.cfg.BASE, "session_stats")
         if os.path.isdir(stats_dir):
             for fn in os.listdir(stats_dir):
