@@ -2080,8 +2080,19 @@ class CloudSync:
         ``achievements_state.json``.  Also fetches ``players/{pid}/progress``
         and merges ROM entries into ``roms_played`` and updates the local
         ``progress_upload_log.json`` so that already-uploaded progress entries
-        are not re-sent after a restore.  Finally fetches
-        ``players/{pid}/vps_mapping`` and saves it to the local
+        are not re-sent after a restore.  After merging ``roms_played``, the
+        method re-evaluates global achievement rules from ``global_achievements.json``
+        that can be resolved without a running Watcher instance:
+
+        * ``nvram_tally`` rules — sums the target field across all played ROMs
+          by reading cached ``end_audits`` from each ROM's session summary file
+          (``session_stats/Highlights/{rom}.summary.json``).
+        * ``rom_count`` rules with ``manufacturer == "__any__"`` — checks whether
+          enough distinct ROMs have been played (``min`` threshold only; rules that
+          require per-manufacturer or per-brand counts are skipped because they
+          need a running Watcher instance to resolve ROM → manufacturer mappings).
+
+        Finally fetches ``players/{pid}/vps_mapping`` and saves it to the local
         ``vps_id_mapping.json``.
 
         Returns ``True`` on success, ``False`` when a critical step fails.
@@ -2147,6 +2158,103 @@ class CloudSync:
                 )
         except Exception as e:
             log(cfg, f"[CLOUD] restore_from_cloud: progress restore failed (non-critical): {e}", "WARN")
+
+        # ── 3.5. Re-evaluate global achievements from local NVRAM summary data ─
+        try:
+            _global_rules_raw = load_json(f_global_ach(cfg))
+            if isinstance(_global_rules_raw, list):
+                _global_rules_for_restore = _global_rules_raw
+            elif isinstance(_global_rules_raw, dict):
+                _global_rules_for_restore = _global_rules_raw.get("rules") or []
+            else:
+                _global_rules_for_restore = []
+
+            if _global_rules_for_restore:
+                _roms_played = list(state.get("roms_played") or [])
+                _already_global = {
+                    str(e.get("title", "")).strip()
+                    for entries in state.get("global", {}).values()
+                    for e in (entries if isinstance(entries, list) else [])
+                    if isinstance(e, dict)
+                }
+
+                # Load end_audits from session summary files for each played ROM
+                _rom_audits_lc: dict = {}  # rom -> {field_lowercase: value}
+                for _r in _roms_played:
+                    _summary_path = os.path.join(p_highlights(cfg), f"{_r}.summary.json")
+                    if os.path.isfile(_summary_path):
+                        try:
+                            _summary_data = secure_load_json(_summary_path, {})
+                            _audits = _summary_data.get("end_audits", {})
+                            if isinstance(_audits, dict) and _audits:
+                                _rom_audits_lc[_r] = {k.lower(): v for k, v in _audits.items()}
+                        except Exception:
+                            pass
+
+                _newly_global: list = []
+                _now_iso = datetime.now(timezone.utc).isoformat()
+
+                for _rule in _global_rules_for_restore:
+                    if not isinstance(_rule, dict):
+                        continue
+                    _title = (_rule.get("title") or "").strip()
+                    if not _title or _title in _already_global:
+                        continue
+                    _cond = _rule.get("condition") or {}
+                    if not isinstance(_cond, dict):
+                        continue
+                    _rtype = str(_cond.get("type") or "").lower()
+
+                    if _rtype == "nvram_tally":
+                        _field = str(_cond.get("field") or "").strip()
+                        if not _field or is_excluded_field(_field):
+                            continue
+                        try:
+                            _need = int(_cond.get("min", 1))
+                        except (TypeError, ValueError):
+                            continue
+                        _field_lc = _field.lower()
+                        _total = 0
+                        for _r in _roms_played:
+                            _aud = _rom_audits_lc.get(_r, {})
+                            try:
+                                _total += int(_aud.get(_field_lc, 0))
+                            except (TypeError, ValueError):
+                                pass
+                        if _total >= _need:
+                            _newly_global.append({"title": _title, "ts": _now_iso, "origin": "global_achievements"})
+                            _already_global.add(_title)
+
+                    elif _rtype == "rom_count":
+                        _manufacturer = str(_cond.get("manufacturer") or "").strip()
+                        if _manufacturer != "__any__":
+                            # Cannot resolve manufacturer without a running Watcher instance – skip
+                            continue
+                        _min_brands = _cond.get("min_brands")
+                        if _min_brands is not None:
+                            # Cannot determine per-brand counts without a running Watcher instance – skip
+                            continue
+                        try:
+                            _need = int(_cond.get("min", 1))
+                        except (TypeError, ValueError):
+                            continue
+                        if len(set(_roms_played)) >= _need:
+                            _newly_global.append({"title": _title, "ts": _now_iso, "origin": "global_achievements"})
+                            _already_global.add(_title)
+
+                if _newly_global:
+                    _global_lst = state.setdefault("global", {}).setdefault("__global__", [])
+                    if not isinstance(_global_lst, list):
+                        state["global"]["__global__"] = []
+                        _global_lst = state["global"]["__global__"]
+                    _global_lst.extend(_newly_global)
+                    log(
+                        cfg,
+                        f"[CLOUD] restore_from_cloud: {len(_newly_global)} global achievement(s) "
+                        f"re-evaluated and restored from local NVRAM data",
+                    )
+        except Exception as e:
+            log(cfg, f"[CLOUD] restore_from_cloud: global achievement re-evaluation failed (non-critical): {e}", "WARN")
 
         # ── 4. Save the enriched state and recompute level ────────────────────
         try:
