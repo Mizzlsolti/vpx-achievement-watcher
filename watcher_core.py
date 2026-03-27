@@ -2073,6 +2073,72 @@ class CloudSync:
             return False
 
     @staticmethod
+    def restore_from_cloud(cfg: AppConfig) -> bool:
+        """Restore local achievement state from the cloud.
+
+        Fetches ``players/{pid}/achievements`` and reconstructs the local
+        ``achievements_state.json``.  Also fetches ``players/{pid}/progress``
+        and updates the local ``progress_upload_log.json`` so that already-
+        uploaded progress entries are not re-sent after a restore.
+
+        Returns ``True`` on success, ``False`` when a critical step fails.
+        """
+        if not cfg.CLOUD_URL or not cfg.CLOUD_ENABLED:
+            log(cfg, "[CLOUD] restore_from_cloud: cloud not enabled", "WARN")
+            return False
+
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            log(cfg, "[CLOUD] restore_from_cloud: no valid player_id set", "WARN")
+            return False
+
+        # ── 1. Fetch achievements node ────────────────────────────────────────
+        data = CloudSync.fetch_node(cfg, f"players/{pid}/achievements")
+        if not data or not isinstance(data, dict):
+            log(cfg, f"[CLOUD] restore_from_cloud: no achievements data found for player {pid}", "WARN")
+            return False
+
+        # ── 2. Reconstruct and save local achievements state ─────────────────
+        state = {
+            "global": {"__global__": data.get("global", [])},
+            "session": data.get("session", {}),
+            "roms_played": data.get("roms_played", []),
+            "badges": data.get("badges", []),
+            "selected_badge": data.get("selected_badge", ""),
+        }
+        try:
+            secure_save_json(f_achievements_state(cfg), state)
+            lv = compute_player_level(state)
+            log(
+                cfg,
+                f"[CLOUD] restore_from_cloud: achievements restored for player {pid} "
+                f"(level {lv['level']}, {lv['total']} achievements)",
+            )
+        except Exception as e:
+            log(cfg, f"[CLOUD] restore_from_cloud: failed to save achievements state: {e}", "WARN")
+            return False
+
+        # ── 3. Fetch progress node and update local upload log ────────────────
+        try:
+            progress_data = CloudSync.fetch_node(cfg, f"players/{pid}/progress")
+            if isinstance(progress_data, dict) and progress_data:
+                log_data = _load_progress_upload_log(cfg)
+                for rom, entry in progress_data.items():
+                    if isinstance(entry, dict):
+                        vps_id = str(entry.get("vps_id") or "").strip()
+                        if rom and vps_id:
+                            log_data[rom] = vps_id
+                _save_progress_upload_log(cfg, log_data)
+                log(
+                    cfg,
+                    f"[CLOUD] restore_from_cloud: progress log restored for {len(progress_data)} ROM(s)",
+                )
+        except Exception as e:
+            log(cfg, f"[CLOUD] restore_from_cloud: progress restore failed (non-critical): {e}", "WARN")
+
+        return True
+
+    @staticmethod
     def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):
         """Upload the full achievements state (global + session + roms_played) to Firebase
         under /players/{pid}/achievements.json. Called automatically after each session
