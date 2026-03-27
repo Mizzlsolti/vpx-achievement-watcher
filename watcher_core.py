@@ -2450,19 +2450,50 @@ class Watcher:
         if not rom:
             return False
         maps_dir = p_local_maps(self.cfg)
-        return (
-            os.path.isfile(os.path.join(maps_dir, f"{rom}.json")) or
-            os.path.isfile(os.path.join(maps_dir, f"{rom}.map.json"))
-        )
- 
+        for candidate in (f"{rom}.json", f"{rom}.map.json"):
+            path = os.path.join(maps_dir, candidate)
+            if os.path.isfile(path):
+                # Verify it is a real NVRAM map and not a custom achievements file.
+                # A real map has "fields"; a custom achievements file has "rules" but
+                # no "fields".  If we cannot read it, err on the side of treating it
+                # as a real map (return True).
+                try:
+                    with open(path, "r", encoding="utf-8") as _f:
+                        _data = json.load(_f)
+                    if (
+                        isinstance(_data, dict)
+                        and "rules" in _data
+                        and "fields" not in _data
+                    ):
+                        continue  # custom achievements file – not a real map
+                except Exception:
+                    pass
+                return True
+        return False
+
     def _has_any_map(self, rom: str) -> bool:
         if not rom:
             return False
         try:
             m1 = os.path.join(p_local_maps(self.cfg), f"{rom}.json")
             m2 = os.path.join(p_local_maps(self.cfg), f"{rom}.map.json")
-            if os.path.isfile(m1) or os.path.isfile(m2):
-                return True
+            for candidate in (m1, m2):
+                if os.path.isfile(candidate):
+                    # Verify it is a real NVRAM map and not a custom achievements file.
+                    # A real map has "fields"; a custom achievements file has "rules"
+                    # but no "fields".  If we cannot read it, treat as real map.
+                    try:
+                        with open(candidate, "r", encoding="utf-8") as _f:
+                            _data = json.load(_f)
+                        if (
+                            isinstance(_data, dict)
+                            and "rules" in _data
+                            and "fields" not in _data
+                        ):
+                            continue  # custom achievements file – not a real map
+                    except Exception:
+                        pass
+                    return True
             fields, _ = self._try_load_map_for(rom)
             return bool(fields)
         except Exception:
