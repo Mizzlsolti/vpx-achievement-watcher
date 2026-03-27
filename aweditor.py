@@ -559,6 +559,7 @@ class AWEditorMixin:
     # ------------------------------------------------------------------
 
     def _aw_scan_tables(self):
+        self._aw_scan_manual = True
         self._aw_btn_scan.setEnabled(False)
         self._aw_btn_scan.setText("⏳")
         self._aw_scan_status_lbl.setText("Scanning tables…")
@@ -608,6 +609,24 @@ class AWEditorMixin:
         self._aw_btn_scan.setEnabled(True)
         self._aw_btn_scan.setText("🔄 Scan")
         self._aw_save_cache(tables)
+
+        # Show a popup only for manual scans (not for startup/cache loads)
+        if getattr(self, "_aw_scan_manual", False):
+            self._aw_scan_manual = False
+            from PyQt6.QtWidgets import QMessageBox
+            lines = []
+            if tables:
+                lines.append(f"✅ {len(tables)} table(s) found without NVRAM map.")
+            else:
+                lines.append("No non-ROM tables found without NVRAM map.")
+            if removed and old_filenames:
+                removed_names = ", ".join(
+                    sorted(os.path.splitext(f)[0] for f in removed)
+                )
+                lines.append(
+                    f"ℹ️ {len(removed)} table(s) now have NVRAM maps and were removed: {removed_names}"
+                )
+            QMessageBox.information(self, "Scan Results", "\n".join(lines))
 
     def _aw_filter_tables(self):
         """Filter the table list by the current search text and repopulate the widget."""
