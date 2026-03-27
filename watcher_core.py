@@ -2522,6 +2522,13 @@ class Watcher:
                 # there can never be an NVRAM map, so we always show the notification.
                 if rom and self._has_any_map(rom):
                     return
+                # Requirement 2: If the user has already created a custom achievements
+                # file for this table in AWEditor, suppress the "no map" notification –
+                # they clearly know there is no NVRAM map and have handled it themselves.
+                if table:
+                    _custom_json = os.path.join(p_aweditor(self.cfg), f"{table}.custom.json")
+                    if os.path.isfile(_custom_json):
+                        return
                 log(self.cfg, f"[OVERLAY] no-map worker start: identifier={identifier!r}")
 
                 shown = getattr(self, "_mini_info_shown_for_rom", None)
@@ -2548,7 +2555,7 @@ class Watcher:
                         return False
                     return found
 
-                for _ in range(40):  # max 20s warten statt endlos
+                for _ in range(120):  # max 60 s – VPX can take a while to show its window
                     if self._stop.is_set():
                         return
                     try:
@@ -6641,9 +6648,30 @@ class Watcher:
             except Exception as e:
                 log(self.cfg, f"[CUSTOM_EVENTS] Failed to scan aweditor dir: {e}", "WARN")
 
+            # Debounce / cooldown bookkeeping – shared across all trigger files in this poll
+            _COOLDOWN_SECS = 3.0
+            _cooldown: dict = getattr(self, "_custom_event_cooldown", {})
+            if not isinstance(_cooldown, dict):
+                _cooldown = {}
+            self._custom_event_cooldown = _cooldown
+            _poll_now = time.time()
+
             for tf in trigger_files:
                 event_name = tf[: -len(".trigger")]
                 tf_path = os.path.join(ce_dir, tf)
+
+                # Debounce: if the same event fired very recently (e.g. the table
+                # script calls FireAchievement multiple times in quick succession due
+                # to switch-bounce or a rapid loop), silently delete the stale trigger
+                # file and skip this iteration so the UI and log are not spammed.
+                _last = _cooldown.get(event_name, 0.0)
+                if _poll_now - _last < _COOLDOWN_SECS:
+                    # Cooldown active – remove the trigger file to prevent accumulation
+                    try:
+                        os.remove(tf_path)
+                    except Exception:
+                        pass
+                    continue
 
                 matched_rules = event_rules.get(event_name, [])
                 if matched_rules:
@@ -6661,6 +6689,12 @@ class Watcher:
                         self._ach_record_unlocks("session", table_key, matched_rules)
                     except Exception as e:
                         log(self.cfg, f"[CUSTOM_EVENTS] persist failed: {e}", "WARN")
+
+                    # Record fire time for debounce so the same event cannot spam the
+                    # UI within the cooldown window.  Only record on a successful match
+                    # so that events without a rule can still be retried immediately
+                    # (e.g. after the user adds the rule in AWEditor mid-session).
+                    _cooldown[event_name] = _poll_now
                 else:
                     log(self.cfg, f"[CUSTOM_EVENTS] No rule found for event '{event_name}'", "WARN")
 
