@@ -11,7 +11,7 @@ Trigger mechanism overview
 1. AWEditor generates two files:
      • aw_{TableName}.vbs   – VBScript with a FireAchievement() Sub
      • {TableName}.custom.json – Achievement rule definitions
-2. The user copies the .vbs next to the .vpx and adds a LoadScript call.
+2. The user copies the .vbs next to the .vpx and adds an ExecuteGlobal GetTextFile(...) call.
 3. During gameplay the VBScript writes a <event>.trigger file into the
    custom_events/ folder.
 4. A separate watchdog (future PR) detects the file and shows a toast.
@@ -1027,15 +1027,17 @@ class AWEditorMixin:
 '   1. Copy this file next to your .vpx table file
 '   2. Open the table in VPX Editor (File > Open)
 '   3. Open Script Editor (View > Script or F12)
-'   4. Add this line near the top of your table script:
-'        LoadScript "aw_{table_stem}.vbs"
+'   4. Add these lines near the top of your table script:
+'        On Error Resume Next
+'        ExecuteGlobal GetTextFile("aw_{table_stem}.vbs")
+'        On Error Goto 0
 '   5. For custom achievements, add FireAchievement calls
 '      at the appropriate places (see comments below)
 '
 '   ⚠️  IMPORTANT: Do NOT rename this file to {table_stem}.vbs !
 '   If the .vbs has the same base name as the .vpx, VPX will
 '   REPLACE the entire table script and completely break the table.
-'   The "aw_" prefix keeps this file additive (loaded via LoadScript).
+'   The "aw_" prefix keeps this file additive (loaded via ExecuteGlobal GetTextFile).
 ' ═══════════════════════════════════════════════════════════════════
 
 Dim AW_EventPath
