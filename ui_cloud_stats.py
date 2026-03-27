@@ -252,7 +252,10 @@ class CloudStatsMixin:
         self.txt_cloud_rom.setCompleter(self._cloud_rom_completer)
         
         self.btn_cloud_fetch = QPushButton("Fetch Highscores ☁️")
-        self.btn_cloud_fetch.setStyleSheet(f"background:{get_theme_color(self.cfg, 'primary')}; color:black; font-weight:bold;")
+        self.btn_cloud_fetch.setStyleSheet(
+            f"QPushButton {{ background-color:{get_theme_color(self.cfg, 'primary')}; color:#000000;"
+            " font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }}"
+        )
         self.btn_cloud_fetch.clicked.connect(self._fetch_cloud_leaderboard)
         
         lay_ctrl.addWidget(QLabel("Category:"))

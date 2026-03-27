@@ -82,10 +82,10 @@ class FeedbackDialog(QDialog):
         self.btn_cancel.clicked.connect(self.reject)
         self.btn_submit = QPushButton("📤 Submit")
         self.btn_submit.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            "QPushButton { background-color: #FF7F00; color: #FFFFFF; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
-            "QPushButton:hover { background: #e06d00; }"
-            "QPushButton:disabled { background: #555; color: #999; }"
+            "QPushButton:hover { background-color: #e06d00; }"
+            "QPushButton:disabled { background-color: #555555; color: #999999; }"
         )
         self.btn_submit.clicked.connect(self._submit)
         btn_row.addWidget(self.btn_cancel)

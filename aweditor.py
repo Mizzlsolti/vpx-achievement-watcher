@@ -289,9 +289,9 @@ class AWEditorMixin:
         btn_row = QHBoxLayout()
         self._aw_btn_export = QPushButton("💾 Export VBS + JSON")
         self._aw_btn_export.setStyleSheet(
-            f"QPushButton {{ background:{get_theme_color(self.cfg, 'primary')}; color:#000;"
-            " font-weight:bold; border-radius:5px; padding:5px 12px; }}"
-            f"QPushButton:hover {{ background:{get_theme_color(self.cfg, 'accent')}; }}"
+            f"QPushButton {{ background-color:{get_theme_color(self.cfg, 'primary')}; color:#000000;"
+            " font-weight:bold; border-radius:5px; padding:5px 12px; border:none; }}"
+            f"QPushButton:hover {{ background-color:{get_theme_color(self.cfg, 'accent')}; }}"
         )
         self._aw_btn_export.clicked.connect(self._aw_export)
         btn_row.addWidget(self._aw_btn_export)
@@ -319,9 +319,9 @@ class AWEditorMixin:
         primary = get_theme_color(self.cfg, "primary")
         accent  = get_theme_color(self.cfg, "accent")
         return (
-            f"QPushButton {{ background:{primary}; color:#000;"
-            " font-weight:bold; border-radius:4px; padding:4px 10px; }}"
-            f"QPushButton:hover {{ background:{accent}; }}"
+            f"QPushButton {{ background-color:{primary}; color:#000000;"
+            " font-weight:bold; border-radius:4px; padding:4px 10px; border:none; }}"
+            f"QPushButton:hover {{ background-color:{accent}; }}"
         )
 
     def _aw_groupbox_style(self) -> str:
@@ -493,9 +493,9 @@ class AWEditorMixin:
         btn_rm.setFixedSize(30, 26)
         btn_rm.setToolTip("Remove this achievement")
         btn_rm.setStyleSheet(
-            "QPushButton { background:#3a1a1a; color:#cc3333; border:1px solid #cc3333;"
-            " border-radius:4px; font-size:10pt; }"
-            "QPushButton:hover { background:#cc3333; color:#fff; }"
+            "QPushButton { background-color:#3a1a1a; color:#cc3333; border:1px solid #cc3333;"
+            " border-radius:4px; font-size:10pt; font-weight:bold; padding:0; }"
+            "QPushButton:hover { background-color:#cc3333; color:#ffffff; }"
         )
 
         row_dict = {"title": ed_title, "desc": ed_desc, "event": ed_event, "frame": frame}

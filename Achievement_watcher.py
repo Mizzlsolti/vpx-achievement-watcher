@@ -365,7 +365,8 @@ class AchievementBeatenDialog(QDialog):
         # Close button
         btn_close = QPushButton("Close")
         btn_close.setStyleSheet(
-            "background:#00E5FF; color:#000; font-weight:bold; padding:4px 16px; border-radius:3px;"
+            "QPushButton { background-color:#00E5FF; color:#000000; font-weight:bold;"
+            " padding:4px 16px; border-radius:3px; border:none; }"
         )
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
@@ -2222,9 +2223,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         btn.setFixedSize(28, 28)
         btn.setToolTip("Show help for this tab")
         btn.setStyleSheet(
-            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
             "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
-            "QPushButton:hover { background: #FF7F00; color: #000; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
         )
         btn.clicked.connect(lambda: self._show_tab_help(help_key))
         row.addWidget(btn)
@@ -2374,13 +2375,22 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
-        self.btn_restart.setStyleSheet("background:#008040; border:none;")
+        self.btn_restart.setStyleSheet(
+            "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 16px; }"
+        )
         self.btn_restart.clicked.connect(self._restart_watcher)
         self.btn_minimize = QPushButton("Minimize to Tray")
-        self.btn_minimize.setStyleSheet("background:#005c99; border:none;")
+        self.btn_minimize.setStyleSheet(
+            "QPushButton { background-color:#005c99; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 16px; }"
+        )
         self.btn_minimize.clicked.connect(self.hide)
         self.btn_quit = QPushButton("Quit GUI")
-        self.btn_quit.setStyleSheet("background:#8a2525; border:none;")
+        self.btn_quit.setStyleSheet(
+            "QPushButton { background-color:#8a2525; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 16px; }"
+        )
         self.btn_quit.clicked.connect(self.quit_all)
 
         lay_actions.addWidget(self.btn_restart)
@@ -2577,8 +2587,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
         self.btn_switch_all_orientation = QPushButton("🔄 Switch All → Portrait")
         self.btn_switch_all_orientation.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #000; font-weight: bold; padding: 6px 16px; border-radius: 6px; font-size: 10pt; }"
-            "QPushButton:hover { background: #FFA040; }"
+            "QPushButton { background-color: #FF7F00; color: #000000; font-weight: bold; padding: 6px 16px; border-radius: 6px; font-size: 10pt; border:none; }"
+            "QPushButton:hover { background-color: #FFA040; }"
         )
         self.btn_switch_all_orientation.clicked.connect(self._on_switch_all_portrait_landscape)
         _row_switch = QHBoxLayout()
@@ -2740,10 +2750,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
         self.btn_apply_theme = QPushButton("Apply Theme")
         self.btn_apply_theme.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #000; font-weight: bold;"
-            " padding: 6px 16px; border-radius: 6px; }"
-            "QPushButton:hover { background: #FFA040; }"
-            "QPushButton:pressed { background: #CC6600; }"
+            "QPushButton { background-color: #FF7F00; color: #000000; font-weight: bold;"
+            " padding: 6px 16px; border-radius: 6px; border:none; }"
+            "QPushButton:hover { background-color: #FFA040; }"
+            "QPushButton:pressed { background-color: #CC6600; }"
         )
         self.btn_apply_theme.clicked.connect(self._on_apply_theme)
         row_active.addWidget(self.btn_apply_theme)
@@ -2790,9 +2800,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         lay_ov_test.addWidget(lbl_ov_hint)
 
         _btn_css = (
-            "QPushButton { background: #333; color: #CCC; border: 1px solid #555;"
-            " border-radius: 4px; padding: 3px 10px; font-size: 9pt; }"
-            "QPushButton:hover { border-color: #AAA; color: #FFF; }"
+            "QPushButton { background-color: #333333; color: #CCCCCC; border: 1px solid #555555;"
+            " border-radius: 4px; padding: 3px 10px; font-size: 9pt; font-weight: bold; }"
+            "QPushButton:hover { border-color: #AAAAAA; color: #FFFFFF; }"
         )
         self._theme_dot_labels: list[QLabel] = []
 
@@ -2992,10 +3002,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             btn_test.setFixedSize(28, 22)
             btn_test.setToolTip(f"Preview sound for {event_label}")
             btn_test.setStyleSheet(
-                "QPushButton { background: #00E5FF; color: #000; border: none; "
+                "QPushButton { background-color: #00E5FF; color: #000000; border: none; "
                 "border-radius: 3px; font-size: 10pt; font-weight: bold; "
                 "padding: 0px; text-align: center; }"
-                "QPushButton:hover { background: #33EEFF; }"
+                "QPushButton:hover { background-color: #33EEFF; }"
             )
 
             def _make_preview(eid):
@@ -3136,7 +3146,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         row.addWidget(self.lbl_progress_rom_name)
         
         btn_refresh = QPushButton("🔄 Refresh")
-        btn_refresh.setStyleSheet("background:#00E5FF; color:black; font-weight:bold;")
+        btn_refresh.setStyleSheet(
+            "QPushButton { background-color:#00E5FF; color:#000000; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 16px; }"
+        )
         btn_refresh.clicked.connect(self._refresh_progress_roms)
         row.addWidget(btn_refresh)
         lay.addLayout(row)
@@ -3544,7 +3557,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         row.addWidget(self.txt_map_search)
 
         btn_refresh = QPushButton("🔄 Load List")
-        btn_refresh.setStyleSheet("background:#FF7F00; color:black; font-weight:bold;")
+        btn_refresh.setStyleSheet(
+            "QPushButton { background-color:#FF7F00; color:#000000; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 16px; }"
+        )
         btn_refresh.clicked.connect(self._refresh_available_maps)
         row.addWidget(btn_refresh)
 
@@ -3552,14 +3568,17 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.btn_nvram_filter.setCheckable(True)
         self.btn_nvram_filter.setChecked(False)
         self.btn_nvram_filter.setStyleSheet(
-            "QPushButton {background:#222; color:#FF7F00; border:1px solid #FF7F00;} "
-            "QPushButton:checked {background:#3D2600; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold;}"
+            "QPushButton { background-color:#222222; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; border-radius:5px; padding:7px 16px; } "
+            "QPushButton:checked { background-color:#3D2600; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; border-radius:5px; padding:7px 16px; }"
         )
         self.btn_nvram_filter.toggled.connect(self._filter_available_maps)
         row.addWidget(self.btn_nvram_filter)
 
         btn_auto = QPushButton("⚡ Auto-Match All")
-        btn_auto.setStyleSheet("background:#003333; color:#00E5FF; border:1px solid #00E5FF;")
+        btn_auto.setStyleSheet(
+            "QPushButton { background-color:#003333; color:#00E5FF; font-weight:bold;"
+            " border:1px solid #00E5FF; border-radius:5px; padding:7px 16px; }"
+        )
         btn_auto.clicked.connect(self._on_vps_auto_match_all)
         row.addWidget(btn_auto)
 
@@ -3601,9 +3620,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         btn_rules.setFixedSize(140, 28)
         btn_rules.setToolTip("Show Cloud Leaderboard rules")
         btn_rules.setStyleSheet(
-            "QPushButton { background: #FF3B30; color: #FFFFFF; border: 1px solid #FF3B30; "
+            "QPushButton { background-color: #FF3B30; color: #FFFFFF; border: 1px solid #FF3B30; "
             "border-radius: 14px; font-size: 10pt; font-weight: bold; padding: 0 8px; }"
-            "QPushButton:hover { background: #CC2F27; color: #FFF; }"
+            "QPushButton:hover { background-color: #CC2F27; color: #FFFFFF; }"
         )
         btn_rules.clicked.connect(self._show_cloud_rules)
         row.addWidget(btn_rules)
@@ -3612,9 +3631,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         btn_help.setFixedSize(28, 28)
         btn_help.setToolTip("Show help for this tab")
         btn_help.setStyleSheet(
-            "QPushButton { background: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
             "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
-            "QPushButton:hover { background: #FF7F00; color: #000; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
         )
         btn_help.clicked.connect(lambda: self._show_tab_help("available_maps"))
         row.addWidget(btn_help)
@@ -3775,8 +3794,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 btn = QPushButton("+")
                 btn.setFixedSize(30, 28)
                 btn.setStyleSheet(
-                    "QPushButton {background:#2a1800; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; font-size:16px;} "
-                    "QPushButton:hover {background:#4a2e00;}"
+                    "QPushButton { background-color:#2a1800; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; font-size:16px; border-radius:4px; padding:0; } "
+                    "QPushButton:hover { background-color:#4a2e00; color:#FF7F00; border:1px solid #FF7F00; font-weight:bold; font-size:16px; border-radius:4px; padding:0; }"
                 )
                 btn.clicked.connect(lambda checked, r=rom, t=title: self._on_vps_picker_clicked(r, t))
                 self.maps_table.setCellWidget(row, 6, btn)
@@ -4185,9 +4204,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         lay_feedback.addWidget(lbl_feedback)
         btn_feedback = QPushButton("🐛 Report Bug / Suggestion")
         btn_feedback.setStyleSheet(
-            "QPushButton { background: #FF7F00; color: #fff; font-weight: bold;"
+            "QPushButton { background-color: #FF7F00; color: #FFFFFF; font-weight: bold;"
             "  border: none; padding: 6px 18px; border-radius: 4px; }"
-            "QPushButton:hover { background: #e06d00; }"
+            "QPushButton:hover { background-color: #e06d00; }"
         )
         btn_feedback.clicked.connect(lambda: FeedbackDialog(self).exec())
         lay_feedback.addWidget(btn_feedback)

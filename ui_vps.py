@@ -882,8 +882,9 @@ class VpsPickerDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_remove = QPushButton("❌ Remove Assignment")
         btn_remove.setStyleSheet(
-            "background:#3D0000; color:#FF3B30; border:1px solid #FF3B30;"
-            " padding:6px 14px; border-radius:4px;"
+            "QPushButton { background-color:#3D0000; color:#FF3B30; font-weight:bold;"
+            " border:1px solid #FF3B30; padding:6px 14px; border-radius:4px; }"
+            "QPushButton:hover { background-color:#5a0000; }"
         )
         btn_remove.clicked.connect(self._remove_assignment)
         btn_row.addWidget(btn_remove)
@@ -895,16 +896,18 @@ class VpsPickerDialog(QDialog):
 
         btn_cancel = QPushButton("Cancel")
         btn_cancel.setStyleSheet(
-            "background:#2a2a2a; color:#AAA; border:1px solid #555;"
-            " padding:6px 14px; border-radius:4px;"
+            "QPushButton { background-color:#2a2a2a; color:#AAAAAA; font-weight:bold;"
+            " border:1px solid #555555; padding:6px 14px; border-radius:4px; }"
+            "QPushButton:hover { background-color:#3a3a3a; }"
         )
         btn_cancel.clicked.connect(self.reject)
         btn_row.addWidget(btn_cancel)
 
         btn_ok = QPushButton("✅ Select")
         btn_ok.setStyleSheet(
-            "background:#003D00; color:#00E5FF; font-weight:bold;"
-            " border:1px solid #00E5FF; padding:6px 14px; border-radius:4px;"
+            "QPushButton { background-color:#003D00; color:#00E5FF; font-weight:bold;"
+            " border:1px solid #00E5FF; padding:6px 14px; border-radius:4px; }"
+            "QPushButton:hover { background-color:#005a00; }"
         )
         btn_ok.clicked.connect(self._accept_selection)
         btn_row.addWidget(btn_ok)
@@ -1149,7 +1152,10 @@ class VpsAchievementInfoDialog(QDialog):
 
         # Close button
         btn_close = QPushButton("Close")
-        btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
+        btn_close.setStyleSheet(
+            "QPushButton { background-color:#222222; color:#AAAAAA; font-weight:bold;"
+            " border:1px solid #444444; border-radius:5px; padding:7px 16px; margin-top:8px; }"
+        )
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -1307,7 +1313,10 @@ class CloudProgressVpsInfoDialog(QDialog):
 
         # Close button
         btn_close = QPushButton("Close")
-        btn_close.setStyleSheet("background:#222; color:#AAA; margin-top:8px;")
+        btn_close.setStyleSheet(
+            "QPushButton { background-color:#222222; color:#AAAAAA; font-weight:bold;"
+            " border:1px solid #444444; border-radius:5px; padding:7px 16px; margin-top:8px; }"
+        )
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
 
