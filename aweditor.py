@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QProgressBar,
     QPushButton,
     QScrollArea,
     QTableWidget,
@@ -49,6 +50,9 @@ from theme import get_theme_color
 from watcher_core import (
     ensure_dir,
     ensure_vpxtool,
+    f_index,
+    f_vps_mapping,
+    load_json,
     p_aweditor,
     p_custom_events,
     p_local_maps,
@@ -88,6 +92,7 @@ class _ScanTablesWorker(QThread):
 
     # Each entry: {"filename": str, "rom": str, "has_map": bool, "is_local": bool}
     finished = pyqtSignal(list)
+    progress = pyqtSignal(int, int)  # (current, total)
 
     def __init__(self, cfg, parent=None):
         super().__init__(parent)
@@ -100,17 +105,43 @@ class _ScanTablesWorker(QThread):
             self.finished.emit(results)
             return
 
-        for fname in sorted(os.listdir(tables_dir)):
-            if not fname.lower().endswith(".vpx"):
-                continue
+        # Load the cloud index (ROM → map path) and VPS-ID mapping once
+        # Normalize keys to lowercase for case-insensitive lookups
+        try:
+            cloud_index: set = {
+                k.lower() for k in (load_json(f_index(self.cfg), {}) or {})
+            }
+        except Exception:
+            cloud_index = set()
+        try:
+            raw_mapping: dict = load_json(f_vps_mapping(self.cfg), {}) or {}
+            vps_mapping: set = {k.lower() for k, v in raw_mapping.items() if v}
+        except Exception:
+            vps_mapping = set()
+
+        # Collect all .vpx files first so we can report total count
+        vpx_files = sorted(
+            fname for fname in os.listdir(tables_dir)
+            if fname.lower().endswith(".vpx")
+        )
+        total = len(vpx_files)
+
+        for idx, fname in enumerate(vpx_files):
+            self.progress.emit(idx + 1, total)
             vpx_path = os.path.join(tables_dir, fname)
             try:
                 rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True) or ""
                 if rom:
-                    # Has a ROM – skip if it also has a map
+                    # Check local map files
                     m1 = os.path.join(p_local_maps(self.cfg), f"{rom}.json")
                     m2 = os.path.join(p_local_maps(self.cfg), f"{rom}.map.json")
                     if os.path.isfile(m1) or os.path.isfile(m2):
+                        continue
+                    # Check cloud index – if the ROM is listed there it has a map
+                    if rom.lower() in cloud_index:
+                        continue
+                    # Check VPS-ID mapping – already assigned means it's managed
+                    if rom.lower() in vps_mapping:
                         continue
                 results.append({"filename": fname, "rom": rom, "has_map": False, "is_local": True})
             except Exception:
@@ -192,7 +223,7 @@ class AWEditorMixin:
         # ── Header ────────────────────────────────────────────────────────
         hdr = QLabel(
             "<span style='font-size:15px; font-weight:bold; color:#E0E0E0;'>"
-            "🎯 AWEditor – Custom Achievements for Non-ROM Tables</span>"
+            "🎯 AWEditor – Custom Achievements for Non-ROM Tables and without NVRAM-Map</span>"
         )
         hdr.setWordWrap(True)
         outer.addWidget(hdr)
@@ -273,9 +304,9 @@ class AWEditorMixin:
         layout.addWidget(lbl_legend)
 
         # ── Table widget ───────────────────────────────────────────────
-        self._aw_tables_widget = QTableWidget(0, 5)
+        self._aw_tables_widget = QTableWidget(0, 6)
         self._aw_tables_widget.setHorizontalHeaderLabels(
-            ["#", "Table Name", "ROM", "NVRAM Map", "Local"]
+            ["#", "Table Name", "ROM", "NVRAM Map", "Local", "+"]
         )
         hh = self._aw_tables_widget.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -283,6 +314,8 @@ class AWEditorMixin:
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self._aw_tables_widget.setColumnWidth(5, 36)
         self._aw_tables_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._aw_tables_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._aw_tables_widget.setStyleSheet(
@@ -293,6 +326,18 @@ class AWEditorMixin:
         )
         self._aw_tables_widget.itemSelectionChanged.connect(self._aw_on_table_selected)
         layout.addWidget(self._aw_tables_widget, stretch=1)
+
+        # ── Progress bar (hidden when not scanning) ────────────────────
+        self._aw_progress_bar = QProgressBar()
+        self._aw_progress_bar.setTextVisible(True)
+        self._aw_progress_bar.setFixedHeight(14)
+        self._aw_progress_bar.setStyleSheet(
+            "QProgressBar { border:1px solid #444; border-radius:3px; background:#222;"
+            " font-size:8pt; color:#E0E0E0; }"
+            "QProgressBar::chunk { background:#FF7F00; border-radius:2px; }"
+        )
+        self._aw_progress_bar.hide()
+        layout.addWidget(self._aw_progress_bar)
 
         # ── Scan status label ──────────────────────────────────────────
         self._aw_scan_status_lbl = QLabel("")
@@ -311,6 +356,8 @@ class AWEditorMixin:
             fname = item.data(Qt.ItemDataRole.UserRole) or ""
             self._aw_selected_table = fname
             self._aw_status_lbl.setText(f"Selected: {fname}")
+            stem = os.path.splitext(fname)[0]
+            self._aw_codes_table_lbl.setText(f"📌 Selected Table: {stem}")
 
     # ------------------------------------------------------------------
     # Sub-tab 2 – Codes
@@ -320,6 +367,18 @@ class AWEditorMixin:
         layout = QVBoxLayout(parent)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
+
+        # ── Selected table label ──────────────────────────────────────
+        self._aw_codes_table_lbl = QLabel(
+            "📌 No table selected – go to Tables tab and click +"
+        )
+        self._aw_codes_table_lbl.setStyleSheet(
+            "QLabel { color:#FF7F00; font-size:11pt; font-weight:bold;"
+            " background:#1a1a1a; border:1px solid #333; border-radius:4px;"
+            " padding:5px 10px; }"
+        )
+        self._aw_codes_table_lbl.setWordWrap(True)
+        layout.addWidget(self._aw_codes_table_lbl)
 
         # ── Analyze button ────────────────────────────────────────────
         self._aw_btn_analyze = QPushButton("🔍 Analyze Script")
@@ -452,22 +511,49 @@ class AWEditorMixin:
         self._aw_btn_scan.setEnabled(False)
         self._aw_btn_scan.setText("⏳")
         self._aw_scan_status_lbl.setText("Scanning tables…")
+        self._aw_progress_bar.setValue(0)
+        self._aw_progress_bar.setMaximum(0)  # indeterminate until we know the total
+        self._aw_progress_bar.show()
         worker = _ScanTablesWorker(self.cfg, parent=self)
+        worker.progress.connect(self._aw_on_scan_progress)
         worker.finished.connect(self._aw_on_scan_done)
         worker.finished.connect(worker.deleteLater)
         worker.start()
         # Keep a reference so the thread is not garbage-collected
         self._aw_scan_worker = worker
 
+    def _aw_on_scan_progress(self, current: int, total: int):
+        """Update the progress bar and status label during a scan."""
+        if total > 0:
+            self._aw_progress_bar.setMaximum(total)
+            self._aw_progress_bar.setValue(current)
+        self._aw_scan_status_lbl.setText(f"Scanning tables… ({current}/{total})")
+
     def _aw_on_scan_done(self, tables: list[dict]):
-        self._aw_all_tables = tables
-        self._aw_filter_tables()
-        if tables:
+        self._aw_progress_bar.hide()
+
+        # Detect tables that were cached before but now have a map (disappeared)
+        old_filenames = {entry.get("filename", "") for entry in self._aw_all_tables}
+        new_filenames = {entry.get("filename", "") for entry in tables}
+        removed = old_filenames - new_filenames
+        if removed and old_filenames:
+            # Show names without extension for readability
+            removed_names = ", ".join(
+                sorted(os.path.splitext(f)[0] for f in removed)
+            )
+            count = len(removed)
+            self._aw_scan_status_lbl.setText(
+                f"ℹ️ {count} table(s) now have NVRAM maps and were removed: {removed_names}"
+            )
+        elif tables:
             self._aw_scan_status_lbl.setText(f"Found {len(tables)} table(s).")
         else:
             self._aw_scan_status_lbl.setText(
                 "No Non-ROM tables found. Check Tables directory in System tab."
             )
+
+        self._aw_all_tables = tables
+        self._aw_filter_tables()
         self._aw_btn_scan.setEnabled(True)
         self._aw_btn_scan.setText("🔄 Scan")
         self._aw_save_cache(tables)
@@ -518,6 +604,27 @@ class AWEditorMixin:
                 row, 4,
                 _make_item("🟠" if is_local else "", align=Qt.AlignmentFlag.AlignCenter),
             )
+
+            # "+" button – click to select table and switch to Codes sub-tab
+            btn_plus = QPushButton("+")
+            btn_plus.setFixedSize(28, 24)
+            btn_plus.setToolTip("Select this table and open the Codes tab")
+            btn_plus.setStyleSheet(
+                "QPushButton { background-color:#1a1a1a; color:#FF7F00; border:1px solid #FF7F00;"
+                " border-radius:3px; font-size:11pt; font-weight:bold; padding:0; }"
+                "QPushButton:hover { background-color:#FF7F00; color:#000000; }"
+            )
+
+            def _make_plus_handler(filename: str, table_stem: str):
+                def _handler():
+                    self._aw_selected_table = filename
+                    self._aw_status_lbl.setText(f"Selected: {filename}")
+                    self._aw_codes_table_lbl.setText(f"📌 Selected Table: {table_stem}")
+                    self._aw_inner_tabs.setCurrentIndex(1)
+                return _handler
+
+            btn_plus.clicked.connect(_make_plus_handler(fname, stem))
+            self._aw_tables_widget.setCellWidget(row, 5, btn_plus)
 
     # ------------------------------------------------------------------
     # Cache helpers
