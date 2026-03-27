@@ -15,7 +15,10 @@ Trigger mechanism overview
 2. The user copies the .vbs next to the .vpx and adds an ExecuteGlobal GetTextFile(...) call.
 3. During gameplay the VBScript writes a <event>.trigger file into the
    custom_events/ folder.
-4. A separate watchdog (future PR) detects the file and shows a toast.
+4. The watcher's ``_poll_custom_events()`` method (called every loop iteration
+   while a table session is active) detects the file, resolves it against the
+   matching ``*.custom.json`` rule, emits an achievement toast, and removes the
+   trigger file so it can fire again on the next occurrence.
 """
 
 from __future__ import annotations

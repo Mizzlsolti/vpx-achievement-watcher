@@ -2499,8 +2499,13 @@ class Watcher:
         except Exception:
             return False
  
-    def _emit_mini_info_if_missing_map(self, rom: str, seconds: int = 5):
-        """Non-blocking: spawns a background thread to wait for VPX window and show info."""
+    def _emit_mini_info_if_missing_map(self, rom: str, seconds: int = 5, *, table: str = ""):
+        """Non-blocking: spawns a background thread to wait for VPX window and show info.
+
+        Works for two cases:
+        - ROM-based table with no NVRAM map (rom is non-empty, no map found)
+        - No-ROM original VPX table (rom is empty, table name provided via ``table``)
+        """
         import threading
         def _worker():
             import time
@@ -2509,16 +2514,20 @@ class Watcher:
             except ImportError:
                 return
             try:
-                if not rom:
+                # Determine the display identifier (ROM name or table name)
+                identifier = rom or table
+                if not identifier:
                     return
-                if self._has_any_map(rom):
+                # For ROM-based tables skip if a map already exists; for no-ROM tables
+                # there can never be an NVRAM map, so we always show the notification.
+                if rom and self._has_any_map(rom):
                     return
-                log(self.cfg, f"[OVERLAY] no-map worker start: rom={rom!r}")
+                log(self.cfg, f"[OVERLAY] no-map worker start: identifier={identifier!r}")
 
                 shown = getattr(self, "_mini_info_shown_for_rom", None)
                 if not isinstance(shown, set):
                     shown = set()
-                if rom in shown:
+                if identifier in shown:
                     return
 
                 def _vpx_window_visible() -> bool:
@@ -2548,13 +2557,16 @@ class Watcher:
                     except Exception:
                         return
                     if _vpx_window_visible():
-                        msg = f"NVRAM map not found for {rom}."
+                        if rom:
+                            msg = f"No NVRAM map found for ROM '{identifier}'."
+                        else:
+                            msg = f"No NVRAM map for '{identifier}'. Use AWEditor for custom achievements."
                         dur = max(3, int(seconds))
                         try:
                             self.bridge.challenge_info_show.emit(msg, dur, "#FF3B30")
-                            shown.add(rom)
+                            shown.add(identifier)
                             self._mini_info_shown_for_rom = shown
-                            log(self.cfg, f"[INFO] Mini overlay (no map) shown for {rom}")
+                            log(self.cfg, f"[INFO] Mini overlay (no map) shown for {identifier!r}")
                         except Exception as e:
                             log(self.cfg, f"[OVERLAY] mini info emit failed: {e}", "WARN")
                         return
@@ -6579,11 +6591,88 @@ class Watcher:
 
         clean_table = table_fragment[:-4] if table_fragment.lower().endswith(".vpx") else table_fragment
 
-        if not rom:
-            return None
+        return {"table": clean_table, "rom": rom or "", "vpx_file": vpx_path or ""}
 
-        return {"table": clean_table, "rom": rom, "vpx_file": vpx_path or ""}
-    
+    def _poll_custom_events(self) -> None:
+        """Detect .trigger files written by AWEditor VBScripts and fire the matching achievements.
+
+        The VBScript ``FireAchievement(eventName)`` sub creates
+        ``<custom_events_dir>/<eventName>.trigger``.  This method is called on
+        every watcher loop iteration while a table session is active.  For each
+        trigger file found it:
+
+        1. Looks up matching rules (``condition.type == "event"``) from every
+           ``*.custom.json`` file in the AWEditor output directory.
+        2. Emits an achievement toast for each matching rule.
+        3. Persists the unlock to achievements_state under the "session" bucket.
+        4. Deletes the trigger file so the same event can fire again next time.
+        """
+        try:
+            ce_dir = p_custom_events(self.cfg)
+            if not os.path.isdir(ce_dir):
+                return
+
+            trigger_files = [
+                f for f in os.listdir(ce_dir)
+                if f.lower().endswith(".trigger") and os.path.isfile(os.path.join(ce_dir, f))
+            ]
+            if not trigger_files:
+                return
+
+            # Build event → [rule, ...] mapping from all *.custom.json files
+            aw_dir = p_aweditor(self.cfg)
+            event_rules: dict[str, list] = {}
+            try:
+                for fname in os.listdir(aw_dir):
+                    if not fname.lower().endswith(".custom.json"):
+                        continue
+                    fpath = os.path.join(aw_dir, fname)
+                    try:
+                        data = load_json(fpath, {}) or {}
+                        for r in (data.get("rules") or []):
+                            if not isinstance(r, dict):
+                                continue
+                            cond = r.get("condition") or {}
+                            if cond.get("type") == "event" and cond.get("event"):
+                                ev = str(cond["event"])
+                                event_rules.setdefault(ev, []).append(r)
+                    except Exception as e:
+                        log(self.cfg, f"[CUSTOM_EVENTS] Failed to load {fname}: {e}", "WARN")
+            except Exception as e:
+                log(self.cfg, f"[CUSTOM_EVENTS] Failed to scan aweditor dir: {e}", "WARN")
+
+            for tf in trigger_files:
+                event_name = tf[: -len(".trigger")]
+                tf_path = os.path.join(ce_dir, tf)
+
+                matched_rules = event_rules.get(event_name, [])
+                if matched_rules:
+                    for rule in matched_rules:
+                        title = str(rule.get("title") or event_name).strip()
+                        log(self.cfg, f"[CUSTOM_EVENTS] Event '{event_name}' → achievement '{title}'")
+                        try:
+                            self.bridge.ach_toast_show.emit(title, self.current_table or "", 5)
+                        except Exception as e:
+                            log(self.cfg, f"[CUSTOM_EVENTS] toast emit failed: {e}", "WARN")
+
+                    # Persist unlocks; use table name (or a fallback key) as the ROM bucket
+                    try:
+                        table_key = (self.current_table or self.current_rom or "").strip() or "__custom__"
+                        self._ach_record_unlocks("session", table_key, matched_rules)
+                    except Exception as e:
+                        log(self.cfg, f"[CUSTOM_EVENTS] persist failed: {e}", "WARN")
+                else:
+                    log(self.cfg, f"[CUSTOM_EVENTS] No rule found for event '{event_name}'", "WARN")
+
+                # Always remove the trigger file so it can fire again next time
+                try:
+                    os.remove(tf_path)
+                    log(self.cfg, f"[CUSTOM_EVENTS] Removed trigger file '{tf}'")
+                except Exception as e:
+                    log(self.cfg, f"[CUSTOM_EVENTS] Failed to remove trigger '{tf}': {e}", "WARN")
+        except Exception as e:
+            log(self.cfg, f"[CUSTOM_EVENTS] poll error: {e}", "WARN")
+
     def _thread_main(self):
         log(self.cfg, ">>> watcher thread running")
         # Lower thread priority so VPX always gets CPU scheduler priority
@@ -6614,20 +6703,32 @@ class Watcher:
             if upd:
                 self._missing_table_ticks = 0  
                 rom = (upd.get("rom") or "").strip()
+                table = (upd.get("table") or "").strip()
+                # Use ROM as the session key when available; fall back to table name
+                # so that original VPX tables without a ROM can still be tracked.
+                session_key = rom or table
 
-                if active_rom is None and rom:
-                    self.on_session_start(rom, is_rom=True)
-                    active_rom = rom
-                    self._emit_mini_info_if_missing_map(rom, 5)
-                    self._emit_mini_info_if_missing_vps_id(rom, 8)
+                if active_rom is None and session_key:
+                    if rom:
+                        self.on_session_start(rom, is_rom=True)
+                    else:
+                        self.on_session_start(table, is_rom=False)
+                    active_rom = session_key
+                    self._emit_mini_info_if_missing_map(rom, 5, table=table)
+                    if rom:
+                        self._emit_mini_info_if_missing_vps_id(rom, 8)
 
-                elif active_rom and rom and rom != active_rom:
+                elif active_rom and session_key and session_key != active_rom:
                     self.on_session_end()
                     active_rom = None
-                    self.on_session_start(rom, is_rom=True)
-                    active_rom = rom
-                    self._emit_mini_info_if_missing_map(rom, 5)
-                    self._emit_mini_info_if_missing_vps_id(rom, 8)
+                    if rom:
+                        self.on_session_start(rom, is_rom=True)
+                    else:
+                        self.on_session_start(table, is_rom=False)
+                    active_rom = session_key
+                    self._emit_mini_info_if_missing_map(rom, 5, table=table)
+                    if rom:
+                        self._emit_mini_info_if_missing_vps_id(rom, 8)
 
                 if active_rom:
                     audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
@@ -6686,6 +6787,12 @@ class Watcher:
                             self._ball_update(audits_ctl)
                         except Exception as e:
                             log(self.cfg, f"[BALL] update failed: {e}", "WARN")
+
+                    # Poll custom_events/ for .trigger files (AWEditor watchdog)
+                    try:
+                        self._poll_custom_events()
+                    except Exception as e:
+                        log(self.cfg, f"[CUSTOM_EVENTS] poll failed: {e}", "WARN")
             else:
                 if active_rom is not None:
 
