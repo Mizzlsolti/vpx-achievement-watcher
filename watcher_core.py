@@ -2948,6 +2948,8 @@ class Watcher:
         total_target = 150
         ci = 0
         while len(rules) < total_target and candidate_fields:
+            if ci >= len(candidate_fields):
+                break
             fld = candidate_fields[ci % len(candidate_fields)]
             for m in self._overall_milestones_for_field(fld):
                 if len(rules) >= total_target:
