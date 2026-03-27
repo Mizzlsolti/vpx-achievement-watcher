@@ -465,6 +465,8 @@ def p_vps(cfg):          return os.path.join(cfg.BASE, "tools", "vps")
 def p_vps_img(cfg):      return os.path.join(p_vps(cfg), "img")
 def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
+def p_aweditor(cfg):     return os.path.join(cfg.BASE, "tools", "AWeditor")
+def p_custom_events(cfg): return os.path.join(p_aweditor(cfg), "custom_events")
 def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
     """Marker file indicating that the one-time legacy progress cleanup has already run."""
     return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
@@ -3011,6 +3013,8 @@ class Watcher:
             p_highlights(self.cfg),
             p_achievements(self.cfg),
             p_rom_spec(self.cfg),
+            p_aweditor(self.cfg),
+            p_custom_events(self.cfg),
         ]:
             ensure_dir(d)
 
