@@ -27,18 +27,22 @@ import threading  # noqa: F401 – available for subclasses
 from datetime import datetime
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFrame,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
-    QComboBox,
 )
 
 from theme import get_theme_color
@@ -82,14 +86,15 @@ _EVENT_PATTERNS: list[tuple[str, str, str, bool]] = [
 class _ScanTablesWorker(QThread):
     """Scans TABLES_DIR for .vpx files that have no ROM or no NVRAM map."""
 
-    finished = pyqtSignal(list)  # list of vpx filenames (basename only)
+    # Each entry: {"filename": str, "rom": str, "has_map": bool, "is_local": bool}
+    finished = pyqtSignal(list)
 
     def __init__(self, cfg, parent=None):
         super().__init__(parent)
         self.cfg = cfg
 
     def run(self):
-        results: list[str] = []
+        results: list[dict] = []
         tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
         if not tables_dir or not os.path.isdir(tables_dir):
             self.finished.emit(results)
@@ -100,16 +105,16 @@ class _ScanTablesWorker(QThread):
                 continue
             vpx_path = os.path.join(tables_dir, fname)
             try:
-                rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True)
+                rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True) or ""
                 if rom:
                     # Has a ROM – skip if it also has a map
                     m1 = os.path.join(p_local_maps(self.cfg), f"{rom}.json")
                     m2 = os.path.join(p_local_maps(self.cfg), f"{rom}.map.json")
                     if os.path.isfile(m1) or os.path.isfile(m2):
                         continue
-                results.append(fname)
+                results.append({"filename": fname, "rom": rom, "has_map": False, "is_local": True})
             except Exception:
-                results.append(fname)
+                results.append({"filename": fname, "rom": "", "has_map": False, "is_local": True})
 
         self.finished.emit(results)
 
@@ -197,44 +202,135 @@ class AWEditorMixin:
         sep.setStyleSheet("color:#333;")
         outer.addWidget(sep)
 
-        # ── Table selector row ─────────────────────────────────────────────
-        row_table = QHBoxLayout()
-        row_table.addWidget(QLabel("Table:"))
+        # ── Inner sub-tabs ─────────────────────────────────────────────────
+        self._aw_inner_tabs = QTabWidget()
+        self._aw_inner_tabs.setStyleSheet(
+            "QTabWidget::pane { border:1px solid #333; background:#111; }"
+            "QTabBar::tab { background:#1a1a1a; color:#aaa; padding:5px 14px;"
+            " border:1px solid #333; border-bottom:none; }"
+            "QTabBar::tab:selected { background:#222; color:#E0E0E0;"
+            " border-bottom:2px solid #FF7F00; }"
+            "QTabBar::tab:hover { background:#222; color:#E0E0E0; }"
+        )
+        outer.addWidget(self._aw_inner_tabs, stretch=1)
 
-        self._aw_cmb_tables = QComboBox()
-        self._aw_cmb_tables.setMinimumWidth(340)
-        self._aw_cmb_tables.setStyleSheet(
-            "QComboBox { background:#222; color:#E0E0E0; border:1px solid #444;"
-            " border-radius:4px; padding:3px 6px; }"
-            "QComboBox::drop-down { border:0; }"
-            "QComboBox QAbstractItemView { background:#222; color:#E0E0E0; selection-background-color:#444; }"
+        # Sub-tab 1 – Tables list
+        tables_tab = QWidget()
+        self._build_aw_subtab_tables(tables_tab)
+        self._aw_inner_tabs.addTab(tables_tab, "📋 Tables")
+
+        # Sub-tab 2 – Codes (analyze / export)
+        codes_tab = QWidget()
+        self._build_aw_subtab_codes(codes_tab)
+        self._aw_inner_tabs.addTab(codes_tab, "✏️ Codes")
+
+        self._add_tab_help_button(outer, "aweditor")
+
+        self.main_tabs.addTab(tab, "🎯 AWEditor")
+
+        # Shared state
+        self._aw_selected_table: str = ""    # .vpx filename selected in the Tables sub-tab
+        self._aw_all_tables: list[dict] = [] # full (unfiltered) scan result
+
+        # Load from cache or kick off initial scan
+        self._aw_init_tables()
+
+    # ------------------------------------------------------------------
+    # Sub-tab 1 – Tables list
+    # ------------------------------------------------------------------
+
+    def _build_aw_subtab_tables(self, parent: QWidget):
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # ── Toolbar row ────────────────────────────────────────────────
+        toolbar = QHBoxLayout()
+
+        self._aw_search = QLineEdit()
+        self._aw_search.setPlaceholderText("🔍 Search Table or ROM…")
+        self._aw_search.setStyleSheet(
+            "QLineEdit { background:#222; color:#E0E0E0; border:1px solid #444;"
+            " border-radius:4px; padding:4px 8px; }"
         )
-        self._aw_cmb_tables.setToolTip(
-            "Select a table without a ROM / NVRAM map to create custom achievements for"
-        )
-        row_table.addWidget(self._aw_cmb_tables, stretch=1)
+        self._aw_search.textChanged.connect(self._aw_filter_tables)
+        toolbar.addWidget(self._aw_search, stretch=1)
 
         self._aw_btn_scan = QPushButton("🔄 Scan")
-        self._aw_btn_scan.setFixedWidth(80)
+        self._aw_btn_scan.setFixedWidth(90)
         self._aw_btn_scan.setStyleSheet(self._aw_btn_style())
         self._aw_btn_scan.setToolTip(
             "Rescan the Tables directory for .vpx files without a ROM or NVRAM map (refreshes cache)"
         )
         self._aw_btn_scan.clicked.connect(self._aw_scan_tables)
-        row_table.addWidget(self._aw_btn_scan)
+        toolbar.addWidget(self._aw_btn_scan)
 
-        outer.addLayout(row_table)
+        layout.addLayout(toolbar)
 
-        # ── Analyze button ────────────────────────────────────────────────
+        # ── Legend ─────────────────────────────────────────────────────
+        lbl_legend = QLabel("Legend:  ❌ = No NVRAM Map  |  🟠 = Local .vpx found")
+        lbl_legend.setStyleSheet("color:#777; font-size:10px; padding:2px 4px;")
+        layout.addWidget(lbl_legend)
+
+        # ── Table widget ───────────────────────────────────────────────
+        self._aw_tables_widget = QTableWidget(0, 5)
+        self._aw_tables_widget.setHorizontalHeaderLabels(
+            ["#", "Table Name", "ROM", "NVRAM Map", "Local"]
+        )
+        hh = self._aw_tables_widget.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self._aw_tables_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._aw_tables_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._aw_tables_widget.setStyleSheet(
+            "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
+            "QHeaderView::section { background:#1a1a1a; color:#FF7F00; padding:4px;"
+            " border-bottom:2px solid #555; }"
+            "QTableWidget::item:selected { background:#3D2600; }"
+        )
+        self._aw_tables_widget.itemSelectionChanged.connect(self._aw_on_table_selected)
+        layout.addWidget(self._aw_tables_widget, stretch=1)
+
+        # ── Scan status label ──────────────────────────────────────────
+        self._aw_scan_status_lbl = QLabel("")
+        self._aw_scan_status_lbl.setStyleSheet("color:#aaa; font-size:9pt;")
+        layout.addWidget(self._aw_scan_status_lbl)
+
+    def _aw_on_table_selected(self):
+        """Store the selected .vpx filename when user clicks a row."""
+        rows = self._aw_tables_widget.selectedItems()
+        if not rows:
+            self._aw_selected_table = ""
+            return
+        row = self._aw_tables_widget.currentRow()
+        item = self._aw_tables_widget.item(row, 1)  # Table Name column
+        if item:
+            fname = item.data(Qt.ItemDataRole.UserRole) or ""
+            self._aw_selected_table = fname
+            self._aw_status_lbl.setText(f"Selected: {fname}")
+
+    # ------------------------------------------------------------------
+    # Sub-tab 2 – Codes
+    # ------------------------------------------------------------------
+
+    def _build_aw_subtab_codes(self, parent: QWidget):
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        # ── Analyze button ────────────────────────────────────────────
         self._aw_btn_analyze = QPushButton("🔍 Analyze Script")
         self._aw_btn_analyze.setStyleSheet(self._aw_btn_style())
         self._aw_btn_analyze.setToolTip(
             "Extract the VBScript from the selected table and detect common event Subs"
         )
         self._aw_btn_analyze.clicked.connect(self._aw_analyze_script)
-        outer.addWidget(self._aw_btn_analyze)
+        layout.addWidget(self._aw_btn_analyze)
 
-        # ── Detected events group ─────────────────────────────────────────
+        # ── Detected events group ─────────────────────────────────────
         grp_detected = QGroupBox("📋 Detected Events in Table Script")
         grp_detected.setStyleSheet(self._aw_groupbox_style())
         detected_layout = QVBoxLayout(grp_detected)
@@ -252,15 +348,15 @@ class AWEditorMixin:
         self._aw_detected_vbox.setSpacing(3)
 
         self._aw_no_events_lbl = QLabel(
-            "<i style='color:#666;'>Click '🔍 Analyze Script' to scan the selected table.</i>"
+            "<i style='color:#666;'>Select a table in the Tables tab, then click '🔍 Analyze Script'.</i>"
         )
         self._aw_detected_vbox.addWidget(self._aw_no_events_lbl)
 
         scroll_det.setWidget(self._aw_detected_container)
         detected_layout.addWidget(scroll_det)
-        outer.addWidget(grp_detected)
+        layout.addWidget(grp_detected)
 
-        # ── Custom achievements group ──────────────────────────────────────
+        # ── Custom achievements group ──────────────────────────────────
         grp_custom = QGroupBox("✏️ Custom Achievements")
         grp_custom.setStyleSheet(self._aw_groupbox_style())
         custom_outer = QVBoxLayout(grp_custom)
@@ -270,7 +366,7 @@ class AWEditorMixin:
         self._aw_btn_add.setToolTip(
             "Add a new custom achievement row with title, description and event name"
         )
-        self._aw_btn_add.clicked.connect(self._aw_add_row)
+        self._aw_btn_add.clicked.connect(lambda: self._aw_add_row())
         custom_outer.addWidget(self._aw_btn_add)
 
         scroll_cust = QScrollArea()
@@ -287,17 +383,17 @@ class AWEditorMixin:
 
         scroll_cust.setWidget(self._aw_rows_container)
         custom_outer.addWidget(scroll_cust)
-        outer.addWidget(grp_custom)
+        layout.addWidget(grp_custom)
 
-        # Internal state
-        self._aw_custom_rows: list[dict] = []   # list of {"title": QLineEdit, "desc": QLineEdit, "event": QLineEdit, "frame": QFrame}
-        self._aw_detected_rows: list[dict] = []  # list of {"chk": QCheckBox, "title": str, "sub": str, "lineno": int, "event": str}
+        # Internal state for row lists
+        self._aw_custom_rows: list[dict] = []
+        self._aw_detected_rows: list[dict] = []
 
-        # ── Bottom row: Export + Status + Help ───────────────────────────
+        # ── Bottom row: Export + Status ───────────────────────────────
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet("color:#333;")
-        outer.addWidget(sep2)
+        layout.addWidget(sep2)
 
         btn_row = QHBoxLayout()
         self._aw_btn_export = QPushButton("💾 Export VBS + JSON")
@@ -318,14 +414,7 @@ class AWEditorMixin:
         self._aw_status_lbl.setStyleSheet("color:#aaa; font-size:9pt;")
         btn_row.addWidget(self._aw_status_lbl)
 
-        outer.addLayout(btn_row)
-
-        self._add_tab_help_button(outer, "aweditor")
-
-        self.main_tabs.addTab(tab, "🎯 AWEditor")
-
-        # Load from cache or kick off initial scan
-        self._aw_init_tables()
+        layout.addLayout(btn_row)
 
     # ------------------------------------------------------------------
     # Styling helpers
@@ -362,7 +451,7 @@ class AWEditorMixin:
     def _aw_scan_tables(self):
         self._aw_btn_scan.setEnabled(False)
         self._aw_btn_scan.setText("⏳")
-        self._aw_status_lbl.setText("Scanning tables…")
+        self._aw_scan_status_lbl.setText("Scanning tables…")
         worker = _ScanTablesWorker(self.cfg, parent=self)
         worker.finished.connect(self._aw_on_scan_done)
         worker.finished.connect(worker.deleteLater)
@@ -370,16 +459,65 @@ class AWEditorMixin:
         # Keep a reference so the thread is not garbage-collected
         self._aw_scan_worker = worker
 
-    def _aw_on_scan_done(self, tables: list[str]):
-        self._aw_cmb_tables.clear()
+    def _aw_on_scan_done(self, tables: list[dict]):
+        self._aw_all_tables = tables
+        self._aw_filter_tables()
         if tables:
-            self._aw_cmb_tables.addItems(tables)
-            self._aw_status_lbl.setText(f"Found {len(tables)} table(s).")
+            self._aw_scan_status_lbl.setText(f"Found {len(tables)} table(s).")
         else:
-            self._aw_status_lbl.setText("No Non-ROM tables found. Check Tables directory in System tab.")
+            self._aw_scan_status_lbl.setText(
+                "No Non-ROM tables found. Check Tables directory in System tab."
+            )
         self._aw_btn_scan.setEnabled(True)
         self._aw_btn_scan.setText("🔄 Scan")
         self._aw_save_cache(tables)
+
+    def _aw_filter_tables(self):
+        """Filter the table list by the current search text and repopulate the widget."""
+        query = self._aw_search.text().lower()
+
+        filtered = []
+        for entry in self._aw_all_tables:
+            fname = entry.get("filename", "")
+            rom = entry.get("rom", "")
+            stem = os.path.splitext(fname)[0].lower()
+            if query and query not in stem and query not in rom.lower():
+                continue
+            filtered.append(entry)
+
+        self._aw_tables_widget.setRowCount(0)
+        self._aw_tables_widget.setRowCount(len(filtered))
+
+        for row, entry in enumerate(filtered):
+            fname = entry.get("filename", "")
+            stem = os.path.splitext(fname)[0]
+            rom = entry.get("rom", "")
+            is_local = entry.get("is_local", False)
+
+            def _make_item(text, color=None, align=None):
+                it = QTableWidgetItem(text)
+                if color:
+                    it.setForeground(QColor(color))
+                if align:
+                    it.setTextAlignment(align)
+                return it
+
+            num_item = _make_item(str(row + 1), "#888", Qt.AlignmentFlag.AlignCenter)
+            self._aw_tables_widget.setItem(row, 0, num_item)
+
+            name_item = _make_item(stem)
+            name_item.setData(Qt.ItemDataRole.UserRole, fname)
+            self._aw_tables_widget.setItem(row, 1, name_item)
+
+            self._aw_tables_widget.setItem(row, 2, _make_item(rom, "#888" if rom else "#555"))
+            self._aw_tables_widget.setItem(
+                row, 3,
+                _make_item("❌", "#555", Qt.AlignmentFlag.AlignCenter),
+            )
+            self._aw_tables_widget.setItem(
+                row, 4,
+                _make_item("🟠" if is_local else "", align=Qt.AlignmentFlag.AlignCenter),
+            )
 
     # ------------------------------------------------------------------
     # Cache helpers
@@ -388,19 +526,30 @@ class AWEditorMixin:
     def _aw_cache_path(self) -> str:
         return os.path.join(p_aweditor(self.cfg), "aweditor_scan_cache.json")
 
-    def _aw_load_cache(self) -> list[str] | None:
+    def _aw_load_cache(self) -> list[dict] | None:
         """Return the cached table list if it matches the current tables_dir, else None."""
         tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
         try:
             with open(self._aw_cache_path(), "r", encoding="utf-8") as f:
                 data = json.load(f)
             if data.get("tables_dir") == tables_dir and isinstance(data.get("results"), list):
-                return data["results"]
+                results = data["results"]
+                # Normalize: accept both old format (list of str) and new format (list of dict),
+                # including mixed caches from partial migrations or corruption.
+                normalized: list[dict] = []
+                for r in results:
+                    if isinstance(r, str):
+                        normalized.append(
+                            {"filename": r, "rom": "", "has_map": False, "is_local": True}
+                        )
+                    elif isinstance(r, dict):
+                        normalized.append(r)
+                return normalized
         except Exception:
             pass
         return None
 
-    def _aw_save_cache(self, tables: list[str]) -> None:
+    def _aw_save_cache(self, tables: list[dict]) -> None:
         """Persist scan results to the cache file."""
         tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
         path = self._aw_cache_path()
@@ -421,15 +570,15 @@ class AWEditorMixin:
             pass
 
     def _aw_init_tables(self) -> None:
-        """On startup: populate the dropdown from cache if available, else run a full scan."""
+        """On startup: populate the table list from cache if available, else run a full scan."""
         cached = self._aw_load_cache()
         if cached is not None:
-            self._aw_cmb_tables.clear()
+            self._aw_all_tables = cached
+            self._aw_filter_tables()
             if cached:
-                self._aw_cmb_tables.addItems(cached)
-                self._aw_status_lbl.setText(f"Found {len(cached)} table(s) (cached).")
+                self._aw_scan_status_lbl.setText(f"Found {len(cached)} table(s) (cached).")
             else:
-                self._aw_status_lbl.setText(
+                self._aw_scan_status_lbl.setText(
                     "No Non-ROM tables found (cached). Check Tables directory in System tab."
                 )
         else:
@@ -440,9 +589,9 @@ class AWEditorMixin:
     # ------------------------------------------------------------------
 
     def _aw_analyze_script(self):
-        fname = self._aw_cmb_tables.currentText()
+        fname = self._aw_selected_table
         if not fname:
-            self._aw_status_lbl.setText("⚠ Please select a table first.")
+            self._aw_status_lbl.setText("⚠ Please select a table in the Tables tab first.")
             return
 
         tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
@@ -592,9 +741,9 @@ class AWEditorMixin:
     # ------------------------------------------------------------------
 
     def _aw_export(self):
-        fname = self._aw_cmb_tables.currentText()
+        fname = self._aw_selected_table
         if not fname:
-            self._aw_status_lbl.setText("⚠ No table selected.")
+            self._aw_status_lbl.setText("⚠ No table selected. Pick one in the Tables tab.")
             return
 
         table_stem = os.path.splitext(fname)[0]  # e.g. "JP_JurassicPark_VPW"
