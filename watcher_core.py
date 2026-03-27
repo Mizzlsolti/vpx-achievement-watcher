@@ -6559,14 +6559,14 @@ class Watcher:
             cache_rom = cache.get("rom")
             cache_ts = float(cache.get("ts") or 0.0)
 
-            if cache_path == vpx_path and cache_rom and (now - cache_ts) < 120:
+            if cache_path == vpx_path and (now - cache_ts) < 120:
                 rom = cache_rom
             else:
                 rom = run_vpxtool_get_rom(self.cfg, vpx_path)
+                self._rom_detect_cache = {"vpx_path": vpx_path, "rom": rom, "ts": now}
                 if rom:
-                    self._rom_detect_cache = {"vpx_path": vpx_path, "rom": rom, "ts": now}
                     try:
-                        if rom != self._last_logged_rom:
+                        if getattr(self, "_last_logged_rom", None) != rom:
                             log(self.cfg, f"[ROM] VPXTOOL: {rom}")
                             self._last_logged_rom = rom
                     except Exception:

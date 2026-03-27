@@ -551,7 +551,7 @@ class AWEditorMixin:
         border = "#cc3333" if invalid else "#444"
         return (
             f"QLineEdit {{ background:#2a2a2a; color:#E0E0E0; border:1px solid {border};"
-            " border-radius:3px; padding:2px 5px; }}"
+            " border-radius:3px; padding:2px 5px; }"
         )
 
     # ------------------------------------------------------------------
