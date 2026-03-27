@@ -5722,11 +5722,124 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             "</style>"
         )
 
+    def _overlay_page2_html(self) -> tuple:
+        """Return (css, header_html, rows) for Page 2: Achievement Progress.
+
+        ``rows`` is a list of ``<tr>`` HTML strings for use with
+        ``OverlayWindow.set_html_scrollable()``.  The Python-level QTimer scroll
+        in OverlayWindow replaces the old CSS-animation approach (which is not
+        supported by Qt's QLabel RichText renderer).
+        """
+        import html as _html_mod
+        import json as _json_mod
+
+        def esc(s):
+            return _html_mod.escape(str(s))
+
+        rom = self._get_last_played_rom()
+        table_name = ""
+        if rom:
+            try:
+                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
+                table_name = _strip_version_from_name(romnames.get(rom, ""))
+            except Exception:
+                pass
+
+        if rom:
+            header = f"Last Played: {table_name}" if table_name else f"Last Played: {rom}"
+        else:
+            header = "No recent play data available"
+
+        _tc_primary = get_theme_color(self.cfg, "primary")
+        _tc_accent = get_theme_color(self.cfg, "accent")
+        css = (
+            "<style>"
+            "table{width:100%;border-collapse:collapse;}"
+            "td{font-size:0.9em;padding:4px 6px;border-bottom:1px solid #333;}"
+            f".unlocked{{color:{_tc_primary};font-weight:bold;}}"
+            ".locked{color:#555;}"
+            f".hdr{{color:{_tc_accent};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}}"
+            ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
+            "</style>"
+        )
+
         if not rom or not self.watcher._has_any_map(rom):
+            # No NVRAM map – check if there are custom achievements for the last table
+            last_table = ""
+            try:
+                summary_path = os.path.join(
+                    self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
+                )
+                if os.path.isfile(summary_path):
+                    with open(summary_path, "r", encoding="utf-8") as _f:
+                        _sdata = _json_mod.load(_f)
+                    last_table = str(_sdata.get("table", "") or "")
+            except Exception:
+                pass
+            if not last_table:
+                last_table = getattr(self.watcher, "current_table", "") or ""
+
+            if last_table:
+                header = f"Last Played: {last_table}"
+                # Check for custom.json in AWEditor dir
+                from watcher_core import p_aweditor
+                custom_json_path = os.path.join(p_aweditor(self.cfg), f"{last_table}.custom.json")
+                if os.path.isfile(custom_json_path):
+                    try:
+                        with open(custom_json_path, "r", encoding="utf-8") as _cf:
+                            custom_data = _json_mod.load(_cf)
+                        all_rules = [r for r in (custom_data.get("rules") or []) if isinstance(r, dict)]
+                        state = self.watcher._ach_state_load()
+                        unlocked_titles = {
+                            str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                            for e in state.get("session", {}).get(last_table, [])
+                        }
+                        if all_rules:
+                            unlocked_count = 0
+                            cells = []
+                            for r in all_rules:
+                                title = str(r.get("title", "Unknown")).strip()
+                                if title in unlocked_titles:
+                                    unlocked_count += 1
+                                    cells.append(f"<td class='unlocked'>✅ {esc(title)}</td>")
+                                else:
+                                    cells.append(f"<td class='locked'>🔒 {esc(title)}</td>")
+                            pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
+                            header_html = (
+                                f"<div class='hdr'>{esc(header)}</div>"
+                                "<div style='text-align:center;color:#FF7F00;font-size:0.85em;"
+                                "padding:2px 0 4px;'>Custom Achievements (no NVRAM map)</div>"
+                                f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
+                            )
+                            COLS = 4
+                            rows = []
+                            for i in range(0, len(cells), COLS):
+                                row = "<tr>"
+                                for j in range(COLS):
+                                    if i + j < len(cells):
+                                        row += cells[i + j]
+                                    else:
+                                        row += "<td></td>"
+                                row += "</tr>"
+                                rows.append(row)
+                            return css, header_html, rows
+                    except Exception:
+                        pass
+                    # custom.json exists but couldn't load rules
+                    header_html = (
+                        f"<div class='hdr'>{esc(header)}</div>"
+                        "<div style='text-align:center;color:#888;padding:18px;'>"
+                        "No NVRAM data / map available for this table. "
+                        "Custom achievements are active.</div>"
+                    )
+                    return css, header_html, []
+
+            # Generic no-map / no custom events fallback
             header_html = (
                 f"<div class='hdr'>{esc(header)}</div>"
                 "<div style='text-align:center;color:#888;padding:18px;'>"
-                "No achievement data for this ROM.</div>"
+                "No NVRAM data / map available for this table. "
+                "Custom achievements are active.</div>"
             )
             return css, header_html, []
 
