@@ -5256,11 +5256,11 @@ class Watcher:
                 _custom_json = os.path.join(p_aweditor(self.cfg), f"{self.current_table}.custom.json")
                 if os.path.isfile(_custom_json):
                     _state = self._ach_state_load()
-                    _custom_ach = [
-                        str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-                        for e in _state.get("session", {}).get(self.current_table, [])
-                        if (str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip())
-                    ]
+                    _custom_ach = []
+                    for _e in _state.get("session", {}).get(self.current_table, []):
+                        _t = str(_e.get("title", "")).strip() if isinstance(_e, dict) else str(_e).strip()
+                        if _t:
+                            _custom_ach.append(_t)
                     if _custom_ach:
                         highlights.setdefault("Fun", [])
                         for _ca in _custom_ach:
@@ -5269,7 +5269,7 @@ class Watcher:
             except Exception as e:
                 log(self.cfg, f"[CUSTOM_EVENTS] highlights inject failed: {e}", "WARN")
 
-        _save_key = self.current_rom or self.current_table or "unknown"
+        _save_key = self.current_rom or self.current_table or "__no_session__"
         payload = {
             "player": 1,
             "rom": self.current_rom,
