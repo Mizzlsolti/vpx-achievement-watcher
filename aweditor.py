@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -308,7 +309,35 @@ class AWEditorMixin:
         self._build_aw_subtab_codes(codes_tab)
         self._aw_inner_tabs.addTab(codes_tab, "✏️ Codes")
 
-        self._add_tab_help_button(outer, "aweditor")
+        # ── Bottom help-button row (red ❓ + blue 💡) ─────────────────────
+        help_row = QHBoxLayout()
+        help_row.addStretch(1)
+
+        btn_guide = QPushButton("💡 Custom Guide")
+        btn_guide.setFixedHeight(28)
+        btn_guide.setToolTip("How to create Custom Achievements step-by-step")
+        btn_guide.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #4FC3F7;"
+            " border: 1px solid #4FC3F7; border-radius: 5px;"
+            " font-size: 9pt; font-weight: bold; padding: 0 10px; }"
+            "QPushButton:hover { background-color: #4FC3F7; color: #000000; }"
+        )
+        btn_guide.clicked.connect(self._aw_show_custom_guide)
+        help_row.addWidget(btn_guide)
+
+        btn_help = QPushButton("❓")
+        btn_help.setFixedSize(28, 28)
+        btn_help.setToolTip("Show help for this tab")
+        btn_help.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00;"
+            " border: 1px solid #FF7F00; border-radius: 14px;"
+            " font-size: 11pt; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
+        )
+        btn_help.clicked.connect(lambda: self._show_tab_help("aweditor"))
+        help_row.addWidget(btn_help)
+
+        outer.addLayout(help_row)
 
         self.main_tabs.addTab(tab, "🎯 AWEditor")
 
@@ -1183,3 +1212,56 @@ End Sub
             f"✅ Exported {vbs_name} + {json_name} + README \u2192 {rel_out}\n"
             "ℹ️ Custom achievements ≠ NVRAM map. Table stays in AWEditor list."
         )
+
+    # ------------------------------------------------------------------
+    # Custom Guide dialog
+    # ------------------------------------------------------------------
+
+    def _aw_show_custom_guide(self):
+        """Show a step-by-step guide for creating Custom Achievements."""
+        text = (
+            "<b style='font-size:12pt;'>How to create Custom Achievements</b><br><br>"
+            "Creating your own achievements via the <b>✏️ Codes</b> tab is perfect when "
+            "<i>Analyze Script</i> doesn't find an event, or when you want to create "
+            "entirely unique goals.<br><br>"
+            "Here is a step-by-step example (e.g. for hitting a secret scoop):<br><br>"
+
+            "<b>1. Select a Table</b><br>"
+            "Go to the <b>📋 Tables</b> sub-tab and click the <b>+</b> button on your "
+            "table to select it.<br><br>"
+
+            "<b>2. Define the Achievement</b><br>"
+            "Switch to the <b>✏️ Codes</b> sub-tab. Scroll down to "
+            "<i>✏️ Custom Achievements</i> and click <b>+ Add Achievement</b>.<br>"
+            "Fill in the three fields:<br>"
+            "&nbsp;&nbsp;• <b>Title:</b> The name of your achievement "
+            "(e.g. <code>Secret Chamber!</code>)<br>"
+            "&nbsp;&nbsp;• <b>Description:</b> A short info text "
+            "(e.g. <code>You found the hidden hole</code>)<br>"
+            "&nbsp;&nbsp;• <b>Event-ID (far right):</b> A short code word you invent yourself. "
+            "<b>Important:</b> Use only lowercase letters, numbers, and underscores – "
+            "no spaces! (e.g. <code>secret_hole</code>)<br><br>"
+
+            "<b>3. Export Files</b><br>"
+            "Click <b>💾 Export VBS + JSON</b> at the bottom.<br><br>"
+
+            "<b>4. Modify the VPX Script</b><br>"
+            "Open your table in VPX and press <b>F12</b> for the script editor.<br>"
+            "Find the exact place in the code where your event happens "
+            "(e.g. <code>Sub sw24_Hit()</code>).<br>"
+            "Add your Event-ID as a trigger like this:<br>"
+            "&nbsp;&nbsp;<code>FireAchievement \"secret_hole\"</code><br>"
+            "<i>(Note: The main <code>ExecuteGlobal GetTextFile(...)</code> code at the top of the script "
+            "must already be installed.)</i><br><br>"
+
+            "<hr>"
+            "<b>Summary:</b> You invent a unique Event-ID, register it in the AWEditor, "
+            "and then paste <code>FireAchievement \"your_event_id\"</code> directly into "
+            "the table's script where the action happens."
+        )
+        box = QMessageBox(self)
+        box.setWindowTitle("How to create Custom Achievements")
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(text)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.exec()
