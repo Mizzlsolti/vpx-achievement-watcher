@@ -4474,28 +4474,14 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         if confirm != QMessageBox.StandardButton.Yes:
             return
 
-        try:
-            data = CloudSync.fetch_node(self.cfg, f"players/{pid}/achievements")
-        except Exception as e:
-            self._msgbox_topmost("warn", "Restore from Cloud", f"Failed to fetch data from cloud:\n{e}")
-            return
-
-        if not data or not isinstance(data, dict):
-            self._msgbox_topmost("warn", "Restore from Cloud", "No achievement data found in the cloud for your Player ID.")
-            return
-
-        try:
-            # Reconstruct the local state structure from the cloud payload
-            state = {
-                "global": {"__global__": data.get("global", [])},
-                "session": data.get("session", {}),
-                "roms_played": data.get("roms_played", []),
-                "badges": data.get("badges", []),
-                "selected_badge": data.get("selected_badge", ""),
-            }
-            self.watcher._ach_state_save(state)
-        except Exception as e:
-            self._msgbox_topmost("warn", "Restore from Cloud", f"Failed to save restored data locally:\n{e}")
+        # Restore achievements state and progress data via CloudSync
+        ok = CloudSync.restore_from_cloud(self.cfg)
+        if not ok:
+            self._msgbox_topmost(
+                "warn",
+                "Restore from Cloud",
+                "No achievement data found in the cloud for your Player ID, or the restore failed.",
+            )
             return
 
         # Restore Challenge Scores from Cloud
@@ -6324,22 +6310,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
         try:
             if self.watcher and self.watcher.game_active:
-                # Wenn eine Challenge aktiv ist oder gestartet wird → nichts tun
+                # Suppress the big overlay while a challenge is active or starting
                 ch = getattr(self.watcher, "challenge", {}) or {}
                 if ch.get("active") or ch.get("suppress_big_overlay_once"):
                     return
-                try:
-                    if self.overlay and self.overlay.isVisible():
-                        self.overlay.hide()
-                except Exception:
-                    pass
-                try:
-                    if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
-                        self._mini_overlay = MiniInfoOverlay(self)
-                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex="#FF3B30")
-                except Exception:
-                    pass
-                return
         except Exception:
             pass
         if getattr(self, "_overlay_busy", False):
