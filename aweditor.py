@@ -64,23 +64,59 @@ from watcher_core import (
 # ---------------------------------------------------------------------------
 
 # Each entry: (regex_pattern, title, event_name, default_checked)
+# ORDER MATTERS – more specific patterns must appear before generic ones so they
+# are matched first (the loop breaks on the first match per line).
 _EVENT_PATTERNS: list[tuple[str, str, str, bool]] = [
-    (r"Sub.*Multi[_]?[Bb]all",        "Multiball",     "multiball",     True),
-    (r"Sub.*SuperJackpot|Sub.*Super_Jackpot", "Super Jackpot", "super_jackpot", False),
-    (r"Sub.*Jackpot",                  "Jackpot",       "jackpot",       True),
-    (r"Sub.*Wizard[_]?Mode|Sub.*Wizard", "Wizard Mode", "wizard_mode",   True),
-    (r"Sub.*Extra[_]?Ball",            "Extra Ball",    "extra_ball",    False),
-    (r"Sub.*Mission",                  "Mission",       "mission",       False),
-    (r"Sub.*Combo",                    "Combo",         "combo",         False),
-    (r"Sub.*Ramp.*Hit",                "Ramp Hit",      "ramp_hit",      False),
-    (r"Sub.*Loop",                     "Loop Shot",     "loop_shot",     False),
-    (r"Sub.*Spinner",                  "Spinner",       "spinner",       False),
-    (r"Sub.*Skill[_]?[Ss]hot",        "Skillshot",     "skillshot",     False),
-    (r"Sub.*Bumper.*Hit",              "Bumper Hit",    "bumper_hit",    False),
-    (r"Sub.*Slingshot|Sub.*Sling\b",   "Slingshot",     "slingshot",     False),
-    (r"Sub.*Target.*Hit|Sub.*DropTarget", "Target Hit", "target_hit",    False),
-    (r"Sub.*Kickback",                 "Kickback",      "kickback",      False),
-    (r"Sub.*Outlane",                  "Outlane Save",  "outlane_save",  False),
+    # ── Multiball ──────────────────────────────────────────────────────────
+    (r"Sub.*Multi[_]?[Bb]all",        "Multiball",          "multiball",          True),
+    # ── Jackpot (specific before generic) ─────────────────────────────────
+    (r"Sub.*SuperJackpot|Sub.*Super_Jackpot", "Super Jackpot", "super_jackpot",   False),
+    (r"Sub.*Triple[_]?Jackpot",        "Triple Jackpot",     "triple_jackpot",     False),
+    (r"Sub.*Jackpot",                  "Jackpot",            "jackpot",            True),
+    # ── Wizard / Mission (specific before generic) ─────────────────────────
+    (r"Sub.*Wizard[_]?Mode|Sub.*Wizard", "Wizard Mode",      "wizard_mode",        True),
+    # ── Mode (before Mission) ──────────────────────────────────────────────
+    (r"Sub.*Mode.*Start|Sub.*ModeStart|Sub.*StartMode", "Mode Start", "mode_start", False),
+    (r"Sub.*Mode.*Complete|Sub.*ModeComplete",          "Mode Complete", "mode_complete", True),
+    (r"Sub.*Mission",                  "Mission",            "mission",            False),
+    # ── Extra Ball ─────────────────────────────────────────────────────────
+    (r"Sub.*Extra[_]?Ball",            "Extra Ball",         "extra_ball",         False),
+    # ── Skillshot (specific before generic) ───────────────────────────────
+    (r"Sub.*Super[_]?Skill",           "Super Skillshot",    "super_skillshot",    False),
+    (r"Sub.*Skill[_]?[Ss]hot",         "Skillshot",          "skillshot",          False),
+    # ── Ball events ────────────────────────────────────────────────────────
+    (r"Sub.*Ball[_]?Save",             "Ball Save",          "ball_save",          False),
+    (r"Sub.*Ball[_]?Lock|Sub.*Lock[_]?Ball", "Ball Lock",    "ball_lock",          False),
+    (r"Sub.*Launch[_]?Ball|Sub.*PlungeBall", "Ball Launch",  "ball_launch",        False),
+    # ── Combo / Ramp / Loop / Spinner ──────────────────────────────────────
+    (r"Sub.*Combo",                    "Combo",              "combo",              False),
+    (r"Sub.*Ramp.*Hit",                "Ramp Hit",           "ramp_hit",           False),
+    (r"Sub.*Loop",                     "Loop Shot",          "loop_shot",          False),
+    (r"Sub.*Orbit",                    "Orbit Shot",         "orbit_shot",         False),
+    (r"Sub.*Spinner",                  "Spinner",            "spinner",            False),
+    # ── Bumpers / Slings / Targets ─────────────────────────────────────────
+    (r"Sub.*Bumper.*Hit",              "Bumper Hit",         "bumper_hit",         False),
+    (r"Sub.*Slingshot|Sub.*Sling\b",   "Slingshot",          "slingshot",          False),
+    (r"Sub.*Target.*Hit|Sub.*DropTarget", "Target Hit",      "target_hit",         False),
+    # ── Saves / Outlane ────────────────────────────────────────────────────
+    (r"Sub.*Kickback",                 "Kickback",           "kickback",           False),
+    (r"Sub.*Outlane",                  "Outlane Save",       "outlane_save",       False),
+    (r"Sub.*Magna[_]?Save",            "Magna Save",         "magna_save",         False),
+    # ── Hurry Up / Frenzy / Bonus ──────────────────────────────────────────
+    (r"Sub.*Hurry[_]?Up",              "Hurry Up",           "hurry_up",           False),
+    (r"Sub.*Frenzy",                   "Frenzy",             "frenzy",             False),
+    (r"Sub.*Bonus.*Collect|Sub.*CollectBonus|Sub.*BonusCollect", "Bonus Collect", "bonus_collect", False),
+    # ── Mini Game / Mystery / Scoop ────────────────────────────────────────
+    (r"Sub.*Mini[_]?Game|Sub.*MiniWizard", "Mini Game",      "mini_game",          False),
+    (r"Sub.*Mystery",                  "Mystery Award",      "mystery",            False),
+    (r"Sub.*Scoop",                    "Scoop Hit",          "scoop_hit",          False),
+    # ── Multiplier / Video Mode / Captive Ball ─────────────────────────────
+    (r"Sub.*Multiplier|Sub.*Playfield[_]?X", "Playfield Multiplier", "multiplier", False),
+    (r"Sub.*Video[_]?Mode",            "Video Mode",         "video_mode",         False),
+    (r"Sub.*Captive[_]?Ball",          "Captive Ball",       "captive_ball",       False),
+    # ── Drain / Tilt ───────────────────────────────────────────────────────
+    (r"Sub.*Drain",                    "Drain",              "drain",              False),
+    (r"Sub.*Tilt",                     "Tilt",               "tilt",               False),
 ]
 
 # ---------------------------------------------------------------------------
@@ -132,11 +168,27 @@ class _ScanTablesWorker(QThread):
             try:
                 rom = run_vpxtool_get_rom(self.cfg, vpx_path, suppress_warn=True) or ""
                 if rom:
-                    # Check local map files
+                    # Check local map files (but NOT .custom.json – those are AWEditor output)
                     m1 = os.path.join(p_local_maps(self.cfg), f"{rom}.json")
                     m2 = os.path.join(p_local_maps(self.cfg), f"{rom}.map.json")
                     if os.path.isfile(m1) or os.path.isfile(m2):
-                        continue
+                        # Verify it is a real NVRAM map and not a custom achievements file.
+                        # A real map has "fields"; a custom achievements file has "rules" but
+                        # no "fields".  If we cannot read it, err on the side of skipping.
+                        map_path = m1 if os.path.isfile(m1) else m2
+                        try:
+                            with open(map_path, "r", encoding="utf-8") as _f:
+                                _map_data = json.load(_f)
+                            if (
+                                isinstance(_map_data, dict)
+                                and "rules" in _map_data
+                                and "fields" not in _map_data
+                            ):
+                                pass  # custom achievements file – do NOT skip
+                            else:
+                                continue  # real NVRAM map – skip
+                        except Exception:
+                            continue  # unreadable – assume real map and skip
                     # Check cloud index – if the ROM is listed there it has a map
                     if rom.lower() in cloud_index:
                         continue
@@ -397,7 +449,6 @@ class AWEditorMixin:
         scroll_det = QScrollArea()
         scroll_det.setWidgetResizable(True)
         scroll_det.setMinimumHeight(140)
-        scroll_det.setMaximumHeight(220)
         scroll_det.setStyleSheet("QScrollArea { border: none; background: #181818; }")
 
         self._aw_detected_container = QWidget()
@@ -413,7 +464,7 @@ class AWEditorMixin:
 
         scroll_det.setWidget(self._aw_detected_container)
         detected_layout.addWidget(scroll_det)
-        layout.addWidget(grp_detected)
+        layout.addWidget(grp_detected, stretch=1)
 
         # ── Custom achievements group ──────────────────────────────────
         grp_custom = QGroupBox("✏️ Custom Achievements")
@@ -754,13 +805,23 @@ class AWEditorMixin:
                 lbl.setStyleSheet("background:transparent;")
                 row_h.addWidget(lbl, stretch=1)
 
+                title_edit = QLineEdit(title)
+                title_edit.setPlaceholderText("Achievement title for toast")
+                title_edit.setStyleSheet(self._aw_lineedit_style())
+                title_edit.setToolTip(
+                    "Customize the achievement title shown in the toast notification (line 1)"
+                )
+                title_edit.setMaximumWidth(200)
+                row_h.addWidget(title_edit)
+
                 self._aw_detected_vbox.addWidget(row_w)
                 self._aw_detected_rows.append({
-                    "chk": chk,
-                    "title": title,
-                    "sub": sub_name,
-                    "lineno": lineno,
-                    "event": event_name,
+                    "chk":        chk,
+                    "title":      title,
+                    "title_edit": title_edit,
+                    "sub":        sub_name,
+                    "lineno":     lineno,
+                    "event":      event_name,
                 })
 
             self._aw_status_lbl.setText(f"Found {len(findings)} event(s).")
@@ -859,8 +920,11 @@ class AWEditorMixin:
         rules: list[dict] = []
         for row in self._aw_detected_rows:
             if row["chk"].isChecked():
+                custom_title = row["title_edit"].text().strip()
+                if not custom_title:
+                    custom_title = row["title"]
                 rules.append({
-                    "title":       row["title"] + "!",
+                    "title":       custom_title + "!",
                     "description": f"Trigger: {row['sub']}()",
                     "condition":   {"type": "event", "event": row["event"]},
                 })
@@ -993,5 +1057,6 @@ End Sub
 
         rel_out = os.path.relpath(out_dir, self.cfg.BASE) if hasattr(self.cfg, "BASE") else out_dir
         self._aw_status_lbl.setText(
-            f"✅ Exported {vbs_name} + {json_name} → {rel_out}"
+            f"✅ Exported {vbs_name} + {json_name} → {rel_out}\n"
+            "ℹ️ Custom achievements ≠ NVRAM map. Table stays in AWEditor list."
         )
