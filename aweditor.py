@@ -78,12 +78,19 @@ _EVENT_PATTERNS: list[tuple[str, str, str, bool]] = [
     (r"Sub.*SuperJackpot|Sub.*Super_Jackpot", "Super Jackpot", "super_jackpot",   False),
     (r"Sub.*Triple[_]?Jackpot",        "Triple Jackpot",     "triple_jackpot",     False),
     (r"Sub.*Jackpot",                  "Jackpot",            "jackpot",            True),
-    # ── Wizard / Mission (specific before generic) ─────────────────────────
+    # ── Wizard ─────────────────────────────────────────────────────────────
     (r"Sub.*Wizard[_]?Mode|Sub.*Wizard", "Wizard Mode",      "wizard_mode",        True),
-    # ── Mode (before Mission) ──────────────────────────────────────────────
-    (r"Sub.*Mode.*Start|Sub.*ModeStart|Sub.*StartMode", "Mode Start", "mode_start", False),
-    (r"Sub.*Mode.*Complete|Sub.*ModeComplete",          "Mode Complete", "mode_complete", True),
+    # ── Mission (specific before generic) ─────────────────────────────────
+    (r"Sub.*Mission.*Start|Sub.*StartMission|Sub.*MissionStart", "Mission Start", "mission_start", True),
+    (r"Sub.*Mission.*Complete|Sub.*CompleteMission|Sub.*MissionComplete|Sub.*Mission.*End|Sub.*EndMission", "Mission Complete", "mission_complete", True),
     (r"Sub.*Mission",                  "Mission",            "mission",            False),
+    # ── Quest (specific before generic) ────────────────────────────────────
+    (r"Sub.*Quest.*Start|Sub.*StartQuest|Sub.*QuestStart", "Quest Start",         "quest_start",        True),
+    (r"Sub.*Quest.*Complete|Sub.*CompleteQuest|Sub.*QuestComplete|Sub.*Quest.*End", "Quest Complete", "quest_complete", True),
+    (r"Sub.*Quest",                    "Quest",              "quest",              False),
+    # ── Mode (specific before generic) ────────────────────────────────────
+    (r"Sub.*Mode.*Start|Sub.*ModeStart|Sub.*StartMode|Sub.*ModeActive|Sub.*ActivateMode", "Mode Start", "mode_start", False),
+    (r"Sub.*Mode.*Complete|Sub.*ModeComplete|Sub.*Mode.*End|Sub.*EndMode|Sub.*Mode.*Win", "Mode Complete", "mode_complete", True),
     # ── Extra Ball ─────────────────────────────────────────────────────────
     (r"Sub.*Extra[_]?Ball",            "Extra Ball",         "extra_ball",         False),
     # ── Skillshot (specific before generic) ───────────────────────────────
@@ -123,6 +130,23 @@ _EVENT_PATTERNS: list[tuple[str, str, str, bool]] = [
     (r"Sub.*Drain",                    "Drain",              "drain",              False),
     (r"Sub.*Tilt",                     "Tilt",               "tilt",               False),
 ]
+
+# Compiled regex to identify a VBScript Sub definition line (strict)
+_SUB_DEF_RE = re.compile(
+    r"^(?:Public\s+|Private\s+)?Sub\s+([a-zA-Z0-9_]+)",
+    re.IGNORECASE,
+)
+
+# Sub names containing these keywords are implementation helpers, not game-logic
+# events, so they are filtered out to reduce noise in the Detected Events list.
+# Note: word boundaries (\b) are intentionally omitted because VBScript sub names
+# use camelCase/PascalCase (e.g. "RandomSoundDrain"), and \b does not recognise
+# camelCase word transitions.  Bare substring matching gives the best coverage
+# without requiring complex lookahead/lookbehind logic.
+_NOISE_SUB_RE = re.compile(
+    r"animate|timer|sound|update|light|flash|init",
+    re.IGNORECASE,
+)
 
 # ---------------------------------------------------------------------------
 # Background workers
@@ -241,16 +265,26 @@ class _AnalyzeScriptWorker(QThread):
         seen_events: set[str] = set()
         for lineno, line in enumerate(script.splitlines(), start=1):
             stripped = line.strip()
+            # Only consider actual Sub definition lines (not variable declarations
+            # or comments that happen to contain "Sub" as a substring).
+            m_def = _SUB_DEF_RE.match(stripped)
+            if not m_def:
+                continue
+            sub_name = m_def.group(1)
+            # Skip implementation-helper subs (animations, sounds, timers, etc.)
+            # that are not meaningful game-logic events.
+            if _NOISE_SUB_RE.search(sub_name):
+                continue
+            # Build a clean, canonical test string so patterns work correctly
+            # regardless of modifiers like "Public" / "Private".
+            test_line = f"Sub {sub_name}"
             for pattern, title, event_name, default_checked in _EVENT_PATTERNS:
                 if event_name in seen_events:
                     continue
-                if re.search(pattern, stripped, re.IGNORECASE):
-                    # Extract the Sub name (everything after "Sub " up to first "(" or space)
-                    m = re.match(r"Sub\s+(\w+)", stripped, re.IGNORECASE)
-                    sub_name = m.group(1) if m else stripped
+                if re.search(pattern, test_line, re.IGNORECASE):
                     findings.append((title, sub_name, lineno, event_name, default_checked))
                     seen_events.add(event_name)
-                    break  # only first pattern match per line
+                    break  # only first pattern match per sub
 
         self.finished.emit(findings)
 
