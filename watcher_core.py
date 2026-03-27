@@ -304,6 +304,7 @@ class AppConfig:
             loaded_ov = data.get("OVERLAY", {})
             
             allowed_keys = [
+                "theme",
                 "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
                 "lines_per_category", "font_family", "overlay_auto_close",
                 "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
@@ -376,6 +377,7 @@ class AppConfig:
             clean_overlay = {}
             ov = getattr(self, "OVERLAY", {})
             allowed_keys = [
+                "theme",
                 "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
                 "lines_per_category", "font_family", "overlay_auto_close",
                 "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
