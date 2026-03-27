@@ -780,7 +780,7 @@ class AWEditorMixin:
             pass
 
     def _aw_init_tables(self) -> None:
-        """On startup: populate the table list from cache if available, else run a full scan."""
+        """On startup: populate the table list from cache if available, else wait for manual scan."""
         cached = self._aw_load_cache()
         if cached is not None:
             self._aw_all_tables = cached
@@ -789,10 +789,12 @@ class AWEditorMixin:
                 self._aw_scan_status_lbl.setText(f"Found {len(cached)} table(s) (cached).")
             else:
                 self._aw_scan_status_lbl.setText(
-                    "No Non-ROM tables found (cached). Check Tables directory in System tab."
+                    "No tables found in cache. Click '🔄 Scan' to search for tables without NVRAM map."
                 )
         else:
-            self._aw_scan_tables()
+            self._aw_scan_status_lbl.setText(
+                "Click '🔄 Scan' to search for tables without NVRAM map."
+            )
 
     # ------------------------------------------------------------------
     # Script analysis

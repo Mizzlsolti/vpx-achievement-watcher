@@ -5250,9 +5250,30 @@ class Watcher:
             log(self.cfg, f"[HIGHLIGHTS] analyze_session failed for P1: {e}", "WARN")
             highlights = {"Power": [], "Precision": [], "Fun": []}
 
+        # For no-ROM custom-events tables, include unlocked custom achievements in highlights
+        if not self.current_rom and self.current_table:
+            try:
+                _custom_json = os.path.join(p_aweditor(self.cfg), f"{self.current_table}.custom.json")
+                if os.path.isfile(_custom_json):
+                    _state = self._ach_state_load()
+                    _custom_ach = [
+                        str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                        for e in _state.get("session", {}).get(self.current_table, [])
+                        if (str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip())
+                    ]
+                    if _custom_ach:
+                        highlights.setdefault("Fun", [])
+                        for _ca in _custom_ach:
+                            if _ca not in highlights["Fun"]:
+                                highlights["Fun"].append(_ca)
+            except Exception as e:
+                log(self.cfg, f"[CUSTOM_EVENTS] highlights inject failed: {e}", "WARN")
+
+        _save_key = self.current_rom or self.current_table or "unknown"
         payload = {
             "player": 1,
             "rom": self.current_rom,
+            "table": self.current_table,
             "playtime_sec": play_sec,
             "score": score_abs,
             "highlights": highlights,
@@ -5261,11 +5282,11 @@ class Watcher:
         # Cache the payload in memory so the overlay can read it without waiting for disk I/O
         self._overlay_snapshot_cache = payload
 
-        save_json(os.path.join(active_dir, f"{self.current_rom}_P1.json"), payload)
+        save_json(os.path.join(active_dir, f"{_save_key}_P1.json"), payload)
 
         try:
             for pid_old in (2, 3, 4):
-                fp = os.path.join(active_dir, f"{self.current_rom}_P{pid_old}.json")
+                fp = os.path.join(active_dir, f"{_save_key}_P{pid_old}.json")
                 if os.path.isfile(fp):
                     os.remove(fp)
         except Exception:
@@ -6148,7 +6169,7 @@ class Watcher:
 
             lines.append(f"{label:<30} {value_txt}")
 
-    def _ach_record_unlocks(self, kind: str, rom: str, titles: list, retriggered: list = None):
+    def _ach_record_unlocks(self, kind: str, rom: str, titles: list, retriggered: list = None, skip_cloud: bool = False):
         if not rom or (not titles and not retriggered):
             return
         from datetime import datetime, timezone
@@ -6243,7 +6264,7 @@ class Watcher:
             except Exception:
                 pass
             try:
-                if self.cfg.CLOUD_ENABLED:
+                if not skip_cloud and self.cfg.CLOUD_ENABLED:
                     player_name = self.cfg.OVERLAY.get("player_name", "Player")
                     CloudSync.upload_full_achievements(self.cfg, state, player_name)
             except Exception:
@@ -6452,8 +6473,17 @@ class Watcher:
                     if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
                         if self.current_rom and self._has_any_map(self.current_rom):
                             self.bridge.overlay_show.emit()
+                        elif not self.current_rom and self.current_table:
+                            # No-ROM table: show overlay if custom events are configured
+                            _custom_json = os.path.join(
+                                p_aweditor(self.cfg), f"{self.current_table}.custom.json"
+                            )
+                            if os.path.isfile(_custom_json):
+                                self.bridge.overlay_show.emit()
+                            else:
+                                log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
                         else:
-                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for {self.current_rom}")
+                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
                 except Exception as e:
                     log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
@@ -6675,18 +6705,30 @@ class Watcher:
 
                 matched_rules = event_rules.get(event_name, [])
                 if matched_rules:
+                    # Check which achievements are already unlocked to avoid repeat toasts
+                    table_key = (self.current_table or self.current_rom or "").strip() or "__custom__"
+                    try:
+                        _state = self._ach_state_load()
+                        _already_unlocked = {
+                            str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
+                            for e in _state.get("session", {}).get(table_key, [])
+                        }
+                    except Exception:
+                        _already_unlocked = set()
+
                     for rule in matched_rules:
                         title = str(rule.get("title") or event_name).strip()
                         log(self.cfg, f"[CUSTOM_EVENTS] Event '{event_name}' → achievement '{title}'")
-                        try:
-                            self.bridge.ach_toast_show.emit(title, self.current_table or "", 5)
-                        except Exception as e:
-                            log(self.cfg, f"[CUSTOM_EVENTS] toast emit failed: {e}", "WARN")
+                        # Only show toast for first-time unlocks (once per profile)
+                        if title not in _already_unlocked:
+                            try:
+                                self.bridge.ach_toast_show.emit(title, self.current_table or "", 5)
+                            except Exception as e:
+                                log(self.cfg, f"[CUSTOM_EVENTS] toast emit failed: {e}", "WARN")
 
-                    # Persist unlocks; use table name (or a fallback key) as the ROM bucket
+                    # Persist unlocks; custom achievements must NOT be uploaded to the cloud
                     try:
-                        table_key = (self.current_table or self.current_rom or "").strip() or "__custom__"
-                        self._ach_record_unlocks("session", table_key, matched_rules)
+                        self._ach_record_unlocks("session", table_key, matched_rules, skip_cloud=True)
                     except Exception as e:
                         log(self.cfg, f"[CUSTOM_EVENTS] persist failed: {e}", "WARN")
 
