@@ -254,7 +254,7 @@ class CloudStatsMixin:
         self.btn_cloud_fetch = QPushButton("Fetch Highscores ☁️")
         self.btn_cloud_fetch.setStyleSheet(
             f"QPushButton {{ background-color:{get_theme_color(self.cfg, 'primary')}; color:#000000;"
-            " font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }}"
+            " font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }"
         )
         self.btn_cloud_fetch.clicked.connect(self._fetch_cloud_leaderboard)
         

@@ -509,7 +509,7 @@ class AWEditorMixin:
         self._aw_btn_export = QPushButton("💾 Export VBS + JSON")
         self._aw_btn_export.setStyleSheet(
             f"QPushButton {{ background-color:{get_theme_color(self.cfg, 'primary')}; color:#000000;"
-            " font-weight:bold; border-radius:5px; padding:5px 12px; border:none; }}"
+            " font-weight:bold; border-radius:5px; padding:5px 12px; border:none; }"
             f"QPushButton:hover {{ background-color:{get_theme_color(self.cfg, 'accent')}; }}"
         )
         self._aw_btn_export.setToolTip(
@@ -535,7 +535,7 @@ class AWEditorMixin:
         accent  = get_theme_color(self.cfg, "accent")
         return (
             f"QPushButton {{ background-color:{primary}; color:#000000;"
-            " font-weight:bold; border-radius:4px; padding:4px 10px; border:none; }}"
+            " font-weight:bold; border-radius:4px; padding:4px 10px; border:none; }"
             f"QPushButton:hover {{ background-color:{accent}; }}"
         )
 
