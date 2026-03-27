@@ -2078,8 +2078,11 @@ class CloudSync:
 
         Fetches ``players/{pid}/achievements`` and reconstructs the local
         ``achievements_state.json``.  Also fetches ``players/{pid}/progress``
-        and updates the local ``progress_upload_log.json`` so that already-
-        uploaded progress entries are not re-sent after a restore.
+        and merges ROM entries into ``roms_played`` and updates the local
+        ``progress_upload_log.json`` so that already-uploaded progress entries
+        are not re-sent after a restore.  Finally fetches
+        ``players/{pid}/vps_mapping`` and saves it to the local
+        ``vps_id_mapping.json``.
 
         Returns ``True`` on success, ``False`` when a critical step fails.
         """
@@ -2098,7 +2101,7 @@ class CloudSync:
             log(cfg, f"[CLOUD] restore_from_cloud: no achievements data found for player {pid}", "WARN")
             return False
 
-        # ── 2. Reconstruct and save local achievements state ─────────────────
+        # ── 2. Reconstruct local achievements state ───────────────────────────
         state = {
             "global": {"__global__": data.get("global", [])},
             "session": data.get("session", {}),
@@ -2106,6 +2109,46 @@ class CloudSync:
             "badges": data.get("badges", []),
             "selected_badge": data.get("selected_badge", ""),
         }
+        if not isinstance(state["session"], dict):
+            state["session"] = {}
+        if not isinstance(state["roms_played"], list):
+            state["roms_played"] = []
+
+        # ── 3. Fetch progress node, enrich state, update local upload log ─────
+        try:
+            progress_data = CloudSync.fetch_node(cfg, f"players/{pid}/progress")
+            if isinstance(progress_data, dict) and progress_data:
+                log_data = _load_progress_upload_log(cfg)
+                for rom, entry in progress_data.items():
+                    if not isinstance(entry, dict) or not rom:
+                        continue
+                    vps_id = str(entry.get("vps_id") or "").strip()
+                    if vps_id:
+                        log_data[rom] = vps_id
+                    # Populate roms_played from progress data
+                    if rom not in state["roms_played"]:
+                        state["roms_played"].append(rom)
+                    # Warn when a ROM has unlocked achievements but no session
+                    # entries could be reconstructed (cloud achievements node
+                    # was stale when the progress was last written).
+                    unlocked = entry.get("unlocked", 0)
+                    if unlocked > 0 and rom not in state["session"]:
+                        log(
+                            cfg,
+                            f"[CLOUD] restore_from_cloud: ROM '{rom}' has {unlocked} unlocked "
+                            f"achievement(s) in progress but no session details in cloud — "
+                            f"session details could not be fully reconstructed",
+                            "WARN",
+                        )
+                _save_progress_upload_log(cfg, log_data)
+                log(
+                    cfg,
+                    f"[CLOUD] restore_from_cloud: progress log restored for {len(progress_data)} ROM(s)",
+                )
+        except Exception as e:
+            log(cfg, f"[CLOUD] restore_from_cloud: progress restore failed (non-critical): {e}", "WARN")
+
+        # ── 4. Save the enriched state and recompute level ────────────────────
         try:
             secure_save_json(f_achievements_state(cfg), state)
             lv = compute_player_level(state)
@@ -2118,23 +2161,15 @@ class CloudSync:
             log(cfg, f"[CLOUD] restore_from_cloud: failed to save achievements state: {e}", "WARN")
             return False
 
-        # ── 3. Fetch progress node and update local upload log ────────────────
+        # ── 5. Fetch vps_mapping node and save locally ────────────────────────
         try:
-            progress_data = CloudSync.fetch_node(cfg, f"players/{pid}/progress")
-            if isinstance(progress_data, dict) and progress_data:
-                log_data = _load_progress_upload_log(cfg)
-                for rom, entry in progress_data.items():
-                    if isinstance(entry, dict):
-                        vps_id = str(entry.get("vps_id") or "").strip()
-                        if rom and vps_id:
-                            log_data[rom] = vps_id
-                _save_progress_upload_log(cfg, log_data)
-                log(
-                    cfg,
-                    f"[CLOUD] restore_from_cloud: progress log restored for {len(progress_data)} ROM(s)",
-                )
+            vps_data = CloudSync.fetch_node(cfg, f"players/{pid}/vps_mapping")
+            if vps_data and isinstance(vps_data, dict):
+                from ui_vps import _save_vps_mapping
+                _save_vps_mapping(cfg, vps_data)
+                log(cfg, f"[CLOUD] restore_from_cloud: VPS mapping restored: {len(vps_data)} entries")
         except Exception as e:
-            log(cfg, f"[CLOUD] restore_from_cloud: progress restore failed (non-critical): {e}", "WARN")
+            log(cfg, f"[CLOUD] restore_from_cloud: VPS mapping restore failed (non-critical): {e}", "WARN")
 
         return True
 
