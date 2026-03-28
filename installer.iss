@@ -14,12 +14,14 @@
 #endif
 
 [Setup]
+AppId={{B8F4E3A1-7C2D-4A5F-9E6B-1D3C8F2A7E4B}
 AppName=VPX Achievement Watcher
 AppVersion={#MyAppVersion}
 AppVerName=VPX Achievement Watcher
 AppPublisher=Mizzlsolti
 AppPublisherURL=https://github.com/Mizzlsolti/vpx-achievement-watcher
 DefaultDirName=C:\vPinball\VPX Achievement Watcher
+UsePreviousAppDir=yes
 DefaultGroupName=VPX Achievement Watcher
 OutputDir=installer-output
 OutputBaseFilename=VPX-Achievement-Watcher-Setup
