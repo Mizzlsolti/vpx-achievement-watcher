@@ -193,15 +193,43 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  cfgPath, json: string;
+  cfgPath, json, oldVal: string;
+  existingJson: AnsiString;
 begin
   if CurStep = ssPostInstall then
   begin
-    { In silent mode, preserve an existing config.json (upgrade path).
-      If the file does not exist yet (first-time silent deploy) we fall
-      through and write the defaults from the edit fields below. }
-    if WizardSilent and FileExists(ExpandConstant('{app}\config.json')) then Exit;
+    cfgPath := ExpandConstant('{app}\config.json');
 
+    if FileExists(cfgPath) then
+    begin
+      { Silent upgrade: preserve existing config.json entirely. }
+      if WizardSilent then Exit;
+
+      { Interactive upgrade: preserve all settings (OVERLAY, cloud config,
+        etc.) but update the three path values to whatever the user entered
+        on the wizard page. }
+      if LoadStringFromFile(cfgPath, existingJson) then
+      begin
+        json := existingJson;
+
+        oldVal := GetJsonValue(json, 'BASE');
+        StringChange(json, '"BASE": "' + EscapeJsonStr(oldVal) + '"',
+                           '"BASE": "' + EscapeJsonStr(EdBase.Text) + '"');
+
+        oldVal := GetJsonValue(json, 'NVRAM_DIR');
+        StringChange(json, '"NVRAM_DIR": "' + EscapeJsonStr(oldVal) + '"',
+                           '"NVRAM_DIR": "' + EscapeJsonStr(EdNvram.Text) + '"');
+
+        oldVal := GetJsonValue(json, 'TABLES_DIR');
+        StringChange(json, '"TABLES_DIR": "' + EscapeJsonStr(oldVal) + '"',
+                           '"TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '"');
+
+        SaveStringToFile(cfgPath, json, False);
+        Exit;
+      end;
+    end;
+
+    { First-time install: write a minimal config.json with the wizard paths. }
     json :=
       '{' + #13#10 +
       '  "BASE": "'       + EscapeJsonStr(EdBase.Text)   + '",' + #13#10 +
@@ -209,7 +237,6 @@ begin
       '  "TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '",' + #13#10 +
       '  "FIRST_RUN": false' + #13#10 +
       '}';
-    cfgPath := ExpandConstant('{app}\config.json');
     SaveStringToFile(cfgPath, json, False);
   end;
 end;
