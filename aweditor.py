@@ -990,10 +990,10 @@ class AWEditorMixin:
         else:
             # Group findings by category
             _CATEGORY_ORDER = [
-                ("missions_modes", "🎯 Missionen & Modi"),
-                ("mechanics",      "🎮 Spielmechanik"),
-                ("basics",         "⚙️ Basis-Events"),
-                ("body",           "🔍 Body-Analyse"),
+                ("missions_modes", "🎯 Missions & Modes"),
+                ("mechanics",      "🎮 Game Mechanics"),
+                ("basics",         "⚙️ Basic Events"),
+                ("body",           "🔍 Body Analysis"),
             ]
             grouped: dict[str, list] = {cat: [] for cat, _ in _CATEGORY_ORDER}
             for finding in findings:

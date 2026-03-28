@@ -577,7 +577,7 @@ def _migrate_runtime_dirs(cfg):
     except Exception:
         pass
 
-GITHUB_BASE = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/475fa3619134f5aa732ccd80244e1613e7e6e9a1"
+GITHUB_BASE = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e"
 INDEX_URL = f"{GITHUB_BASE}/index.json"
 ROMNAMES_URL = f"{GITHUB_BASE}/romnames.json"
 VPXTOOL_EXE = "vpxtool.exe"
@@ -3294,8 +3294,22 @@ class Watcher:
             except Exception as e:
                 log(self.cfg, f"Could not download {url}: {e}", "ERROR")
 
-        ensure_file(f_index(self.cfg), INDEX_URL)
-        ensure_file(f_romnames(self.cfg), ROMNAMES_URL)
+        def refresh_file(path, url):
+            """Always attempt a fresh download; fall back to existing local file on failure."""
+            try:
+                data = _fetch_bytes_url(url, timeout=25)
+                ensure_dir(os.path.dirname(path))
+                with open(path, "wb") as f:
+                    f.write(data)
+                log(self.cfg, f"Refreshed {url} -> {path}")
+            except Exception as e:
+                if os.path.exists(path):
+                    log(self.cfg, f"Could not refresh {url}, keeping existing file: {e}", "WARN")
+                else:
+                    log(self.cfg, f"Could not download {url} and no local copy exists: {e}", "ERROR")
+
+        refresh_file(f_index(self.cfg), INDEX_URL)
+        refresh_file(f_romnames(self.cfg), ROMNAMES_URL)
         from ui_vps import VPSDB_URL as _VPSDB_URL
         ensure_file(f_vpsdb_cache(self.cfg), _VPSDB_URL)
         try:
