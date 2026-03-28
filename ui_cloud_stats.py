@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json, _strip_version_from_name
+from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state
 from theme import get_theme_color
 
 
@@ -499,6 +499,17 @@ class CloudStatsMixin:
 
             # Badge icon next to player name
             selected_badge_id = str(row.get("selected_badge") or "").strip()
+            # For the current player's own row, override with the locally stored badge so
+            # the display is immediately current after a badge change (before cloud sync).
+            try:
+                own_name = str(self.cfg.OVERLAY.get("player_name", "") or "").strip()
+                if own_name and str(row.get("name") or "").strip() == own_name:
+                    _local_state = secure_load_json(f_achievements_state(self.cfg), {}) or {}
+                    _local_badge = str(_local_state.get("selected_badge") or "").strip()
+                    if _local_badge:
+                        selected_badge_id = _local_badge
+            except Exception:
+                pass
             badge_icon = ""
             if selected_badge_id:
                 try:

@@ -4883,8 +4883,8 @@ class Watcher:
                 else:
                     title = "CHALLENGE COMPLETE!"
                 self.bridge.challenge_info_show.emit(f"{title}<br>Score: {score_txt}", 8, "#FFFFFF")
-            except Exception:
-                pass
+            except Exception as e:
+                log(self.cfg, f"[CHALLENGE] score overlay emit failed: {e}", "WARN")
 
             try:
                 deadline = time.time() + 3.0

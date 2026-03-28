@@ -1279,16 +1279,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             except Exception:
                 pass
             self._status_overlay = None
-        if getattr(self, '_mini_overlay', None) is not None:
-            try:
-                self._mini_overlay.close()
-                self._mini_overlay.deleteLater()
-            except Exception:
-                pass
-            self._mini_overlay = None
-        # NOTE: _ach_toast_mgr is intentionally NOT cleared here.
-        # Achievement toasts are post-game notifications that must survive VPX exit,
-        # because _persist_and_toast_achievements() runs AFTER the session ends.
+        # NOTE: _ach_toast_mgr and _mini_overlay are intentionally NOT cleared here.
+        # Both are post-game notifications that must survive VPX exit:
+        # - _ach_toast_mgr: achievement toasts fired by _persist_and_toast_achievements()
+        # - _mini_overlay: challenge score overlay emitted by _challenge_record_result()
 
     def _refresh_challenge_select_overlay(self):
         ovw = getattr(self, "_challenge_select", None)
@@ -6741,6 +6735,11 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                         pass
 
                 threading.Thread(target=_reupload_progress, daemon=True).start()
+        except Exception:
+            pass
+        # Schedule a cloud leaderboard refresh so the updated badge icon appears immediately
+        try:
+            QTimer.singleShot(3000, self._fetch_cloud_leaderboard)
         except Exception:
             pass
 
