@@ -53,6 +53,7 @@ from PyQt6.QtWidgets import (
 
 from theme import get_theme_color
 from watcher_core import (
+    CONFIG_FILE,
     ensure_dir,
     ensure_vpxtool,
     f_index,
@@ -770,7 +771,12 @@ class AWEditorMixin:
         old_filenames = {entry.get("filename", "") for entry in self._aw_all_tables}
         new_filenames = {entry.get("filename", "") for entry in tables}
         removed = old_filenames - new_filenames
-        if removed and old_filenames:
+
+        is_manual = getattr(self, "_aw_scan_manual", False)
+        if is_manual:
+            # Popup will convey the result — clear the status label instead of duplicating
+            self._aw_scan_status_lbl.setText("")
+        elif removed and old_filenames:
             # Show names without extension for readability
             removed_names = ", ".join(
                 sorted(os.path.splitext(f)[0] for f in removed)
@@ -1201,8 +1207,9 @@ class AWEditorMixin:
         vbs_name = f"aw_{table_stem}.vbs"
         vbs_path = os.path.join(out_dir, vbs_name)
 
-        # VBScript path needs backslashes and trailing backslash
+        # VBScript paths need backslashes; events_path_vbs is the fallback if config read fails
         events_path_vbs = p_custom_events(self.cfg).replace("/", "\\").rstrip("\\") + "\\"
+        config_path_vbs = CONFIG_FILE.replace("/", "\\")
 
         # Build comment lines for detected events
         detected_lines: list[str] = []
@@ -1252,7 +1259,38 @@ class AWEditorMixin:
 ' ═══════════════════════════════════════════════════════════════════
 
 Dim AW_EventPath
-AW_EventPath = "{events_path_vbs}"
+
+' Reads BASE from config.json and builds the custom_events path at runtime.
+' Falls back to the path that was current when this file was exported.
+Sub AW_InitEventPath()
+    On Error Resume Next
+    Dim fso, f, txt, p1, p2, base
+    Dim q : q = Chr(34)
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FileExists("{config_path_vbs}") Then
+        Set f = fso.OpenTextFile("{config_path_vbs}", 1)
+        txt = f.ReadAll
+        f.Close
+        Set f = Nothing
+        p1 = InStr(txt, q & "BASE" & q & ": " & q)
+        If p1 > 0 Then
+            p1 = p1 + Len(q & "BASE" & q & ": " & q)
+            p2 = InStr(p1, txt, q)
+            If p2 > 0 Then
+                base = Mid(txt, p1, p2 - p1)
+                base = Replace(base, "\\\\", "\\")
+                AW_EventPath = base & "\\tools\\AWeditor\\custom_events\\"
+                Set fso = Nothing
+                Exit Sub
+            End If
+        End If
+    End If
+    AW_EventPath = "{events_path_vbs}"
+    Set fso = Nothing
+    On Error GoTo 0
+End Sub
+
+AW_InitEventPath
 
 Sub FireAchievement(eventName)
     On Error Resume Next
