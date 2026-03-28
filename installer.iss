@@ -55,6 +55,10 @@ Filename: "{app}\Achievement_Watcher.exe"; Flags: nowait runasoriginaluser; Chec
 ; including files created after install (config, logs, cache, etc.)
 Type: filesandordirs; Name: "{app}"
 
+[Registry]
+Root: HKCU; Subkey: "Software\VPX Achievement Watcher"; ValueType: string; ValueName: "EventsPath"; ValueData: "{code:GetEventsPath}"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\VPX Achievement Watcher"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
+
 [Code]
 var
   PathsPage: TWizardPage;
@@ -191,6 +195,12 @@ begin
     else
       Result := Result + S[i];
   end;
+end;
+
+{ Returns the custom_events folder path based on the wizard BASE value }
+function GetEventsPath(Param: string): string;
+begin
+  Result := EdBase.Text + '\tools\AWeditor\custom_events\';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
