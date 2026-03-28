@@ -73,24 +73,39 @@ from watcher_core import (
 # are matched first (the loop breaks on the first match per line).
 _EVENT_PATTERNS: list[tuple[str, str, str, bool]] = [
     # ── Multiball ──────────────────────────────────────────────────────────
-    (r"Sub.*Multi[_]?[Bb]all",        "Multiball",          "multiball",          True),
+    (r"Sub.*Multi[_]?[Bb]all",        "Multiball",          "multiball",          False),
     # ── Jackpot (specific before generic) ─────────────────────────────────
     (r"Sub.*SuperJackpot|Sub.*Super_Jackpot", "Super Jackpot", "super_jackpot",   False),
     (r"Sub.*Triple[_]?Jackpot",        "Triple Jackpot",     "triple_jackpot",     False),
-    (r"Sub.*Jackpot",                  "Jackpot",            "jackpot",            True),
+    (r"Sub.*Jackpot",                  "Jackpot",            "jackpot",            False),
     # ── Wizard ─────────────────────────────────────────────────────────────
-    (r"Sub.*Wizard[_]?Mode|Sub.*Wizard", "Wizard Mode",      "wizard_mode",        True),
+    (r"Sub.*Wizard[_]?Mode|Sub.*Wizard", "Wizard Mode",      "wizard_mode",        False),
     # ── Mission (specific before generic) ─────────────────────────────────
-    (r"Sub.*Mission.*Start|Sub.*StartMission|Sub.*MissionStart", "Mission Start", "mission_start", True),
-    (r"Sub.*Mission.*Complete|Sub.*CompleteMission|Sub.*MissionComplete|Sub.*Mission.*End|Sub.*EndMission", "Mission Complete", "mission_complete", True),
+    (r"Sub.*Mission.*Start|Sub.*StartMission|Sub.*MissionStart", "Mission Start", "mission_start", False),
+    (r"Sub.*Mission.*Complete|Sub.*CompleteMission|Sub.*MissionComplete|Sub.*Mission.*End|Sub.*EndMission", "Mission Complete", "mission_complete", False),
     (r"Sub.*Mission",                  "Mission",            "mission",            False),
     # ── Quest (specific before generic) ────────────────────────────────────
-    (r"Sub.*Quest.*Start|Sub.*StartQuest|Sub.*QuestStart", "Quest Start",         "quest_start",        True),
-    (r"Sub.*Quest.*Complete|Sub.*CompleteQuest|Sub.*QuestComplete|Sub.*Quest.*End", "Quest Complete", "quest_complete", True),
+    (r"Sub.*Quest.*Start|Sub.*StartQuest|Sub.*QuestStart", "Quest Start",         "quest_start",        False),
+    (r"Sub.*Quest.*Complete|Sub.*CompleteQuest|Sub.*QuestComplete|Sub.*Quest.*End", "Quest Complete", "quest_complete", False),
     (r"Sub.*Quest",                    "Quest",              "quest",              False),
     # ── Mode (specific before generic) ────────────────────────────────────
     (r"Sub.*Mode.*Start|Sub.*ModeStart|Sub.*StartMode|Sub.*ModeActive|Sub.*ActivateMode", "Mode Start", "mode_start", False),
-    (r"Sub.*Mode.*Complete|Sub.*ModeComplete|Sub.*Mode.*End|Sub.*EndMode|Sub.*Mode.*Win", "Mode Complete", "mode_complete", True),
+    (r"Sub.*Mode.*Complete|Sub.*ModeComplete|Sub.*Mode.*End|Sub.*EndMode|Sub.*Mode.*Win", "Mode Complete", "mode_complete", False),
+    # ── Game Modes / Features (table-specific) ────────────────────────────
+    (r"Sub.*Start[A-Z]\w+Mode",        "Game Mode Start",    "game_mode_start",    False),
+    (r"Sub.*Activate[A-Z]\w+",         "Feature Activated",  "feature_activate",   False),
+    (r"Sub.*Begin[A-Z]\w+",            "Feature Begin",      "feature_begin",      False),
+    (r"Sub.*Complete[A-Z]\w+",         "Feature Complete",   "feature_complete",   False),
+    (r"Sub.*Collect[A-Z]\w+",          "Collect",            "collect",            False),
+    (r"Sub.*Award[A-Z]\w+",            "Award",              "award",              False),
+    (r"Sub.*Unlock[A-Z]\w+",           "Unlock",             "unlock",             False),
+    # ── Boss / Final ───────────────────────────────────────────────────────
+    (r"Sub.*Boss",                     "Boss Fight",         "boss_fight",         False),
+    (r"Sub.*Final[A-Z]\w+",            "Final Challenge",    "final_challenge",    False),
+    # ── Scoring milestones ─────────────────────────────────────────────────
+    (r"Sub.*Super[A-Z]\w+",            "Super Feature",      "super_feature",      False),
+    (r"Sub.*Mega[A-Z]\w+",             "Mega Feature",       "mega_feature",       False),
+    (r"Sub.*Ultra[A-Z]\w+",            "Ultra Feature",      "ultra_feature",      False),
     # ── Extra Ball ─────────────────────────────────────────────────────────
     (r"Sub.*Extra[_]?Ball",            "Extra Ball",         "extra_ball",         False),
     # ── Skillshot (specific before generic) ───────────────────────────────
@@ -147,6 +162,46 @@ _NOISE_SUB_RE = re.compile(
     r"animate|timer|sound|update|light|flash|init",
     re.IGNORECASE,
 )
+
+# Body indicators: patterns that suggest a Sub contains real game logic even if
+# its name did not match any entry in _EVENT_PATTERNS.
+# Each entry: (regex_pattern, human_readable_type)
+_BODY_INDICATORS: list[tuple[str, str]] = [
+    (r"\bAddScore\b|\.Score\s*=|\bCurrentPlayer\b",  "Scoring Logic"),
+    (r"\bModeIsRunning\b|\bModeActive\b|\bbMode\b",   "Mode State"),
+    (r"\bDMD\b|\bDispDMD\b|\bShowText\b|\bDisplayText\b", "Display Event"),
+]
+
+# Maps event_name values to display categories used for grouping in the UI.
+_MISSIONS_MODES_EVENTS: frozenset[str] = frozenset({
+    "multiball", "wizard_mode",
+    "mission_start", "mission_complete", "mission",
+    "quest_start", "quest_complete", "quest",
+    "mode_start", "mode_complete",
+    "game_mode_start", "feature_activate", "feature_begin", "feature_complete",
+    "collect", "award", "unlock",
+    "boss_fight", "final_challenge",
+})
+
+_MECHANICS_EVENTS: frozenset[str] = frozenset({
+    "super_jackpot", "triple_jackpot", "jackpot",
+    "extra_ball", "super_skillshot", "skillshot",
+    "ball_save", "ball_lock", "ball_launch",
+    "combo", "ramp_hit", "loop_shot", "orbit_shot",
+    "super_feature", "mega_feature", "ultra_feature",
+    "hurry_up", "frenzy", "bonus_collect",
+    "mini_game", "mystery", "scoop_hit",
+    "multiplier", "video_mode", "captive_ball",
+})
+
+
+def _event_category(event_name: str) -> str:
+    """Return a category string for a given event_name."""
+    if event_name in _MISSIONS_MODES_EVENTS:
+        return "missions_modes"
+    if event_name in _MECHANICS_EVENTS:
+        return "mechanics"
+    return "basics"
 
 # ---------------------------------------------------------------------------
 # Background workers
@@ -234,15 +289,23 @@ class _ScanTablesWorker(QThread):
 class _AnalyzeScriptWorker(QThread):
     """Reads the VBScript of a .vpx file and finds matching event Subs."""
 
-    finished = pyqtSignal(list)  # list of (title, sub_name, line_no, event_name, default_checked)
+    finished = pyqtSignal(list)  # list of (title, sub_name, line_no, event_name, default_checked, category)
 
     def __init__(self, cfg, vpx_path: str, parent=None):
         super().__init__(parent)
         self.cfg = cfg
         self.vpx_path = vpx_path
 
+    @staticmethod
+    def _prettify_sub_name(name: str) -> str:
+        """Convert a CamelCase sub name to a human-readable title string."""
+        # Insert spaces before uppercase letters that follow lowercase letters,
+        # or before uppercase letters that start a new word in an all-caps run.
+        spaced = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", name)
+        return spaced.strip()
+
     def run(self):
-        findings: list[tuple[str, str, int, str, bool]] = []
+        findings: list[tuple[str, str, int, str, bool, str]] = []
         exe = ensure_vpxtool(self.cfg)
         if not exe:
             self.finished.emit(findings)
@@ -262,29 +325,81 @@ class _AnalyzeScriptWorker(QThread):
             self.finished.emit(findings)
             return
 
+        lines = script.splitlines()
+        # Pre-compile body indicator patterns
+        body_indicator_res = [
+            (re.compile(pat, re.IGNORECASE), label)
+            for pat, label in _BODY_INDICATORS
+        ]
+        # End-Sub pattern used to delimit sub bodies
+        end_sub_re = re.compile(r"^\s*End\s+Sub\b", re.IGNORECASE)
+
         seen_events: set[str] = set()
-        for lineno, line in enumerate(script.splitlines(), start=1):
-            stripped = line.strip()
+        # Track sub names already covered by body analysis to avoid duplicates
+        seen_sub_names: set[str] = set()
+        i = 0
+        while i < len(lines):
+            lineno = i + 1
+            stripped = lines[i].strip()
             # Only consider actual Sub definition lines (not variable declarations
             # or comments that happen to contain "Sub" as a substring).
             m_def = _SUB_DEF_RE.match(stripped)
             if not m_def:
+                i += 1
                 continue
             sub_name = m_def.group(1)
             # Skip implementation-helper subs (animations, sounds, timers, etc.)
             # that are not meaningful game-logic events.
             if _NOISE_SUB_RE.search(sub_name):
+                i += 1
                 continue
             # Build a clean, canonical test string so patterns work correctly
             # regardless of modifiers like "Public" / "Private".
             test_line = f"Sub {sub_name}"
+            matched = False
             for pattern, title, event_name, default_checked in _EVENT_PATTERNS:
                 if event_name in seen_events:
                     continue
                 if re.search(pattern, test_line, re.IGNORECASE):
-                    findings.append((title, sub_name, lineno, event_name, default_checked))
+                    # Determine display category from event name
+                    category = _event_category(event_name)
+                    findings.append((title, sub_name, lineno, event_name, default_checked, category))
                     seen_events.add(event_name)
+                    seen_sub_names.add(sub_name)
+                    matched = True
                     break  # only first pattern match per sub
+
+            # Body analysis: only for subs that had no pattern match and are not duplicates
+            if not matched and sub_name not in seen_sub_names:
+                # Collect the body of this sub up to the matching End Sub
+                body_lines: list[str] = []
+                j = i + 1
+                while j < len(lines):
+                    if end_sub_re.match(lines[j]):
+                        break
+                    body_lines.append(lines[j])
+                    j += 1
+
+                body_text = "\n".join(body_lines)
+                for body_re, indicator_label in body_indicator_res:
+                    if body_re.search(body_text):
+                        pretty_title = self._prettify_sub_name(sub_name)
+                        # Generate a unique event name from the sub name (lowercase + underscores)
+                        event_name = re.sub(r"[^a-z0-9]+", "_", sub_name.lower()).strip("_")
+                        if event_name not in seen_events:
+                            findings.append((
+                                pretty_title,
+                                sub_name,
+                                lineno,
+                                event_name,
+                                False,       # body-analysed findings are always unchecked
+                                "body",
+                            ))
+                            seen_events.add(event_name)
+                            seen_sub_names.add(sub_name)
+                        break  # one indicator match per sub is enough
+
+            i += 1
 
         self.finished.emit(findings)
 
@@ -873,44 +988,71 @@ class AWEditorMixin:
             self._aw_detected_vbox.addWidget(lbl)
             self._aw_status_lbl.setText("Analysis complete. No known events found.")
         else:
-            for title, sub_name, lineno, event_name, default_checked in findings:
-                row_w = QWidget()
-                row_w.setStyleSheet("background:transparent;")
-                row_h = QHBoxLayout(row_w)
-                row_h.setContentsMargins(4, 2, 4, 2)
+            # Group findings by category
+            _CATEGORY_ORDER = [
+                ("missions_modes", "🎯 Missionen & Modi"),
+                ("mechanics",      "🎮 Spielmechanik"),
+                ("basics",         "⚙️ Basis-Events"),
+                ("body",           "🔍 Body-Analyse"),
+            ]
+            grouped: dict[str, list] = {cat: [] for cat, _ in _CATEGORY_ORDER}
+            for finding in findings:
+                # Support both 5-element (legacy) and 6-element tuples
+                if len(finding) == 6:
+                    title, sub_name, lineno, event_name, default_checked, category = finding
+                else:
+                    title, sub_name, lineno, event_name, default_checked = finding
+                    category = _event_category(event_name)
+                grouped[category].append((title, sub_name, lineno, event_name, default_checked))
 
-                chk = QCheckBox()
-                chk.setChecked(default_checked)
-                chk.setStyleSheet("QCheckBox { color:#E0E0E0; }")
-                chk.setToolTip("Check to include this event as an achievement trigger")
-                row_h.addWidget(chk)
+            for cat_key, cat_label in _CATEGORY_ORDER:
+                items = grouped.get(cat_key, [])
+                if not items:
+                    continue
 
-                lbl = QLabel(
-                    f"<span style='color:#E0E0E0; font-weight:bold;'>{title}</span>"
-                    f"<span style='color:#888;'> → Sub {sub_name}()</span>"
-                    f"<span style='color:#555;'>  Ln {lineno}</span>"
-                )
-                lbl.setStyleSheet("background:transparent;")
-                row_h.addWidget(lbl, stretch=1)
+                # Category header label
+                hdr = QLabel(f"<b style='color:#FF7F00;'>{cat_label}</b>")
+                hdr.setStyleSheet("background:transparent; padding:4px 2px 1px 2px;")
+                self._aw_detected_vbox.addWidget(hdr)
 
-                title_edit = QLineEdit(title)
-                title_edit.setPlaceholderText("Achievement title for toast")
-                title_edit.setStyleSheet(self._aw_lineedit_style())
-                title_edit.setToolTip(
-                    "Customize the achievement title shown in the toast notification (line 1)"
-                )
-                title_edit.setMaximumWidth(200)
-                row_h.addWidget(title_edit)
+                for title, sub_name, lineno, event_name, default_checked in items:
+                    row_w = QWidget()
+                    row_w.setStyleSheet("background:transparent;")
+                    row_h = QHBoxLayout(row_w)
+                    row_h.setContentsMargins(4, 2, 4, 2)
 
-                self._aw_detected_vbox.addWidget(row_w)
-                self._aw_detected_rows.append({
-                    "chk":        chk,
-                    "title":      title,
-                    "title_edit": title_edit,
-                    "sub":        sub_name,
-                    "lineno":     lineno,
-                    "event":      event_name,
-                })
+                    chk = QCheckBox()
+                    chk.setChecked(default_checked)
+                    chk.setStyleSheet("QCheckBox { color:#E0E0E0; }")
+                    chk.setToolTip("Check to include this event as an achievement trigger")
+                    row_h.addWidget(chk)
+
+                    lbl = QLabel(
+                        f"<span style='color:#E0E0E0; font-weight:bold;'>{title}</span>"
+                        f"<span style='color:#888;'> → Sub {sub_name}()</span>"
+                        f"<span style='color:#555;'>  Ln {lineno}</span>"
+                    )
+                    lbl.setStyleSheet("background:transparent;")
+                    row_h.addWidget(lbl, stretch=1)
+
+                    title_edit = QLineEdit(title)
+                    title_edit.setPlaceholderText("Achievement title for toast")
+                    title_edit.setStyleSheet(self._aw_lineedit_style())
+                    title_edit.setToolTip(
+                        "Customize the achievement title shown in the toast notification (line 1)"
+                    )
+                    title_edit.setMaximumWidth(200)
+                    row_h.addWidget(title_edit)
+
+                    self._aw_detected_vbox.addWidget(row_w)
+                    self._aw_detected_rows.append({
+                        "chk":        chk,
+                        "title":      title,
+                        "title_edit": title_edit,
+                        "sub":        sub_name,
+                        "lineno":     lineno,
+                        "event":      event_name,
+                    })
 
             self._aw_status_lbl.setText(f"Found {len(findings)} event(s).")
 
@@ -1154,7 +1296,7 @@ End Sub
         for row in self._aw_detected_rows:
             if row["chk"].isChecked():
                 readme_detected_lines.append(
-                    f'  Sub {row["sub"]}()\n'
+                    f'  Sub {row["sub"]}()    \' Line {row["lineno"]}\n'
                     f'      \' ... existing code ...\n'
                     f'      FireAchievement "{row["event"]}"    \' <-- Add this line\n'
                     f'  End Sub'
