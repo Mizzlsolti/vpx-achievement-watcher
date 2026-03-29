@@ -50,6 +50,8 @@ from watcher_core import (
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
     _strip_version_from_name,
+    f_custom_achievements_progress, p_aweditor,
+    _is_valid_rom_name,
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
@@ -3197,6 +3199,19 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             for r in valid_roms:
                 title = _strip_version_from_name(romnames.get(r, r))
                 self.cmb_progress_rom.addItem(title, r)
+
+        # Add custom achievement tables from custom_achievements_progress.json
+        try:
+            cap_path = f_custom_achievements_progress(self.cfg)
+            if os.path.isfile(cap_path):
+                with open(cap_path, "r", encoding="utf-8") as _f:
+                    cap_data = json.load(_f)
+                if isinstance(cap_data, dict):
+                    for table_key in sorted(cap_data.keys()):
+                        display_name = _strip_version_from_name(table_key)
+                        self.cmb_progress_rom.addItem(display_name, f"__custom__:{table_key}")
+        except Exception:
+            pass
             
         self.cmb_progress_rom.blockSignals(False)
         self._on_progress_rom_changed()
@@ -3242,6 +3257,69 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 pass
         threading.Thread(target=_worker, daemon=True).start()
 
+    def _render_custom_progress(self, table_key: str):
+        """Render the progress view for a custom achievement table."""
+        try:
+            cap_path = f_custom_achievements_progress(self.cfg)
+            cap_data = {}
+            if os.path.isfile(cap_path):
+                with open(cap_path, "r", encoding="utf-8") as _f:
+                    cap_data = json.load(_f)
+            entry = cap_data.get(table_key, {}) if isinstance(cap_data, dict) else {}
+            unlocked_list = entry.get("unlocked") or []
+            unlocked_titles = {str(e.get("title", "")).strip() for e in unlocked_list if isinstance(e, dict)}
+
+            # Load all defined rules from the matching .custom.json
+            aw_dir = p_aweditor(self.cfg)
+            all_rules = []
+            json_name = f"{table_key}.custom.json"
+            json_path = os.path.join(aw_dir, json_name)
+            if os.path.isfile(json_path):
+                try:
+                    with open(json_path, "r", encoding="utf-8") as _f:
+                        custom_data = json.load(_f)
+                    all_rules = custom_data.get("rules") or []
+                except Exception:
+                    pass
+
+            display_name = _strip_version_from_name(table_key)
+            unlocked_count = len(unlocked_titles)
+            total = len(all_rules) if all_rules else entry.get("total_rules", 0)
+
+            cells = []
+            for r in all_rules:
+                title = str(r.get("title", "Unknown")).strip()
+                if title in unlocked_titles:
+                    cells.append(f"<td class='unlocked'>✅ {title}</td>")
+                else:
+                    cells.append(f"<td class='locked'>🔒 {title}</td>")
+            # Also show any unlocked achievements that are no longer in the rules file
+            for e in unlocked_list:
+                t = str(e.get("title", "")).strip()
+                if t and t not in {str(r.get("title", "")).strip() for r in all_rules}:
+                    cells.append(f"<td class='unlocked'>✅ {t}</td>")
+
+            rows = []
+            for i in range(0, len(cells), 4):
+                rows.append("<tr>" + "".join(cells[i:i+4]) + "</tr>")
+
+            pct = int(unlocked_count * 100 / total) if total > 0 else 0
+            html = (
+                "<style>table {border-collapse:collapse;} "
+                "td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} "
+                ".unlocked {color:#00E5FF; font-weight:bold;} "
+                ".locked {color:#666; font-size:0.85em;}</style>"
+                f"<h3 style='color:#00E5FF;'>{display_name}</h3>"
+                f"<p style='color:#aaa;'>Custom Achievements — {unlocked_count}/{total} unlocked ({pct}%)</p>"
+            )
+            if rows:
+                html += "<table>" + "".join(rows) + "</table>"
+            else:
+                html += "<p style='color:#888;'>(No achievements defined yet)</p>"
+            self.progress_view.setHtml(html)
+        except Exception as e:
+            self.progress_view.setHtml(f"<div style='color:#FF3B30;'>Error loading custom progress: {e}</div>")
+
     def _on_progress_rom_changed(self):
         rom = self.cmb_progress_rom.currentData()
         if not rom:
@@ -3252,6 +3330,12 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
         if not rom:
             self.progress_view.setHtml("<div style='text-align:center; color:#888;'>(No data available)</div>")
+            return
+
+        # ── Custom achievement table (no NVRAM map) ──────────────────────────
+        if isinstance(rom, str) and rom.startswith("__custom__:"):
+            table_key = rom[len("__custom__:"):]
+            self._render_custom_progress(table_key)
             return
 
         # ── Rarity: trigger background fetch when cloud is enabled ──────────
@@ -7266,6 +7350,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         """Background: fetch cloud scores for *rom*, find own rank, notify if Top 5."""
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
             return
+        # Custom achievement tables have non-standard ROM names; skip cloud fetch.
+        if not _is_valid_rom_name(rom):
+            return
         pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip()
         if not pid or pid == "unknown":
             return
@@ -7343,6 +7430,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
                 for rom in roms_played:
                     if rom in recently_notified:
+                        continue
+                    # Custom achievement tables have non-standard names; skip cloud fetch.
+                    if not _is_valid_rom_name(rom):
                         continue
                     paths = [f"players/{p}/progress/{rom}" for p in player_ids]
                     batch = CloudSync.fetch_parallel(self.cfg, paths)

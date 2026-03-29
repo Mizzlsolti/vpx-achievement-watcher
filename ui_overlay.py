@@ -3787,7 +3787,7 @@ class AchToastWindow(QWidget):
                     except Exception:
                         pass
 
-                    line2 = table_name if table_name else rom
+                    line2 = table_name if table_name else _strip_version_from_name(rom)
 
         # Set typewriter full text on first call (now applies to title/line1)
         if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
