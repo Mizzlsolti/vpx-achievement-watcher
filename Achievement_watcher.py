@@ -3309,8 +3309,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 "td {width:25%; padding:3px 4px; border-bottom:1px solid #444; text-align:center;} "
                 ".unlocked {color:#00E5FF; font-weight:bold;} "
                 ".locked {color:#666; font-size:0.85em;}</style>"
-                f"<h3 style='color:#00E5FF;'>{display_name}</h3>"
-                f"<p style='color:#aaa;'>Custom Achievements — {unlocked_count}/{total} unlocked ({pct}%)</p>"
+                f"<h3 style='color:#00E5FF; text-align:center;'>{display_name}</h3>"
+                f"<p style='color:#aaa; text-align:center;'>Progress: {unlocked_count} / {total} ({pct}%)</p>"
             )
             if rows:
                 html += "<table>" + "".join(rows) + "</table>"
@@ -3326,7 +3326,14 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             rom = self.cmb_progress_rom.currentText()
 
         # Update colored ROM name label next to the dropdown
-        self.lbl_progress_rom_name.setText(rom if (rom and rom != "Global") else "")
+        if rom and rom != "Global":
+            if isinstance(rom, str) and rom.startswith("__custom__:"):
+                _label = _strip_version_from_name(rom[len("__custom__:"):])
+            else:
+                _label = rom
+            self.lbl_progress_rom_name.setText(_label)
+        else:
+            self.lbl_progress_rom_name.setText("")
 
         if not rom:
             self.progress_view.setHtml("<div style='text-align:center; color:#888;'>(No data available)</div>")
@@ -5541,11 +5548,32 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
     # Overlay page navigation (4 pages cycled via challenge_left/right)
     # ------------------------------------------------------------------
 
+    def _is_active_cat_table(self) -> bool:
+        """Return True if the currently active table is a Custom Achievement Table (no NVRAM map)."""
+        try:
+            watcher = getattr(self, "watcher", None)
+            if not watcher:
+                return False
+            current_table = getattr(watcher, "current_table", "") or ""
+            if not current_table:
+                return False
+            current_rom = getattr(watcher, "current_rom", "") or ""
+            if current_rom:
+                return False  # Has ROM → not a CAT table
+            custom_json = os.path.join(p_aweditor(self.cfg), f"{current_table}.custom.json")
+            return os.path.isfile(custom_json)
+        except Exception:
+            return False
+
     def _navigate_overlay_page(self, direction: int):
         """Cycle to the next/previous overlay page, skipping disabled pages."""
         ov = self.cfg.OVERLAY or {}
-        # Build list of enabled page indices (page 0 is always enabled)
-        enabled_pages = [0]
+        # Build list of enabled page indices. Page 0 (Highlights/Session Overview) is skipped
+        # for Custom Achievement Tables (CAT) because it shows "UNKNOWN ROM" which is meaningless.
+        if not self._is_active_cat_table():
+            enabled_pages = [0]
+        else:
+            enabled_pages = []
         if ov.get("overlay_page2_enabled", True):
             enabled_pages.append(1)
         if ov.get("overlay_page3_enabled", True):
@@ -5556,7 +5584,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             enabled_pages.append(4)
 
         if not enabled_pages:
-            enabled_pages = [0]
+            enabled_pages = [1] if self._is_active_cat_table() else [0]
 
         current = int(getattr(self, "_overlay_page", 0))
         if current in enabled_pages:
@@ -5854,19 +5882,27 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 last_table = getattr(self.watcher, "current_table", "") or ""
 
             if last_table:
-                header = f"Last Played: {last_table}"
+                header = f"Last Played: {_strip_version_from_name(last_table)}"
                 # Check for custom.json in AWEditor dir
-                from watcher_core import p_aweditor
                 custom_json_path = os.path.join(p_aweditor(self.cfg), f"{last_table}.custom.json")
                 if os.path.isfile(custom_json_path):
                     try:
                         with open(custom_json_path, "r", encoding="utf-8") as _cf:
                             custom_data = _json_mod.load(_cf)
                         all_rules = [r for r in (custom_data.get("rules") or []) if isinstance(r, dict)]
-                        state = self.watcher._ach_state_load()
+                        # Read unlocked achievements from custom_achievements_progress.json
+                        _cap_data = {}
+                        try:
+                            _cap_path = f_custom_achievements_progress(self.cfg)
+                            if os.path.isfile(_cap_path):
+                                with open(_cap_path, "r", encoding="utf-8") as _capf:
+                                    _cap_data = _json_mod.load(_capf)
+                        except Exception:
+                            pass
                         unlocked_titles = {
-                            str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-                            for e in state.get("session", {}).get(last_table, [])
+                            str(e.get("title", "")).strip()
+                            for e in (_cap_data.get(last_table, {}).get("unlocked") or [])
+                            if isinstance(e, dict) and str(e.get("title", "")).strip()
                         }
                         if all_rules:
                             unlocked_count = 0
@@ -6422,19 +6458,28 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         try:
             ov = getattr(self, "overlay", None)
             if not ov or not ov.isVisible():
-                # Open overlay on page 0 (Main Stats)
-                self._overlay_page = 0
-                self._prepare_overlay_sections()
-                secs = self._overlay_cycle.get("sections", [])
-                if not secs:
-                    self._msgbox_topmost("info", "Overlay", "No contents available (Global/Player).")
-                    return
-                self._overlay_cycle["idx"] = 0
-                self._show_overlay_section(secs[0])
+                # Open overlay. For CAT tables, start at page 1 (Achievement Progress)
+                # because page 0 (Highlights/Session Overview) shows "UNKNOWN ROM".
+                if self._is_active_cat_table():
+                    self._overlay_page = 1
+                    self._show_overlay_page(1)
+                else:
+                    self._overlay_page = 0
+                    self._prepare_overlay_sections()
+                    secs = self._overlay_cycle.get("sections", [])
+                    if not secs:
+                        self._msgbox_topmost("info", "Overlay", "No contents available (Global/Player).")
+                        return
+                    self._overlay_cycle["idx"] = 0
+                    self._show_overlay_section(secs[0])
             else:
-                # Overlay already visible – cycle to next enabled page, close after last
+                # Overlay already visible – cycle to next enabled page, close after last.
+                # Page 0 is skipped for CAT tables.
                 ov = self.cfg.OVERLAY or {}
-                enabled_pages = [0]
+                if not self._is_active_cat_table():
+                    enabled_pages = [0]
+                else:
+                    enabled_pages = []
                 if ov.get("overlay_page2_enabled", True):
                     enabled_pages.append(1)
                 if ov.get("overlay_page3_enabled", True):
@@ -6443,6 +6488,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                     enabled_pages.append(3)
                 if ov.get("overlay_page5_enabled", True):
                     enabled_pages.append(4)
+                if not enabled_pages:
+                    enabled_pages = [1] if self._is_active_cat_table() else [0]
                 current = int(getattr(self, "_overlay_page", 0))
                 if current in enabled_pages:
                     current_idx = enabled_pages.index(current)

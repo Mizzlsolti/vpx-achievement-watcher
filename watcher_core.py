@@ -47,13 +47,14 @@ _CUSTOM_EVENT_STARTUP_GRACE_SEC = 10.0  # seconds after session start during whi
 
 
 def _strip_version_from_name(name: str) -> str:
-    """Remove all trailing parenthesised/bracketed suffixes from table names.
+    """Remove all trailing parenthesised/bracketed suffixes and bare version numbers.
 
     Examples:
-        "Medieval Madness (Williams)"        -> "Medieval Madness"
-        "AC/DC (Premium) (V1.13b)"           -> "AC/DC"
-        "Theatre of Magic [VPX]"             -> "Theatre of Magic"
-        "Attack from Mars (Remake) (2.0)"    -> "Attack from Mars"
+        "Medieval Madness (Williams)"             -> "Medieval Madness"
+        "AC/DC (Premium) (V1.13b)"                -> "AC/DC"
+        "Theatre of Magic [VPX]"                  -> "Theatre of Magic"
+        "Attack from Mars (Remake) (2.0)"         -> "Attack from Mars"
+        "Shovel Knight (Original 2017) v1.2.1"    -> "Shovel Knight"
     """
     result = name
     while True:
@@ -61,6 +62,8 @@ def _strip_version_from_name(name: str) -> str:
         # unbalanced pairs such as "(Name]".
         stripped = re.sub(r"\s*\([^\)]*\)\s*$", "", result, flags=re.IGNORECASE).strip()
         stripped = re.sub(r"\s*\[[^\]]*\]\s*$", "", stripped, flags=re.IGNORECASE).strip()
+        # Also strip trailing bare version numbers such as "v1.2.1", "v2.0", "v1.2.1-beta"
+        stripped = re.sub(r"\s+v\d+(?:\.\d+)*(?:[.-]\S+)?$", "", stripped, flags=re.IGNORECASE).strip()
         if stripped == result:
             break
         result = stripped
