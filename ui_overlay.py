@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
     QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
-from watcher_core import APP_DIR, register_raw_input_for_window
+from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, load_json, f_custom_achievements_progress
 from theme import get_theme_color, get_theme, DEFAULT_THEME
 
 try:
@@ -1294,11 +1294,56 @@ class OverlayWindow(QWidget):
         except Exception:
             pass
 
+        # For custom (non-ROM) tables, check for a matching .custom.json and
+        # read progress from custom_achievements_progress.json instead of
+        # achievements_state.json so that custom achievements are shown
+        # correctly without mixing them into the player level calculation.
+        custom_table_name = ""
+        custom_total_achs = 0
+        custom_unlocked_total = 0
+        custom_unlocked_titles: set[str] = set()
+        custom_rules: list = []
+        is_custom_table = False
+        try:
+            if not rom_name or rom_name == "Unknown ROM":
+                current_table = getattr(self.parent_gui.watcher, "current_table", None) or ""
+                if current_table:
+                    _custom_json_path = os.path.join(
+                        p_aweditor(self.parent_gui.cfg), f"{current_table}.custom.json"
+                    )
+                    if os.path.isfile(_custom_json_path):
+                        is_custom_table = True
+                        _cdata = load_json(_custom_json_path, {}) or {}
+                        # Use the vpx filename (without .vpx) as the display title
+                        _tf = str(_cdata.get("table_file") or "").strip()
+                        if _tf.lower().endswith(".vpx"):
+                            custom_table_name = _tf[:-4]
+                        else:
+                            custom_table_name = _tf or current_table
+                        custom_rules = [r for r in (_cdata.get("rules") or []) if isinstance(r, dict)]
+                        custom_total_achs = len(custom_rules)
+
+                        # Read progress from custom_achievements_progress.json
+                        _cap_data = load_json(f_custom_achievements_progress(self.parent_gui.cfg), {}) or {}
+                        _unlocked_entries = (_cap_data.get(current_table, {}).get("unlocked") or [])
+                        custom_unlocked_titles = {
+                            str(e.get("title", "")).strip()
+                            for e in _unlocked_entries
+                            if isinstance(e, dict) and str(e.get("title", "")).strip()
+                        }
+                        custom_unlocked_total = len(custom_unlocked_titles)
+        except Exception:
+            pass
+
         total_achs = 0
         unlocked_total = 0
         pct = 0.0
         try:
-            if rom_name and rom_name != "Unknown ROM" and self.parent_gui.watcher._has_any_map(rom_name):
+            if is_custom_table:
+                total_achs = custom_total_achs
+                unlocked_total = custom_unlocked_total
+                pct = round((unlocked_total / total_achs) * 100, 1) if total_achs > 0 else 0.0
+            elif rom_name and rom_name != "Unknown ROM" and self.parent_gui.watcher._has_any_map(rom_name):
                 g_rules = self.parent_gui.watcher._collect_global_rules_for_rom(rom_name)
                 s_rules = self.parent_gui.watcher._collect_player_rules_for_rom(rom_name)
                 total_achs = len(g_rules) + len(s_rules)
@@ -1379,7 +1424,7 @@ class OverlayWindow(QWidget):
 
             lines = []
 
-            display_title = table_title or rom_name or "Unknown ROM"
+            display_title = custom_table_name or table_title or rom_name or "Unknown ROM"
             lines.append(f"<div class='rom-title'>{esc(display_title)}</div>")
 
             if total_achs > 0:
@@ -1416,18 +1461,32 @@ class OverlayWindow(QWidget):
             lines.append(f"<td valign='top' style='padding-right: 20px; border-right: 1px solid rgba({_bdr_r}, {_bdr_g}, {_bdr_b}, 0.4);'>")
             lines.append("<table class='hltable'>")
             has_high = False
-            for cat in ["Power", "Precision", "Fun"]:
-                arr = hld.get(cat, [])
-                if arr:
-                    has_high = True
-                    lines.append(f"<tr><th colspan='2'>{esc(cat)}</th></tr>")
-                    for x in arr[:max(1, limit)]:
-                        parts = x.rsplit(" – ", 1)
-                        if len(parts) == 2:
-                            name, val = parts[0], parts[1]
-                        else:
-                            name, val = x, ""
-                        lines.append(f"<tr><td class='left'>{esc(name)}</td><td class='right'>{esc(val)}</td></tr>")
+
+            if is_custom_table and custom_rules:
+                # Show custom achievement list: unlocked first with ✅, then locked with ⬜
+                has_high = True
+                lines.append(f"<tr><th colspan='2'>Achievements</th></tr>")
+                unlocked_rules = [r for r in custom_rules if str(r.get("title") or "").strip() in custom_unlocked_titles]
+                locked_rules = [r for r in custom_rules if str(r.get("title") or "").strip() not in custom_unlocked_titles]
+                for r in unlocked_rules[:max(1, limit)]:
+                    t = esc(str(r.get("title") or "").strip())
+                    lines.append(f"<tr><td class='left'>✅ {t}</td><td class='right'></td></tr>")
+                for r in locked_rules[:max(1, limit)]:
+                    t = esc(str(r.get("title") or "").strip())
+                    lines.append(f"<tr><td class='left'>⬜ {t}</td><td class='right'></td></tr>")
+            else:
+                for cat in ["Power", "Precision", "Fun"]:
+                    arr = hld.get(cat, [])
+                    if arr:
+                        has_high = True
+                        lines.append(f"<tr><th colspan='2'>{esc(cat)}</th></tr>")
+                        for x in arr[:max(1, limit)]:
+                            parts = x.rsplit(" – ", 1)
+                            if len(parts) == 2:
+                                name, val = parts[0], parts[1]
+                            else:
+                                name, val = x, ""
+                            lines.append(f"<tr><td class='left'>{esc(name)}</td><td class='right'>{esc(val)}</td></tr>")
             lines.append("</table>")
             if not has_high:
                 lines.append("<div style='text-align:center; color:#888; margin-top:1em;'>(No Highlights yet)</div>")

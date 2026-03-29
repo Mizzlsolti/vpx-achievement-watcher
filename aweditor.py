@@ -166,6 +166,15 @@ _NOISE_SUB_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Subs that VPX calls automatically on table load or on key events – these fire
+# before the player starts playing, so achievements attached to them would
+# trigger immediately at startup.  They are marked with ⚠️ in the UI so users
+# know to uncheck them before exporting.
+_STARTUP_SUB_RE = re.compile(
+    r"AttractMode|_Init\b|Table_Init|Table_KeyDown|Table_KeyUp|KeyDown|KeyUp|_Timer\b",
+    re.IGNORECASE,
+)
+
 # Body indicators: patterns that suggest a Sub contains real game logic even if
 # its name did not match any entry in _EVENT_PATTERNS.
 # Each entry: (regex_pattern, human_readable_type)
@@ -1047,21 +1056,33 @@ class AWEditorMixin:
                 self._aw_detected_vbox.addWidget(hdr)
 
                 for title, sub_name, lineno, event_name, default_checked in items:
+                    fires_on_load = bool(_STARTUP_SUB_RE.search(sub_name))
+
                     row_w = QWidget()
                     row_w.setStyleSheet("background:transparent;")
                     row_h = QHBoxLayout(row_w)
                     row_h.setContentsMargins(4, 2, 4, 2)
 
                     chk = QCheckBox()
-                    chk.setChecked(default_checked)
+                    # Uncheck by default if this sub is known to fire on table load
+                    chk.setChecked(default_checked and not fires_on_load)
                     chk.setStyleSheet("QCheckBox { color:#E0E0E0; }")
                     chk.setToolTip("Check to include this event as an achievement trigger")
                     row_h.addWidget(chk)
+
+                    if fires_on_load:
+                        warn_suffix = (
+                            f"<span style='color:#FF8800; font-size:0.9em;'>"
+                            f" ⚠️ fires on table load</span>"
+                        )
+                    else:
+                        warn_suffix = ""
 
                     lbl = QLabel(
                         f"<span style='color:#E0E0E0; font-weight:bold;'>{title}</span>"
                         f"<span style='color:#888;'> → Sub {sub_name}()</span>"
                         f"<span style='color:#555;'>  Ln {lineno}</span>"
+                        f"{warn_suffix}"
                     )
                     lbl.setStyleSheet("background:transparent;")
                     row_h.addWidget(lbl, stretch=1)
