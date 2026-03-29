@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state, p_aweditor, load_json, f_custom_achievements_progress
+from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state, p_aweditor, load_json, f_custom_achievements_progress, _is_valid_rom_name
 from theme import get_theme_color
 
 
@@ -355,6 +355,10 @@ class CloudStatsMixin:
             
         if not self.cfg.CLOUD_URL:
             self.cloud_view.setHtml("<div style='color:#FF3B30;'>(No Firebase URL configured in System Tab!)</div>")
+            return
+
+        if not _is_valid_rom_name(rom):
+            self.cloud_view.setHtml("<div style='color:#FF3B30;'>(Invalid ROM name — custom achievement tables are not tracked in the cloud)</div>")
             return
 
         self.cloud_view.setHtml(f"<div style='color:{get_theme_color(self.cfg, 'primary')};'>Fetching data from cloud...</div>")

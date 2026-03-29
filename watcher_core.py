@@ -71,6 +71,15 @@ def _strip_version_from_name(name: str) -> str:
 _clean_table_name = _strip_version_from_name
 
 
+def _is_valid_rom_name(rom: str) -> bool:
+    """Return True if *rom* is a valid VPinMAME ROM name (only [A-Za-z0-9_]).
+
+    Custom achievement table names (e.g. "Blood Machines (Original 2022)") contain
+    spaces and special characters and must never be used as Firebase path segments.
+    """
+    return bool(rom and re.fullmatch(r"[A-Za-z0-9_]+", rom))
+
+
 def _fetch_json_url(url: str, timeout: int = 25) -> dict:
     ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
     if requests:
@@ -1834,6 +1843,10 @@ class CloudSync:
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
             return
         if not cfg.CLOUD_BACKUP_ENABLED:
+            return
+        # Block upload for custom achievement tables (names with spaces/special chars are not
+        # valid VPinMAME ROM names and must not be used as Firebase path segments).
+        if not _is_valid_rom_name(rom):
             return
         if CloudSync._warn_missing_player_name(cfg):
             return
