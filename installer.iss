@@ -55,10 +55,6 @@ Filename: "{app}\Achievement_Watcher.exe"; Flags: nowait runasoriginaluser; Chec
 ; including files created after install (config, logs, cache, etc.)
 Type: filesandordirs; Name: "{app}"
 
-[Registry]
-Root: HKCU; Subkey: "Software\VPX Achievement Watcher"; ValueType: string; ValueName: "EventsPath"; ValueData: "{code:GetEventsPath}"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\VPX Achievement Watcher"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
-
 [Code]
 var
   PathsPage: TWizardPage;
@@ -205,50 +201,78 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  cfgPath, json, oldVal: string;
+  cfgPath, json, oldVal, basePath: string;
   existingJson: AnsiString;
 begin
   if CurStep = ssPostInstall then
   begin
     cfgPath := ExpandConstant('{app}\config.json');
+    basePath := EdBase.Text;
 
     if FileExists(cfgPath) then
     begin
-      { Silent upgrade: preserve existing config.json entirely. }
-      if WizardSilent then Exit;
-
-      { Interactive upgrade: preserve all settings (OVERLAY, cloud config,
-        etc.) but update the three path values to whatever the user entered
-        on the wizard page. }
-      if LoadStringFromFile(cfgPath, existingJson) then
+      if WizardSilent then
       begin
-        json := existingJson;
+        { Silent upgrade: preserve existing config.json entirely.
+          Read BASE from config for the registry entry. }
+        if LoadStringFromFile(cfgPath, existingJson) then
+          basePath := GetJsonValue(existingJson, 'BASE');
+      end
+      else
+      begin
+        { Interactive upgrade: preserve all settings (OVERLAY, cloud config,
+          etc.) but update the three path values to whatever the user entered
+          on the wizard page. }
+        if LoadStringFromFile(cfgPath, existingJson) then
+        begin
+          json := existingJson;
 
-        oldVal := GetJsonValue(json, 'BASE');
-        StringChange(json, '"BASE": "' + EscapeJsonStr(oldVal) + '"',
-                           '"BASE": "' + EscapeJsonStr(EdBase.Text) + '"');
+          oldVal := GetJsonValue(json, 'BASE');
+          StringChange(json, '"BASE": "' + EscapeJsonStr(oldVal) + '"',
+                             '"BASE": "' + EscapeJsonStr(EdBase.Text) + '"');
 
-        oldVal := GetJsonValue(json, 'NVRAM_DIR');
-        StringChange(json, '"NVRAM_DIR": "' + EscapeJsonStr(oldVal) + '"',
-                           '"NVRAM_DIR": "' + EscapeJsonStr(EdNvram.Text) + '"');
+          oldVal := GetJsonValue(json, 'NVRAM_DIR');
+          StringChange(json, '"NVRAM_DIR": "' + EscapeJsonStr(oldVal) + '"',
+                             '"NVRAM_DIR": "' + EscapeJsonStr(EdNvram.Text) + '"');
 
-        oldVal := GetJsonValue(json, 'TABLES_DIR');
-        StringChange(json, '"TABLES_DIR": "' + EscapeJsonStr(oldVal) + '"',
-                           '"TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '"');
+          oldVal := GetJsonValue(json, 'TABLES_DIR');
+          StringChange(json, '"TABLES_DIR": "' + EscapeJsonStr(oldVal) + '"',
+                             '"TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '"');
 
-        SaveStringToFile(cfgPath, json, False);
-        Exit;
+          SaveStringToFile(cfgPath, json, False);
+        end;
       end;
+    end
+    else
+    begin
+      { First-time install: write a minimal config.json with the wizard paths. }
+      json :=
+        '{' + #13#10 +
+        '  "BASE": "'       + EscapeJsonStr(EdBase.Text)   + '",' + #13#10 +
+        '  "NVRAM_DIR": "'  + EscapeJsonStr(EdNvram.Text)  + '",' + #13#10 +
+        '  "TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '",' + #13#10 +
+        '  "FIRST_RUN": false' + #13#10 +
+        '}';
+      SaveStringToFile(cfgPath, json, False);
     end;
 
-    { First-time install: write a minimal config.json with the wizard paths. }
-    json :=
-      '{' + #13#10 +
-      '  "BASE": "'       + EscapeJsonStr(EdBase.Text)   + '",' + #13#10 +
-      '  "NVRAM_DIR": "'  + EscapeJsonStr(EdNvram.Text)  + '",' + #13#10 +
-      '  "TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '",' + #13#10 +
-      '  "FIRST_RUN": false' + #13#10 +
-      '}';
-    SaveStringToFile(cfgPath, json, False);
+    { Write registry entries (only when we have a valid base path) }
+    if basePath <> '' then
+    begin
+      RegWriteStringValue(HKEY_CURRENT_USER,
+        'Software\VPX Achievement Watcher',
+        'EventsPath',
+        basePath + '\tools\AWeditor\custom_events\');
+      RegWriteStringValue(HKEY_CURRENT_USER,
+        'Software\VPX Achievement Watcher',
+        'Version',
+        '{#MyAppVersion}');
+    end;
   end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+    RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, 'Software\VPX Achievement Watcher');
 end;
