@@ -703,6 +703,20 @@ class AWEditorMixin:
         self._aw_btn_export.clicked.connect(self._aw_export)
         btn_row.addWidget(self._aw_btn_export)
 
+        self._aw_btn_export_full = QPushButton("⚡ Export Full Script")
+        self._aw_btn_export_full.setStyleSheet(
+            "QPushButton { background-color: #1a3a1a; color: #88CC88;"
+            " font-weight:bold; border-radius:5px; padding:5px 12px; border: 1px solid #88CC88; }"
+            "QPushButton:hover { background-color: #88CC88; color: #000000; }"
+        )
+        self._aw_btn_export_full.setToolTip(
+            "Export the complete table script with FireAchievement calls inserted automatically. "
+            "Saves as {TableName}.vbs – VPX loads it instead of the built-in script. "
+            "⚠ Does NOT support Custom Achievements."
+        )
+        self._aw_btn_export_full.clicked.connect(self._aw_export_full_script)
+        btn_row.addWidget(self._aw_btn_export_full)
+
         btn_row.addStretch(1)
 
         self._aw_status_lbl = QLabel("")
@@ -1443,6 +1457,16 @@ End Sub
             f"  \u2705 No extra .vbs file needed\n"
             f"  \u2705 No error if Achievement Watcher is not installed\n"
             f"\n"
+            f"{'─' * 74}\n"
+            f"\n"
+            f"OPTION C \u2013 Full Script Export (zero manual work):\n"
+            f"  Use the \u26a1 Export Full Script button in AWEditor.\n"
+            f"  AWEditor inserts all FireAchievement calls automatically.\n"
+            f"  See README_aw_{table_stem}_optionC.txt for details.\n"
+            f"\n"
+            f"  \u26a0\ufe0f  CUSTOM ACHIEVEMENTS NOT SUPPORTED in Option C.\n"
+            f"      \u2192 Use Option A or B if you need custom achievements.\n"
+            f"\n"
             f"{'═' * 74}\n"
             f"\n"
             f"\u26a0\ufe0f  IMPORTANT: Do NOT rename the .vbs file to \"{table_stem}.vbs\"!\n"
@@ -1483,6 +1507,220 @@ End Sub
         self._aw_status_lbl.setText(
             f"✅ Exported {vbs_name} + {json_name} + README \u2192 {rel_out}\n"
             "ℹ️ Custom achievements ≠ NVRAM map. Table stays in AWEditor list."
+        )
+
+    # ------------------------------------------------------------------
+    # Option C – Full Script Export
+    # ------------------------------------------------------------------
+
+    def _aw_export_full_script(self):
+        """Export the complete table script with FireAchievement calls inserted (Option C)."""
+        fname = self._aw_selected_table
+        if not fname:
+            self._aw_status_lbl.setText("⚠ No table selected. Pick one in the Tables tab.")
+            return
+
+        # Guard: no detected events checked
+        checked_detected = [r for r in self._aw_detected_rows if r["chk"].isChecked()]
+        if not checked_detected:
+            self._aw_status_lbl.setText(
+                "⚠ No detected events selected. Use '🔍 Analyze Script' first and check at least one event."
+            )
+            return
+
+        # Guard: custom achievements present
+        if self._aw_custom_rows:
+            mb = QMessageBox(self)
+            mb.setWindowTitle("Option C \u2013 Custom Achievements Not Supported")
+            mb.setText(
+                "Option C (Full Script Export) does not support Custom Achievements.\n\n"
+                "Custom achievements cannot be placed automatically because AWEditor does not know "
+                "where in the script they should fire.\n\n"
+                "Please use Option A or B if you need custom achievements.\n\n"
+                "Do you want to continue with detected events only?"
+            )
+            mb.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            mb.setDefaultButton(QMessageBox.StandardButton.No)
+            if mb.exec() != QMessageBox.StandardButton.Yes:
+                return
+
+        # Extract full script via vpxtool
+        exe = ensure_vpxtool(self.cfg)
+        if not exe:
+            self._aw_status_lbl.setText("⚠ vpxtool not available.")
+            return
+        tables_dir = getattr(self.cfg, "TABLES_DIR", "") or ""
+        vpx_path = os.path.join(tables_dir, fname)
+        try:
+            cp = subprocess.run(
+                [exe, "script", "show", vpx_path],
+                capture_output=True, text=True, timeout=30,
+                creationflags=0x08000000,  # CREATE_NO_WINDOW – suppress console popup on Windows
+                encoding="utf-8", errors="replace",
+            )
+            original_script = cp.stdout or ""
+        except Exception as e:
+            self._aw_status_lbl.setText(f"❌ Could not extract script: {e}")
+            return
+        if not original_script.strip():
+            self._aw_status_lbl.setText("⚠ Could not extract script from table.")
+            return
+
+        # Insert FireAchievement calls into the script
+        lines = original_script.splitlines()
+        inject_map: dict[str, str] = {}
+        for row in self._aw_detected_rows:
+            if row["chk"].isChecked():
+                inject_map[row["sub"].lower()] = row["event"]
+
+        modified_lines: list[str] = []
+        sub_def_re = re.compile(r'^(?:Public\s+|Private\s+)?Sub\s+([a-zA-Z0-9_]+)', re.IGNORECASE)
+        for line in lines:
+            modified_lines.append(line)
+            m = sub_def_re.match(line.strip())
+            if m and m.group(1).lower() in inject_map:
+                event = inject_map[m.group(1).lower()]
+                modified_lines.append(f'    FireAchievement "{event}"')
+
+        modified_script = "\n".join(modified_lines)
+
+        # Build AW-Init inline block
+        aw_init_block = (
+            "' \u2500\u2500 VPX Achievement Watcher \u2013 Inline Integration "
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
+            "Dim AW_EventPath, AW_Installed\n"
+            "Sub AW_Init()\n"
+            "    On Error Resume Next\n"
+            "    AW_Installed = False\n"
+            "    Dim sh : Set sh = CreateObject(\"WScript.Shell\")\n"
+            "    AW_EventPath = sh.RegRead(\"HKCU\\\\Software\\\\VPX Achievement Watcher\\\\EventsPath\")\n"
+            "    Set sh = Nothing\n"
+            "    AW_Installed = (Err.Number = 0 And AW_EventPath <> \"\")\n"
+            "    Err.Clear : On Error GoTo 0\n"
+            "End Sub\n"
+            "AW_Init\n"
+            "\n"
+            "Sub FireAchievement(eventName)\n"
+            "    If Not AW_Installed Then Exit Sub\n"
+            "    On Error Resume Next\n"
+            "    Dim fso, f\n"
+            "    Set fso = CreateObject(\"Scripting.FileSystemObject\")\n"
+            "    Set f = fso.CreateTextFile(AW_EventPath & eventName & \".trigger\", True)\n"
+            "    f.WriteLine eventName : f.WriteLine Now\n"
+            "    f.Close\n"
+            "    Set f = Nothing : Set fso = Nothing\n"
+            "    On Error GoTo 0\n"
+            "End Sub\n"
+            "' \u2500\u2500 End Achievement Watcher \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+        )
+
+        full_script = aw_init_block + "\n\n" + modified_script
+
+        table_stem = os.path.splitext(fname)[0]
+        out_dir = p_aweditor(self.cfg)
+        ensure_dir(out_dir)
+
+        # Write {table_stem}.vbs into the Tables folder (next to the .vpx)
+        vbs_name = f"{table_stem}.vbs"
+        vbs_path = os.path.join(tables_dir, vbs_name)
+        try:
+            with open(vbs_path, "w", encoding="utf-8") as f:
+                f.write(full_script)
+        except Exception as e:
+            self._aw_status_lbl.setText(f"❌ Could not write VBS: {e}")
+            return
+
+        # Write {table_stem}.custom.json (detected events only)
+        json_name = f"{table_stem}.custom.json"
+        json_path = os.path.join(out_dir, json_name)
+        rules: list[dict] = []
+        for row in self._aw_detected_rows:
+            if row["chk"].isChecked():
+                custom_title = row["title_edit"].text().strip()
+                if not custom_title:
+                    custom_title = row["title"]
+                rules.append({
+                    "title":       custom_title + "!",
+                    "description": f"Trigger: {row['sub']}()",
+                    "condition":   {"type": "event", "event": row["event"]},
+                })
+        try:
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump({"table_file": fname, "rules": rules}, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            self._aw_status_lbl.setText(f"❌ Could not write JSON: {e}")
+            return
+
+        # Write Option C README
+        readme_name = f"README_aw_{table_stem}_optionC.txt"
+        readme_path = os.path.join(out_dir, readme_name)
+        readme_detected_lines: list[str] = []
+        for row in self._aw_detected_rows:
+            if row["chk"].isChecked():
+                readme_detected_lines.append(
+                    f'  Sub {row["sub"]}()    \' Line {row["lineno"]}\n'
+                    f'      \' ... existing code ...\n'
+                    f'      FireAchievement "{row["event"]}"    \' inserted automatically\n'
+                    f'  End Sub'
+                )
+        detected_section = (
+            "\n\n".join(readme_detected_lines)
+            if readme_detected_lines
+            else "  (none selected)"
+        )
+        sep = "\u2550" * 75
+        readme_content = (
+            f"{sep}\n"
+            f"  VPX Achievement Watcher \u2013 Full Script Export (Option C)\n"
+            f"  Table: {fname}\n"
+            f"  Generated by AWEditor\n"
+            f"{sep}\n"
+            f"\n"
+            f"OPTION C \u2013 Full Script Export (zero manual work):\n"
+            f"{'─' * 76}\n"
+            f"\n"
+            f"  1. Copy \"{vbs_name}\" next to your .vpx file (into your Tables folder)\n"
+            f"     \u2192 It is already there if you exported directly.\n"
+            f"  2. Done. VPX loads this file automatically instead of the built-in script.\n"
+            f"\n"
+            f"  \u26a0\ufe0f  IMPORTANT \u2013 RE-EXPORT AFTER EVERY SCRIPT CHANGE:\n"
+            f"      This file contains a FULL COPY of your table script at the time of export.\n"
+            f"      If you edit the table script in VPX Editor afterwards, those changes will\n"
+            f"      be IGNORED because VPX loads this .vbs file instead.\n"
+            f"      \u2192 Re-export from AWEditor every time you change the script in VPX Editor.\n"
+            f"\n"
+            f"  \u26a0\ufe0f  CUSTOM ACHIEVEMENTS NOT SUPPORTED:\n"
+            f"      Option C only works with auto-detected events from Analyze Script.\n"
+            f"      Custom achievements cannot be placed automatically because AWEditor\n"
+            f"      does not know where in the script they should fire.\n"
+            f"      \u2192 Use Option A or B if you need custom achievements.\n"
+            f"\n"
+            f"{'═' * 76}\n"
+            f"\n"
+            f"FIREACHIEVEMENT CALLS INSERTED:\n"
+            f"{'─' * 32}\n"
+            f"{detected_section}\n"
+            f"\n"
+            f"\n"
+            f"FILES GENERATED:\n"
+            f"{'─' * 16}\n"
+            f"  \u2022 {vbs_name}        \u2192 Copy to Tables folder (replaces built-in script)\n"
+            f"  \u2022 {json_name} \u2192 Stays in AWEditor folder\n"
+            f"  \u2022 {readme_name}   \u2192 Stays in AWEditor folder\n"
+            f"{sep}\n"
+        )
+        try:
+            with open(readme_path, "w", encoding="utf-8") as f:
+                f.write(readme_content)
+        except Exception as e:
+            self._aw_status_lbl.setText(f"❌ Could not write README: {e}")
+            return
+
+        self._aw_status_lbl.setText(
+            f"✅ Option C exported: {vbs_name} \u2192 Tables folder"
+            " | Re-export after every script change in VPX Editor!"
         )
 
     # ------------------------------------------------------------------
@@ -1635,6 +1873,33 @@ End Sub
         lbl_note.setStyleSheet("color: #E0E0E0; font-size: 9pt;")
         lay.addWidget(lbl_note)
 
+        lbl_option_c = QLabel(
+            "<br><b>\u26a1 Option C \u2013 Full Script Export (zero manual work)</b><br><br>"
+            "AWEditor extracts the complete table script from the .vpx file, automatically "
+            "inserts <code>FireAchievement</code> calls into the correct Subs, prepends the "
+            "AW-Init block, and saves the result as <b>{TableName}.vbs</b> \u2014 the same name "
+            "as your .vpx file. VPX loads this file automatically instead of the built-in script.<br><br>"
+            "<b>How to use:</b><br>"
+            "&nbsp;&nbsp;1. Select a table in the \U0001f4cb Tables tab<br>"
+            "&nbsp;&nbsp;2. Click \U0001f50d Analyze Script and check the events you want<br>"
+            "&nbsp;&nbsp;3. Click <b>\u26a1 Export Full Script</b><br>"
+            "&nbsp;&nbsp;4. Done \u2014 no manual script editing needed<br><br>"
+            "\u2705 No manual editing needed<br>"
+            "\u2705 FireAchievement calls are inserted automatically<br>"
+            "\u2705 Works silently if Achievement Watcher is not installed<br><br>"
+            "<b>\u26a0\ufe0f Re-export every time you edit the table script in VPX Editor.</b> "
+            "This file is a full copy of the script \u2014 VPX edits made afterwards will be ignored "
+            "until you re-export.<br><br>"
+            "<b>\u26a0\ufe0f Custom Achievements are NOT supported in Option C.</b><br>"
+            "Option C only inserts FireAchievement calls for auto-detected events. "
+            "Custom achievements require you to manually decide where in the script they fire \u2014 "
+            "use Option A or B for those."
+        )
+        lbl_option_c.setWordWrap(True)
+        lbl_option_c.setTextFormat(Qt.TextFormat.RichText)
+        lbl_option_c.setStyleSheet("color: #E0E0E0; font-size: 9pt;")
+        lay.addWidget(lbl_option_c)
+
         lay.addStretch(1)
         scroll.setWidget(container)
 
@@ -1749,20 +2014,38 @@ End Sub
             "<b>\u2500\u2500\u2500 OPTION B \u2013 Inline (no extra file needed) "
             "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</b><br>"
             "Instead of the .vbs file, copy the full inline block at the very TOP of your "
-            "table script. Find the block in the <b>❓ Help</b> button on this tab.<br><br>"
-            "✅ No extra file needed<br>"
-            "✅ Works automatically when Achievement Watcher is installed<br>"
-            "✅ Does nothing silently when Achievement Watcher is NOT installed<br><br>"
-
-            "<hr>"
-            "<b>Summary:</b> You invent a unique Event-ID, register it in the AWEditor, "
-            "and then paste <code>FireAchievement \"your_event_id\"</code> directly into "
-            "the table's script where the action happens."
+            "table script. Find the block in the <b>\u2753 Help</b> button on this tab.<br><br>"
+            "\u2705 No extra file needed<br>"
+            "\u2705 Works automatically when Achievement Watcher is installed<br>"
+            "\u2705 Does nothing silently when Achievement Watcher is NOT installed<br><br>"
         )
         lbl_option_a_note.setWordWrap(True)
         lbl_option_a_note.setTextFormat(Qt.TextFormat.RichText)
         lbl_option_a_note.setStyleSheet("color: #E0E0E0; font-size: 9pt;")
         lay.addWidget(lbl_option_a_note)
+
+        lbl_option_c_guide = QLabel(
+            "<b>\u2500\u2500\u2500 OPTION C \u2013 Full Script Export (zero manual work) "
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500</b><br>"
+            "Click <b>\u26a1 Export Full Script</b>. AWEditor extracts the complete table script, "
+            "inserts all <code>FireAchievement</code> calls automatically, and saves "
+            "<b>{TableName}.vbs</b> directly into your Tables folder.<br><br>"
+            "\u2705 No manual script editing needed<br>"
+            "\u2705 FireAchievement calls inserted automatically<br><br>"
+            "<b>\u26a0\ufe0f Re-export after every script change in VPX Editor.</b> "
+            "This file replaces the built-in script entirely \u2014 VPX changes made afterwards "
+            "are ignored until you re-export.<br><br>"
+            "<b>\u26a0\ufe0f Custom Achievements are NOT supported in Option C.</b> "
+            "If you have defined custom achievements in the \u270f\ufe0f Codes tab, use Option A or B instead.<br><br>"
+            "<hr>"
+            "<b>Summary:</b> You invent a unique Event-ID, register it in the AWEditor, "
+            "and then paste <code>FireAchievement \"your_event_id\"</code> directly into "
+            "the table's script where the action happens."
+        )
+        lbl_option_c_guide.setWordWrap(True)
+        lbl_option_c_guide.setTextFormat(Qt.TextFormat.RichText)
+        lbl_option_c_guide.setStyleSheet("color: #E0E0E0; font-size: 9pt;")
+        lay.addWidget(lbl_option_c_guide)
 
         lay.addStretch(1)
         scroll.setWidget(container)
