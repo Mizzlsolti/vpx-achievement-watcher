@@ -1595,37 +1595,110 @@ End Sub
 
         modified_script = "\n".join(modified_lines)
 
-        # Build AW-Init inline block
+        # VBScript-friendly paths for fallback path discovery (same as Option A)
+        events_path_vbs = p_custom_events(self.cfg).replace("/", "\\").rstrip("\\") + "\\"
+        config_path_vbs = CONFIG_FILE.replace("/", "\\")
+
+        # Build AW-Init inline block (full 3-step path discovery, same as Option A)
         aw_init_block = (
             "' \u2500\u2500 VPX Achievement Watcher \u2013 Inline Integration "
             "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n"
             "Dim AW_EventPath, AW_Installed\n"
-            "Sub AW_Init()\n"
+            "\n"
+            "' Locates the custom_events folder at runtime.\n"
+            "' Priority: 1. Registry  2. config.json  3. Hardcoded fallback (path at export time)\n"
+            "Sub AW_InitEventPath()\n"
             "    On Error Resume Next\n"
             "    AW_Installed = False\n"
-            "    Dim sh : Set sh = CreateObject(\"WScript.Shell\")\n"
-            "    AW_EventPath = sh.RegRead(\"HKCU\\\\Software\\\\VPX Achievement Watcher\\\\EventsPath\")\n"
+            "    AW_EventPath = \"\"\n"
+            "\n"
+            "    ' --- 1. Registry ---\n"
+            "    Dim sh\n"
+            "    Set sh = CreateObject(\"WScript.Shell\")\n"
+            "    Dim regVal\n"
+            "    regVal = sh.RegRead(\"HKCU\\Software\\VPX Achievement Watcher\\EventsPath\")\n"
             "    Set sh = Nothing\n"
-            "    AW_Installed = (Err.Number = 0 And AW_EventPath <> \"\")\n"
-            "    Err.Clear : On Error GoTo 0\n"
+            "    If Err.Number = 0 And regVal <> \"\" Then\n"
+            "        AW_EventPath = regVal\n"
+            "        AW_Installed = True\n"
+            "        On Error GoTo 0\n"
+            "        Exit Sub\n"
+            "    End If\n"
+            "    Err.Clear\n"
+            "\n"
+            "    ' --- 2. config.json ---\n"
+            "    Dim fso, f, txt, p1, p2, base\n"
+            "    Dim q : q = Chr(34)\n"
+            "    Set fso = CreateObject(\"Scripting.FileSystemObject\")\n"
+            f"    If fso.FileExists(\"{config_path_vbs}\") Then\n"
+            f"        Set f = fso.OpenTextFile(\"{config_path_vbs}\", 1)\n"
+            "        txt = f.ReadAll\n"
+            "        f.Close\n"
+            "        Set f = Nothing\n"
+            "        p1 = InStr(txt, q & \"BASE\" & q & \": \" & q)\n"
+            "        If p1 > 0 Then\n"
+            "            p1 = p1 + Len(q & \"BASE\" & q & \": \" & q)\n"
+            "            p2 = InStr(p1, txt, q)\n"
+            "            If p2 > 0 Then\n"
+            "                base = Mid(txt, p1, p2 - p1)\n"
+            "                ' Convert JSON-escaped backslashes (\\\\) to single backslashes for VBScript paths\n"
+            "                base = Replace(base, \"\\\\\", \"\\\")\n"
+            "                AW_EventPath = base & \"\\tools\\AWeditor\\custom_events\\\"\n"
+            "                AW_Installed = True\n"
+            "                Set fso = Nothing\n"
+            "                On Error GoTo 0\n"
+            "                Exit Sub\n"
+            "            End If\n"
+            "        End If\n"
+            "    End If\n"
+            "    Set fso = Nothing\n"
+            "\n"
+            "    ' --- 3. Hardcoded fallback (path at export time) ---\n"
+            f"    AW_EventPath = \"{events_path_vbs}\"\n"
+            "    On Error GoTo 0\n"
             "End Sub\n"
-            "AW_Init\n"
+            "\n"
+            "AW_InitEventPath\n"
             "\n"
             "Sub FireAchievement(eventName)\n"
+            "    ' If Achievement Watcher is not installed, do nothing silently\n"
             "    If Not AW_Installed Then Exit Sub\n"
             "    On Error Resume Next\n"
             "    Dim fso, f\n"
             "    Set fso = CreateObject(\"Scripting.FileSystemObject\")\n"
             "    Set f = fso.CreateTextFile(AW_EventPath & eventName & \".trigger\", True)\n"
-            "    f.WriteLine eventName : f.WriteLine Now\n"
+            "    f.WriteLine eventName\n"
+            "    f.WriteLine Now\n"
             "    f.Close\n"
-            "    Set f = Nothing : Set fso = Nothing\n"
+            "    Set f = Nothing\n"
+            "    Set fso = Nothing\n"
             "    On Error GoTo 0\n"
             "End Sub\n"
             "' \u2500\u2500 End Achievement Watcher \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
         )
 
-        full_script = aw_init_block + "\n\n" + modified_script
+        # Smart insertion: place AW-Init block AFTER leading Option Explicit / Randomize /
+        # blank lines / comments so that VBScript's Option Explicit remains first.
+        ms_lines = modified_script.splitlines()
+        insert_pos = 0
+        for i, ln in enumerate(ms_lines):
+            stripped = ln.strip()
+            if (
+                stripped == ""
+                or stripped.lower().startswith("option explicit")
+                or stripped.lower().startswith("randomize")
+                or stripped.startswith("'")
+            ):
+                insert_pos = i + 1
+            else:
+                break
+
+        leading = "\n".join(ms_lines[:insert_pos])
+        remaining = "\n".join(ms_lines[insert_pos:])
+        if leading:
+            full_script = leading + "\n\n" + aw_init_block + "\n\n" + remaining
+        else:
+            full_script = aw_init_block + "\n\n" + remaining
 
         table_stem = os.path.splitext(fname)[0]
         out_dir = p_aweditor(self.cfg)
@@ -1690,8 +1763,7 @@ End Sub
             f"OPTION C \u2013 Full Script Export (zero manual work):\n"
             f"{'─' * 76}\n"
             f"\n"
-            f"  1. Copy \"{vbs_name}\" next to your .vpx file (into your Tables folder)\n"
-            f"     \u2192 It is already there if you exported directly.\n"
+            f"  1. \"{vbs_name}\" has been automatically saved to your Tables folder.\n"
             f"  2. Done. VPX loads this file automatically instead of the built-in script.\n"
             f"\n"
             f"  \u26a0\ufe0f  IMPORTANT \u2013 RE-EXPORT AFTER EVERY SCRIPT CHANGE:\n"
@@ -1715,7 +1787,7 @@ End Sub
             f"\n"
             f"FILES GENERATED:\n"
             f"{'─' * 16}\n"
-            f"  \u2022 {vbs_name}        \u2192 Copy to Tables folder (replaces built-in script)\n"
+            f"  \u2022 {vbs_name}        \u2192 Already in Tables folder (saved automatically)\n"
             f"  \u2022 {json_name} \u2192 Stays in AWEditor folder\n"
             f"  \u2022 {readme_name}   \u2192 Stays in AWEditor folder\n"
             f"{sep}\n"
@@ -1728,7 +1800,7 @@ End Sub
             return
 
         self._aw_status_lbl.setText(
-            f"✅ Option C exported: {vbs_name} \u2192 Tables folder"
+            f"✅ Option C exported: {vbs_name} automatically saved to Tables folder"
             " | Re-export after every script change in VPX Editor!"
         )
 
