@@ -41,6 +41,10 @@ def resource_path(rel: str) -> str:
 
 WATCHER_VERSION = "2.6"
 
+# Custom-events polling constants
+_CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
+_CUSTOM_EVENT_STARTUP_GRACE_SEC = 10.0  # seconds after session start during which triggers are discarded
+
 
 def _strip_version_from_name(name: str) -> str:
     """Remove all trailing parenthesised/bracketed suffixes from table names.
@@ -467,6 +471,7 @@ def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
 def p_aweditor(cfg):     return os.path.join(cfg.BASE, "tools", "AWeditor")
 def p_custom_events(cfg): return os.path.join(p_aweditor(cfg), "custom_events")
+def f_custom_achievements_progress(cfg): return os.path.join(p_aweditor(cfg), "custom_achievements_progress.json")
 def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
     """Marker file indicating that the one-time legacy progress cleanup has already run."""
     return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
@@ -2435,6 +2440,7 @@ class Watcher:
         self.current_table: Optional[str] = None
         self.current_rom: Optional[str] = None
         self.start_time: Optional[float] = None
+        self._custom_events_session_start: float = 0.0
         self.game_active: bool = False
         self.start_audits: Dict[str, Any] = {}
         self.current_player = 1
@@ -5480,12 +5486,12 @@ class Watcher:
             try:
                 _custom_json = os.path.join(p_aweditor(self.cfg), f"{self.current_table}.custom.json")
                 if os.path.isfile(_custom_json):
-                    _state = self._ach_state_load()
-                    _custom_ach = []
-                    for _e in _state.get("session", {}).get(self.current_table, []):
-                        _t = str(_e.get("title", "")).strip() if isinstance(_e, dict) else str(_e).strip()
-                        if _t:
-                            _custom_ach.append(_t)
+                    _cap_data = load_json(f_custom_achievements_progress(self.cfg), {}) or {}
+                    _custom_ach = [
+                        str(e.get("title", "")).strip()
+                        for e in (_cap_data.get(self.current_table, {}).get("unlocked") or [])
+                        if isinstance(e, dict) and str(e.get("title", "")).strip()
+                    ]
                     if _custom_ach:
                         highlights.setdefault("Fun", [])
                         for _ca in _custom_ach:
@@ -6554,6 +6560,7 @@ class Watcher:
             pass
 
         self.start_time = time.time()
+        self._custom_events_session_start = self.start_time
         self.game_active = True
         self.players.clear()
         self._toasted_titles = set()
@@ -6866,8 +6873,16 @@ class Watcher:
         1. Looks up matching rules (``condition.type == "event"``) from every
            ``*.custom.json`` file in the AWEditor output directory.
         2. Emits an achievement toast for each matching rule.
-        3. Persists the unlock to achievements_state under the "session" bucket.
+        3. Persists the unlock to custom_achievements_progress.json (NOT
+           achievements_state.json, so custom achievements never affect the
+           player level / badge calculation).
         4. Deletes the trigger file so the same event can fire again next time.
+
+        A startup grace period of ``_STARTUP_GRACE_SEC`` seconds is observed
+        after each new session begins.  Trigger files that arrive during the
+        grace period are silently deleted – this prevents Subs that VPX calls
+        automatically on table load (e.g. StartAttractMode, Table_Init) from
+        immediately granting achievements before the player has started playing.
         """
         try:
             ce_dir = p_custom_events(self.cfg)
@@ -6884,6 +6899,8 @@ class Watcher:
             # Build event → [rule, ...] mapping from all *.custom.json files
             aw_dir = p_aweditor(self.cfg)
             event_rules: dict[str, list] = {}
+            # Also track total_rules per table_file stem for progress storage
+            table_total_rules: dict[str, int] = {}
             try:
                 for fname in os.listdir(aw_dir):
                     if not fname.lower().endswith(".custom.json"):
@@ -6891,36 +6908,55 @@ class Watcher:
                     fpath = os.path.join(aw_dir, fname)
                     try:
                         data = load_json(fpath, {}) or {}
-                        for r in (data.get("rules") or []):
+                        rules = data.get("rules") or []
+                        # Derive stem from the json filename (e.g. "Blood Machines.custom.json" → "Blood Machines")
+                        table_stem = fname[: -len(".custom.json")]
+                        table_total_rules[table_stem] = len(rules)
+                        for r in rules:
                             if not isinstance(r, dict):
                                 continue
                             cond = r.get("condition") or {}
                             if cond.get("type") == "event" and cond.get("event"):
                                 ev = str(cond["event"])
-                                event_rules.setdefault(ev, []).append(r)
+                                event_rules.setdefault(ev, []).append((r, table_stem))
                     except Exception as e:
                         log(self.cfg, f"[CUSTOM_EVENTS] Failed to load {fname}: {e}", "WARN")
             except Exception as e:
                 log(self.cfg, f"[CUSTOM_EVENTS] Failed to scan aweditor dir: {e}", "WARN")
 
             # Debounce / cooldown bookkeeping – shared across all trigger files in this poll
-            _COOLDOWN_SECS = 3.0
             _cooldown: dict = getattr(self, "_custom_event_cooldown", {})
             if not isinstance(_cooldown, dict):
                 _cooldown = {}
             self._custom_event_cooldown = _cooldown
             _poll_now = time.time()
 
+            # Startup grace period: table VBScript runs init code immediately on
+            # load, which can fire trigger files before the player has started
+            # playing.  During the grace window we discard triggers silently.
+            _session_start = getattr(self, "_custom_events_session_start", 0.0)
+            _in_grace = (_poll_now - _session_start) < _CUSTOM_EVENT_STARTUP_GRACE_SEC
+
             for tf in trigger_files:
                 event_name = tf[: -len(".trigger")]
                 tf_path = os.path.join(ce_dir, tf)
+
+                # Grace period: delete trigger files to prevent accumulation but
+                # do NOT toast or persist the achievement.
+                if _in_grace:
+                    try:
+                        os.remove(tf_path)
+                        log(self.cfg, f"[CUSTOM_EVENTS] Grace period – discarded early trigger '{tf}'")
+                    except Exception:
+                        pass
+                    continue
 
                 # Debounce: if the same event fired very recently (e.g. the table
                 # script calls FireAchievement multiple times in quick succession due
                 # to switch-bounce or a rapid loop), silently delete the stale trigger
                 # file and skip this iteration so the UI and log are not spammed.
                 _last = _cooldown.get(event_name, 0.0)
-                if _poll_now - _last < _COOLDOWN_SECS:
+                if _poll_now - _last < _CUSTOM_EVENT_COOLDOWN_SECS:
                     # Cooldown active – remove the trigger file to prevent accumulation
                     try:
                         os.remove(tf_path)
@@ -6928,32 +6964,47 @@ class Watcher:
                         pass
                     continue
 
-                matched_rules = event_rules.get(event_name, [])
-                if matched_rules:
-                    # Check which achievements are already unlocked to avoid repeat toasts
+                matched = event_rules.get(event_name, [])
+                if matched:
                     table_key = (self.current_table or self.current_rom or "").strip() or "__custom__"
-                    try:
-                        _state = self._ach_state_load()
-                        _already_unlocked = {
-                            str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-                            for e in _state.get("session", {}).get(table_key, [])
-                        }
-                    except Exception:
-                        _already_unlocked = set()
 
-                    for rule in matched_rules:
+                    # Load existing custom progress (separate from achievements_state.json)
+                    cap_path = f_custom_achievements_progress(self.cfg)
+                    try:
+                        cap_data: dict = load_json(cap_path, {}) or {}
+                    except Exception:
+                        cap_data = {}
+                    table_entry = cap_data.setdefault(table_key, {"unlocked": [], "total_rules": 0})
+                    _already_unlocked = {
+                        str(e.get("title", "")).strip()
+                        for e in (table_entry.get("unlocked") or [])
+                        if isinstance(e, dict)
+                    }
+
+                    for rule, _rule_stem in matched:
                         title = str(rule.get("title") or event_name).strip()
                         log(self.cfg, f"[CUSTOM_EVENTS] Event '{event_name}' → achievement '{title}'")
-                        # Only show toast for first-time unlocks (once per profile)
+                        # Only toast and persist first-time unlocks (once per profile)
                         if title not in _already_unlocked:
                             try:
                                 self.bridge.ach_toast_show.emit(title, self.current_table or "", 5)
                             except Exception as e:
                                 log(self.cfg, f"[CUSTOM_EVENTS] toast emit failed: {e}", "WARN")
+                            # Append to custom progress file
+                            ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                            table_entry["unlocked"].append({"title": title, "event": event_name, "ts": ts})
+                            _already_unlocked.add(title)
 
-                    # Persist unlocks; custom achievements must NOT be uploaded to the cloud
+                    # Update total_rules count from the matching custom.json (best-effort)
+                    for _rule, _rule_stem in matched:
+                        if _rule_stem in table_total_rules:
+                            table_entry["total_rules"] = table_total_rules[_rule_stem]
+                            break
+
+                    # Persist to the dedicated custom progress file
                     try:
-                        self._ach_record_unlocks("session", table_key, matched_rules, skip_cloud=True)
+                        ensure_dir(os.path.dirname(cap_path))
+                        save_json(cap_path, cap_data)
                     except Exception as e:
                         log(self.cfg, f"[CUSTOM_EVENTS] persist failed: {e}", "WARN")
 

@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state
+from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state, p_aweditor, load_json, f_custom_achievements_progress
 from theme import get_theme_color
 
 
@@ -598,6 +598,31 @@ class CloudStatsMixin:
         except Exception:
             pass
 
+    def _resolve_custom_table_title(self, rom: str) -> str:
+        """Return the display title for a custom (no-ROM) table.
+
+        When ``rom`` is empty or "Unknown", checks whether the watcher's
+        ``current_table`` has a matching ``.custom.json`` file and extracts
+        the table name from ``table_file``.  Returns an empty string when no
+        custom table can be identified.
+        """
+        if rom not in ("Unknown", ""):
+            return ""
+        try:
+            current_table = str(getattr(self.watcher, "current_table", "") or "").strip()
+            if not current_table:
+                return ""
+            _cjp = os.path.join(p_aweditor(self.cfg), f"{current_table}.custom.json")
+            if not os.path.isfile(_cjp):
+                return ""
+            _cd = load_json(_cjp, {}) or {}
+            _tf = str(_cd.get("table_file") or "").strip()
+            if _tf.lower().endswith(".vpx"):
+                return _tf[:-4]
+            return _tf or current_table
+        except Exception:
+            return ""
+
     def _gui_stats_global_html(self) -> str:
         _tc_primary = get_theme_color(self.cfg, "primary")
         _tc_accent = get_theme_color(self.cfg, "accent")
@@ -633,6 +658,10 @@ class CloudStatsMixin:
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
         table_title = _strip_version_from_name(romnames.get(rom, ""))
+
+        # For custom (no-ROM) tables, look up the display name from the .custom.json
+        if not table_title:
+            table_title = self._resolve_custom_table_title(rom)
 
         audits, _, _ = self.watcher.read_nvram_audits_with_autofix(rom)
 
@@ -719,6 +748,10 @@ class CloudStatsMixin:
 
         romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
         table_title = _strip_version_from_name(romnames.get(rom, ""))
+
+        # For custom (no-ROM) tables, look up the display name from the .custom.json
+        if not table_title:
+            table_title = self._resolve_custom_table_title(rom)
 
         active_deltas = {}
         playtime_str = ""
