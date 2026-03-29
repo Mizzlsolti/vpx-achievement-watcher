@@ -669,13 +669,13 @@ def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = Fal
             if re.fullmatch(r"[A-Za-z0-9_]+", rom or ""):
                 if key in warned:
                     warned.discard(key)
-                return rom
+                return rom.lower()
 
         m = re.search(r"\b([A-Za-z0-9_]{2,})\b", out)
         if m:
             if key in warned:
                 warned.discard(key)
-            return m.group(1)
+            return m.group(1).lower()
 
         if key not in warned:
             if not suppress_warn:
