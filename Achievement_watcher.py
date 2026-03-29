@@ -396,7 +396,7 @@ class AchievementBeatenDialog(QDialog):
 
 
 class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
-    CURRENT_VERSION = "2.8.8"
+    CURRENT_VERSION = "2.8.9"
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
     _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
 
