@@ -536,14 +536,14 @@ class AWEditorMixin:
         layout.addLayout(toolbar)
 
         # ── Legend ─────────────────────────────────────────────────────
-        lbl_legend = QLabel("Legend:  ❌ = No NVRAM Map  |  🟠 = Local .vpx found")
+        lbl_legend = QLabel("Legend:  ❌ = No NVRAM Map  |  🟠 = Local .vpx found  |  ✅ = Custom Achievements configured")
         lbl_legend.setStyleSheet("color:#777; font-size:10px; padding:2px 4px;")
         layout.addWidget(lbl_legend)
 
         # ── Table widget ───────────────────────────────────────────────
-        self._aw_tables_widget = QTableWidget(0, 6)
+        self._aw_tables_widget = QTableWidget(0, 7)
         self._aw_tables_widget.setHorizontalHeaderLabels(
-            ["#", "Table Name", "ROM", "NVRAM Map", "Local", "+"]
+            ["#", "Table Name", "ROM", "NVRAM Map", "Local", "Custom", "+"]
         )
         hh = self._aw_tables_widget.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -551,8 +551,9 @@ class AWEditorMixin:
         hh.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         hh.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
-        self._aw_tables_widget.setColumnWidth(5, 36)
+        hh.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        hh.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
+        self._aw_tables_widget.setColumnWidth(6, 36)
         self._aw_tables_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._aw_tables_widget.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._aw_tables_widget.setStyleSheet(
@@ -865,6 +866,14 @@ class AWEditorMixin:
                 _make_item("🟠" if is_local else "", align=Qt.AlignmentFlag.AlignCenter),
             )
 
+            # Check if a .custom.json exists for this table
+            custom_json_path = os.path.join(p_aweditor(self.cfg), f"{stem}.custom.json")
+            has_custom = os.path.isfile(custom_json_path)
+            self._aw_tables_widget.setItem(
+                row, 5,
+                _make_item("✅" if has_custom else "", align=Qt.AlignmentFlag.AlignCenter),
+            )
+
             # "+" button – click to select table and switch to Codes sub-tab
             btn_plus = QPushButton("+")
             btn_plus.setFixedSize(28, 24)
@@ -884,7 +893,7 @@ class AWEditorMixin:
                 return _handler
 
             btn_plus.clicked.connect(_make_plus_handler(fname, stem))
-            self._aw_tables_widget.setCellWidget(row, 5, btn_plus)
+            self._aw_tables_widget.setCellWidget(row, 6, btn_plus)
 
     # ------------------------------------------------------------------
     # Cache helpers
