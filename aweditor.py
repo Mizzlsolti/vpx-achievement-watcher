@@ -542,6 +542,15 @@ class AWEditorMixin:
         self._aw_btn_scan.clicked.connect(self._aw_scan_tables)
         toolbar.addWidget(self._aw_btn_scan)
 
+        self._aw_btn_refresh = QPushButton("🔃 Refresh")
+        self._aw_btn_refresh.setFixedWidth(90)
+        self._aw_btn_refresh.setStyleSheet(self._aw_btn_style())
+        self._aw_btn_refresh.setToolTip(
+            "Refresh the Custom status column (checks for .custom.json files without rescanning)"
+        )
+        self._aw_btn_refresh.clicked.connect(self._aw_refresh_custom_status)
+        toolbar.addWidget(self._aw_btn_refresh)
+
         layout.addLayout(toolbar)
 
         # ── Legend ─────────────────────────────────────────────────────
@@ -782,6 +791,11 @@ class AWEditorMixin:
         worker.start()
         # Keep a reference so the thread is not garbage-collected
         self._aw_scan_worker = worker
+
+    def _aw_refresh_custom_status(self):
+        """Refresh the Custom column by re-checking .custom.json files without rescanning."""
+        self._aw_filter_tables()
+        self._aw_scan_status_lbl.setText("✅ Custom status refreshed.")
 
     def _aw_on_scan_progress(self, current: int, total: int):
         """Update the progress bar and status label during a scan."""
