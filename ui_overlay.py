@@ -1392,6 +1392,7 @@ class OverlayWindow(QWidget):
           .hltable th, .hltable td {{ padding: 0.35em 0.65em; border-bottom: 1px solid rgba({_bdr_r},{_bdr_g},{_bdr_b},0.15); color: #E0E0E0; overflow-wrap: break-word; }}
           .hltable th {{ text-align: center; background: rgba({_pr}, {_pg}, {_pb}, 0.20); color: {_tc_primary}; font-weight: bold; font-size: 1.1em; border-bottom: 2px solid rgba({_pr}, {_pg}, {_pb}, 0.35); }}
           .hltable td.left {{ text-align: left; }}
+          .hltable td.center {{ text-align: center; }}
           .hltable td.right {{ text-align: right; font-weight: bold; font-size: 1.15em; color: {_tc_accent}; }}
           .rom-title {{ text-align: center; font-size: 1.6em; font-weight: bold; color: {_tc_accent}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 0.2em; margin-top: 0.4em; border-bottom: 1px solid rgba({_pr}, {_pg}, {_pb}, 0.3); padding-bottom: 0.3em; }}
           .score-box {{ text-align: center; font-size: 2.2em; font-weight: bold; margin-bottom: 1.0em; color: {_tc_primary}; }}
@@ -1470,10 +1471,10 @@ class OverlayWindow(QWidget):
                 locked_rules = [r for r in custom_rules if str(r.get("title") or "").strip() not in custom_unlocked_titles]
                 for r in unlocked_rules[:max(1, limit)]:
                     t = esc(str(r.get("title") or "").strip())
-                    lines.append(f"<tr><td class='left'>✅ {t}</td><td class='right'></td></tr>")
+                    lines.append(f"<tr><td class='center'>✅ {t}</td><td class='right'></td></tr>")
                 for r in locked_rules[:max(1, limit)]:
                     t = esc(str(r.get("title") or "").strip())
-                    lines.append(f"<tr><td class='left'>⬜ {t}</td><td class='right'></td></tr>")
+                    lines.append(f"<tr><td class='center'>⬜ {t}</td><td class='right'></td></tr>")
             else:
                 for cat in ["Power", "Precision", "Fun"]:
                     arr = hld.get(cat, [])
