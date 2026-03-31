@@ -220,6 +220,7 @@ class EffectsPreviewWidget(QWidget):
         super().showEvent(event)
 
 
+class _AvailableMapsWorker(QThread):
     """Background worker that scans TABLES_DIR and builds the available-maps list."""
     progress = pyqtSignal(int, int, str)   # (current_index, total, filename)
     finished = pyqtSignal(list)            # sorted list of entry dicts
