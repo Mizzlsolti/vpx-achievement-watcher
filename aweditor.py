@@ -155,16 +155,24 @@ _SUB_DEF_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Sub names containing these keywords are implementation helpers, not game-logic
-# events, so they are filtered out to reduce noise in the Detected Events list.
-# Note: word boundaries (\b) are intentionally omitted because VBScript sub names
-# use camelCase/PascalCase (e.g. "RandomSoundDrain"), and \b does not recognise
-# camelCase word transitions.  Bare substring matching gives the best coverage
-# without requiring complex lookahead/lookbehind logic.
-_NOISE_SUB_RE = re.compile(
-    r"animate|timer|sound|update|light|flash|init",
-    re.IGNORECASE,
-)
+# Sub names that look like implementation helpers (animations, sounds, timers, etc.)
+# are filtered out to reduce noise in the Detected Events list.
+# Rules:
+#   - Filter if name STARTS WITH one of the noise prefixes (case-insensitive).
+#   - Filter if name ENDS WITH "timer" (case-insensitive).
+# Using a prefix/suffix check avoids false positives like Sub LeftRampSoundJackpot
+# or Sub SauceTimerExpired which are real game-logic events.
+_NOISE_PREFIXES = ("animate", "sound", "update", "light", "flash", "init")
+
+
+def _is_noise_sub(sub_name: str) -> bool:
+    """Return True if this sub name looks like an implementation helper, not a game-logic event."""
+    name_lower = sub_name.lower()
+    if any(name_lower.startswith(p) for p in _NOISE_PREFIXES):
+        return True
+    if name_lower.endswith("timer"):
+        return True
+    return False
 
 # Subs that VPX calls automatically on table load or on key events – these fire
 # before the player starts playing, so achievements attached to them would
@@ -364,7 +372,10 @@ class _AnalyzeScriptWorker(QThread):
         # Insert spaces before uppercase letters that follow lowercase letters,
         # or before uppercase letters that start a new word in an all-caps run.
         spaced = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", name)
-        return spaced.strip()
+        # Re-merge sequences of spaced single uppercase letters back into
+        # abbreviations, e.g. "D M D" -> "DMD", "V I P" -> "VIP".
+        merged = re.sub(r"\b([A-Z])(?: ([A-Z]))+\b", lambda m: m.group(0).replace(" ", ""), spaced)
+        return merged.strip()
 
     def run(self):
         findings: list[tuple[str, str, int, str, bool, str]] = []
@@ -412,7 +423,7 @@ class _AnalyzeScriptWorker(QThread):
             sub_name = m_def.group(1)
             # Skip implementation-helper subs (animations, sounds, timers, etc.)
             # that are not meaningful game-logic events.
-            if _NOISE_SUB_RE.search(sub_name):
+            if _is_noise_sub(sub_name):
                 i += 1
                 continue
             # Build a clean, canonical test string so patterns work correctly
@@ -420,13 +431,17 @@ class _AnalyzeScriptWorker(QThread):
             test_line = f"Sub {sub_name}"
             matched = False
             for pattern, title, event_name, default_checked in _EVENT_PATTERNS:
-                if event_name in seen_events:
-                    continue
                 if re.search(pattern, test_line, re.IGNORECASE):
                     # Determine display category from event name
                     category = _event_category(event_name)
-                    findings.append((title, sub_name, lineno, event_name, default_checked, category))
-                    seen_events.add(event_name)
+                    # Make event_name unique if already used by a previous sub
+                    unique_event = event_name
+                    suffix = 2
+                    while unique_event in seen_events:
+                        unique_event = f"{event_name}_{suffix}"
+                        suffix += 1
+                    findings.append((title, sub_name, lineno, unique_event, default_checked, category))
+                    seen_events.add(unique_event)
                     seen_sub_names.add(sub_name)
                     matched = True
                     break  # only first pattern match per sub
@@ -446,19 +461,24 @@ class _AnalyzeScriptWorker(QThread):
                 for body_re, indicator_label in body_indicator_res:
                     if body_re.search(body_text):
                         pretty_title = self._prettify_sub_name(sub_name)
-                        # Generate a unique event name from the sub name (lowercase + underscores)
-                        event_name = re.sub(r"[^a-z0-9]+", "_", sub_name.lower()).strip("_")
-                        if event_name not in seen_events:
-                            findings.append((
-                                pretty_title,
-                                sub_name,
-                                lineno,
-                                event_name,
-                                False,       # body-analysed findings are always unchecked
-                                "body",
-                            ))
-                            seen_events.add(event_name)
-                            seen_sub_names.add(sub_name)
+                        # Generate an event name from the sub name (lowercase + underscores)
+                        base_event = re.sub(r"[^a-z0-9]+", "_", sub_name.lower()).strip("_")
+                        # Make event_name unique if already used by a previous sub
+                        unique_event = base_event
+                        suffix = 2
+                        while unique_event in seen_events:
+                            unique_event = f"{base_event}_{suffix}"
+                            suffix += 1
+                        findings.append((
+                            pretty_title,
+                            sub_name,
+                            lineno,
+                            unique_event,
+                            False,       # body-analysed findings are always unchecked
+                            "body",
+                        ))
+                        seen_events.add(unique_event)
+                        seen_sub_names.add(sub_name)
                         break  # one indicator match per sub is enough
 
             i += 1
