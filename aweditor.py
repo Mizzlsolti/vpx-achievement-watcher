@@ -175,6 +175,56 @@ _STARTUP_SUB_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Event types that are too generic or frequent to be useful as achievements.
+# Used by _aw_auto_select_for_option_c to skip noise events.
+_AUTO_SELECT_SKIP_EVENTS: frozenset[str] = frozenset({
+    "drain", "tilt", "slingshot", "bumper_hit", "spinner",
+})
+
+# Stop words excluded when deriving a thematic keyword from a table filename.
+_KEYWORD_STOP_WORDS: frozenset[str] = frozenset({
+    "the", "of", "a", "an", "and", "from", "in", "on", "at", "to", "for",
+})
+
+
+def _extract_table_keyword(fname: str) -> str:
+    """
+    Extracts a short thematic keyword from a .vpx filename for use in achievement titles.
+
+    Examples:
+        "AFM_AttackFromMars_VPW.vpx"  -> "Mars"
+        "JP_JurassicPark_VPW.vpx"     -> "Park"
+        "MM_MedievalMadness.vpx"       -> "Madness"
+        "Theatre_of_Magic_VPX.vpx"     -> "Magic"
+        "PinballWizard.vpx"            -> "Wizard"
+    """
+    stem = os.path.splitext(fname)[0]
+
+    # Remove known suffixes first (case-insensitive)
+    stem = re.sub(r"[_\s](?:VPW|VPX|MOD|v\d[\w.]*|\d+)$", "", stem, flags=re.IGNORECASE)
+
+    # Remove short prefix (2-4 uppercase chars followed by underscore, e.g. "AFM_", "JP_")
+    stem = re.sub(r"^[A-Z]{2,4}_", "", stem)
+
+    # Replace underscores with spaces, then split CamelCase
+    stem = stem.replace("_", " ")
+    spaced = re.sub(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", stem)
+    words = spaced.strip().split()
+
+    # Prefer words longer than 3 chars that are not stop words
+    meaningful = [w for w in words if len(w) > 3 and w.lower() not in _KEYWORD_STOP_WORDS]
+    if not meaningful:
+        # Fall back to any non-stop word
+        meaningful = [w for w in words if w.lower() not in _KEYWORD_STOP_WORDS]
+
+    # Return last meaningful word (most specific / thematic)
+    if meaningful:
+        return meaningful[-1]
+    if words:
+        return words[-1]
+    return ""
+
+
 # Body indicators: patterns that suggest a Sub contains real game logic even if
 # its name did not match any entry in _EVENT_PATTERNS.
 # Each entry: (regex_pattern, human_readable_type)
@@ -644,6 +694,22 @@ class AWEditorMixin:
         )
         self._aw_btn_analyze.clicked.connect(self._aw_analyze_script)
         layout.addWidget(self._aw_btn_analyze)
+
+        # ── Auto-Select button ────────────────────────────────────────
+        self._aw_btn_auto_select = QPushButton("⚡ Auto-Select for Option C")
+        self._aw_btn_auto_select.setStyleSheet(
+            "QPushButton { background-color:#1a2a1a; color:#88CC88;"
+            " font-weight:bold; border-radius:5px; padding:4px 12px; border:1px solid #88CC88; }"
+            "QPushButton:hover { background-color:#88CC88; color:#000000; }"
+        )
+        self._aw_btn_auto_select.setToolTip(
+            "Automatically check all meaningful events and fill in context-aware achievement titles"
+            " based on the table name.\n"
+            "Skips: drain, tilt, slingshot, bumper hits, spinners and startup-firing subs.\n"
+            "Run '🔍 Analyze Script' first."
+        )
+        self._aw_btn_auto_select.clicked.connect(self._aw_auto_select_for_option_c)
+        layout.addWidget(self._aw_btn_auto_select)
 
         # ── Detected events group ─────────────────────────────────────
         grp_detected = QGroupBox("📋 Detected Events in Table Script")
@@ -1127,6 +1193,46 @@ class AWEditorMixin:
     # ------------------------------------------------------------------
     # Custom achievement rows
     # ------------------------------------------------------------------
+
+    def _aw_auto_select_for_option_c(self):
+        """Check all meaningful detected events and fill in context-aware achievement titles."""
+        if not self._aw_detected_rows:
+            self._aw_status_lbl.setText("⚠ No detected events. Run 'Analyze Script' first.")
+            return
+
+        keyword = _extract_table_keyword(self._aw_selected_table or "")
+
+        checked_count = 0
+        for row in self._aw_detected_rows:
+            event_name = row["event"]
+            sub_name = row["sub"]
+
+            # Never check startup-firing subs
+            if _STARTUP_SUB_RE.search(sub_name):
+                row["chk"].setChecked(False)
+                continue
+
+            # Skip noise events
+            if event_name in _AUTO_SELECT_SKIP_EVENTS:
+                row["chk"].setChecked(False)
+                continue
+
+            # Check it
+            row["chk"].setChecked(True)
+            checked_count += 1
+
+            # Build context-aware title
+            base_title = row["title"]
+            if keyword and keyword.lower() not in base_title.lower():
+                new_title = f"{keyword} {base_title}"
+            else:
+                new_title = base_title
+
+            row["title_edit"].setText(new_title)
+
+        self._aw_status_lbl.setText(
+            f"✅ Auto-selected {checked_count} event(s) for Option C."
+        )
 
     def _aw_add_row(self, title: str = "", desc: str = "", event: str = ""):
         frame = QFrame()
