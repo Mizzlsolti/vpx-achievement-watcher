@@ -699,6 +699,10 @@ class SparkleEffect(BaseEffect):
         self._elapsed = 0.0
         self._particles = []
 
+    @property
+    def active(self) -> bool:
+        return self._active
+
     def trigger(self, portrait: bool = False):
         self._active = True
         self._elapsed = 0.0

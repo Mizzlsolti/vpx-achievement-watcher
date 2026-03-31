@@ -153,7 +153,7 @@ class EffectsPreviewWidget(QWidget):
                 if eff is not None:
                     eff.tick(dt)
             # Re-trigger sparkle when it finishes
-            if self._sparkle is not None and not self._sparkle._active:
+            if self._sparkle is not None and not self._sparkle.active:
                 self._sparkle.trigger(portrait=self._portrait)
         self.update()
 
@@ -4824,7 +4824,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.cfg.OVERLAY["anim_main_ripple"] = _get("chk_anim_main_ripple")
         self.cfg.OVERLAY["anim_main_bar_shimmer"] = _get("chk_anim_main_bar_shimmer")
         self.cfg.OVERLAY["anim_main_confetti"] = _get("chk_anim_main_confetti")
-        # anim_toast (legacy key) keeps the value of burst for backward compat
+        # anim_toast is the legacy single-key from older configs. It is kept in sync with
+        # anim_toast_burst so that code reading the old key still gets the expected value.
         self.cfg.OVERLAY["anim_toast_burst"] = _get("chk_anim_toast_burst")
         self.cfg.OVERLAY["anim_toast"] = _get("chk_anim_toast_burst")
         self.cfg.OVERLAY["anim_toast_typewriter"] = _get("chk_anim_toast_typewriter")
@@ -4834,8 +4835,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.cfg.OVERLAY["anim_toast_shine"] = _get("chk_anim_toast_shine")
         self.cfg.OVERLAY["anim_toast_ring"] = _get("chk_anim_toast_ring")
         self.cfg.OVERLAY["anim_toast_glow"] = _get("chk_anim_toast_glow")
-        # anim_status has no UI checkbox in the Effects tab — do not overwrite it
-        self.cfg.OVERLAY["anim_challenge"] = _get("chk_anim_challenge")
+        # anim_status is not exposed in the Effects tab UI (no checkbox); its value
+        # in cfg.OVERLAY is left untouched so existing behaviour is preserved.
+        self.cfg.OVERLAY["anim_challenge"] = _get("chk_anim_challenge")  # Challenge Select → Pulse Glow
         self.cfg.OVERLAY["anim_flip_pulse"] = _get("chk_anim_flip_pulse")
         self.cfg.OVERLAY["anim_flip_numbers"] = _get("chk_anim_flip_numbers")
         self.cfg.OVERLAY["anim_flip_goal_flash"] = _get("chk_anim_flip_goal_flash")
