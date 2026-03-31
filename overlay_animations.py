@@ -1547,3 +1547,532 @@ class ChallengeFadeInEffect(BaseEffect):
     def reset(self):
         self._active = False
         self._elapsed = 0.0
+
+
+# ===========================================================================
+# ── Heat Bar effects ────────────────────────────────────────────────────────
+# ===========================================================================
+
+class HeatPulseGlowEffect(BaseEffect):
+    """Breathing glow border that intensifies with heat level."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._heat = 0
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+
+    def tick(self, dt: float):
+        speed = 0.002 + 0.004 * (self._heat / 100.0)
+        self._phase = (self._phase + dt * speed) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        if self._heat < 30:
+            return
+        amp = 0.5 + 0.5 * math.sin(self._phase)
+        if self._heat > 85:
+            color = QColor(255, 40, 0, int(120 + 80 * amp))
+            width = 2 + int(2 * amp)
+        elif self._heat > 65:
+            color = QColor(255, 140, 0, int(80 + 60 * amp))
+            width = 2
+        else:
+            color = QColor(0, 200, 100, int(40 + 40 * amp))
+            width = 1
+        pen = QPen(color, width)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), 8, 8)
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class HeatFillShimmerEffect(BaseEffect):
+    """Shimmer sweep over the filled portion of the bar."""
+
+    PERIOD = 1200.0
+
+    def __init__(self):
+        self._elapsed = 0.0
+
+    def tick(self, dt: float):
+        self._elapsed = (self._elapsed + dt) % self.PERIOD
+
+    def paint(self, painter, rect):
+        t = self._elapsed / self.PERIOD
+        x = rect.x() + t * rect.width()
+        grad = QLinearGradient(x - 10, 0, x + 10, 0)
+        grad.setColorAt(0.0, QColor(255, 255, 255, 0))
+        grad.setColorAt(0.5, QColor(255, 255, 255, 60))
+        grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.fillRect(QRectF(rect), grad)
+
+    def reset(self):
+        self._elapsed = 0.0
+
+
+class HeatColorMorphEffect(BaseEffect):
+    """Smooth color transition overlay as heat changes (green->orange->red)."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._heat = 0
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+
+    def tick(self, dt: float):
+        self._phase = (self._phase + dt * 0.001) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        if self._heat < 50:
+            return
+        pulse = 0.5 + 0.5 * math.sin(self._phase)
+        frac = (self._heat - 50) / 50.0
+        r = int(200 * frac)
+        g = int(80 * (1.0 - frac))
+        alpha = int(20 + 15 * pulse)
+        painter.fillRect(QRectF(rect), QColor(r, g, 0, alpha))
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class HeatWarningFlashEffect(BaseEffect):
+    """Flash effect when heat exceeds 85%."""
+
+    FLASH_INTERVAL = 400.0
+
+    def __init__(self):
+        self._elapsed = 0.0
+        self._heat = 0
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+
+    def tick(self, dt: float):
+        self._elapsed = (self._elapsed + dt) % (self.FLASH_INTERVAL * 2)
+
+    def paint(self, painter, rect):
+        if self._heat <= 85:
+            return
+        t = self._elapsed / self.FLASH_INTERVAL
+        alpha = int(60 * math.sin(t * math.pi))
+        if alpha > 0:
+            painter.fillRect(QRectF(rect), QColor(255, 30, 0, alpha))
+
+    def reset(self):
+        self._elapsed = 0.0
+
+
+class HeatParticleRiseEffect(BaseEffect):
+    """Small particles rising from the bar (like heat/steam)."""
+
+    MAX_PARTICLES = 12
+
+    def __init__(self):
+        self._particles = []
+        self._spawn_timer = 0.0
+        self._heat = 0
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+
+    def tick(self, dt: float):
+        if self._heat < 40:
+            self._particles.clear()
+            return
+        interval = max(80.0, 300.0 - 2.0 * self._heat)
+        self._spawn_timer += dt
+        if self._spawn_timer >= interval and len(self._particles) < self.MAX_PARTICLES:
+            self._spawn_timer = 0.0
+            self._particles.append({
+                "x": random.uniform(0.1, 0.9),
+                "y": random.uniform(0.7, 1.0),
+                "vy": random.uniform(0.0003, 0.0007),
+                "life": 1.0,
+                "r": random.randint(2, 4),
+            })
+        for p in self._particles:
+            p["y"] -= p["vy"] * dt
+            p["life"] -= dt / 1200.0
+        self._particles = [p for p in self._particles if p["life"] > 0 and p["y"] > -0.1]
+
+    def paint(self, painter, rect):
+        w, h = rect.width(), rect.height()
+        for p in self._particles:
+            alpha = int(p["life"] * 180)
+            c = QColor(255, 200, 80, alpha)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(c))
+            px = rect.x() + p["x"] * w
+            py = rect.y() + p["y"] * h
+            painter.drawEllipse(QPointF(px, py), p["r"], p["r"])
+
+    def reset(self):
+        self._particles.clear()
+        self._spawn_timer = 0.0
+
+
+class HeatShakeEffect(BaseEffect):
+    """Horizontal shake when heat is critical (>90%)."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._heat = 0
+
+    @property
+    def offset_x(self):
+        if self._heat <= 90:
+            return 0.0
+        return 2.0 * math.sin(self._phase)
+
+    def set_heat(self, heat: int):
+        self._heat = max(0, min(100, int(heat)))
+
+    def tick(self, dt: float):
+        self._phase = (self._phase + dt * 0.04) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        pass
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class HeatFadeInEffect(BaseEffect):
+    """Opacity fade-in when bar first appears."""
+
+    DURATION = 400.0
+
+    def __init__(self):
+        self._elapsed = 0.0
+        self._active = False
+
+    def trigger(self):
+        self._elapsed = 0.0
+        self._active = True
+
+    @property
+    def opacity(self):
+        if not self._active:
+            return 1.0
+        return min(1.0, self._elapsed / self.DURATION)
+
+    def tick(self, dt: float):
+        if not self._active:
+            return
+        self._elapsed += dt
+        if self._elapsed >= self.DURATION:
+            self._active = False
+
+    def paint(self, painter, rect):
+        if not self._active:
+            return
+        alpha = int((1.0 - self.opacity) * 255)
+        if alpha > 0:
+            painter.fillRect(QRectF(rect), QColor(0, 0, 0, alpha))
+
+    def reset(self):
+        self._active = False
+        self._elapsed = 0.0
+
+
+class HeatBarScaleEffect(BaseEffect):
+    """Subtle scale pulse on heat level change."""
+
+    PERIOD = 600.0
+
+    def __init__(self):
+        self._elapsed = 0.0
+        self._active = False
+
+    @property
+    def scale(self):
+        if not self._active:
+            return 1.0
+        t = self._elapsed / self.PERIOD
+        return 1.0 + 0.03 * math.sin(t * math.pi)
+
+    def trigger(self):
+        self._elapsed = 0.0
+        self._active = True
+
+    def tick(self, dt: float):
+        if not self._active:
+            return
+        self._elapsed += dt
+        if self._elapsed >= self.PERIOD:
+            self._active = False
+
+    def paint(self, painter, rect):
+        pass
+
+    def reset(self):
+        self._active = False
+        self._elapsed = 0.0
+
+
+# ===========================================================================
+# ── Timer effects ───────────────────────────────────────────────────────────
+# ===========================================================================
+
+class TimerPulseEffect(BaseEffect):
+    """Breathing pulse that speeds up as time runs out."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._seconds_left = 300
+
+    def set_time(self, seconds_left: int):
+        self._seconds_left = max(0, int(seconds_left))
+
+    @property
+    def scale(self):
+        return 1.0 + 0.02 * math.sin(self._phase)
+
+    def tick(self, dt: float):
+        speed = 0.002 + 0.006 * max(0.0, 1.0 - self._seconds_left / 30.0)
+        self._phase = (self._phase + dt * speed) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        pass
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class TimerTickFlashEffect(BaseEffect):
+    """Brief flash on each second tick."""
+
+    FLASH_DURATION = 120.0
+
+    def __init__(self):
+        self._elapsed = self.FLASH_DURATION  # start inactive
+
+    def trigger(self):
+        self._elapsed = 0.0
+
+    def tick(self, dt: float):
+        self._elapsed = min(self._elapsed + dt, self.FLASH_DURATION)
+
+    def paint(self, painter, rect):
+        if self._elapsed >= self.FLASH_DURATION:
+            return
+        t = self._elapsed / self.FLASH_DURATION
+        alpha = int(80 * (1.0 - t))
+        if alpha > 0:
+            painter.fillRect(QRectF(rect), QColor(255, 255, 255, alpha))
+
+    def reset(self):
+        self._elapsed = self.FLASH_DURATION
+
+
+class TimerColorShiftEffect(BaseEffect):
+    """Color shifts from calm to urgent as time decreases."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._seconds_left = 300
+
+    def set_time(self, seconds_left: int):
+        self._seconds_left = max(0, int(seconds_left))
+
+    def tick(self, dt: float):
+        self._phase = (self._phase + dt * 0.001) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        if self._seconds_left > 30:
+            return
+        frac = max(0.0, 1.0 - self._seconds_left / 30.0)
+        pulse = 0.5 + 0.5 * math.sin(self._phase)
+        r = int(200 * frac)
+        alpha = int((10 + 20 * pulse) * frac)
+        if alpha > 0:
+            painter.fillRect(QRectF(rect), QColor(r, 0, 0, alpha))
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class TimerShakeEffect(BaseEffect):
+    """Shake when time is critically low (<10 seconds)."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._seconds_left = 300
+
+    @property
+    def offset_x(self):
+        if self._seconds_left >= 10:
+            return 0.0
+        return 3.0 * math.sin(self._phase)
+
+    def set_time(self, seconds_left: int):
+        self._seconds_left = max(0, int(seconds_left))
+
+    def tick(self, dt: float):
+        self._phase = (self._phase + dt * 0.05) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        pass
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class TimerGlowBorderEffect(BaseEffect):
+    """Glowing border that intensifies near timeout."""
+
+    def __init__(self):
+        self._phase = 0.0
+        self._seconds_left = 300
+
+    def set_time(self, seconds_left: int):
+        self._seconds_left = max(0, int(seconds_left))
+
+    def tick(self, dt: float):
+        speed = 0.002 + 0.005 * max(0.0, 1.0 - self._seconds_left / 60.0)
+        self._phase = (self._phase + dt * speed) % (2 * math.pi)
+
+    def paint(self, painter, rect):
+        if self._seconds_left > 60:
+            return
+        frac = max(0.0, 1.0 - self._seconds_left / 60.0)
+        amp = 0.5 + 0.5 * math.sin(self._phase)
+        if self._seconds_left <= 10:
+            color = QColor(255, 40, 0, int((80 + 80 * amp) * frac))
+            width = 2 + int(2 * amp)
+        else:
+            color = QColor(255, 140, 0, int((50 + 50 * amp) * frac))
+            width = 2
+        pen = QPen(color, width)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(rect).adjusted(2, 2, -2, -2), 10, 10)
+
+    def reset(self):
+        self._phase = 0.0
+
+
+class TimerFadeInEffect(BaseEffect):
+    """Opacity fade-in when timer first appears."""
+
+    DURATION = 350.0
+
+    def __init__(self):
+        self._elapsed = 0.0
+        self._active = False
+
+    def trigger(self):
+        self._elapsed = 0.0
+        self._active = True
+
+    @property
+    def opacity(self):
+        if not self._active:
+            return 1.0
+        return min(1.0, self._elapsed / self.DURATION)
+
+    def tick(self, dt: float):
+        if not self._active:
+            return
+        self._elapsed += dt
+        if self._elapsed >= self.DURATION:
+            self._active = False
+
+    def paint(self, painter, rect):
+        if not self._active:
+            return
+        alpha = int((1.0 - self.opacity) * 255)
+        if alpha > 0:
+            painter.fillRect(QRectF(rect), QColor(0, 0, 0, alpha))
+
+    def reset(self):
+        self._active = False
+        self._elapsed = 0.0
+
+
+class TimerDigitFlipEffect(BaseEffect):
+    """Split-flap digit animation on second change."""
+
+    FLIP_DURATION = 150.0
+
+    def __init__(self):
+        self._elapsed = self.FLIP_DURATION  # start inactive
+
+    def trigger(self):
+        self._elapsed = 0.0
+
+    @property
+    def flip_progress(self):
+        return min(1.0, self._elapsed / self.FLIP_DURATION)
+
+    def tick(self, dt: float):
+        self._elapsed = min(self._elapsed + dt, self.FLIP_DURATION)
+
+    def paint(self, painter, rect):
+        if self._elapsed >= self.FLIP_DURATION:
+            return
+        t = self._elapsed / self.FLIP_DURATION
+        # Draw a horizontal sweep bar to simulate the flip
+        y = rect.y() + t * rect.height()
+        alpha = int(100 * (1.0 - t))
+        if alpha > 0:
+            painter.fillRect(
+                QRectF(rect.x(), y - 4, rect.width(), 4),
+                QColor(255, 255, 255, alpha),
+            )
+
+    def reset(self):
+        self._elapsed = self.FLIP_DURATION
+
+
+class TimerUrgencyParticleEffect(BaseEffect):
+    """Orbiting particles that speed up as time runs out."""
+
+    MAX_PARTICLES = 8
+
+    def __init__(self):
+        self._angles = []
+        self._seconds_left = 300
+        self._elapsed = 0.0
+
+    def set_time(self, seconds_left: int):
+        self._seconds_left = max(0, int(seconds_left))
+
+    def tick(self, dt: float):
+        if self._seconds_left > 60:
+            self._angles.clear()
+            return
+        self._elapsed += dt
+        speed = 0.002 + 0.006 * max(0.0, 1.0 - self._seconds_left / 60.0)
+        count = max(2, int(self.MAX_PARTICLES * (1.0 - self._seconds_left / 60.0)))
+        while len(self._angles) < count:
+            self._angles.append(random.uniform(0, 2 * math.pi))
+        while len(self._angles) > count:
+            self._angles.pop()
+        self._angles = [(a + dt * speed) % (2 * math.pi) for a in self._angles]
+
+    def paint(self, painter, rect):
+        if self._seconds_left > 60 or not self._angles:
+            return
+        cx = rect.x() + rect.width() / 2
+        cy = rect.y() + rect.height() / 2
+        rx = rect.width() / 2 + 6
+        ry = rect.height() / 2 + 6
+        frac = max(0.0, 1.0 - self._seconds_left / 60.0)
+        alpha = int(160 * frac)
+        for angle in self._angles:
+            px = cx + rx * math.cos(angle)
+            py = cy + ry * math.sin(angle)
+            c = QColor(255, 200, 50, alpha)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(c))
+            painter.drawEllipse(QPointF(px, py), 3.0, 3.0)
+
+    def reset(self):
+        self._angles.clear()
+        self._elapsed = 0.0

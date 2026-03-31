@@ -4194,6 +4194,16 @@ class ChallengeCountdownOverlay(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(1000)
+        # Animation pulse timer
+        self._anim_t: float = 0.0
+        self._tick_flash_t: float = 120.0  # start inactive
+        ov = parent.cfg.OVERLAY or {}
+        low_perf = bool(ov.get("low_performance_mode", False))
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(50)
+        self._pulse_timer.timeout.connect(self._on_anim_tick)
+        if not low_perf:
+            self._pulse_timer.start()
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -4216,8 +4226,14 @@ class ChallengeCountdownOverlay(QWidget):
         self._render_and_place()
         _start_topmost_timer(self)
 
+    def _on_anim_tick(self):
+        self._anim_t = (self._anim_t + 50) % 100000
+        self._tick_flash_t = min(self._tick_flash_t + 50, 120.0)
+        self._render_and_place()
+
     def _tick(self):
         self._left -= 1
+        self._tick_flash_t = 0.0  # trigger tick flash
         if self._left <= 0:
             self._left = 0
             if _sound_mod is not None:
@@ -4269,8 +4285,10 @@ class ChallengeCountdownOverlay(QWidget):
         self.update()
 
     def _compose_image(self):
+        import math as _math
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
+        low_perf = bool(ov.get("low_performance_mode", False))
         factor = 1.0  # Challenge timer is always fixed size (100%)
         w = max(200, int(round(400 * factor)))
         h = max(60, int(round(120 * factor)))
@@ -4285,7 +4303,41 @@ class ChallengeCountdownOverlay(QWidget):
         p.drawRoundedRect(0, 0, w, h, 16, 16)
         _draw_glow_border(p, 0, 0, w, h, radius=16,
                           color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                          low_perf=bool(ov.get("low_performance_mode", False)))
+                          low_perf=low_perf)
+        # ── Timer animations ──────────────────────────────────────────────
+        if not low_perf:
+            rect = QRect(0, 0, w, h)
+            anim_t = getattr(self, "_anim_t", 0.0)
+            # Glow border that intensifies near timeout
+            if bool(ov.get("anim_timer_glow_border", True)) and self._left <= 60:
+                frac = max(0.0, 1.0 - self._left / 60.0)
+                amp = 0.5 + 0.5 * _math.sin(anim_t * 0.003 * _math.pi)
+                if self._left <= 10:
+                    border_color = QColor(255, 40, 0, int((80 + 80 * amp) * frac))
+                    bwidth = 2 + int(2 * amp)
+                else:
+                    border_color = QColor(255, 140, 0, int((50 + 50 * amp) * frac))
+                    bwidth = 2
+                pen = QPen(border_color, bwidth)
+                p.setPen(pen)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawRoundedRect(2, 2, w - 4, h - 4, 14, 14)
+                p.setPen(Qt.PenStyle.NoPen)
+            # Color shift overlay (red tinge when urgent)
+            if bool(ov.get("anim_timer_color_shift", True)) and self._left <= 30:
+                frac = max(0.0, 1.0 - self._left / 30.0)
+                pulse = 0.5 + 0.5 * _math.sin(anim_t * 0.001 * _math.pi)
+                r_val = int(200 * frac)
+                alpha = int((10 + 20 * pulse) * frac)
+                if alpha > 0:
+                    p.fillRect(QRectF(rect), QColor(r_val, 0, 0, alpha))
+            # Tick flash
+            tick_t = getattr(self, "_tick_flash_t", 120.0)
+            if bool(ov.get("anim_timer_tick_flash", True)) and tick_t < 120.0:
+                flash_alpha = int(80 * (1.0 - tick_t / 120.0))
+                if flash_alpha > 0:
+                    p.fillRect(QRectF(rect), QColor(255, 255, 255, flash_alpha))
+        # ─────────────────────────────────────────────────────────────────
         # Turn accent colour when 10 seconds or fewer remain
         if self._left <= 10:
             p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
@@ -4305,6 +4357,13 @@ class ChallengeCountdownOverlay(QWidget):
         except Exception:
             pass
         return img
+
+    def closeEvent(self, e):
+        try:
+            self._pulse_timer.stop()
+        except Exception:
+            pass
+        super().closeEvent(e)
 
     def update_font(self):
         if self.isVisible():
@@ -4936,8 +4995,8 @@ class HeatBarometerOverlay(QWidget):
         # Reactive pulse animation timer (warning/critical)
         ov = self.parent_gui.cfg.OVERLAY or {}
         low_perf = bool(ov.get("low_performance_mode", False))
-        anim_challenge = bool(ov.get("anim_challenge", True))
-        self._low_perf = low_perf or not anim_challenge
+        anim_heat_pulse = bool(ov.get("anim_heat_pulse", True))
+        self._low_perf = low_perf or not anim_heat_pulse
         self._pulse_t: float = 0.0
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)
@@ -4962,6 +5021,11 @@ class HeatBarometerOverlay(QWidget):
 
     def set_heat(self, heat: int):
         self._heat = max(0, min(100, int(heat)))
+        # Re-evaluate low_perf from current config so runtime config changes take effect
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        low_perf = bool(ov.get("low_performance_mode", False))
+        anim_heat_pulse = bool(ov.get("anim_heat_pulse", True))
+        self._low_perf = low_perf or not anim_heat_pulse
         # Start/stop pulse timer based on heat level and low_perf
         if not self._low_perf and self._heat >= 65:
             if not self._pulse_timer.isActive():
@@ -5041,8 +5105,9 @@ class HeatBarometerOverlay(QWidget):
             # Reactive warning/critical pulse border (no success effect for overheating)
             ov = self.parent_gui.cfg.OVERLAY or {}
             low_perf = bool(ov.get("low_performance_mode", False))
+            anim_heat_pulse = bool(ov.get("anim_heat_pulse", True))
             if self._heat >= 65:
-                if not low_perf:
+                if not low_perf and anim_heat_pulse:
                     from math import sin, pi as _pi
                     pulse_t = getattr(self, '_pulse_t', 0.0)
                     amp = 0.5 + 0.5 * sin(2 * _pi * pulse_t)
