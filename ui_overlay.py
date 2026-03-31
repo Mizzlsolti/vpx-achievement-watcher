@@ -3636,6 +3636,12 @@ class AchToastWindow(QWidget):
         if anim_toast:
             self._anim_timer.start()
 
+        self._needs_render = False
+        self._render_timer = QTimer(self)
+        self._render_timer.setInterval(16)
+        self._render_timer.timeout.connect(self._render_tick)
+        self._render_timer.start()
+
         self._render_and_place()
         self._timer.start()
         self.show()
@@ -3665,7 +3671,7 @@ class AchToastWindow(QWidget):
                         pass
                     QTimer.singleShot(200, self.close)
             return
-        self._render_and_place()
+        self._needs_render = True
 
     def closeEvent(self, e):
         if not getattr(self, "_is_closing", False):
@@ -3676,7 +3682,7 @@ class AchToastWindow(QWidget):
                 pass
         # Stop all animation timers
         for attr in ('_burst_timer', '_ring_timer', '_anim_timer',
-                     '_tw_cursor_timer', '_timer', '_motion_timer'):
+                     '_tw_cursor_timer', '_timer', '_motion_timer', '_render_timer'):
             t = getattr(self, attr, None)
             if t is not None:
                 try:
@@ -4016,6 +4022,11 @@ class AchToastWindow(QWidget):
         except Exception as e:
             print(f"[TOAST] render_and_place failed: {e}")
 
+    def _render_tick(self):
+        if self._needs_render:
+            self._needs_render = False
+            self._render_and_place()
+
     def _motion_tick(self):
         """Advance slide-in (entry) or slide-out (exit) animation."""
         dt = 16.0
@@ -4025,7 +4036,7 @@ class AchToastWindow(QWidget):
                 self._entry_active = False
                 self._entry_elapsed = self._entry_duration
                 self._motion_timer.stop()
-            self._render_and_place()
+            self._needs_render = True
         elif getattr(self, '_exit_active', False):
             self._exit_elapsed += dt
             if self._exit_elapsed >= self._exit_duration:
@@ -4039,7 +4050,7 @@ class AchToastWindow(QWidget):
                         pass
                     QTimer.singleShot(50, self.close)
                 return
-            self._render_and_place()
+            self._needs_render = True
 
     def _burst_tick(self):
         """Advance burst particle positions and fade out. Stops after ~700ms."""
@@ -4057,7 +4068,7 @@ class AchToastWindow(QWidget):
             if not getattr(self, '_ring_active', False):
                 self._burst_img_margin = 0
             self._burst_timer.stop()
-        self._render_and_place()
+        self._needs_render = True
 
     def _ring_tick(self):
         """Advance neon ring expansion for level-up toasts."""
@@ -4080,7 +4091,7 @@ class AchToastWindow(QWidget):
             if not getattr(self, '_burst_active', False):
                 self._burst_img_margin = 0
             self._ring_timer.stop()
-        self._render_and_place()
+        self._needs_render = True
 
     def _anim_tick(self):
         """Advance typewriter index, icon bounce, and energy flash, then re-render."""
@@ -4115,7 +4126,7 @@ class AchToastWindow(QWidget):
             changed = True
 
         if changed:
-            self._render_and_place()
+            self._needs_render = True
 
         # Stop anim timer when typewriter, bounce, and flash are all done
         if (not getattr(self, '_tw_active', False) and
@@ -4128,7 +4139,7 @@ class AchToastWindow(QWidget):
         """Toggle cursor visibility for typewriter effect."""
         self._tw_cursor_visible = not getattr(self, '_tw_cursor_visible', True)
         if getattr(self, '_tw_active', False):
-            self._render_and_place()
+            self._needs_render = True
 
 
 class AchToastManager(QObject):
