@@ -3314,11 +3314,11 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
             left_v.addStretch(1)
 
-            def _all_on(cl=chk_list):
+            def _all_on(checked=False, cl=chk_list):
                 for c in cl:
                     c.setChecked(True)
 
-            def _all_off(cl=chk_list):
+            def _all_off(checked=False, cl=chk_list):
                 for c in cl:
                     c.setChecked(False)
 
@@ -4955,8 +4955,32 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             for prev in previews:
                 if prev is not None:
                     prev.refresh_config()
-        # Propagate config changes to any currently visible real overlay windows
-        for attr in ("overlay", "_flip_total_win", "_heat_bar_win",
+        self._refresh_active_overlays()
+
+    def _refresh_active_overlays(self):
+        """Force all running overlay windows to re-read animation config."""
+        # Main Overlay (OverlayWindow has no _render_and_place; use effects-widget toggle)
+        overlay = getattr(self, "overlay", None)
+        if overlay is not None and hasattr(overlay, "isVisible") and overlay.isVisible():
+            try:
+                ov = self.cfg.OVERLAY or {}
+                low_perf = bool(ov.get("low_performance_mode", False))
+                anim_glow = bool(ov.get("anim_main_glow", True))
+                if hasattr(overlay, "_effects_widget"):
+                    ew = overlay._effects_widget
+                    if low_perf or not anim_glow:
+                        ew.hide()
+                    else:
+                        W, H = overlay.width(), overlay.height()
+                        ew.setGeometry(0, 0, W, H)
+                        if not ew.isVisible():
+                            ew.show()
+                        ew.raise_()
+                overlay.update()
+            except Exception:
+                pass
+        # Flip Counter, Heat Bar, Challenge Select, Challenge Timer
+        for attr in ("_flip_total_win", "_heat_bar_win",
                      "_challenge_select", "_challenge_timer"):
             win = getattr(self, attr, None)
             if win is not None and hasattr(win, "isVisible") and win.isVisible():
@@ -4964,6 +4988,13 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                     win._render_and_place()
                 except Exception:
                     pass
+        # Status Overlay
+        status = getattr(self, "_status_overlay", None)
+        if status is not None and hasattr(status, "isVisible") and status.isVisible():
+            try:
+                status.update()
+            except Exception:
+                pass
 
     def _save_overlay_page_settings(self):
         self.cfg.OVERLAY["overlay_page2_enabled"] = self.chk_overlay_page2.isChecked()
