@@ -3745,12 +3745,10 @@ class AchToastWindow(QWidget):
 
         is_level_up = (self._rom == "__levelup__")
         if is_level_up:
-            border_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
             line1 = "LEVEL UP!"
             line2 = self._title.replace("LEVEL UP!  ", "").strip()
             line3 = ""
         else:
-            border_color = QColor(get_theme_color(self.parent_gui.cfg, "border"))
             raw_title = self._title or "Achievement unlocked"
             rom = self._rom or ""
             line3 = ""
@@ -3846,18 +3844,9 @@ class AchToastWindow(QWidget):
         radius = 16
         p.drawRoundedRect(0, 0, W, H, radius, radius)
 
-        # Outer glow for toast
-        glow_pen = QPen(QColor(border_color.red(), border_color.green(), border_color.blue(), 50))
-        glow_pen.setWidth(4)
-        p.setPen(glow_pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(3, 3, W - 6, H - 6, radius - 2, radius - 2)
-
-        pen = QPen(border_color)
-        pen.setWidth(2)
-        p.setPen(pen)
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRoundedRect(1, 1, W - 2, H - 2, radius, radius)
+        _draw_glow_border(p, 0, 0, W, H, radius=radius,
+                          color=QColor(get_theme_color(self.parent_gui.cfg, "primary" if is_level_up else "border")),
+                          low_perf=bool(ov.get("low_performance_mode", False)))
         
         # Icon bounce animation: apply scale and Y-offset
         if getattr(self, '_bounce_active', False):
