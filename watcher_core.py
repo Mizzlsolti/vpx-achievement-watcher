@@ -245,37 +245,9 @@ DEFAULT_OVERLAY.setdefault("anim_main_transitions", True)
 DEFAULT_OVERLAY.setdefault("anim_main_glow", True)
 DEFAULT_OVERLAY.setdefault("anim_main_score_progress", True)
 DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
-DEFAULT_OVERLAY.setdefault("anim_main_sparkle", True)
-DEFAULT_OVERLAY.setdefault("anim_main_ripple", True)
-DEFAULT_OVERLAY.setdefault("anim_main_bar_shimmer", True)
-DEFAULT_OVERLAY.setdefault("anim_main_confetti", True)
 DEFAULT_OVERLAY.setdefault("anim_toast", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_burst", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_typewriter", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_bounce", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_flash", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_slidein", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_shine", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_ring", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_glow", True)
-DEFAULT_OVERLAY.setdefault("anim_toast_slideout", True)
 DEFAULT_OVERLAY.setdefault("anim_status", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_pulse", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_numbers", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_goal_flash", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_gradient", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_particles", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_shake", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_fadein", True)
-DEFAULT_OVERLAY.setdefault("anim_flip_zoom", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_slide", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_flip3d", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_spotlight", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_glitter", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_zoom", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_halo", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge_fadein", True)
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
@@ -394,19 +366,7 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_main_sparkle", "anim_main_ripple",
-                "anim_main_bar_shimmer", "anim_main_confetti",
-                "anim_toast", "anim_toast_burst", "anim_toast_typewriter",
-                "anim_toast_bounce", "anim_toast_flash", "anim_toast_slidein",
-                "anim_toast_shine", "anim_toast_ring", "anim_toast_glow",
-                "anim_toast_slideout",
-                "anim_status", "anim_challenge",
-                "anim_flip_pulse", "anim_flip_numbers", "anim_flip_goal_flash",
-                "anim_flip_gradient", "anim_flip_particles", "anim_flip_shake",
-                "anim_flip_fadein", "anim_flip_zoom",
-                "anim_challenge_slide", "anim_challenge_flip3d",
-                "anim_challenge_spotlight", "anim_challenge_glitter",
-                "anim_challenge_zoom", "anim_challenge_halo", "anim_challenge_fadein",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
@@ -417,15 +377,6 @@ class AppConfig:
                     del loaded_ov[k]
                     
             ov.update(loaded_ov)
-
-            # Backward compatibility: when old config has anim_toast=False,
-            # propagate that to all anim_toast_* sub-keys that weren't explicitly saved.
-            if "anim_toast" in loaded_ov and not loaded_ov["anim_toast"]:
-                for _k in ("anim_toast_burst", "anim_toast_typewriter", "anim_toast_bounce",
-                           "anim_toast_flash", "anim_toast_slidein", "anim_toast_shine",
-                           "anim_toast_ring", "anim_toast_glow", "anim_toast_slideout"):
-                    if _k not in loaded_ov:
-                        ov[_k] = False
 
             cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
             cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
@@ -491,19 +442,7 @@ class AppConfig:
                 "challenges_voice_volume", "challenges_voice_mute",
                 "low_performance_mode",
                 "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_main_sparkle", "anim_main_ripple",
-                "anim_main_bar_shimmer", "anim_main_confetti",
-                "anim_toast", "anim_toast_burst", "anim_toast_typewriter",
-                "anim_toast_bounce", "anim_toast_flash", "anim_toast_slidein",
-                "anim_toast_shine", "anim_toast_ring", "anim_toast_glow",
-                "anim_toast_slideout",
-                "anim_status", "anim_challenge",
-                "anim_flip_pulse", "anim_flip_numbers", "anim_flip_goal_flash",
-                "anim_flip_gradient", "anim_flip_particles", "anim_flip_shake",
-                "anim_flip_fadein", "anim_flip_zoom",
-                "anim_challenge_slide", "anim_challenge_flip3d",
-                "anim_challenge_spotlight", "anim_challenge_glitter",
-                "anim_challenge_zoom", "anim_challenge_halo", "anim_challenge_fadein",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
