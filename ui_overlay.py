@@ -3517,6 +3517,9 @@ class OverlayPositionPicker(QWidget):
 
 class AchToastWindow(QWidget):
     finished = pyqtSignal()
+    # 1px transparent padding added around the composed image so QPen anti-aliasing
+    # never touches the QImage edge, preventing edge-flicker during opacity transitions.
+    _IMG_PAD = 1
     def __init__(self, parent: "MainWindow", title: str, rom: str, seconds: int = 5):
         super().__init__(None)
         self.parent_gui = parent
@@ -3904,6 +3907,19 @@ class AchToastWindow(QWidget):
                 p.drawRoundedRect(0, 0, W, H, radius, radius)
         p.end()
 
+        # Pad image by 1px on all sides so anti-aliased border strokes never touch
+        # the QImage edge — prevents visible flicker during slide-in/slide-out opacity
+        # transitions.
+        _img_pad = self._IMG_PAD
+        padded = QImage(W + 2 * _img_pad, H + 2 * _img_pad, img.format())
+        padded.fill(Qt.GlobalColor.transparent)
+        pp = QPainter(padded)
+        pp.drawImage(_img_pad, _img_pad, img)
+        pp.end()
+        img = padded
+        W += 2 * _img_pad
+        H += 2 * _img_pad
+
         portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
 
         # Draw burst particles and neon ring — works in both landscape and portrait.
@@ -3968,8 +3984,11 @@ class AchToastWindow(QWidget):
             burst_active = getattr(self, '_burst_active', False)
             ring_active = getattr(self, '_ring_active', False)
             burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
-            W = EW - 2 * burst_margin
-            H = EH - 2 * burst_margin
+            # _IMG_PAD is the 1px anti-alias padding added in _compose_image to
+            # prevent QPen strokes from touching the QImage edge.
+            _img_pad = self._IMG_PAD
+            W = EW - 2 * burst_margin - 2 * _img_pad
+            H = EH - 2 * burst_margin - 2 * _img_pad
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
             screen = QApplication.primaryScreen()
             geo = screen.availableGeometry() if screen else QRect(0, 0, 1280, 720)
@@ -4001,9 +4020,10 @@ class AchToastWindow(QWidget):
                 slide_offset = int(60 * exit_t)
                 opacity = max(0.0, min(1.0, 1.0 - exit_t))
 
-            # Expand window for burst/ring area
-            x_win = x - burst_margin + slide_offset
-            y_win = y - burst_margin
+            # Expand window for burst/ring area; subtract _img_pad so the visible
+            # content lands at (x, y) while the transparent padding extends beyond.
+            x_win = x - burst_margin - _img_pad + slide_offset
+            y_win = y - burst_margin - _img_pad
             self.setGeometry(x_win, y_win, EW, EH)
             self._label.setGeometry(0, 0, EW, EH)
             self._label.setPixmap(QPixmap.fromImage(img))
