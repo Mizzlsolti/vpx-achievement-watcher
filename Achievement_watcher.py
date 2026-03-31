@@ -92,7 +92,134 @@ from ui_overlay import (
     ChallengeStartCountdown,
 )
 
-class _AvailableMapsWorker(QThread):
+from PyQt6.QtGui import QBrush, QLinearGradient, QRadialGradient
+
+try:
+    from overlay_animations import (
+        GlowBorderEffect, SparkleEffect, BackgroundRippleEffect, ConfettiEffect,
+    )
+    _OVERLAY_ANIM_AVAILABLE = True
+except Exception:
+    _OVERLAY_ANIM_AVAILABLE = False
+
+
+class EffectsPreviewWidget(QWidget):
+    """Live preview widget for the Effects sub-tab.
+
+    Shows a fake overlay frame and animates effects using the overlay_animations module.
+    """
+
+    _LANDSCAPE_SIZE = (320, 200)
+    _PORTRAIT_SIZE = (120, 200)
+    _TICK_MS = 50
+
+    def __init__(self, cfg, parent=None):
+        super().__init__(parent)
+        self._cfg = cfg
+        self._portrait = False
+        self._elapsed = 0.0
+        self._last_ms = 0
+
+        # Active effects for the preview
+        if _OVERLAY_ANIM_AVAILABLE:
+            self._glow = GlowBorderEffect("#00E5FF")
+            self._sparkle = SparkleEffect("#FF7F00")
+            self._ripple = BackgroundRippleEffect("#00E5FF")
+            self._confetti = ConfettiEffect()
+            self._confetti.trigger(portrait=False)
+            self._sparkle.trigger(portrait=False)
+        else:
+            self._glow = self._sparkle = self._ripple = self._confetti = None
+
+        self._timer = QTimer(self)
+        self._timer.setInterval(self._TICK_MS)
+        self._timer.timeout.connect(self._on_tick)
+        self._timer.start()
+
+        self.setFixedSize(*self._LANDSCAPE_SIZE)
+
+    def set_portrait(self, portrait: bool):
+        self._portrait = portrait
+        if portrait:
+            self.setFixedSize(*self._PORTRAIT_SIZE)
+        else:
+            self.setFixedSize(*self._LANDSCAPE_SIZE)
+        self.update()
+
+    def _on_tick(self):
+        dt = float(self._TICK_MS)
+        if _OVERLAY_ANIM_AVAILABLE:
+            for eff in (self._glow, self._sparkle, self._ripple, self._confetti):
+                if eff is not None:
+                    eff.tick(dt)
+            # Re-trigger sparkle when it finishes
+            if self._sparkle is not None and not self._sparkle.active:
+                self._sparkle.trigger(portrait=self._portrait)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect()
+
+        # Background
+        painter.fillRect(rect, QColor("#111111"))
+
+        # Rounded border
+        from PyQt6.QtCore import QRectF
+        border_color = QColor("#00E5FF")
+        pen = QPen(border_color, 2)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), 10, 10)
+
+        # Paint effects
+        if _OVERLAY_ANIM_AVAILABLE:
+            if self._ripple is not None:
+                self._ripple.paint(painter, rect)
+            if self._glow is not None:
+                self._glow.paint(painter, rect)
+            if self._confetti is not None:
+                self._confetti.paint(painter, rect)
+            if self._sparkle is not None:
+                self._sparkle.paint(painter, rect)
+
+        # Fake overlay content
+        painter.setPen(QPen(QColor("#00E5FF"), 1))
+        font = QFont()
+        font.setPointSize(10)
+        font.setBold(True)
+        painter.setFont(font)
+        from PyQt6.QtCore import Qt as _Qt
+        painter.drawText(
+            rect.adjusted(8, 12, -8, 0), _Qt.AlignmentFlag.AlignTop | _Qt.AlignmentFlag.AlignHCenter,
+            "Achievement Unlocked!"
+        )
+        font.setBold(False)
+        font.setPointSize(9)
+        painter.setFont(font)
+        painter.setPen(QPen(QColor("#FFFFFF"), 1))
+        painter.drawText(
+            rect.adjusted(8, 36, -8, 0), _Qt.AlignmentFlag.AlignTop | _Qt.AlignmentFlag.AlignHCenter,
+            "Mars Jackpot"
+        )
+
+        painter.end()
+
+    def closeEvent(self, event):
+        self._timer.stop()
+        super().closeEvent(event)
+
+    def hideEvent(self, event):
+        self._timer.stop()
+        super().hideEvent(event)
+
+    def showEvent(self, event):
+        if not self._timer.isActive():
+            self._timer.start()
+        super().showEvent(event)
+
+
     """Background worker that scans TABLES_DIR and builds the available-maps list."""
     progress = pyqtSignal(int, int, str)   # (current_index, total, filename)
     finished = pyqtSignal(list)            # sorted list of entry dicts
@@ -2093,6 +2220,28 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             "• <b>Overlay Open</b>: Plays when the stats overlay opens.<br>"
             "• <b>Overlay Close</b>: Plays when the stats overlay closes."
         ),
+        "appearance_effects": (
+            "<b>✨ Effects – Help</b><br><br>"
+            "This tab controls which animations play on each overlay during gameplay.<br><br>"
+            "<b>🎯 Main Overlay</b><br>"
+            "&nbsp;&nbsp;Controls animations on the main stats overlay (page transitions,<br>"
+            "&nbsp;&nbsp;glow border, score spin, sparkle effects and more).<br><br>"
+            "<b>🔔 Toast</b><br>"
+            "&nbsp;&nbsp;Controls animations on the achievement toast notification<br>"
+            "&nbsp;&nbsp;(slide-in, typewriter text, particles, shine sweep and more).<br><br>"
+            "<b>🔢 Flip Counter</b><br>"
+            "&nbsp;&nbsp;Controls animations on the Flip Counter overlay<br>"
+            "&nbsp;&nbsp;(number flip, goal flash, color gradient, orbit particles and more).<br><br>"
+            "<b>🎯 Challenge Select</b><br>"
+            "&nbsp;&nbsp;Controls animations on the Challenge selection menu<br>"
+            "&nbsp;&nbsp;(card flip, spotlight, glitter trail, zoom pulse and more).<br><br>"
+            "<b>💡 Low Performance Mode</b><br>"
+            "&nbsp;&nbsp;When enabled in the Overlay tab, ALL effects are disabled<br>"
+            "&nbsp;&nbsp;regardless of individual settings here.<br><br>"
+            "<b>💡 Preview</b><br>"
+            "&nbsp;&nbsp;The preview window on the right shows a live animation preview.<br>"
+            "&nbsp;&nbsp;Toggle [Landscape] / [Portrait] to see both orientations."
+        ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
@@ -3030,9 +3179,207 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         sound_outer.addWidget(sound_scroll)
         self.appearance_subtabs.addTab(sound_tab, "🔊 Sound")
 
+        # ── Effects sub-tab ────────────────────────────────────────────────────
+        self._build_effects_subtab()
+
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
-    def _portrait_checkboxes(self):
+    # ──────────────────────────────────────────────────────────────────────────
+    # Effects sub-tab builder
+    # ──────────────────────────────────────────────────────────────────────────
+    def _build_effects_subtab(self):
+        """Build the ✨ Effects sub-tab and add it to appearance_subtabs."""
+        effects_tab = QWidget()
+        outer_layout = QVBoxLayout(effects_tab)
+        outer_layout.setContentsMargins(4, 4, 4, 4)
+        outer_layout.setSpacing(4)
+
+        # Horizontal split: left (60%) scrollable controls, right (40%) preview
+        h_split = QHBoxLayout()
+        outer_layout.addLayout(h_split, 1)
+
+        # ── Left side ─────────────────────────────────────────────────────────
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+
+        # Low performance warning label
+        self.lbl_low_perf_warning = QLabel(
+            "⚠ Low Performance Mode is active – all effects are disabled."
+        )
+        self.lbl_low_perf_warning.setStyleSheet(
+            "color: #FF4444; font-weight: bold; background: #2a1010; "
+            "padding: 6px 10px; border: 1px solid #FF4444; border-radius: 4px;"
+        )
+        self.lbl_low_perf_warning.setWordWrap(True)
+        is_low_perf = bool(self.cfg.OVERLAY.get("low_performance_mode", False))
+        self.lbl_low_perf_warning.setVisible(is_low_perf)
+        left_layout.addWidget(self.lbl_low_perf_warning)
+
+        # Scrollable area for animation groups
+        effects_scroll = QScrollArea()
+        effects_scroll.setWidgetResizable(True)
+        effects_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        effects_inner = QWidget()
+        effects_scroll_layout = QVBoxLayout(effects_inner)
+        effects_scroll_layout.setContentsMargins(4, 4, 4, 4)
+        effects_scroll_layout.setSpacing(8)
+
+        # Helper to create a group with [All On] [All Off] buttons and checkboxes
+        def _make_anim_group(title: str, items: list):
+            """items = list of (label, cfg_key, attr_name)"""
+            grp = QGroupBox(title)
+            grp_lay = QVBoxLayout(grp)
+            grp_lay.setSpacing(2)
+
+            btn_row = QHBoxLayout()
+            btn_on = QPushButton("[All On]")
+            btn_off = QPushButton("[All Off]")
+            for b in (btn_on, btn_off):
+                b.setFixedHeight(22)
+                b.setStyleSheet(
+                    "QPushButton { background: #1a1a1a; color: #00E5FF; "
+                    "border: 1px solid #00E5FF; border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
+                    "QPushButton:hover { background: #00E5FF; color: #000; }"
+                )
+            btn_row.addWidget(btn_on)
+            btn_row.addWidget(btn_off)
+            btn_row.addStretch(1)
+            grp_lay.addLayout(btn_row)
+
+            chk_list = []
+            for label_text, cfg_key, attr_name in items:
+                chk = QCheckBox(label_text)
+                chk.setChecked(bool(self.cfg.OVERLAY.get(cfg_key, True)))
+                chk.stateChanged.connect(self._save_anim_settings)
+                setattr(self, attr_name, chk)
+                grp_lay.addWidget(chk)
+                chk_list.append(chk)
+
+            def _all_on():
+                for c in chk_list:
+                    c.setChecked(True)
+            def _all_off():
+                for c in chk_list:
+                    c.setChecked(False)
+            btn_on.clicked.connect(_all_on)
+            btn_off.clicked.connect(_all_off)
+
+            return grp, chk_list
+
+        # 🎯 Main Overlay
+        grp_main, self._effects_main_chks = _make_anim_group("🎯 Main Overlay", [
+            ("Page Slide Transition",            "anim_main_transitions",  "chk_anim_main_transitions"),
+            ("Glow Border & Particles",          "anim_main_glow",         "chk_anim_main_glow"),
+            ("Score Counter Spin",               "anim_main_score_progress", "chk_anim_main_score_progress"),
+            ("Highlights Auto-Scroll",           "anim_main_highlights",   "chk_anim_main_highlights"),
+            ("Sparkle Burst on Page Change",     "anim_main_sparkle",      "chk_anim_main_sparkle"),
+            ("Background Ripple",                "anim_main_ripple",       "chk_anim_main_ripple"),
+            ("Progress Bar Shimmer",             "anim_main_bar_shimmer",  "chk_anim_main_bar_shimmer"),
+            ("Achievement Confetti",             "anim_main_confetti",     "chk_anim_main_confetti"),
+        ])
+        effects_scroll_layout.addWidget(grp_main)
+
+        # 🔔 Toast
+        grp_toast, self._effects_toast_chks = _make_anim_group("🔔 Toast", [
+            ("Burst Particles",                  "anim_toast_burst",       "chk_anim_toast_burst"),
+            ("Typewriter Text",                  "anim_toast_typewriter",  "chk_anim_toast_typewriter"),
+            ("Icon Bounce",                      "anim_toast_bounce",      "chk_anim_toast_bounce"),
+            ("Energy Flash",                     "anim_toast_flash",       "chk_anim_toast_flash"),
+            ("Slide In",                         "anim_toast_slidein",     "chk_anim_toast_slidein"),
+            ("Shine Sweep",                      "anim_toast_shine",       "chk_anim_toast_shine"),
+            ("Pulse Ring",                       "anim_toast_ring",        "chk_anim_toast_ring"),
+            ("Glow Fade",                        "anim_toast_glow",        "chk_anim_toast_glow"),
+        ])
+        effects_scroll_layout.addWidget(grp_toast)
+
+        # 🔢 Flip Counter
+        grp_flip, self._effects_flip_chks = _make_anim_group("🔢 Flip Counter", [
+            ("Pulse Glow",                       "anim_flip_pulse",        "chk_anim_flip_pulse"),
+            ("Flip Numbers",                     "anim_flip_numbers",      "chk_anim_flip_numbers"),
+            ("Goal Flash",                       "anim_flip_goal_flash",   "chk_anim_flip_goal_flash"),
+            ("Color Gradient",                   "anim_flip_gradient",     "chk_anim_flip_gradient"),
+            ("Orbit Particles",                  "anim_flip_particles",    "chk_anim_flip_particles"),
+            ("Warning Shake",                    "anim_flip_shake",        "chk_anim_flip_shake"),
+            ("Fade In",                          "anim_flip_fadein",       "chk_anim_flip_fadein"),
+            ("Zoom Pulse on Count",              "anim_flip_zoom",         "chk_anim_flip_zoom"),
+        ])
+        effects_scroll_layout.addWidget(grp_flip)
+
+        # 🎯 Challenge Select
+        grp_ch, self._effects_challenge_chks = _make_anim_group("🎯 Challenge Select", [
+            ("Pulse Glow",                       "anim_challenge",         "chk_anim_challenge"),
+            ("Carousel Slide",                   "anim_challenge_slide",   "chk_anim_challenge_slide"),
+            ("3D Card Flip",                     "anim_challenge_flip3d",  "chk_anim_challenge_flip3d"),
+            ("Spotlight",                        "anim_challenge_spotlight","chk_anim_challenge_spotlight"),
+            ("Glitter Trail",                    "anim_challenge_glitter", "chk_anim_challenge_glitter"),
+            ("Zoom Pulse",                       "anim_challenge_zoom",    "chk_anim_challenge_zoom"),
+            ("Color Halo",                       "anim_challenge_halo",    "chk_anim_challenge_halo"),
+            ("Fade In",                          "anim_challenge_fadein",  "chk_anim_challenge_fadein"),
+        ])
+        effects_scroll_layout.addWidget(grp_ch)
+
+        effects_scroll_layout.addStretch(1)
+        effects_scroll.setWidget(effects_inner)
+        left_layout.addWidget(effects_scroll, 1)
+
+        # Help button at bottom of left side
+        self._add_tab_help_button(left_layout, "appearance_effects")
+
+        h_split.addWidget(left_widget, 60)
+
+        # Disable all effect checkboxes if low perf mode is on
+        self._all_effect_chks = (
+            self._effects_main_chks + self._effects_toast_chks
+            + self._effects_flip_chks + self._effects_challenge_chks
+        )
+        if is_low_perf:
+            for chk in self._all_effect_chks:
+                chk.setEnabled(False)
+
+        # ── Right side: live preview ───────────────────────────────────────────
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(4, 4, 4, 4)
+        right_layout.setSpacing(6)
+        right_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+
+        preview_title = QLabel("Live Preview")
+        preview_title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+        preview_title.setStyleSheet("color: #AAA; font-size: 9pt;")
+        right_layout.addWidget(preview_title)
+
+        self.effects_preview = EffectsPreviewWidget(self.cfg)
+        self.effects_preview.setFixedSize(320, 200)
+        right_layout.addWidget(self.effects_preview, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        # Portrait / Landscape toggle buttons
+        orient_row = QHBoxLayout()
+        btn_landscape = QPushButton("Landscape")
+        btn_portrait = QPushButton("Portrait")
+        for b in (btn_landscape, btn_portrait):
+            b.setFixedHeight(24)
+            b.setStyleSheet(
+                "QPushButton { background: #1a1a1a; color: #AAA; "
+                "border: 1px solid #555; border-radius: 3px; font-size: 8pt; padding: 0 8px; }"
+                "QPushButton:hover { background: #333; color: #FFF; }"
+                "QPushButton:checked { background: #00E5FF; color: #000; border-color: #00E5FF; }"
+            )
+        btn_landscape.clicked.connect(lambda: self.effects_preview.set_portrait(False))
+        btn_portrait.clicked.connect(lambda: self.effects_preview.set_portrait(True))
+        orient_row.addStretch(1)
+        orient_row.addWidget(btn_landscape)
+        orient_row.addWidget(btn_portrait)
+        orient_row.addStretch(1)
+        right_layout.addLayout(orient_row)
+
+        right_layout.addStretch(1)
+        h_split.addWidget(right_widget, 40)
+
+        self.appearance_subtabs.addTab(effects_tab, "✨ Effects")
+
+
         """Returns the list of all overlay portrait-mode checkboxes."""
         return [
             self.chk_portrait,
@@ -4233,62 +4580,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.chk_low_perf_mode.stateChanged.connect(self._save_low_performance_mode)
         lay_perf_anim.addWidget(self.chk_low_perf_mode)
 
-        lbl_anim_note = QLabel("Enable or disable individual animation groups. Low Performance Mode overrides all.")
+        lbl_anim_note = QLabel("Individual animation settings are available in the Appearance → ✨ Effects tab.")
         lbl_anim_note.setWordWrap(True)
         lbl_anim_note.setStyleSheet("color:#AAA; font-size:9pt; margin-top:6px; margin-bottom:4px;")
         lay_perf_anim.addWidget(lbl_anim_note)
-
-        lbl_main_anim = QLabel("Main / Large Overlay:")
-        lbl_main_anim.setStyleSheet("font-weight:bold; margin-top:4px;")
-        lay_perf_anim.addWidget(lbl_main_anim)
-
-        self.chk_anim_main_transitions = QCheckBox("  ↔  Page / content transitions (Main Overlay)")
-        self.chk_anim_main_transitions.setChecked(bool(self.cfg.OVERLAY.get("anim_main_transitions", True)))
-        self.chk_anim_main_transitions.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_main_transitions)
-
-        self.chk_anim_main_glow = QCheckBox("  ✨  Glow border & floating particles (Main Overlay)")
-        self.chk_anim_main_glow.setChecked(bool(self.cfg.OVERLAY.get("anim_main_glow", True)))
-        self.chk_anim_main_glow.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_main_glow)
-
-        self.chk_anim_main_score_progress = QCheckBox("  📊  Score counter & progress bar (Main Overlay)")
-        self.chk_anim_main_score_progress.setChecked(bool(self.cfg.OVERLAY.get("anim_main_score_progress", True)))
-        self.chk_anim_main_score_progress.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_main_score_progress)
-
-        self.chk_anim_main_highlights = QCheckBox("  💡  Value update highlights & shine sweep (Main Overlay)")
-        self.chk_anim_main_highlights.setChecked(bool(self.cfg.OVERLAY.get("anim_main_highlights", True)))
-        self.chk_anim_main_highlights.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_main_highlights)
-
-        lbl_other_anim = QLabel("Other Overlays:")
-        lbl_other_anim.setStyleSheet("font-weight:bold; margin-top:6px;")
-        lay_perf_anim.addWidget(lbl_other_anim)
-
-        self.chk_anim_toast = QCheckBox("  🏆  Achievement toast (Toast Overlay)")
-        self.chk_anim_toast.setChecked(bool(self.cfg.OVERLAY.get("anim_toast", True)))
-        self.chk_anim_toast.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_toast)
-
-        self.chk_anim_status = QCheckBox("  🔵  Status overlay (Status Badge)")
-        self.chk_anim_status.setChecked(bool(self.cfg.OVERLAY.get("anim_status", True)))
-        self.chk_anim_status.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_status)
-
-        self.chk_anim_challenge = QCheckBox("  ⚡  Challenge overlays (Challenge Select / Timer / Flip Counter)")
-        self.chk_anim_challenge.setChecked(bool(self.cfg.OVERLAY.get("anim_challenge", True)))
-        self.chk_anim_challenge.stateChanged.connect(self._save_anim_settings)
-        lay_perf_anim.addWidget(self.chk_anim_challenge)
-
-        # Disable individual animation checkboxes if Low Performance Mode is already on
-        if bool(self.cfg.OVERLAY.get("low_performance_mode", False)):
-            for _chk in [
-                self.chk_anim_main_transitions, self.chk_anim_main_glow,
-                self.chk_anim_main_score_progress, self.chk_anim_main_highlights,
-                self.chk_anim_toast, self.chk_anim_status, self.chk_anim_challenge,
-            ]:
-                _chk.setEnabled(False)
 
         layout.addWidget(grp_perf_anim)
 
@@ -4508,25 +4803,56 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
     def _save_low_performance_mode(self, state: int):
         self.cfg.OVERLAY["low_performance_mode"] = bool(state)
         self.cfg.save()
-        _anim_chks = [
-            "chk_anim_main_transitions", "chk_anim_main_glow",
-            "chk_anim_main_score_progress", "chk_anim_main_highlights",
-            "chk_anim_toast", "chk_anim_status", "chk_anim_challenge",
-        ]
         enabled = not bool(state)
-        for name in _anim_chks:
-            chk = getattr(self, name, None)
-            if chk is not None:
-                chk.setEnabled(enabled)
+        # Update the Effects sub-tab checkboxes and warning label
+        for chk in getattr(self, "_all_effect_chks", []):
+            chk.setEnabled(enabled)
+        lbl = getattr(self, "lbl_low_perf_warning", None)
+        if lbl is not None:
+            lbl.setVisible(bool(state))
 
     def _save_anim_settings(self):
-        self.cfg.OVERLAY["anim_main_transitions"] = bool(getattr(self, "chk_anim_main_transitions", None) and self.chk_anim_main_transitions.isChecked())
-        self.cfg.OVERLAY["anim_main_glow"] = bool(getattr(self, "chk_anim_main_glow", None) and self.chk_anim_main_glow.isChecked())
-        self.cfg.OVERLAY["anim_main_score_progress"] = bool(getattr(self, "chk_anim_main_score_progress", None) and self.chk_anim_main_score_progress.isChecked())
-        self.cfg.OVERLAY["anim_main_highlights"] = bool(getattr(self, "chk_anim_main_highlights", None) and self.chk_anim_main_highlights.isChecked())
-        self.cfg.OVERLAY["anim_toast"] = bool(getattr(self, "chk_anim_toast", None) and self.chk_anim_toast.isChecked())
-        self.cfg.OVERLAY["anim_status"] = bool(getattr(self, "chk_anim_status", None) and self.chk_anim_status.isChecked())
-        self.cfg.OVERLAY["anim_challenge"] = bool(getattr(self, "chk_anim_challenge", None) and self.chk_anim_challenge.isChecked())
+        def _get(attr):
+            chk = getattr(self, attr, None)
+            return bool(chk and chk.isChecked())
+
+        self.cfg.OVERLAY["anim_main_transitions"] = _get("chk_anim_main_transitions")
+        self.cfg.OVERLAY["anim_main_glow"] = _get("chk_anim_main_glow")
+        self.cfg.OVERLAY["anim_main_score_progress"] = _get("chk_anim_main_score_progress")
+        self.cfg.OVERLAY["anim_main_highlights"] = _get("chk_anim_main_highlights")
+        self.cfg.OVERLAY["anim_main_sparkle"] = _get("chk_anim_main_sparkle")
+        self.cfg.OVERLAY["anim_main_ripple"] = _get("chk_anim_main_ripple")
+        self.cfg.OVERLAY["anim_main_bar_shimmer"] = _get("chk_anim_main_bar_shimmer")
+        self.cfg.OVERLAY["anim_main_confetti"] = _get("chk_anim_main_confetti")
+        # anim_toast is the legacy single-key from older configs. It is kept in sync with
+        # anim_toast_burst so that code reading the old key still gets the expected value.
+        self.cfg.OVERLAY["anim_toast_burst"] = _get("chk_anim_toast_burst")
+        self.cfg.OVERLAY["anim_toast"] = _get("chk_anim_toast_burst")
+        self.cfg.OVERLAY["anim_toast_typewriter"] = _get("chk_anim_toast_typewriter")
+        self.cfg.OVERLAY["anim_toast_bounce"] = _get("chk_anim_toast_bounce")
+        self.cfg.OVERLAY["anim_toast_flash"] = _get("chk_anim_toast_flash")
+        self.cfg.OVERLAY["anim_toast_slidein"] = _get("chk_anim_toast_slidein")
+        self.cfg.OVERLAY["anim_toast_shine"] = _get("chk_anim_toast_shine")
+        self.cfg.OVERLAY["anim_toast_ring"] = _get("chk_anim_toast_ring")
+        self.cfg.OVERLAY["anim_toast_glow"] = _get("chk_anim_toast_glow")
+        # anim_status is not exposed in the Effects tab UI (no checkbox); its value
+        # in cfg.OVERLAY is left untouched so existing behaviour is preserved.
+        self.cfg.OVERLAY["anim_challenge"] = _get("chk_anim_challenge")  # Challenge Select → Pulse Glow
+        self.cfg.OVERLAY["anim_flip_pulse"] = _get("chk_anim_flip_pulse")
+        self.cfg.OVERLAY["anim_flip_numbers"] = _get("chk_anim_flip_numbers")
+        self.cfg.OVERLAY["anim_flip_goal_flash"] = _get("chk_anim_flip_goal_flash")
+        self.cfg.OVERLAY["anim_flip_gradient"] = _get("chk_anim_flip_gradient")
+        self.cfg.OVERLAY["anim_flip_particles"] = _get("chk_anim_flip_particles")
+        self.cfg.OVERLAY["anim_flip_shake"] = _get("chk_anim_flip_shake")
+        self.cfg.OVERLAY["anim_flip_fadein"] = _get("chk_anim_flip_fadein")
+        self.cfg.OVERLAY["anim_flip_zoom"] = _get("chk_anim_flip_zoom")
+        self.cfg.OVERLAY["anim_challenge_slide"] = _get("chk_anim_challenge_slide")
+        self.cfg.OVERLAY["anim_challenge_flip3d"] = _get("chk_anim_challenge_flip3d")
+        self.cfg.OVERLAY["anim_challenge_spotlight"] = _get("chk_anim_challenge_spotlight")
+        self.cfg.OVERLAY["anim_challenge_glitter"] = _get("chk_anim_challenge_glitter")
+        self.cfg.OVERLAY["anim_challenge_zoom"] = _get("chk_anim_challenge_zoom")
+        self.cfg.OVERLAY["anim_challenge_halo"] = _get("chk_anim_challenge_halo")
+        self.cfg.OVERLAY["anim_challenge_fadein"] = _get("chk_anim_challenge_fadein")
         self.cfg.save()
 
     def _save_overlay_page_settings(self):

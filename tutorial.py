@@ -176,6 +176,19 @@ _STEPS = [
         "subtab": 2,  # Sound sub-tab
     },
     {
+        "title": "✨ Effects (optional)",
+        "body": (
+            "Fine-tune which animations are shown on each overlay.\n\n"
+            "  • Toggle individual effects on or off per overlay\n"
+            "  • Use [All On] / [All Off] for quick control\n"
+            "  • Preview animations live in the preview window\n"
+            "  • Low Performance Mode (Overlay tab) disables all effects\n\n"
+            "All effects are enabled by default."
+        ),
+        "tab": 2,   # Appearance
+        "subtab": 3,  # Effects sub-tab
+    },
+    {
         "title": "📊 Records & Stats",
         "body": (
             "This tab tracks your personal records across all tables:\n\n"
