@@ -3417,7 +3417,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         (grp_heat, self._effects_heat_chks,
          _prev_heat_l, _prev_heat_p) = _make_section("🔥 Heat Bar", [
             ("Pulse Glow Border",             "anim_heat_pulse",         "chk_anim_heat_pulse"),
-            ("Fill Shimmer",                  "anim_heat_shimmer",        "chk_anim_heat_shimmer"),
+            ("Fill Shimmer",                  "anim_heat_shimmer",       "chk_anim_heat_shimmer"),
             ("Color Morph",                   "anim_heat_color_morph",   "chk_anim_heat_color_morph"),
             ("Warning Flash",                 "anim_heat_warning_flash", "chk_anim_heat_warning_flash"),
             ("Particle Rise",                 "anim_heat_particles",     "chk_anim_heat_particles"),
