@@ -276,22 +276,6 @@ DEFAULT_OVERLAY.setdefault("anim_challenge_glitter", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge_zoom", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge_halo", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge_fadein", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_pulse", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_shimmer", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_color_morph", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_warning_flash", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_particles", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_shake", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_fadein", True)
-DEFAULT_OVERLAY.setdefault("anim_heat_scale", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_pulse", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_tick_flash", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_color_shift", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_shake", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_glow_border", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_fadein", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_digit_flip", True)
-DEFAULT_OVERLAY.setdefault("anim_timer_urgency_particles", True)
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
@@ -423,12 +407,6 @@ class AppConfig:
                 "anim_challenge_slide", "anim_challenge_flip3d",
                 "anim_challenge_spotlight", "anim_challenge_glitter",
                 "anim_challenge_zoom", "anim_challenge_halo", "anim_challenge_fadein",
-                "anim_heat_pulse", "anim_heat_shimmer", "anim_heat_color_morph",
-                "anim_heat_warning_flash", "anim_heat_particles", "anim_heat_shake",
-                "anim_heat_fadein", "anim_heat_scale",
-                "anim_timer_pulse", "anim_timer_tick_flash", "anim_timer_color_shift",
-                "anim_timer_shake", "anim_timer_glow_border", "anim_timer_fadein",
-                "anim_timer_digit_flip", "anim_timer_urgency_particles",
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",
@@ -526,12 +504,6 @@ class AppConfig:
                 "anim_challenge_slide", "anim_challenge_flip3d",
                 "anim_challenge_spotlight", "anim_challenge_glitter",
                 "anim_challenge_zoom", "anim_challenge_halo", "anim_challenge_fadein",
-                "anim_heat_pulse", "anim_heat_shimmer", "anim_heat_color_morph",
-                "anim_heat_warning_flash", "anim_heat_particles", "anim_heat_shake",
-                "anim_heat_fadein", "anim_heat_scale",
-                "anim_timer_pulse", "anim_timer_tick_flash", "anim_timer_color_shift",
-                "anim_timer_shake", "anim_timer_glow_border", "anim_timer_fadein",
-                "anim_timer_digit_flip", "anim_timer_urgency_particles",
                 "overlay_page2_enabled", "overlay_page3_enabled",
                 "overlay_page4_enabled", "overlay_page5_enabled",
                 "sound_enabled", "sound_volume", "sound_pack", "sound_events",

@@ -180,11 +180,9 @@ _STEPS = [
         "body": (
             "Fine-tune which animations are shown on each overlay.\n\n"
             "  • Toggle individual effects on or off per overlay\n"
-            "  • Sections: Main Overlay, Toast, Flip Counter,\n"
-            "    Challenge Select, Heat Bar, Timer\n"
             "  • Use [All On] / [All Off] for quick control\n"
             "  • Preview animations live in the preview window\n"
-            "  • Low Performance Mode (System tab) disables all effects\n\n"
+            "  • Low Performance Mode (Overlay tab) disables all effects\n\n"
             "All effects are enabled by default."
         ),
         "tab": 2,   # Appearance
@@ -219,7 +217,7 @@ _STEPS = [
         "subtab": None,
     },
     {
-        "title": "☁️ Cloud Sync & Leaderboards",
+        "title": "☁️ Cloud Sync & Leaderboards (optional)",
         "body": (
             "Upload your scores and achievements to compete on the\n"
             "global cloud leaderboard!\n\n"
