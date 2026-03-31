@@ -4195,8 +4195,8 @@ class ChallengeCountdownOverlay(QWidget):
         self._timer.timeout.connect(self._tick)
         self._timer.start(1000)
         # Animation pulse timer
-        self._anim_t: float = 0.0
-        self._tick_flash_t: float = 120.0  # start inactive
+        self._anim_time: float = 0.0
+        self._tick_flash_time: float = 120.0  # start inactive
         ov = parent.cfg.OVERLAY or {}
         low_perf = bool(ov.get("low_performance_mode", False))
         self._pulse_timer = QTimer(self)
@@ -4227,13 +4227,13 @@ class ChallengeCountdownOverlay(QWidget):
         _start_topmost_timer(self)
 
     def _on_anim_tick(self):
-        self._anim_t = (self._anim_t + 50) % 100000
-        self._tick_flash_t = min(self._tick_flash_t + 50, 120.0)
+        self._anim_time = (self._anim_time + 50) % 100000
+        self._tick_flash_time = min(self._tick_flash_time + 50, 120.0)
         self._render_and_place()
 
     def _tick(self):
         self._left -= 1
-        self._tick_flash_t = 0.0  # trigger tick flash
+        self._tick_flash_time = 0.0  # trigger tick flash
         if self._left <= 0:
             self._left = 0
             if _sound_mod is not None:
@@ -4285,7 +4285,6 @@ class ChallengeCountdownOverlay(QWidget):
         self.update()
 
     def _compose_image(self):
-        import math as _math
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         low_perf = bool(ov.get("low_performance_mode", False))
@@ -4307,11 +4306,11 @@ class ChallengeCountdownOverlay(QWidget):
         # ── Timer animations ──────────────────────────────────────────────
         if not low_perf:
             rect = QRect(0, 0, w, h)
-            anim_t = getattr(self, "_anim_t", 0.0)
+            anim_time = getattr(self, "_anim_time", 0.0)
             # Glow border that intensifies near timeout
             if bool(ov.get("anim_timer_glow_border", True)) and self._left <= 60:
                 frac = max(0.0, 1.0 - self._left / 60.0)
-                amp = 0.5 + 0.5 * _math.sin(anim_t * 0.003 * _math.pi)
+                amp = 0.5 + 0.5 * math.sin(anim_time * 0.003 * math.pi)
                 if self._left <= 10:
                     border_color = QColor(255, 40, 0, int((80 + 80 * amp) * frac))
                     bwidth = 2 + int(2 * amp)
@@ -4326,15 +4325,15 @@ class ChallengeCountdownOverlay(QWidget):
             # Color shift overlay (red tinge when urgent)
             if bool(ov.get("anim_timer_color_shift", True)) and self._left <= 30:
                 frac = max(0.0, 1.0 - self._left / 30.0)
-                pulse = 0.5 + 0.5 * _math.sin(anim_t * 0.001 * _math.pi)
+                pulse = 0.5 + 0.5 * math.sin(anim_time * 0.001 * math.pi)
                 r_val = int(200 * frac)
                 alpha = int((10 + 20 * pulse) * frac)
                 if alpha > 0:
                     p.fillRect(QRectF(rect), QColor(r_val, 0, 0, alpha))
             # Tick flash
-            tick_t = getattr(self, "_tick_flash_t", 120.0)
-            if bool(ov.get("anim_timer_tick_flash", True)) and tick_t < 120.0:
-                flash_alpha = int(80 * (1.0 - tick_t / 120.0))
+            tick_flash_time = getattr(self, "_tick_flash_time", 120.0)
+            if bool(ov.get("anim_timer_tick_flash", True)) and tick_flash_time < 120.0:
+                flash_alpha = int(80 * (1.0 - tick_flash_time / 120.0))
                 if flash_alpha > 0:
                     p.fillRect(QRectF(rect), QColor(255, 255, 255, flash_alpha))
         # ─────────────────────────────────────────────────────────────────
