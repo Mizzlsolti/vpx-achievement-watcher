@@ -4059,7 +4059,8 @@ class AchToastWindow(QWidget):
             pt['alpha'] = int(255 * fade)
         if self._burst_elapsed >= duration:
             self._burst_active = False
-            self._burst_img_margin = 0
+            if not getattr(self, '_ring_active', False):
+                self._burst_img_margin = 0
             self._burst_timer.stop()
         self._render_and_place()
 
@@ -4081,6 +4082,8 @@ class AchToastWindow(QWidget):
                 all_done = False
         if all_done:
             self._ring_active = False
+            if not getattr(self, '_burst_active', False):
+                self._burst_img_margin = 0
             self._ring_timer.stop()
         self._render_and_place()
 
