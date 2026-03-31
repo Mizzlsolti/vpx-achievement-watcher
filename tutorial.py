@@ -176,21 +176,6 @@ _STEPS = [
         "subtab": 2,  # Sound sub-tab
     },
     {
-        "title": "✨ Effects (optional)",
-        "body": (
-            "Fine-tune which animations are shown on each overlay.\n\n"
-            "  • Toggle individual effects on or off per overlay\n"
-            "  • Sections: Main Overlay, Toast, Flip Counter,\n"
-            "    Challenge Select, Heat Bar, Timer\n"
-            "  • Use [All On] / [All Off] for quick control\n"
-            "  • Preview animations live in the preview window\n"
-            "  • Low Performance Mode (System tab) disables all effects\n\n"
-            "All effects are enabled by default."
-        ),
-        "tab": 2,   # Appearance
-        "subtab": 3,  # Effects sub-tab
-    },
-    {
         "title": "📊 Records & Stats",
         "body": (
             "This tab tracks your personal records across all tables:\n\n"
@@ -219,7 +204,7 @@ _STEPS = [
         "subtab": None,
     },
     {
-        "title": "☁️ Cloud Sync & Leaderboards",
+        "title": "☁️ Cloud Sync & Leaderboards (optional)",
         "body": (
             "Upload your scores and achievements to compete on the\n"
             "global cloud leaderboard!\n\n"
