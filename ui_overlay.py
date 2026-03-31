@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import QApplication, QWidget, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QRect, QObject, QPoint, QEventLoop
 from PyQt6.QtGui import (
     QColor, QFont, QFontMetrics, QTransform, QPixmap,
-    QPainter, QImage, QPen, QLinearGradient, QBrush,
+    QPainter, QImage, QPen, QLinearGradient, QBrush, QPainterPath,
 )
 
 from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, load_json, f_custom_achievements_progress
@@ -3843,6 +3843,12 @@ class AchToastWindow(QWidget):
         p.setBrush(bg)
         radius = 16
         p.drawRoundedRect(0, 0, W, H, radius, radius)
+
+        # Clip to background shape so glow border never bleeds past rounded corners
+        # during slide-in/slide-out animation
+        clip = QPainterPath()
+        clip.addRoundedRect(0.0, 0.0, float(W), float(H), float(radius), float(radius))
+        p.setClipPath(clip)
 
         _draw_glow_border(p, 0, 0, W, H, radius=radius,
                           color=QColor(get_theme_color(self.parent_gui.cfg, "primary" if is_level_up else "border")),
