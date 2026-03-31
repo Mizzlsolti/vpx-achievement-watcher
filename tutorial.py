@@ -182,7 +182,7 @@ _STEPS = [
             "  • Toggle individual effects on or off per overlay\n"
             "  • Use [All On] / [All Off] for quick control\n"
             "  • Preview animations live in the preview window\n"
-            "  • Low Performance Mode (Overlay tab) disables all effects\n\n"
+            "  • Low Performance Mode (System tab) disables all effects\n\n"
             "All effects are enabled by default."
         ),
         "tab": 2,   # Appearance
@@ -217,7 +217,7 @@ _STEPS = [
         "subtab": None,
     },
     {
-        "title": "☁️ Cloud Sync & Leaderboards (optional)",
+        "title": "☁️ Cloud Sync & Leaderboards",
         "body": (
             "Upload your scores and achievements to compete on the\n"
             "global cloud leaderboard!\n\n"
