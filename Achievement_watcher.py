@@ -3299,9 +3299,13 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 if t and t not in {str(r.get("title", "")).strip() for r in all_rules}:
                     cells.append(f"<td class='unlocked'>✅ {t}</td>")
 
+            COLUMNS = 4
             rows = []
-            for i in range(0, len(cells), 4):
-                rows.append("<tr>" + "".join(cells[i:i+4]) + "</tr>")
+            for i in range(0, len(cells), COLUMNS):
+                row_cells = cells[i:i + COLUMNS]
+                while len(row_cells) < COLUMNS:
+                    row_cells.append("<td></td>")
+                rows.append("<tr>" + "".join(row_cells) + "</tr>")
 
             pct = int(unlocked_count * 100 / total) if total > 0 else 0
             html = (
@@ -3313,7 +3317,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 f"<p style='color:#aaa; text-align:center;'>Progress: {unlocked_count} / {total} ({pct}%)</p>"
             )
             if rows:
-                html += "<table>" + "".join(rows) + "</table>"
+                html += "<table align='center' width='100%'>" + "".join(rows) + "</table>"
             else:
                 html += "<p style='color:#888;'>(No achievements defined yet)</p>"
             self.progress_view.setHtml(html)
@@ -6617,12 +6621,19 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                     pass
                 self._prepare_overlay_sections()
                 secs = self._overlay_cycle.get("sections", [])
-                if not secs:
-                    return
                 self._ensure_overlay()
                 self._overlay_cycle["idx"] = 0
-                self._overlay_page = 0
-                self._show_overlay_section(secs[0])
+                if self._is_active_cat_table():
+                    # For custom tables (no NVRAM map) skip the Highlights page
+                    # (page 0) which shows "(No Highlights yet)" and start
+                    # directly at Achievement Progress (page 1).
+                    self._overlay_page = 1
+                    self._show_overlay_page(1)
+                else:
+                    if not secs:
+                        return
+                    self._overlay_page = 0
+                    self._show_overlay_section(secs[0])
                 try:
                     self._overlay_last_action = _time.monotonic()
                 except Exception:
