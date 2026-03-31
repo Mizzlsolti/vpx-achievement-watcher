@@ -3321,32 +3321,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         ])
         effects_scroll_layout.addWidget(grp_ch)
 
-        # 🔥 Heat Bar
-        grp_heat, self._effects_heat_chks = _make_anim_group("🔥 Heat Bar", [
-            ("Pulse Glow Border",                "anim_heat_pulse",           "chk_anim_heat_pulse"),
-            ("Fill Shimmer",                     "anim_heat_shimmer",         "chk_anim_heat_shimmer"),
-            ("Color Morph",                      "anim_heat_color_morph",     "chk_anim_heat_color_morph"),
-            ("Warning Flash",                    "anim_heat_warning_flash",   "chk_anim_heat_warning_flash"),
-            ("Particle Rise",                    "anim_heat_particles",       "chk_anim_heat_particles"),
-            ("Critical Shake",                   "anim_heat_shake",           "chk_anim_heat_shake"),
-            ("Fade In",                          "anim_heat_fadein",          "chk_anim_heat_fadein"),
-            ("Scale Pulse",                      "anim_heat_scale",           "chk_anim_heat_scale"),
-        ])
-        effects_scroll_layout.addWidget(grp_heat)
-
-        # ⏱️ Timer
-        grp_timer, self._effects_timer_chks = _make_anim_group("\u23f1\ufe0f Timer", [
-            ("Pulse",                            "anim_timer_pulse",          "chk_anim_timer_pulse"),
-            ("Tick Flash",                       "anim_timer_tick_flash",     "chk_anim_timer_tick_flash"),
-            ("Color Shift",                      "anim_timer_color_shift",    "chk_anim_timer_color_shift"),
-            ("Urgency Shake",                    "anim_timer_shake",          "chk_anim_timer_shake"),
-            ("Glow Border",                      "anim_timer_glow_border",    "chk_anim_timer_glow_border"),
-            ("Fade In",                          "anim_timer_fadein",         "chk_anim_timer_fadein"),
-            ("Digit Flip",                       "anim_timer_digit_flip",     "chk_anim_timer_digit_flip"),
-            ("Urgency Particles",                "anim_timer_urgency_particles", "chk_anim_timer_urgency_particles"),
-        ])
-        effects_scroll_layout.addWidget(grp_timer)
-
         effects_scroll_layout.addStretch(1)
         effects_scroll.setWidget(effects_inner)
         left_layout.addWidget(effects_scroll, 1)
@@ -3360,7 +3334,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self._all_effect_chks = (
             self._effects_main_chks + self._effects_toast_chks
             + self._effects_flip_chks + self._effects_challenge_chks
-            + self._effects_heat_chks + self._effects_timer_chks
         )
         if is_low_perf:
             for chk in self._all_effect_chks:
@@ -4881,31 +4854,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.cfg.OVERLAY["anim_challenge_zoom"] = _get("chk_anim_challenge_zoom")
         self.cfg.OVERLAY["anim_challenge_halo"] = _get("chk_anim_challenge_halo")
         self.cfg.OVERLAY["anim_challenge_fadein"] = _get("chk_anim_challenge_fadein")
-        self.cfg.OVERLAY["anim_heat_pulse"] = _get("chk_anim_heat_pulse")
-        self.cfg.OVERLAY["anim_heat_shimmer"] = _get("chk_anim_heat_shimmer")
-        self.cfg.OVERLAY["anim_heat_color_morph"] = _get("chk_anim_heat_color_morph")
-        self.cfg.OVERLAY["anim_heat_warning_flash"] = _get("chk_anim_heat_warning_flash")
-        self.cfg.OVERLAY["anim_heat_particles"] = _get("chk_anim_heat_particles")
-        self.cfg.OVERLAY["anim_heat_shake"] = _get("chk_anim_heat_shake")
-        self.cfg.OVERLAY["anim_heat_fadein"] = _get("chk_anim_heat_fadein")
-        self.cfg.OVERLAY["anim_heat_scale"] = _get("chk_anim_heat_scale")
-        self.cfg.OVERLAY["anim_timer_pulse"] = _get("chk_anim_timer_pulse")
-        self.cfg.OVERLAY["anim_timer_tick_flash"] = _get("chk_anim_timer_tick_flash")
-        self.cfg.OVERLAY["anim_timer_color_shift"] = _get("chk_anim_timer_color_shift")
-        self.cfg.OVERLAY["anim_timer_shake"] = _get("chk_anim_timer_shake")
-        self.cfg.OVERLAY["anim_timer_glow_border"] = _get("chk_anim_timer_glow_border")
-        self.cfg.OVERLAY["anim_timer_fadein"] = _get("chk_anim_timer_fadein")
-        self.cfg.OVERLAY["anim_timer_digit_flip"] = _get("chk_anim_timer_digit_flip")
-        self.cfg.OVERLAY["anim_timer_urgency_particles"] = _get("chk_anim_timer_urgency_particles")
         self.cfg.save()
-        # Propagate config changes to active overlay windows
-        for attr in ("overlay_window", "_heat_bar_win", "_challenge_timer"):
-            win = getattr(self, attr, None)
-            if win is not None and win.isVisible():
-                try:
-                    win._render_and_place()
-                except Exception:
-                    pass
 
     def _save_overlay_page_settings(self):
         self.cfg.OVERLAY["overlay_page2_enabled"] = self.chk_overlay_page2.isChecked()
