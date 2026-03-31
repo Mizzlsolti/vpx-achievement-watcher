@@ -90,6 +90,7 @@ from ui_overlay import (
     HeatBarometerOverlay,
     HeatBarPositionPicker,
     ChallengeStartCountdown,
+    _draw_glow_border,
 )
 
 from PyQt6.QtGui import QBrush, QLinearGradient, QRadialGradient
@@ -157,7 +158,11 @@ class OverlaySectionPreviewWidget(QWidget):
         else:
             self.setFixedSize(self._LANDSCAPE_W, self._LANDSCAPE_H)
 
-        _, border_col, accent_col = self._CONTENT.get(overlay_type, ("...", "#00E5FF", "#FF7F00"))
+        try:
+            border_col = get_theme_color(cfg, "border")
+            accent_col = get_theme_color(cfg, "accent")
+        except Exception:
+            _, border_col, accent_col = self._CONTENT.get(overlay_type, ("...", "#00E5FF", "#FF7F00"))
         if _OVERLAY_ANIM_AVAILABLE:
             self._glow = GlowBorderEffect(border_col)
             self._sparkle = SparkleEffect(accent_col)
@@ -171,7 +176,21 @@ class OverlaySectionPreviewWidget(QWidget):
         self._timer.start()
 
     def refresh_config(self):
-        """Call after any animation config key changes to force an immediate repaint."""
+        """Call after any animation config key changes to force an immediate repaint.
+        Also refreshes glow/sparkle effect colors to match the current theme."""
+        if _OVERLAY_ANIM_AVAILABLE:
+            try:
+                border_col = get_theme_color(self._cfg, "border")
+                accent_col = get_theme_color(self._cfg, "accent")
+            except Exception:
+                _, border_col, accent_col = self._CONTENT.get(self._overlay_type, ("...", "#00E5FF", "#FF7F00"))
+            if self._glow is not None:
+                from overlay_animations import GlowBorderEffect
+                self._glow = GlowBorderEffect(border_col)
+            if self._sparkle is not None:
+                from overlay_animations import SparkleEffect
+                self._sparkle = SparkleEffect(accent_col)
+                self._sparkle.trigger(portrait=self._portrait)
         self.update()
 
     def _glow_enabled(self) -> bool:
@@ -201,43 +220,61 @@ class OverlaySectionPreviewWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
 
-        painter.fillRect(rect, QColor("#111111"))
+        # ── Theme-aware background (matches real overlays) ─────────────────
+        try:
+            bg_hex = get_theme_color(self._cfg, "bg").lstrip("#")
+            bg_color = QColor(
+                int(bg_hex[0:2], 16), int(bg_hex[2:4], 16), int(bg_hex[4:6], 16), 235
+            )
+            border_hex = get_theme_color(self._cfg, "border").lstrip("#")
+            border_color = QColor(
+                int(border_hex[0:2], 16), int(border_hex[2:4], 16), int(border_hex[4:6], 16)
+            )
+            accent_hex = get_theme_color(self._cfg, "accent").lstrip("#")
+            text_color = QColor(
+                int(accent_hex[0:2], 16), int(accent_hex[2:4], 16), int(accent_hex[4:6], 16)
+            )
+        except Exception:
+            bg_color = QColor(15, 15, 20, 235)
+            border_color = QColor("#00E5FF")
+            text_color = QColor("#00E5FF")
 
-        _, border_hex, _ = self._CONTENT.get(self._overlay_type, ("...", "#00E5FF", "#FF7F00"))
+        radius = 5
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(bg_color)
+        painter.drawRoundedRect(QRectF(rect), radius, radius)
 
-        # Glow border effect
+        # ── Glow border effect ─────────────────────────────────────────────
         if self._glow_enabled() and _OVERLAY_ANIM_AVAILABLE and self._glow is not None:
             self._glow.paint(painter, rect)
 
-        # Border ring (always drawn; pulsates when glow enabled)
-        border_color = QColor(border_hex)
-        pen = QPen(border_color, 2)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), 5, 5)
+        # ── Neon border ring (multi-layer glow, like real overlays) ────────
+        _draw_glow_border(painter, rect.x(), rect.y(), rect.width(), rect.height(),
+                          radius=radius, color=border_color, layers=2,
+                          low_perf=not self._glow_enabled())
 
-        # Sparkle / particle overlay
+        # ── Sparkle / particle overlay ─────────────────────────────────────
         if self._sparkle_enabled() and _OVERLAY_ANIM_AVAILABLE and self._sparkle is not None:
             self._sparkle.paint(painter, rect)
 
-        # Representative text
+        # ── Representative text ────────────────────────────────────────────
         text, _, _ = self._CONTENT.get(self._overlay_type, ("...", "#00E5FF", "#FF7F00"))
         font = QFont()
         font.setPointSize(5 if self._portrait else 7)
         font.setBold(True)
         painter.setFont(font)
-        painter.setPen(QPen(QColor(border_hex), 1))
+        painter.setPen(QPen(text_color, 1))
         painter.drawText(
             rect.adjusted(2, 4, -2, -14),
             _Qt.AlignmentFlag.AlignVCenter | _Qt.AlignmentFlag.AlignHCenter,
             text,
         )
 
-        # Orientation label at bottom
+        # ── Orientation label at bottom ────────────────────────────────────
         font.setBold(False)
         font.setPointSize(5)
         painter.setFont(font)
-        painter.setPen(QPen(QColor("#666666"), 1))
+        painter.setPen(QPen(QColor("#888888"), 1))
         orient_lbl = "Portrait" if self._portrait else "Landscape"
         painter.drawText(
             rect.adjusted(2, 0, -2, -2),
