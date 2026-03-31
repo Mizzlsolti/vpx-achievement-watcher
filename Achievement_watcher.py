@@ -103,105 +103,146 @@ except Exception:
     _OVERLAY_ANIM_AVAILABLE = False
 
 
-class EffectsPreviewWidget(QWidget):
-    """Live preview widget for the Effects sub-tab.
+class OverlaySectionPreviewWidget(QWidget):
+    """Per-overlay-section mini preview widget for the Effects sub-tab.
 
-    Shows a fake overlay frame and animates effects using the overlay_animations module.
+    Shows a scaled-down representation of the real overlay in landscape or portrait
+    orientation.  A QTimer drives the animation at ~30 ms intervals, and the preview
+    reacts immediately when animation config keys change (call refresh_config()).
     """
 
-    _LANDSCAPE_SIZE = (320, 200)
-    _PORTRAIT_SIZE = (120, 200)
-    _TICK_MS = 50
+    _LANDSCAPE_W, _LANDSCAPE_H = 162, 90
+    _PORTRAIT_W, _PORTRAIT_H = 52, 90
+    _TICK_MS = 30
 
-    def __init__(self, cfg, parent=None):
+    # (display text, border colour hex, accent/sparkle colour hex)
+    _CONTENT: dict = {
+        "main":      ("Achievement\nUnlocked!",  "#00E5FF", "#FF7F00"),
+        "toast":     ("\U0001F3C6 Mars Jackpot", "#FFD700", "#FF7F00"),
+        "flip":      ("Flips\n247 / 300",        "#00E5FF", "#00FF88"),
+        "challenge": ("Challenge\nSelect",        "#FF7F00", "#FFD700"),
+        "heat":      ("Heat: 87%",               "#FF4444", "#FF7F00"),
+        "timer":     ("2:47",                    "#FFD700", "#FF4444"),
+    }
+
+    # Config key that controls the glow/pulse border animation per section
+    _GLOW_KEY: dict = {
+        "main":      "anim_main_glow",
+        "toast":     "anim_toast_glow",
+        "flip":      "anim_flip_pulse",
+        "challenge": "anim_challenge",
+        "heat":      "anim_heat_pulse",
+        "timer":     "anim_timer_glow_border",
+    }
+
+    # Config key that controls the sparkle/particle animation per section
+    _SPARKLE_KEY: dict = {
+        "main":      "anim_main_sparkle",
+        "toast":     "anim_toast_burst",
+        "flip":      "anim_flip_particles",
+        "challenge": "anim_challenge_glitter",
+        "heat":      "anim_heat_particles",
+        "timer":     "anim_timer_urgency_particles",
+    }
+
+    def __init__(self, cfg, overlay_type: str, portrait: bool = False, parent=None):
         super().__init__(parent)
         self._cfg = cfg
-        self._portrait = False
-        self._elapsed = 0.0
-        self._last_ms = 0
+        self._overlay_type = overlay_type
+        self._portrait = portrait
+        self._phase = 0.0
 
-        # Active effects for the preview
-        if _OVERLAY_ANIM_AVAILABLE:
-            self._glow = GlowBorderEffect("#00E5FF")
-            self._sparkle = SparkleEffect("#FF7F00")
-            self._ripple = BackgroundRippleEffect("#00E5FF")
-            self._confetti = ConfettiEffect()
-            self._confetti.trigger(portrait=False)
-            self._sparkle.trigger(portrait=False)
+        if portrait:
+            self.setFixedSize(self._PORTRAIT_W, self._PORTRAIT_H)
         else:
-            self._glow = self._sparkle = self._ripple = self._confetti = None
+            self.setFixedSize(self._LANDSCAPE_W, self._LANDSCAPE_H)
+
+        _, border_col, accent_col = self._CONTENT.get(overlay_type, ("...", "#00E5FF", "#FF7F00"))
+        if _OVERLAY_ANIM_AVAILABLE:
+            self._glow = GlowBorderEffect(border_col)
+            self._sparkle = SparkleEffect(accent_col)
+            self._sparkle.trigger(portrait=portrait)
+        else:
+            self._glow = self._sparkle = None
 
         self._timer = QTimer(self)
         self._timer.setInterval(self._TICK_MS)
-        self._timer.timeout.connect(self._on_tick)
+        self._timer.timeout.connect(self._tick)
         self._timer.start()
 
-        self.setFixedSize(*self._LANDSCAPE_SIZE)
-
-    def set_portrait(self, portrait: bool):
-        self._portrait = portrait
-        if portrait:
-            self.setFixedSize(*self._PORTRAIT_SIZE)
-        else:
-            self.setFixedSize(*self._LANDSCAPE_SIZE)
+    def refresh_config(self):
+        """Call after any animation config key changes to force an immediate repaint."""
         self.update()
 
-    def _on_tick(self):
+    def _glow_enabled(self) -> bool:
+        key = self._GLOW_KEY.get(self._overlay_type, "")
+        return bool(self._cfg.OVERLAY.get(key, True))
+
+    def _sparkle_enabled(self) -> bool:
+        key = self._SPARKLE_KEY.get(self._overlay_type, "")
+        return bool(self._cfg.OVERLAY.get(key, True))
+
+    def _tick(self):
+        self._phase = (self._phase + self._TICK_MS / 1000.0) % 6.283
         dt = float(self._TICK_MS)
         if _OVERLAY_ANIM_AVAILABLE:
-            for eff in (self._glow, self._sparkle, self._ripple, self._confetti):
-                if eff is not None:
-                    eff.tick(dt)
-            # Re-trigger sparkle when it finishes
-            if self._sparkle is not None and not self._sparkle.active:
-                self._sparkle.trigger(portrait=self._portrait)
+            if self._glow is not None and self._glow_enabled():
+                self._glow.tick(dt)
+            if self._sparkle is not None:
+                if self._sparkle_enabled():
+                    self._sparkle.tick(dt)
+                    if not self._sparkle.active:
+                        self._sparkle.trigger(portrait=self._portrait)
         self.update()
 
     def paintEvent(self, event):
+        from PyQt6.QtCore import QRectF, Qt as _Qt
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = self.rect()
 
-        # Background
         painter.fillRect(rect, QColor("#111111"))
 
-        # Rounded border
-        from PyQt6.QtCore import QRectF
-        border_color = QColor("#00E5FF")
+        _, border_hex, _ = self._CONTENT.get(self._overlay_type, ("...", "#00E5FF", "#FF7F00"))
+
+        # Glow border effect
+        if self._glow_enabled() and _OVERLAY_ANIM_AVAILABLE and self._glow is not None:
+            self._glow.paint(painter, rect)
+
+        # Border ring (always drawn; pulsates when glow enabled)
+        border_color = QColor(border_hex)
         pen = QPen(border_color, 2)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), 10, 10)
+        painter.drawRoundedRect(QRectF(rect).adjusted(1, 1, -1, -1), 5, 5)
 
-        # Paint effects
-        if _OVERLAY_ANIM_AVAILABLE:
-            if self._ripple is not None:
-                self._ripple.paint(painter, rect)
-            if self._glow is not None:
-                self._glow.paint(painter, rect)
-            if self._confetti is not None:
-                self._confetti.paint(painter, rect)
-            if self._sparkle is not None:
-                self._sparkle.paint(painter, rect)
+        # Sparkle / particle overlay
+        if self._sparkle_enabled() and _OVERLAY_ANIM_AVAILABLE and self._sparkle is not None:
+            self._sparkle.paint(painter, rect)
 
-        # Fake overlay content
-        painter.setPen(QPen(QColor("#00E5FF"), 1))
+        # Representative text
+        text, _, _ = self._CONTENT.get(self._overlay_type, ("...", "#00E5FF", "#FF7F00"))
         font = QFont()
-        font.setPointSize(10)
+        font.setPointSize(5 if self._portrait else 7)
         font.setBold(True)
         painter.setFont(font)
-        from PyQt6.QtCore import Qt as _Qt
+        painter.setPen(QPen(QColor(border_hex), 1))
         painter.drawText(
-            rect.adjusted(8, 12, -8, 0), _Qt.AlignmentFlag.AlignTop | _Qt.AlignmentFlag.AlignHCenter,
-            "Achievement Unlocked!"
+            rect.adjusted(2, 4, -2, -14),
+            _Qt.AlignmentFlag.AlignVCenter | _Qt.AlignmentFlag.AlignHCenter,
+            text,
         )
+
+        # Orientation label at bottom
         font.setBold(False)
-        font.setPointSize(9)
+        font.setPointSize(5)
         painter.setFont(font)
-        painter.setPen(QPen(QColor("#FFFFFF"), 1))
+        painter.setPen(QPen(QColor("#666666"), 1))
+        orient_lbl = "Portrait" if self._portrait else "Landscape"
         painter.drawText(
-            rect.adjusted(8, 36, -8, 0), _Qt.AlignmentFlag.AlignTop | _Qt.AlignmentFlag.AlignHCenter,
-            "Mars Jackpot"
+            rect.adjusted(2, 0, -2, -2),
+            _Qt.AlignmentFlag.AlignBottom | _Qt.AlignmentFlag.AlignHCenter,
+            orient_lbl,
         )
 
         painter.end()
@@ -2223,25 +2264,27 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         ),
         "appearance_effects": (
             "<b>✨ Effects – Help</b><br><br>"
-            "This tab controls which animations play on each overlay during gameplay.<br><br>"
+            "This tab controls which animations play on each overlay during gameplay.<br>"
+            "Six overlay sections are arranged in two columns, each with checkboxes on the left "
+            "and Landscape &amp; Portrait live previews on the right.<br><br>"
             "<b>🎯 Main Overlay</b><br>"
-            "&nbsp;&nbsp;Controls animations on the main stats overlay (page transitions,<br>"
-            "&nbsp;&nbsp;glow border, score spin, sparkle effects and more).<br><br>"
+            "&nbsp;&nbsp;Page transitions, glow border, score spin, sparkle effects and more.<br><br>"
             "<b>🔔 Toast</b><br>"
-            "&nbsp;&nbsp;Controls animations on the achievement toast notification<br>"
-            "&nbsp;&nbsp;(slide-in, typewriter text, particles, shine sweep and more).<br><br>"
-            "<b>🔢 Flip Counter</b><br>"
-            "&nbsp;&nbsp;Controls animations on the Flip Counter overlay<br>"
-            "&nbsp;&nbsp;(number flip, goal flash, color gradient, orbit particles and more).<br><br>"
+            "&nbsp;&nbsp;Slide-in, typewriter text, particles, shine sweep and more.<br><br>"
             "<b>🎯 Challenge Select</b><br>"
-            "&nbsp;&nbsp;Controls animations on the Challenge selection menu<br>"
-            "&nbsp;&nbsp;(card flip, spotlight, glitter trail, zoom pulse and more).<br><br>"
+            "&nbsp;&nbsp;Card flip, spotlight, glitter trail, zoom pulse and more.<br><br>"
+            "<b>🔢 Flip Counter</b><br>"
+            "&nbsp;&nbsp;Number flip, goal flash, color gradient, orbit particles and more.<br><br>"
+            "<b>⏱️ Timer</b><br>"
+            "&nbsp;&nbsp;Tick flash, digit flip, urgency shake, glow border and more.<br><br>"
+            "<b>🔥 Heat Bar</b><br>"
+            "&nbsp;&nbsp;Pulse glow, fill shimmer, color morph, particle rise and more.<br><br>"
             "<b>💡 Low Performance Mode</b><br>"
-            "&nbsp;&nbsp;When enabled in the Overlay tab, ALL effects are disabled<br>"
+            "&nbsp;&nbsp;When enabled in the System tab, ALL effects are disabled<br>"
             "&nbsp;&nbsp;regardless of individual settings here.<br><br>"
-            "<b>💡 Preview</b><br>"
-            "&nbsp;&nbsp;The preview window on the right shows a live animation preview.<br>"
-            "&nbsp;&nbsp;Toggle [Landscape] / [Portrait] to see both orientations."
+            "<b>💡 Per-section Previews</b><br>"
+            "&nbsp;&nbsp;Each section shows a Landscape and a Portrait mini-preview that "
+            "reacts immediately when you toggle a checkbox."
         ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
@@ -3189,21 +3232,18 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
     # Effects sub-tab builder
     # ──────────────────────────────────────────────────────────────────────────
     def _build_effects_subtab(self):
-        """Build the ✨ Effects sub-tab and add it to appearance_subtabs."""
+        """Build the ✨ Effects sub-tab and add it to appearance_subtabs.
+
+        Layout: two-column scrollable grid.
+          Left column  (top→bottom): Main Overlay, Toast, Challenge Select
+          Right column (top→bottom): Flip Counter, Timer, Heat Bar
+        Each section has checkboxes on the left and Landscape + Portrait
+        mini-preview widgets on the right that react immediately to changes.
+        """
         effects_tab = QWidget()
         outer_layout = QVBoxLayout(effects_tab)
         outer_layout.setContentsMargins(4, 4, 4, 4)
         outer_layout.setSpacing(4)
-
-        # Horizontal split: left (60%) scrollable controls, right (40%) preview
-        h_split = QHBoxLayout()
-        outer_layout.addLayout(h_split, 1)
-
-        # ── Left side ─────────────────────────────────────────────────────────
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(4)
 
         # Low performance warning label
         self.lbl_low_perf_warning = QLabel(
@@ -3216,38 +3256,52 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.lbl_low_perf_warning.setWordWrap(True)
         is_low_perf = bool(self.cfg.OVERLAY.get("low_performance_mode", False))
         self.lbl_low_perf_warning.setVisible(is_low_perf)
-        left_layout.addWidget(self.lbl_low_perf_warning)
+        outer_layout.addWidget(self.lbl_low_perf_warning)
 
-        # Scrollable area for animation groups
+        # ── Scroll area with two-column layout ────────────────────────────────
         effects_scroll = QScrollArea()
         effects_scroll.setWidgetResizable(True)
         effects_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         effects_inner = QWidget()
-        effects_scroll_layout = QVBoxLayout(effects_inner)
-        effects_scroll_layout.setContentsMargins(4, 4, 4, 4)
-        effects_scroll_layout.setSpacing(8)
+        cols_layout = QHBoxLayout(effects_inner)
+        cols_layout.setContentsMargins(4, 4, 4, 4)
+        cols_layout.setSpacing(12)
 
-        # Helper to create a group with [All On] [All Off] buttons and checkboxes
-        def _make_anim_group(title: str, items: list):
-            """items = list of (label, cfg_key, attr_name)"""
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
+        right_col = QVBoxLayout()
+        right_col.setSpacing(8)
+
+        _btn_style = (
+            "QPushButton { background: #1a1a1a; color: #00E5FF; "
+            "border: 1px solid #00E5FF; border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
+            "QPushButton:hover { background: #00E5FF; color: #000; }"
+        )
+
+        def _make_section(title: str, items: list, overlay_type: str):
+            """Build one overlay section: checkboxes left + previews right.
+
+            Returns (group_widget, chk_list, preview_landscape, preview_portrait).
+            """
             grp = QGroupBox(title)
-            grp_lay = QVBoxLayout(grp)
-            grp_lay.setSpacing(2)
+            grp_h = QHBoxLayout(grp)
+            grp_h.setContentsMargins(6, 6, 6, 6)
+            grp_h.setSpacing(8)
+
+            # ── Left: buttons + checkboxes ──────────────────────────────────
+            left_v = QVBoxLayout()
+            left_v.setSpacing(2)
 
             btn_row = QHBoxLayout()
             btn_on = QPushButton("[All On]")
             btn_off = QPushButton("[All Off]")
             for b in (btn_on, btn_off):
                 b.setFixedHeight(22)
-                b.setStyleSheet(
-                    "QPushButton { background: #1a1a1a; color: #00E5FF; "
-                    "border: 1px solid #00E5FF; border-radius: 3px; font-size: 8pt; padding: 0 6px; }"
-                    "QPushButton:hover { background: #00E5FF; color: #000; }"
-                )
+                b.setStyleSheet(_btn_style)
             btn_row.addWidget(btn_on)
             btn_row.addWidget(btn_off)
             btn_row.addStretch(1)
-            grp_lay.addLayout(btn_row)
+            left_v.addLayout(btn_row)
 
             chk_list = []
             for label_text, cfg_key, attr_name in items:
@@ -3255,108 +3309,142 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
                 chk.setChecked(bool(self.cfg.OVERLAY.get(cfg_key, True)))
                 chk.stateChanged.connect(self._save_anim_settings)
                 setattr(self, attr_name, chk)
-                grp_lay.addWidget(chk)
+                left_v.addWidget(chk)
                 chk_list.append(chk)
 
-            def _all_on():
-                for c in chk_list:
+            left_v.addStretch(1)
+
+            def _all_on(cl=chk_list):
+                for c in cl:
                     c.setChecked(True)
-            def _all_off():
-                for c in chk_list:
+
+            def _all_off(cl=chk_list):
+                for c in cl:
                     c.setChecked(False)
+
             btn_on.clicked.connect(_all_on)
             btn_off.clicked.connect(_all_off)
 
-            return grp, chk_list
+            grp_h.addLayout(left_v, 3)
 
-        # 🎯 Main Overlay
-        grp_main, self._effects_main_chks = _make_anim_group("🎯 Main Overlay", [
-            ("Page Slide Transition",            "anim_main_transitions",  "chk_anim_main_transitions"),
-            ("Glow Border & Particles",          "anim_main_glow",         "chk_anim_main_glow"),
-            ("Score Counter Spin",               "anim_main_score_progress", "chk_anim_main_score_progress"),
-            ("Highlights Auto-Scroll",           "anim_main_highlights",   "chk_anim_main_highlights"),
-            ("Sparkle Burst on Page Change",     "anim_main_sparkle",      "chk_anim_main_sparkle"),
-            ("Background Ripple",                "anim_main_ripple",       "chk_anim_main_ripple"),
-            ("Progress Bar Shimmer",             "anim_main_bar_shimmer",  "chk_anim_main_bar_shimmer"),
-            ("Achievement Confetti",             "anim_main_confetti",     "chk_anim_main_confetti"),
-        ])
-        effects_scroll_layout.addWidget(grp_main)
+            # ── Right: Landscape + Portrait previews ────────────────────────
+            right_v = QVBoxLayout()
+            right_v.setSpacing(4)
+            right_v.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
 
-        # 🔔 Toast
-        grp_toast, self._effects_toast_chks = _make_anim_group("🔔 Toast", [
-            ("Burst Particles",                  "anim_toast_burst",       "chk_anim_toast_burst"),
-            ("Typewriter Text",                  "anim_toast_typewriter",  "chk_anim_toast_typewriter"),
-            ("Icon Bounce",                      "anim_toast_bounce",      "chk_anim_toast_bounce"),
-            ("Energy Flash",                     "anim_toast_flash",       "chk_anim_toast_flash"),
-            ("Slide In",                         "anim_toast_slidein",     "chk_anim_toast_slidein"),
-            ("Shine Sweep",                      "anim_toast_shine",       "chk_anim_toast_shine"),
-            ("Pulse Ring",                       "anim_toast_ring",        "chk_anim_toast_ring"),
-            ("Glow Fade",                        "anim_toast_glow",        "chk_anim_toast_glow"),
-        ])
-        effects_scroll_layout.addWidget(grp_toast)
+            prev_l = OverlaySectionPreviewWidget(self.cfg, overlay_type, portrait=False)
+            prev_p = OverlaySectionPreviewWidget(self.cfg, overlay_type, portrait=True)
+            right_v.addWidget(prev_l, 0, Qt.AlignmentFlag.AlignHCenter)
+            right_v.addWidget(prev_p, 0, Qt.AlignmentFlag.AlignHCenter)
+            right_v.addStretch(1)
 
-        # 🔢 Flip Counter
-        grp_flip, self._effects_flip_chks = _make_anim_group("🔢 Flip Counter", [
-            ("Pulse Glow",                       "anim_flip_pulse",        "chk_anim_flip_pulse"),
-            ("Flip Numbers",                     "anim_flip_numbers",      "chk_anim_flip_numbers"),
-            ("Goal Flash",                       "anim_flip_goal_flash",   "chk_anim_flip_goal_flash"),
-            ("Color Gradient",                   "anim_flip_gradient",     "chk_anim_flip_gradient"),
-            ("Orbit Particles",                  "anim_flip_particles",    "chk_anim_flip_particles"),
-            ("Warning Shake",                    "anim_flip_shake",        "chk_anim_flip_shake"),
-            ("Fade In",                          "anim_flip_fadein",       "chk_anim_flip_fadein"),
-            ("Zoom Pulse on Count",              "anim_flip_zoom",         "chk_anim_flip_zoom"),
-        ])
-        effects_scroll_layout.addWidget(grp_flip)
+            grp_h.addLayout(right_v, 2)
 
-        # 🎯 Challenge Select
-        grp_ch, self._effects_challenge_chks = _make_anim_group("🎯 Challenge Select", [
-            ("Pulse Glow",                       "anim_challenge",         "chk_anim_challenge"),
-            ("Carousel Slide",                   "anim_challenge_slide",   "chk_anim_challenge_slide"),
-            ("3D Card Flip",                     "anim_challenge_flip3d",  "chk_anim_challenge_flip3d"),
-            ("Spotlight",                        "anim_challenge_spotlight","chk_anim_challenge_spotlight"),
-            ("Glitter Trail",                    "anim_challenge_glitter", "chk_anim_challenge_glitter"),
-            ("Zoom Pulse",                       "anim_challenge_zoom",    "chk_anim_challenge_zoom"),
-            ("Color Halo",                       "anim_challenge_halo",    "chk_anim_challenge_halo"),
-            ("Fade In",                          "anim_challenge_fadein",  "chk_anim_challenge_fadein"),
-        ])
-        effects_scroll_layout.addWidget(grp_ch)
+            return grp, chk_list, prev_l, prev_p
 
-        # 🔥 Heat Bar
-        grp_heat, self._effects_heat_chks = _make_anim_group("🔥 Heat Bar", [
-            ("Pulse Glow Border",                "anim_heat_pulse",           "chk_anim_heat_pulse"),
-            ("Fill Shimmer",                     "anim_heat_shimmer",         "chk_anim_heat_shimmer"),
-            ("Color Morph",                      "anim_heat_color_morph",     "chk_anim_heat_color_morph"),
-            ("Warning Flash",                    "anim_heat_warning_flash",   "chk_anim_heat_warning_flash"),
-            ("Particle Rise",                    "anim_heat_particles",       "chk_anim_heat_particles"),
-            ("Critical Shake",                   "anim_heat_shake",           "chk_anim_heat_shake"),
-            ("Fade In",                          "anim_heat_fadein",          "chk_anim_heat_fadein"),
-            ("Scale Pulse",                      "anim_heat_scale",           "chk_anim_heat_scale"),
-        ])
-        effects_scroll_layout.addWidget(grp_heat)
+        # ── Left column: Main Overlay ──────────────────────────────────────────
+        (grp_main, self._effects_main_chks,
+         _prev_main_l, _prev_main_p) = _make_section("🎯 Main Overlay", [
+            ("Page Slide Transition",         "anim_main_transitions",   "chk_anim_main_transitions"),
+            ("Glow Border & Particles",       "anim_main_glow",          "chk_anim_main_glow"),
+            ("Score Counter Spin",            "anim_main_score_progress","chk_anim_main_score_progress"),
+            ("Highlights Auto-Scroll",        "anim_main_highlights",    "chk_anim_main_highlights"),
+            ("Sparkle Burst on Page Change",  "anim_main_sparkle",       "chk_anim_main_sparkle"),
+            ("Background Ripple",             "anim_main_ripple",        "chk_anim_main_ripple"),
+            ("Progress Bar Shimmer",          "anim_main_bar_shimmer",   "chk_anim_main_bar_shimmer"),
+            ("Achievement Confetti",          "anim_main_confetti",      "chk_anim_main_confetti"),
+        ], "main")
+        left_col.addWidget(grp_main)
 
-        # ⏱️ Timer
-        grp_timer, self._effects_timer_chks = _make_anim_group("\u23f1\ufe0f Timer", [
-            ("Pulse",                            "anim_timer_pulse",          "chk_anim_timer_pulse"),
-            ("Tick Flash",                       "anim_timer_tick_flash",     "chk_anim_timer_tick_flash"),
-            ("Color Shift",                      "anim_timer_color_shift",    "chk_anim_timer_color_shift"),
-            ("Urgency Shake",                    "anim_timer_shake",          "chk_anim_timer_shake"),
-            ("Glow Border",                      "anim_timer_glow_border",    "chk_anim_timer_glow_border"),
-            ("Fade In",                          "anim_timer_fadein",         "chk_anim_timer_fadein"),
-            ("Digit Flip",                       "anim_timer_digit_flip",     "chk_anim_timer_digit_flip"),
-            ("Urgency Particles",                "anim_timer_urgency_particles", "chk_anim_timer_urgency_particles"),
-        ])
-        effects_scroll_layout.addWidget(grp_timer)
+        # ── Left column: Toast ────────────────────────────────────────────────
+        (grp_toast, self._effects_toast_chks,
+         _prev_toast_l, _prev_toast_p) = _make_section("🔔 Toast", [
+            ("Burst Particles",               "anim_toast_burst",        "chk_anim_toast_burst"),
+            ("Typewriter Text",               "anim_toast_typewriter",   "chk_anim_toast_typewriter"),
+            ("Icon Bounce",                   "anim_toast_bounce",       "chk_anim_toast_bounce"),
+            ("Energy Flash",                  "anim_toast_flash",        "chk_anim_toast_flash"),
+            ("Slide In",                      "anim_toast_slidein",      "chk_anim_toast_slidein"),
+            ("Shine Sweep",                   "anim_toast_shine",        "chk_anim_toast_shine"),
+            ("Pulse Ring",                    "anim_toast_ring",         "chk_anim_toast_ring"),
+            ("Glow Fade",                     "anim_toast_glow",         "chk_anim_toast_glow"),
+        ], "toast")
+        left_col.addWidget(grp_toast)
 
-        effects_scroll_layout.addStretch(1)
+        # ── Left column: Challenge Select ─────────────────────────────────────
+        (grp_ch, self._effects_challenge_chks,
+         _prev_ch_l, _prev_ch_p) = _make_section("🎯 Challenge Select", [
+            ("Pulse Glow",                    "anim_challenge",          "chk_anim_challenge"),
+            ("Carousel Slide",                "anim_challenge_slide",    "chk_anim_challenge_slide"),
+            ("3D Card Flip",                  "anim_challenge_flip3d",   "chk_anim_challenge_flip3d"),
+            ("Spotlight",                     "anim_challenge_spotlight","chk_anim_challenge_spotlight"),
+            ("Glitter Trail",                 "anim_challenge_glitter",  "chk_anim_challenge_glitter"),
+            ("Zoom Pulse",                    "anim_challenge_zoom",     "chk_anim_challenge_zoom"),
+            ("Color Halo",                    "anim_challenge_halo",     "chk_anim_challenge_halo"),
+            ("Fade In",                       "anim_challenge_fadein",   "chk_anim_challenge_fadein"),
+        ], "challenge")
+        left_col.addWidget(grp_ch)
+        left_col.addStretch(1)
+
+        # ── Right column: Flip Counter ─────────────────────────────────────────
+        (grp_flip, self._effects_flip_chks,
+         _prev_flip_l, _prev_flip_p) = _make_section("🔢 Flip Counter", [
+            ("Pulse Glow",                    "anim_flip_pulse",         "chk_anim_flip_pulse"),
+            ("Flip Numbers",                  "anim_flip_numbers",       "chk_anim_flip_numbers"),
+            ("Goal Flash",                    "anim_flip_goal_flash",    "chk_anim_flip_goal_flash"),
+            ("Color Gradient",                "anim_flip_gradient",      "chk_anim_flip_gradient"),
+            ("Orbit Particles",               "anim_flip_particles",     "chk_anim_flip_particles"),
+            ("Warning Shake",                 "anim_flip_shake",         "chk_anim_flip_shake"),
+            ("Fade In",                       "anim_flip_fadein",        "chk_anim_flip_fadein"),
+            ("Zoom Pulse on Count",           "anim_flip_zoom",          "chk_anim_flip_zoom"),
+        ], "flip")
+        right_col.addWidget(grp_flip)
+
+        # ── Right column: Timer ────────────────────────────────────────────────
+        (grp_timer, self._effects_timer_chks,
+         _prev_timer_l, _prev_timer_p) = _make_section("\u23f1\ufe0f Timer", [
+            ("Pulse",                         "anim_timer_pulse",              "chk_anim_timer_pulse"),
+            ("Tick Flash",                    "anim_timer_tick_flash",         "chk_anim_timer_tick_flash"),
+            ("Color Shift",                   "anim_timer_color_shift",        "chk_anim_timer_color_shift"),
+            ("Urgency Shake",                 "anim_timer_shake",              "chk_anim_timer_shake"),
+            ("Glow Border",                   "anim_timer_glow_border",        "chk_anim_timer_glow_border"),
+            ("Fade In",                       "anim_timer_fadein",             "chk_anim_timer_fadein"),
+            ("Digit Flip",                    "anim_timer_digit_flip",         "chk_anim_timer_digit_flip"),
+            ("Urgency Particles",             "anim_timer_urgency_particles",  "chk_anim_timer_urgency_particles"),
+        ], "timer")
+        right_col.addWidget(grp_timer)
+
+        # ── Right column: Heat Bar ─────────────────────────────────────────────
+        (grp_heat, self._effects_heat_chks,
+         _prev_heat_l, _prev_heat_p) = _make_section("🔥 Heat Bar", [
+            ("Pulse Glow Border",             "anim_heat_pulse",         "chk_anim_heat_pulse"),
+            ("Fill Shimmer",                  "anim_heat_shimmer",       "chk_anim_heat_shimmer"),
+            ("Color Morph",                   "anim_heat_color_morph",   "chk_anim_heat_color_morph"),
+            ("Warning Flash",                 "anim_heat_warning_flash", "chk_anim_heat_warning_flash"),
+            ("Particle Rise",                 "anim_heat_particles",     "chk_anim_heat_particles"),
+            ("Critical Shake",                "anim_heat_shake",         "chk_anim_heat_shake"),
+            ("Fade In",                       "anim_heat_fadein",        "chk_anim_heat_fadein"),
+            ("Scale Pulse",                   "anim_heat_scale",         "chk_anim_heat_scale"),
+        ], "heat")
+        right_col.addWidget(grp_heat)
+        right_col.addStretch(1)
+
+        cols_layout.addLayout(left_col, 1)
+        cols_layout.addLayout(right_col, 1)
+
         effects_scroll.setWidget(effects_inner)
-        left_layout.addWidget(effects_scroll, 1)
+        outer_layout.addWidget(effects_scroll, 1)
 
-        # Help button at bottom of left side
-        self._add_tab_help_button(left_layout, "appearance_effects")
+        # Keep a registry of all section preview widgets for easy refresh
+        self._section_previews = {
+            "main":      (_prev_main_l,  _prev_main_p),
+            "toast":     (_prev_toast_l, _prev_toast_p),
+            "challenge": (_prev_ch_l,    _prev_ch_p),
+            "flip":      (_prev_flip_l,  _prev_flip_p),
+            "timer":     (_prev_timer_l, _prev_timer_p),
+            "heat":      (_prev_heat_l,  _prev_heat_p),
+        }
 
-        h_split.addWidget(left_widget, 60)
-
-        # Disable all effect checkboxes if low perf mode is on
+        # Disable all checkboxes when Low Performance Mode is active
         self._all_effect_chks = (
             self._effects_main_chks + self._effects_toast_chks
             + self._effects_flip_chks + self._effects_challenge_chks
@@ -3366,48 +3454,12 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
             for chk in self._all_effect_chks:
                 chk.setEnabled(False)
 
-        # ── Right side: live preview ───────────────────────────────────────────
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(4, 4, 4, 4)
-        right_layout.setSpacing(6)
-        right_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
-
-        preview_title = QLabel("Live Preview")
-        preview_title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        preview_title.setStyleSheet("color: #AAA; font-size: 9pt;")
-        right_layout.addWidget(preview_title)
-
-        self.effects_preview = EffectsPreviewWidget(self.cfg)
-        self.effects_preview.setFixedSize(320, 200)
-        right_layout.addWidget(self.effects_preview, 0, Qt.AlignmentFlag.AlignHCenter)
-
-        # Portrait / Landscape toggle buttons
-        orient_row = QHBoxLayout()
-        btn_landscape = QPushButton("Landscape")
-        btn_portrait = QPushButton("Portrait")
-        for b in (btn_landscape, btn_portrait):
-            b.setFixedHeight(24)
-            b.setStyleSheet(
-                "QPushButton { background: #1a1a1a; color: #AAA; "
-                "border: 1px solid #555; border-radius: 3px; font-size: 8pt; padding: 0 8px; }"
-                "QPushButton:hover { background: #333; color: #FFF; }"
-                "QPushButton:checked { background: #00E5FF; color: #000; border-color: #00E5FF; }"
-            )
-        btn_landscape.clicked.connect(lambda: self.effects_preview.set_portrait(False))
-        btn_portrait.clicked.connect(lambda: self.effects_preview.set_portrait(True))
-        orient_row.addStretch(1)
-        orient_row.addWidget(btn_landscape)
-        orient_row.addWidget(btn_portrait)
-        orient_row.addStretch(1)
-        right_layout.addLayout(orient_row)
-
-        right_layout.addStretch(1)
-        h_split.addWidget(right_widget, 40)
+        # Help button anchored to the bottom-right of the whole tab
+        self._add_tab_help_button(outer_layout, "appearance_effects")
 
         self.appearance_subtabs.addTab(effects_tab, "✨ Effects")
 
-
+    def _portrait_checkboxes(self):
         """Returns the list of all overlay portrait-mode checkboxes."""
         return [
             self.chk_portrait,
@@ -4898,10 +4950,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
         self.cfg.OVERLAY["anim_timer_digit_flip"] = _get("chk_anim_timer_digit_flip")
         self.cfg.OVERLAY["anim_timer_urgency_particles"] = _get("chk_anim_timer_urgency_particles")
         self.cfg.save()
-        # Propagate config changes to active overlay windows
-        for attr in ("overlay_window", "_heat_bar_win", "_challenge_timer"):
+        # Refresh all section preview widgets immediately
+        for previews in getattr(self, "_section_previews", {}).values():
+            for prev in previews:
+                if prev is not None:
+                    prev.refresh_config()
+        # Propagate config changes to any currently visible real overlay windows
+        for attr in ("overlay", "_flip_total_win", "_heat_bar_win",
+                     "_challenge_select", "_challenge_timer"):
             win = getattr(self, attr, None)
-            if win is not None and win.isVisible():
+            if win is not None and hasattr(win, "isVisible") and win.isVisible():
                 try:
                     win._render_and_place()
                 except Exception:
