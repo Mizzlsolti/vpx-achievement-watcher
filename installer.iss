@@ -253,8 +253,8 @@ begin
     if (not FileExists(cfgPath)) and (SavedConfig <> '') then
       if not SaveStringToFile(cfgPath, SavedConfig, False) then
         if not WizardSilent then
-          MsgBox('Warning: could not restore the previous configuration file.' +
-                 #13#10 + 'You may need to re-enter your paths.',
+          MsgBox('Warning: could not restore the previous configuration file.' + #13#10 +
+                 'You may need to re-enter your paths.',
                  mbInformation, MB_OK);
 
     if FileExists(cfgPath) then
