@@ -751,6 +751,54 @@ class SystemMixin:
                 errors.append(f"❌ Progress: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
 
+            # 4. Upload progress for each registered CAT table
+            cat_uploaded = 0
+            cat_errors = 0
+            try:
+                from cat_registry import CAT_REGISTRY
+                from watcher_core import f_custom_achievements_progress, load_json
+                import re
+                cat_progress_path = f_custom_achievements_progress(self.cfg)
+                all_cat_progress: dict = load_json(cat_progress_path, {}) or {}
+                for firebase_key, registry_entry in CAT_REGISTRY.items():
+                    if not re.fullmatch(r"[A-Za-z0-9_]+", firebase_key):
+                        log(self.cfg, f"[CLOUD] Manual backup: skipping CAT '{firebase_key}': invalid key", "WARN")
+                        continue
+                    table_key = registry_entry.get("table_key", "")
+                    table_progress = all_cat_progress.get(table_key, {})
+                    unlocked_list = table_progress.get("unlocked", [])
+                    unlocked_count = len(unlocked_list) if isinstance(unlocked_list, list) else 0
+                    total_count = int(table_progress.get("total_rules", 0) or 0)
+                    if total_count <= 0:
+                        log(self.cfg, f"[CLOUD] Manual backup: skipping CAT '{table_key}': total_count is 0", "WARN")
+                        continue
+                    try:
+                        cat_percentage = round((unlocked_count / total_count) * 100, 1)
+                        cat_payload = {
+                            "name": player_name,
+                            "display_name": registry_entry["display_name"],
+                            "unlocked": unlocked_count,
+                            "total": total_count,
+                            "percentage": cat_percentage,
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "watcher_version": WATCHER_VERSION,
+                        }
+                        if CloudSync.set_node(self.cfg, f"players/{pid}/progress_cat/{firebase_key}", cat_payload):
+                            cat_uploaded += 1
+                            log(self.cfg, f"[CLOUD] Manual backup: CAT progress uploaded for '{table_key}' ({firebase_key}): {unlocked_count}/{total_count} ({cat_percentage}%)")
+                        else:
+                            cat_errors += 1
+                    except Exception as _cat_err:
+                        cat_errors += 1
+                        log(self.cfg, f"[CLOUD] Manual backup: CAT progress upload failed for '{table_key}': {_cat_err}", "WARN")
+            except Exception as e:
+                errors.append(f"❌ CAT Progress: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: CAT progress iteration failed: {e}", "WARN")
+            if cat_uploaded > 0:
+                results.append(f"✅ CAT Progress for {cat_uploaded} table(s)")
+            if cat_errors > 0:
+                errors.append(f"❌ CAT Progress: {cat_errors} table(s) failed")
+
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
             summary = "\n".join(results + errors)
             QMetaObject.invokeMethod(self, "_on_manual_cloud_backup_done",
