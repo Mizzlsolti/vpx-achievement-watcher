@@ -1449,6 +1449,27 @@ class OverlayWindow(QWidget):
             else:
                 lines.append("<div style='margin-bottom: 1.2em;'></div>")
 
+            if is_custom_table:
+                # Clean summary layout for Custom Achievement Tables:
+                # no score box, no achievement list (achievements are on page 1)
+                remaining_achs = total_achs - unlocked_total
+                lines.append(
+                    f"<div style='text-align:center; margin-top:1.2em; font-size:1.25em; color:#E0E0E0;'>"
+                    f"🏆 {unlocked_total} Achievements unlocked"
+                    f"</div>"
+                )
+                lines.append(
+                    f"<div style='text-align:center; margin-top:0.5em; font-size:1.1em; color:#aaa;'>"
+                    f"⬜ {remaining_achs} remaining"
+                    f"</div>"
+                )
+                lines.append(
+                    "<div style='text-align:center; margin-top:2.5em; font-size:1.0em; color:#888;'>"
+                    "► swipe for details"
+                    "</div>"
+                )
+                return "".join(lines)
+
             if score_abs > 0:
                 # Use animated score display value
                 anim_score = getattr(self, '_score_display', score_abs)
