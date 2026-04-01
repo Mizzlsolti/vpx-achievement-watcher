@@ -4983,6 +4983,14 @@ class Watcher:
                     except Exception as e:
                         log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
+                # CAT upload: custom tables have no ROM; upload via cat_registry if approved
+                if self.current_rom is None and self.current_table:
+                    try:
+                        from cat_registry import upload_cat_progress
+                        upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)
+                    except Exception as e:
+                        log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
+
         finally:
             self.current_table = None
             self.current_rom = None
