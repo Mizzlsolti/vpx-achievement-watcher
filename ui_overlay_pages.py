@@ -10,7 +10,7 @@ import ssl
 import time
 import urllib.request
 
-from PyQt6.QtCore import Qt, pyqtSlot, Q_ARG, QMetaObject, QObject, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSlot, Q_ARG, QMetaObject, QObject, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from config import p_aweditor, f_custom_achievements_progress
@@ -371,6 +371,14 @@ class OverlayPagesMixin:
                                             try:
                                                 rarity_data, total = _CS.fetch_rarity_for_cat(self.cfg, _fk)
                                                 self._rarity_cache[f"cat:{_fk}"] = {"data": rarity_data, "ts": time.time(), "total_players": total}
+                                                # Refresh overlay page 2 if still visible so rarity
+                                                # labels appear without requiring a manual page flip.
+                                                if (
+                                                    getattr(self, "_overlay_page", -1) == 1
+                                                    and getattr(self, "overlay", None) is not None
+                                                    and self.overlay.isVisible()
+                                                ):
+                                                    QTimer.singleShot(0, lambda: self._show_overlay_page(1))
                                             except Exception:
                                                 pass
                                         import threading as _threading
