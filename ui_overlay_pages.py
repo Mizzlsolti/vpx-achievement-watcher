@@ -355,13 +355,41 @@ class OverlayPagesMixin:
                         if all_rules:
                             unlocked_count = 0
                             cells = []
+                            # Pull rarity data from cache for this CAT table
+                            _cat_rarity: dict = {}
+                            try:
+                                from cat_registry import lookup_by_table_key as _lookup_cat
+                                _cat_result = _lookup_cat(last_table)
+                                if _cat_result:
+                                    _cat_firebase_key = _cat_result[0]
+                                    _cat_cached = self._rarity_cache.get(f"cat:{_cat_firebase_key}")
+                                    if _cat_cached:
+                                        _cat_rarity = _cat_cached.get("data", {})
+                                    elif getattr(self.cfg, "CLOUD_ENABLED", False):
+                                        from cloud_sync import CloudSync as _CS
+                                        def _cat_rarity_worker(_fk=_cat_firebase_key):
+                                            try:
+                                                rarity_data, total = _CS.fetch_rarity_for_cat(self.cfg, _fk)
+                                                self._rarity_cache[f"cat:{_fk}"] = {"data": rarity_data, "ts": time.time(), "total_players": total}
+                                            except Exception:
+                                                pass
+                                        import threading as _threading
+                                        _threading.Thread(target=_cat_rarity_worker, daemon=True).start()
+                            except Exception:
+                                pass
                             for r in all_rules:
                                 title = str(r.get("title", "Unknown")).strip()
+                                ri = _cat_rarity.get(title)
+                                rarity_suffix = (
+                                    f"<br><span style='font-size:0.65em;color:{esc(ri['color'])};'>"
+                                    f"{esc(ri['tier'])} ({esc(str(ri['pct']))}%)</span>"
+                                    if ri else ""
+                                )
                                 if title in unlocked_titles:
                                     unlocked_count += 1
-                                    cells.append(f"<td class='unlocked'>✅ {esc(title)}</td>")
+                                    cells.append(f"<td class='unlocked'>✅ {esc(title)}{rarity_suffix}</td>")
                                 else:
-                                    cells.append(f"<td class='locked'>🔒 {esc(title)}</td>")
+                                    cells.append(f"<td class='locked'>🔒 {esc(title)}{rarity_suffix}</td>")
                             pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
                             header_html = (
                                 f"<div class='hdr'>{esc(header)}</div>"

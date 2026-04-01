@@ -158,6 +158,7 @@ def upload_cat_progress(
     _pname = pname
     _unlocked = unlocked_count
     _total = total_count
+    _unlocked_list = list(unlocked_list) if isinstance(unlocked_list, list) else []
     _display_name = registry_entry["display_name"]
     _table_key = table_key
     _firebase_key = firebase_key
@@ -170,6 +171,7 @@ def upload_cat_progress(
             "unlocked": _unlocked,
             "total": _total,
             "percentage": percentage,
+            "unlocked_titles": [str(e.get("title", "")).strip() for e in _unlocked_list if isinstance(e, dict)],
             "ts": datetime.now(timezone.utc).isoformat(),
             "watcher_version": WATCHER_VERSION,
         }

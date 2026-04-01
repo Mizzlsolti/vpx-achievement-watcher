@@ -970,3 +970,40 @@ class CloudSync:
 
         return result, total_players
 
+    @staticmethod
+    def fetch_rarity_for_cat(cfg: AppConfig, firebase_key: str) -> tuple:
+        """Fetch all players' CAT progress from cloud and compute rarity for each
+        achievement title of the given custom table.
+
+        Returns: ({achievement_title: {tier, color, pct}, ...}, total_players)
+        """
+        player_ids = CloudSync.fetch_player_ids(cfg)
+        if not player_ids:
+            return {}, 0
+
+        paths = [f"players/{pid}/progress_cat/{firebase_key}" for pid in player_ids]
+        batch = CloudSync.fetch_parallel(cfg, paths)
+
+        total_players = 0
+        title_counts: dict = {}
+
+        for path, data in batch.items():
+            if not data or not isinstance(data, dict):
+                continue
+            unlocked_titles = data.get("unlocked_titles", [])
+            if not unlocked_titles:
+                continue
+            total_players += 1
+            seen_titles: set = set()
+            for t in unlocked_titles:
+                t = str(t).strip()
+                if t and t not in seen_titles:
+                    seen_titles.add(t)
+                    title_counts[t] = title_counts.get(t, 0) + 1
+
+        result: dict = {}
+        for title, count in title_counts.items():
+            result[title] = compute_rarity(count, total_players)
+
+        return result, total_players
+
