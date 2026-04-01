@@ -324,8 +324,7 @@ def _gather_badge_stats(cfg: "AppConfig", state: dict, watcher=None, rarity_cach
             for e in entries:
                 if isinstance(e, dict) and e.get("ts"):
                     try:
-                        from datetime import datetime as _dt
-                        t = _dt.fromisoformat(str(e["ts"]).replace("Z", "+00:00"))
+                        t = datetime.fromisoformat(str(e["ts"]).replace("Z", "+00:00"))
                         ts_list.append(t.timestamp())
                     except Exception:
                         pass
@@ -351,9 +350,8 @@ def _gather_badge_stats(cfg: "AppConfig", state: dict, watcher=None, rarity_cach
                         data = secure_load_json(fpath, {}) or {}
                         ts_str = str(data.get("ts") or data.get("start_ts") or "")
                         if ts_str:
-                            from datetime import datetime as _dt
                             try:
-                                t = _dt.fromisoformat(ts_str.replace("Z", "+00:00"))
+                                t = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                             except Exception:
                                 continue
                             hour = t.hour

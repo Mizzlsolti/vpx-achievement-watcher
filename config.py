@@ -115,6 +115,51 @@ DEFAULT_OVERLAY.setdefault("sound_enabled", False)
 DEFAULT_OVERLAY.setdefault("sound_volume", 20)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
 DEFAULT_OVERLAY.setdefault("sound_events", {})
+
+_ALLOWED_OVERLAY_KEYS = [
+    "theme",
+    "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
+    "lines_per_category", "font_family", "overlay_auto_close",
+    "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+    "base_body_size", "base_title_size", "base_hint_size",
+    
+    "toggle_input_source", "toggle_vk", "toggle_joy_button",
+    "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
+    "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
+    "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
+    
+    "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
+    "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
+    
+    "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
+    "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
+    
+    "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
+    "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
+    
+    "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
+    "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
+    
+    "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
+    "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
+    
+    "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
+    "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
+    
+    "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
+    "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
+    "status_overlay_x_portrait", "status_overlay_y_portrait",
+    
+    "player_name", "player_id", "flip_counter_goal_total", 
+    "challenges_voice_volume", "challenges_voice_mute",
+    "low_performance_mode",
+    "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
+    "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+    "overlay_page2_enabled", "overlay_page3_enabled",
+    "overlay_page4_enabled", "overlay_page5_enabled",
+    "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+]
+
 CHALLENGES_ENABLED = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -180,49 +225,7 @@ class AppConfig:
             ov = dict(DEFAULT_OVERLAY)
             loaded_ov = data.get("OVERLAY", {})
             
-            allowed_keys = [
-                "theme",
-                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
-                "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
-                "base_body_size", "base_title_size", "base_hint_size",
-                
-                "toggle_input_source", "toggle_vk", "toggle_joy_button",
-                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
-                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
-                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
-                
-                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
-                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
-                
-                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
-                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
-                
-                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
-                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
-                
-                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
-                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
-                
-                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
-                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
-                
-                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
-                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
-                
-                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
-                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
-                "status_overlay_x_portrait", "status_overlay_y_portrait",
-                
-                "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute",
-                "low_performance_mode",
-                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
-                "overlay_page2_enabled", "overlay_page3_enabled",
-                "overlay_page4_enabled", "overlay_page5_enabled",
-                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
-            ]
+            allowed_keys = _ALLOWED_OVERLAY_KEYS
             
             for k in list(loaded_ov.keys()):
                 if k not in allowed_keys:
@@ -256,49 +259,7 @@ class AppConfig:
         try:
             clean_overlay = {}
             ov = getattr(self, "OVERLAY", {})
-            allowed_keys = [
-                "theme",
-                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
-                "lines_per_category", "font_family", "overlay_auto_close",
-                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
-                "base_body_size", "base_title_size", "base_hint_size",
-                
-                "toggle_input_source", "toggle_vk", "toggle_joy_button",
-                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
-                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
-                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
-                
-                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
-                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
-                
-                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
-                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
-                
-                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
-                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
-                
-                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
-                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
-                
-                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
-                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
-                
-                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
-                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
-                
-                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
-                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
-                "status_overlay_x_portrait", "status_overlay_y_portrait",
-                
-                "player_name", "player_id", "flip_counter_goal_total", 
-                "challenges_voice_volume", "challenges_voice_mute",
-                "low_performance_mode",
-                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
-                "overlay_page2_enabled", "overlay_page3_enabled",
-                "overlay_page4_enabled", "overlay_page5_enabled",
-                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
-            ]
+            allowed_keys = _ALLOWED_OVERLAY_KEYS
             
             for k in allowed_keys:
                 if k in ov:
