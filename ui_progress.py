@@ -164,6 +164,17 @@ class ProgressMixin:
                 pass
         threading.Thread(target=_worker, daemon=True).start()
 
+    def _fetch_cat_rarity_bg(self, firebase_key: str):
+        """Fetch CAT rarity data in background and refresh progress tab when done."""
+        def _worker():
+            try:
+                rarity_data, total = CloudSync.fetch_rarity_for_cat(self.cfg, firebase_key)
+                self._rarity_cache[f"cat:{firebase_key}"] = {"data": rarity_data, "ts": time.time(), "total_players": total}
+                QTimer.singleShot(0, self._on_progress_rom_changed)
+            except Exception:
+                pass
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _render_custom_progress(self, table_key: str):
         """Render the progress view for a custom achievement table."""
         try:
@@ -189,6 +200,24 @@ class ProgressMixin:
                 except Exception:
                     pass
 
+            # Rarity: trigger background fetch if cloud enabled
+            rarity_map: dict = {}
+            if self.cfg.CLOUD_ENABLED:
+                try:
+                    from cat_registry import lookup_by_table_key
+                    result = lookup_by_table_key(table_key)
+                    if result:
+                        firebase_key = result[0]
+                        _RARITY_TTL = 300
+                        cached = self._rarity_cache.get(f"cat:{firebase_key}")
+                        if cached is None or (time.time() - cached.get("ts", 0)) > _RARITY_TTL:
+                            self._fetch_cat_rarity_bg(firebase_key)
+                        cached = self._rarity_cache.get(f"cat:{firebase_key}")
+                        if cached:
+                            rarity_map = cached.get("data", {})
+                except Exception:
+                    pass
+
             display_name = _strip_version_from_name(table_key)
             unlocked_count = len(unlocked_titles)
             total = len(all_rules) if all_rules else entry.get("total_rules", 0)
@@ -196,10 +225,18 @@ class ProgressMixin:
             cells = []
             for r in all_rules:
                 title = str(r.get("title", "Unknown")).strip()
+                rarity_label = ""
+                if rarity_map:
+                    ri = rarity_map.get(title)
+                    if ri:
+                        rarity_label = (
+                            f"<br><span style='font-size:0.7em;color:{ri['color']};'>"
+                            f"{ri['tier']} ({ri['pct']}%)</span>"
+                        )
                 if title in unlocked_titles:
-                    cells.append(f"<td class='unlocked'>✅ {title}</td>")
+                    cells.append(f"<td class='unlocked'>✅ {title}{rarity_label}</td>")
                 else:
-                    cells.append(f"<td class='locked'>🔒 {title}</td>")
+                    cells.append(f"<td class='locked'>🔒 {title}{rarity_label}</td>")
             # Also show any unlocked achievements that are no longer in the rules file
             for e in unlocked_list:
                 t = str(e.get("title", "")).strip()
@@ -223,6 +260,26 @@ class ProgressMixin:
                 f"<h3 style='color:#00E5FF; text-align:center;'>{display_name}</h3>"
                 f"<p style='color:#aaa; text-align:center;'>Progress: {unlocked_count} / {total} ({pct}%)</p>"
             )
+
+            if rarity_map:
+                rarity_tooltips = {
+                    "Common": "Unlocked by more than 50% of players",
+                    "Uncommon": "Unlocked by 20–50% of players",
+                    "Rare": "Unlocked by 5–20% of players",
+                    "Epic": "Unlocked by 1–5% of players",
+                    "Legendary": "Unlocked by less than 1% of players",
+                }
+                legend_parts = "".join(
+                    f"<span style='color:{color}; margin:0 6px; cursor:help;' "
+                    f"title='{rarity_tooltips.get(name, '')}'>"
+                    f"■ {name}</span>"
+                    for _, name, color in RARITY_TIERS
+                )
+                html += (
+                    f"<div style='text-align:center; font-size:0.78em; margin-bottom:18px;'>"
+                    f"Rarity: {legend_parts}</div>"
+                )
+
             if rows:
                 html += "<table align='center' width='100%'>" + "".join(rows) + "</table>"
             else:
