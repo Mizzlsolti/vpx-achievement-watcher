@@ -63,12 +63,7 @@ class OverlayPagesMixin:
     def _navigate_overlay_page(self, direction: int):
         """Cycle to the next/previous overlay page, skipping disabled pages."""
         ov = self.cfg.OVERLAY or {}
-        # Build list of enabled page indices. Page 0 (Highlights/Session Overview) is skipped
-        # for Custom Achievement Tables (CAT) because it shows "UNKNOWN ROM" which is meaningless.
-        if not self._is_active_cat_table():
-            enabled_pages = [0]
-        else:
-            enabled_pages = []
+        enabled_pages = [0]
         if ov.get("overlay_page2_enabled", True):
             enabled_pages.append(1)
         if ov.get("overlay_page3_enabled", True):
@@ -79,7 +74,7 @@ class OverlayPagesMixin:
             enabled_pages.append(4)
 
         if not enabled_pages:
-            enabled_pages = [1] if self._is_active_cat_table() else [0]
+            enabled_pages = [0]
 
         current = int(getattr(self, "_overlay_page", 0))
         if current in enabled_pages:
