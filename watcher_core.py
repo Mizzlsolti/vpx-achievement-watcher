@@ -637,8 +637,6 @@ from badges import (
 )
 
 
-from cloud_sync import CloudSync
-
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
     SUMMARY_FILENAME = "session_latest.summary.json"
