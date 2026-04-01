@@ -16,9 +16,8 @@
 [Setup]
 AppId={{B8F4E3A1-7C2D-4A5F-9E6B-1D3C8F2A7E4B}
 AppName=VPX Achievement Watcher
-AppVersion={#MyAppVersion}
 AppVerName=VPX Achievement Watcher
-AppPublisher=Mizzlsolti
+AppPublisher=Solters
 AppPublisherURL=https://github.com/Mizzlsolti/vpx-achievement-watcher
 DefaultDirName=C:\vPinball\VPX Achievement Watcher
 UsePreviousAppDir=yes
@@ -57,10 +56,11 @@ Type: filesandordirs; Name: "{app}"
 
 [Code]
 var
-  PathsPage: TWizardPage;
-  EdBase:   TEdit;
-  EdTables: TEdit;
-  EdNvram:  TEdit;
+  PathsPage:   TWizardPage;
+  EdBase:      TEdit;
+  EdTables:    TEdit;
+  EdNvram:     TEdit;
+  SavedConfig: AnsiString;
 
 { Read a string value from our simple JSON config file }
 function GetJsonValue(const Json: string; const Key: string): string;
@@ -163,6 +163,44 @@ begin
   CreatePathsPage;
 end;
 
+{ Before installation begins: silently remove any existing installation so
+  only one Control Panel entry exists after the upgrade. The existing
+  config.json is saved in memory and restored afterwards. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  UninstallString: string;
+  cfgPath: string;
+  ResultCode: Integer;
+begin
+  Result := '';
+  NeedsRestart := False;
+
+  { Save existing config.json so we can restore it after the uninstaller
+    removes the installation directory. }
+  SavedConfig := '';
+  cfgPath := ExpandConstant('{app}\config.json');
+  if FileExists(cfgPath) then
+    LoadStringFromFile(cfgPath, SavedConfig);
+
+  { Look for an existing uninstall entry – check HKLM first, then HKCU. }
+  UninstallString := '';
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+      '{B8F4E3A1-7C2D-4A5F-9E6B-1D3C8F2A7E4B}_is1',
+      'UninstallString', UninstallString) then
+    RegQueryStringValue(HKEY_CURRENT_USER,
+      'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
+      '{B8F4E3A1-7C2D-4A5F-9E6B-1D3C8F2A7E4B}_is1',
+      'UninstallString', UninstallString);
+
+  { Run the old uninstaller silently so its Control Panel entry is removed.
+    If the uninstaller cannot be launched we continue anyway; the duplicate
+    entry may remain but the new installation itself is not affected. }
+  if UninstallString <> '' then
+    if not Exec(UninstallString, '/SILENT', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      { Ignore: proceed with installation even if the old uninstaller failed. };
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (PathsPage <> nil) and (CurPageID = PathsPage.ID) then
@@ -208,6 +246,15 @@ begin
   begin
     cfgPath := ExpandConstant('{app}\config.json');
     basePath := EdBase.Text;
+
+    { If the old uninstaller deleted config.json, restore the saved copy so
+      the upgrade logic below can preserve all existing settings. }
+    if (not FileExists(cfgPath)) and (SavedConfig <> '') then
+      if not SaveStringToFile(cfgPath, SavedConfig, False) then
+        if not WizardSilent then
+          MsgBox('Warning: could not restore the previous configuration file.' +
+                 #13#10 + 'You may need to re-enter your paths.',
+                 mbInformation, MB_OK);
 
     if FileExists(cfgPath) then
     begin
