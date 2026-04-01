@@ -4988,7 +4988,7 @@ class Watcher:
                         log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
                 # CAT upload: custom tables have no ROM; upload via cat_registry if approved
-                if self.current_rom is None and self.current_table:
+                if not self.current_rom and self.current_table:
                     try:
                         from cat_registry import upload_cat_progress
                         upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)

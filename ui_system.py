@@ -751,50 +751,21 @@ class SystemMixin:
                 errors.append(f"❌ Progress: {e}")
                 log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
 
-            # 4. Upload CAT progress
+            # 4. Upload CAT progress via upload_cat_progress() (includes unlocked_titles)
             cat_uploaded = 0
             cat_errors = 0
             try:
-                from cat_registry import lookup_by_table_key
-                from config import f_custom_achievements_progress, p_aweditor
+                from cat_registry import upload_cat_progress
+                from config import f_custom_achievements_progress
                 all_cat_progress = secure_load_json(f_custom_achievements_progress(self.cfg)) or {}
-                for table_key, table_progress in all_cat_progress.items():
-                    result = lookup_by_table_key(table_key)
-                    if result is None:
-                        continue
-                    firebase_key, registry_entry = result
-                    try:
-                        unlocked_list = table_progress.get("unlocked", [])
-                        unlocked_count = len(unlocked_list) if isinstance(unlocked_list, list) else 0
-                        total_count = int(table_progress.get("total_rules", 0) or 0)
+                if isinstance(all_cat_progress, dict):
+                    for table_key in all_cat_progress:
                         try:
-                            custom_json_path = os.path.join(p_aweditor(self.cfg), f"{table_key}.custom.json")
-                            if os.path.isfile(custom_json_path):
-                                rules_data = secure_load_json(custom_json_path) or {}
-                                rules_list = rules_data.get("rules", [])
-                                if isinstance(rules_list, list) and rules_list:
-                                    total_count = len(rules_list)
-                        except Exception as _rule_err:
-                            log(self.cfg, f"[CLOUD] Manual backup: could not read rule file for {table_key}: {_rule_err}", "WARN")
-                        if total_count <= 0:
-                            continue
-                        percentage = round((unlocked_count / total_count) * 100, 1)
-                        cat_payload = {
-                            "name": player_name,
-                            "display_name": registry_entry["display_name"],
-                            "unlocked": unlocked_count,
-                            "total": total_count,
-                            "percentage": percentage,
-                            "ts": datetime.now(timezone.utc).isoformat(),
-                            "watcher_version": WATCHER_VERSION,
-                        }
-                        if CloudSync.set_node(self.cfg, f"players/{pid}/progress_cat/{firebase_key}", cat_payload):
+                            upload_cat_progress(self.cfg, table_key)
                             cat_uploaded += 1
-                        else:
+                        except Exception as _cat_err:
                             cat_errors += 1
-                    except Exception as _cat_err:
-                        cat_errors += 1
-                        log(self.cfg, f"[CLOUD] Manual backup: CAT progress upload failed for {table_key}: {_cat_err}", "WARN")
+                            log(self.cfg, f"[CLOUD] Manual backup: CAT upload failed for '{table_key}': {_cat_err}", "WARN")
                 if cat_uploaded > 0:
                     results.append(f"✅ CAT Progress for {cat_uploaded} table(s)")
                 if cat_errors > 0:
