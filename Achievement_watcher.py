@@ -3253,7 +3253,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
         all_rules = []
 
         if rom == "Global":
-            import json, os
             gp = f_global_ach(self.cfg)
             if os.path.exists(gp):
                 try:
@@ -4360,7 +4359,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
 
             summary_rom = ""
             try:
-                import json
                 summary_path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json")
                 if os.path.isfile(summary_path):
                     with open(summary_path, "r", encoding="utf-8") as f:
@@ -4690,46 +4688,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
                 pass
 
         return ctx
-
-    def _overlay_page2_html(self) -> tuple:
-        """Return (css, header_html, rows) for Page 2: Achievement Progress.
-
-        ``rows`` is a list of ``<tr>`` HTML strings for use with
-        ``OverlayWindow.set_html_scrollable()``.  The Python-level QTimer scroll
-        in OverlayWindow replaces the old CSS-animation approach (which is not
-        supported by Qt's QLabel RichText renderer).
-        """
-        import html as _html_mod
-
-        def esc(s):
-            return _html_mod.escape(str(s))
-
-        rom = self._get_last_played_rom()
-        table_name = ""
-        if rom:
-            try:
-                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-                table_name = _strip_version_from_name(romnames.get(rom, ""))
-            except Exception:
-                pass
-
-        if rom:
-            header = f"Last Played: {table_name}" if table_name else f"Last Played: {rom}"
-        else:
-            header = "No recent play data available"
-
-        _tc_primary = get_theme_color(self.cfg, "primary")
-        _tc_accent = get_theme_color(self.cfg, "accent")
-        css = (
-            "<style>"
-            "table{width:100%;border-collapse:collapse;}"
-            "td{font-size:0.9em;padding:4px 6px;border-bottom:1px solid #333;}"
-            f".unlocked{{color:{_tc_primary};font-weight:bold;}}"
-            ".locked{color:#555;}"
-            f".hdr{{color:{_tc_accent};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;}}"
-            ".prog{color:#FFFFFF;font-size:0.95em;text-align:center;margin-bottom:6px;}"
-            "</style>"
-        )
 
     def _overlay_page2_html(self) -> tuple:
         """Return (css, header_html, rows) for Page 2: Achievement Progress.
@@ -5076,32 +5034,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
-    def _generate_vpc_html_portrait(self, b64_img, week_text, table_name, overlay_w, overlay_h):
-        # Use full overlay dimensions — image already contains all branding/week info.
-        avail_w = overlay_w
-        avail_h = overlay_h
-
-        # The API returns 640x752 portrait images (aspect ratio 640/752).
-        aspect = 640.0 / 752.0
-
-        # Fit image within available bounds while preserving aspect ratio.
-        img_w = avail_w
-        img_h = int(img_w / aspect)
-
-        if img_h > avail_h:
-            img_h = avail_h
-            img_w = int(img_h * aspect)
-
-        img_w = max(100, img_w)
-        img_h = max(int(100 / aspect), img_h)
-
-        # Use <table> centering — the only reliable method in Qt's RichText engine.
-        return (
-            f"<table width='100%' height='100%'><tr><td align='center' valign='middle'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
-            f"</td></tr></table>"
-        )
-
     def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
         # Use full overlay dimensions — image already contains all branding/week info.
         avail_w = overlay_w
@@ -5156,7 +5088,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
         """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
         from PyQt6.QtCore import QObject, pyqtSignal
         import urllib.request
-        import json
         import base64
         import threading
         import ssl
