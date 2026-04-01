@@ -3099,6 +3099,7 @@ class Watcher:
             except Exception:
                 pass
 
+            from cloud_sync import CloudSync
             CloudSync.upload_score(self.cfg, kind, rom, int(score), extra, bridge=self.bridge)
             
             ch["result_recorded"] = True
@@ -3797,6 +3798,7 @@ class Watcher:
                 # Mark cloud upload done for cloud_pioneer badge
                 state["cloud_upload_done"] = True
                 self._ach_state_save(state)
+                from cloud_sync import CloudSync
                 CloudSync.upload_full_achievements(self.cfg, state, player_name)
         except Exception as e:
             log(self.cfg, f"[ACH] full achievements upload failed: {e}", "WARN")
@@ -4710,6 +4712,7 @@ class Watcher:
             try:
                 if not skip_cloud and self.cfg.CLOUD_ENABLED:
                     player_name = self.cfg.OVERLAY.get("player_name", "Player")
+                    from cloud_sync import CloudSync
                     CloudSync.upload_full_achievements(self.cfg, state, player_name)
             except Exception:
                 pass
@@ -4959,9 +4962,10 @@ class Watcher:
                             _rom = self.current_rom
                             _cfg = self.cfg
                             _br = self.bridge
+                            from cloud_sync import CloudSync
                             threading.Thread(
-                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br:
-                                    CloudSync.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
+                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br, _CS=CloudSync:
+                                    _CS.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
                                 daemon=True,
                             ).start()
                             # Retroactive upload: if this ROM now has a VPS-ID but was previously
