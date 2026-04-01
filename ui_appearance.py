@@ -466,7 +466,7 @@ class AppearanceMixin:
 
     def _apply_theme(self):
         app = QApplication.instance()
-        # Fusion ist die beste Basis für starke Custom-Themes
+        # Fusion is the best base for strong custom themes
         app.setStyle("Fusion")
 
         theme_id = (self.cfg.OVERLAY or {}).get("theme", DEFAULT_THEME)
@@ -645,7 +645,7 @@ class AppearanceMixin:
         self.chk_flip_counter_portrait = self.chk_ch_timer_portrait
         self.chk_flip_counter_ccw = self.chk_ch_timer_ccw
 
-        # 5) NEU: Mini Info / Notifications Overlay
+        # 5) NEW: Mini Info / Notifications Overlay
         self.chk_mini_info_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_mini_info_portrait.setChecked(bool(self.cfg.OVERLAY.get("notifications_portrait", True))); self.chk_mini_info_portrait.stateChanged.connect(self._on_mini_info_portrait_toggle)
         self.chk_mini_info_ccw = QCheckBox("Rotate CCW"); self.chk_mini_info_ccw.setChecked(bool(self.cfg.OVERLAY.get("notifications_rotate_ccw", True))); self.chk_mini_info_ccw.stateChanged.connect(self._on_mini_info_ccw_toggle)
         self.btn_mini_info_place = QPushButton("Place"); self.btn_mini_info_place.clicked.connect(self._on_mini_info_place_clicked)
