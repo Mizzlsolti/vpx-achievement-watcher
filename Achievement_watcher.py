@@ -42,8 +42,9 @@ from config import (
     f_vps_mapping, f_vpsdb_cache,
     f_custom_achievements_progress, p_aweditor,
 )
+from cloud_sync import CloudSync
 from watcher_core import (
-    APP_DIR, CloudSync, Watcher,
+    APP_DIR, Watcher,
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
     KBDLLHOOKSTRUCT, GlobalKeyHook,
@@ -5003,7 +5004,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
             return
 
         # Fetch cloud data in background
-        from watcher_core import CloudSync
+        from cloud_sync import CloudSync
 
         def _do_fetch():
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
