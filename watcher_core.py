@@ -636,7 +636,6 @@ from badges import (
     _gather_badge_stats, evaluate_badges,
 )
 
-
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
     SUMMARY_FILENAME = "session_latest.summary.json"
