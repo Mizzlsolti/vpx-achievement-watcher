@@ -658,10 +658,19 @@ class SystemMixin:
         def _worker():
             from datetime import datetime, timezone
             from watcher_core import compute_player_level, WATCHER_VERSION
+            from config import f_custom_achievements_progress
+            from watcher_core import secure_load_json
             results = []
             errors = []
 
             state = self.watcher._ach_state_load()
+
+            # Load CAT progress to include in the achievements payload
+            custom_progress: dict = {}
+            try:
+                custom_progress = secure_load_json(f_custom_achievements_progress(self.cfg)) or {}
+            except Exception:
+                pass
 
             # 1. Upload full achievements state
             try:
@@ -684,6 +693,8 @@ class SystemMixin:
                     "badge_count": len(badges),
                     "selected_badge": selected_badge,
                 }
+                if custom_progress:
+                    payload["custom_progress"] = custom_progress
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
                     results.append("✅ Achievements")
                     log(self.cfg, "[CLOUD] Manual backup: full achievements uploaded")

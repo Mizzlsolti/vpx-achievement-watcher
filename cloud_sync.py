@@ -34,6 +34,7 @@ from watcher_core import (
     ensure_dir,
     is_excluded_field,
 )
+from config import f_custom_achievements_progress
 
 class CloudSync:
     _upload_skip_warned: bool = False
@@ -939,6 +940,13 @@ class CloudSync:
             lv = compute_player_level(state)
             badges = list(state.get("badges") or [])
             selected_badge = state.get("selected_badge", "")
+            # Load CAT (Custom Achievement Table) progress so it is included in
+            # the cloud backup even though CAT names are not valid ROM identifiers.
+            custom_progress: dict = {}
+            try:
+                custom_progress = secure_load_json(f_custom_achievements_progress(cfg)) or {}
+            except Exception:
+                pass
             payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
@@ -955,6 +963,8 @@ class CloudSync:
                 "badge_count": len(badges),
                 "selected_badge": selected_badge,
             }
+            if custom_progress:
+                payload["custom_progress"] = custom_progress
             put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
             put_req.add_header('Content-Type', 'application/json')
             try:

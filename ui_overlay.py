@@ -1326,12 +1326,14 @@ class OverlayWindow(QWidget):
                     if os.path.isfile(_custom_json_path):
                         is_custom_table = True
                         _cdata = load_json(_custom_json_path, {}) or {}
-                        # Use the vpx filename (without .vpx) as the display title
+                        # Use the vpx filename (without .vpx) as the display title,
+                        # stripping parenthetical content and version strings.
+                        from watcher_core import _strip_version_from_name as _svfn
                         _tf = str(_cdata.get("table_file") or "").strip()
                         if _tf.lower().endswith(".vpx"):
-                            custom_table_name = _tf[:-4]
+                            custom_table_name = _svfn(_tf[:-4])
                         else:
-                            custom_table_name = _tf or current_table
+                            custom_table_name = _svfn(_tf) if _tf else current_table
                         custom_rules = [r for r in (_cdata.get("rules") or []) if isinstance(r, dict)]
                         custom_total_achs = len(custom_rules)
 
