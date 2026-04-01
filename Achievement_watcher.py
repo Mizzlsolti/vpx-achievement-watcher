@@ -62,7 +62,7 @@ from badges import (
     BADGE_DEFINITIONS,
 )
 
-from ui_dialogs import SetupWizardDialog, FeedbackDialog, AchievementBeatenDialog
+from ui_dialogs import FeedbackDialog, AchievementBeatenDialog
 from tutorial import TutorialWizardDialog
 from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
 from ui_cloud_stats import CloudStatsMixin
@@ -2782,15 +2782,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
 def main():
     cfg = AppConfig.load()
     app = QApplication(sys.argv)
-    need_wizard = cfg.FIRST_RUN or not os.path.isdir(cfg.BASE)
-    if need_wizard:
-        if not os.path.isdir(cfg.BASE):
-            home_alt = os.path.join(os.path.expanduser("~"), "Achievements")
-            if not os.path.exists(cfg.BASE) and not os.path.exists(home_alt):
-                cfg.BASE = home_alt
-        wiz = SetupWizardDialog(cfg)
-        if wiz.exec() != QDialog.DialogCode.Accepted:
-            sys.exit(0)
     for sub in [
         os.path.join("tools", "NVRAM_Maps", "maps"),
         os.path.join("session_stats", "Highlights"),

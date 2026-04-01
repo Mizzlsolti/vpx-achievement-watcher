@@ -58,7 +58,6 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   PathsPage:   TWizardPage;
-  EdBase:      TEdit;
   EdTables:    TEdit;
   EdNvram:     TEdit;
   SavedConfig: AnsiString;
@@ -85,27 +84,22 @@ begin
 end;
 
 { Try to load existing paths from config.json into the edit fields.
-  Returns True if the file was found and at least BASE was read. }
+  Returns True if the file was found. }
 function LoadExistingConfig: Boolean;
 var
   cfgPath: string;
   json: AnsiString;
-  base, nvram, tables: string;
+  nvram, tables: string;
 begin
   Result := False;
   cfgPath := ExpandConstant('{app}\config.json');
   if not FileExists(cfgPath) then Exit;
   if not LoadStringFromFile(cfgPath, json) then Exit;
 
-  base   := GetJsonValue(json, 'BASE');
   nvram  := GetJsonValue(json, 'NVRAM_DIR');
   tables := GetJsonValue(json, 'TABLES_DIR');
 
-  if base <> '' then
-  begin
-    EdBase.Text := base;
-    Result := True;
-  end;
+  Result := True;
   if nvram   <> '' then EdNvram.Text   := nvram;
   if tables  <> '' then EdTables.Text  := tables;
 end;
@@ -122,18 +116,6 @@ begin
   );
 
   top := 8;
-
-  lbl := TLabel.Create(PathsPage);
-  lbl.Caption := 'Base folder (achievements data):';
-  lbl.Parent  := PathsPage.Surface;
-  lbl.SetBounds(0, top, PathsPage.SurfaceWidth, 16);
-  top := top + 20;
-
-  EdBase := TEdit.Create(PathsPage);
-  EdBase.Parent := PathsPage.Surface;
-  EdBase.SetBounds(0, top, PathsPage.SurfaceWidth, 22);
-  EdBase.Text := 'C:\vPinball\VPX Achievement Watcher';
-  top := top + 36;
 
   lbl := TLabel.Create(PathsPage);
   lbl.Caption := 'Tables folder (.vpx files):';
@@ -232,10 +214,10 @@ begin
   end;
 end;
 
-{ Returns the custom_events folder path based on the wizard BASE value }
+{ Returns the custom_events folder path based on the installation directory }
 function GetEventsPath(Param: string): string;
 begin
-  Result := EdBase.Text + '\tools\AWeditor\custom_events\';
+  Result := ExpandConstant('{app}') + '\tools\AWeditor\custom_events\';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -246,7 +228,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     cfgPath := ExpandConstant('{app}\config.json');
-    basePath := EdBase.Text;
+    basePath := ExpandConstant('{app}');
 
     { If the old uninstaller deleted config.json, restore the saved copy so
       the upgrade logic below can preserve all existing settings. }
@@ -261,23 +243,30 @@ begin
     begin
       if WizardSilent then
       begin
-        { Silent upgrade: preserve existing config.json entirely.
-          Read BASE from config for the registry entry. }
-        if LoadStringFromFile(cfgPath, existingJson) then
-          basePath := GetJsonValue(existingJson, 'BASE');
-      end
-      else
-      begin
-        { Interactive upgrade: preserve all settings (OVERLAY, cloud config,
-          etc.) but update the three path values to whatever the user entered
-          on the wizard page. }
+        { Silent upgrade: preserve existing config.json entirely,
+          but update BASE to the current installation directory. }
         if LoadStringFromFile(cfgPath, existingJson) then
         begin
           json := existingJson;
 
           oldVal := GetJsonValue(json, 'BASE');
           StringChange(json, '"BASE": "' + EscapeJsonStr(oldVal) + '"',
-                             '"BASE": "' + EscapeJsonStr(EdBase.Text) + '"');
+                             '"BASE": "' + EscapeJsonStr(basePath) + '"');
+
+          SaveStringToFile(cfgPath, json, False);
+        end;
+      end
+      else
+      begin
+        { Interactive upgrade: preserve all settings (OVERLAY, cloud config,
+          etc.) but update the three path values. }
+        if LoadStringFromFile(cfgPath, existingJson) then
+        begin
+          json := existingJson;
+
+          oldVal := GetJsonValue(json, 'BASE');
+          StringChange(json, '"BASE": "' + EscapeJsonStr(oldVal) + '"',
+                             '"BASE": "' + EscapeJsonStr(basePath) + '"');
 
           oldVal := GetJsonValue(json, 'NVRAM_DIR');
           StringChange(json, '"NVRAM_DIR": "' + EscapeJsonStr(oldVal) + '"',
@@ -293,12 +282,12 @@ begin
     end
     else
     begin
-      { First-time install: write a minimal config.json with the wizard paths. }
+      { First-time install: write a minimal config.json. BASE = installation dir. }
       json :=
         '{' + #13#10 +
-        '  "BASE": "'       + EscapeJsonStr(EdBase.Text)   + '",' + #13#10 +
-        '  "NVRAM_DIR": "'  + EscapeJsonStr(EdNvram.Text)  + '",' + #13#10 +
-        '  "TABLES_DIR": "' + EscapeJsonStr(EdTables.Text) + '",' + #13#10 +
+        '  "BASE": "'       + EscapeJsonStr(basePath)        + '",' + #13#10 +
+        '  "NVRAM_DIR": "'  + EscapeJsonStr(EdNvram.Text)   + '",' + #13#10 +
+        '  "TABLES_DIR": "' + EscapeJsonStr(EdTables.Text)  + '",' + #13#10 +
         '  "FIRST_RUN": false' + #13#10 +
         '}';
       SaveStringToFile(cfgPath, json, False);
