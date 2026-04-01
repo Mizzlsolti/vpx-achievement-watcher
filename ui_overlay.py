@@ -16,7 +16,7 @@ from PyQt6.QtGui import (
     QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
-from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, load_json, f_custom_achievements_progress
+from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, p_highlights, load_json, f_custom_achievements_progress
 from theme import get_theme_color, get_theme, DEFAULT_THEME
 
 try:
@@ -1307,6 +1307,18 @@ class OverlayWindow(QWidget):
         try:
             if not rom_name or rom_name == "Unknown ROM":
                 current_table = getattr(self.parent_gui.watcher, "current_table", None) or ""
+                # Fallback: read current_table from session_latest.summary.json when the
+                # watcher has already cleared it after session end.
+                if not current_table:
+                    try:
+                        _summary_path = os.path.join(
+                            p_highlights(self.parent_gui.cfg), "session_latest.summary.json"
+                        )
+                        if os.path.isfile(_summary_path):
+                            _sdata = load_json(_summary_path, {}) or {}
+                            current_table = str(_sdata.get("table", "") or "")
+                    except Exception:
+                        pass
                 if current_table:
                     _custom_json_path = os.path.join(
                         p_aweditor(self.parent_gui.cfg), f"{current_table}.custom.json"
@@ -1558,9 +1570,13 @@ class OverlayWindow(QWidget):
             return "".join(lines)
 
         if not players:
-            self.body.setText("<div>-</div>")
-            self._layout_positions()
-            return
+            if is_custom_table:
+                # CAT tables have no NVRAM players entry — render from custom data directly.
+                players = [{}]
+            else:
+                self.body.setText("<div>-</div>")
+                self._layout_positions()
+                return
 
         html = style + "<div align='center' style='width:100%;'>" + \
                "".join(f"{block(p)}" for p in players) + \
