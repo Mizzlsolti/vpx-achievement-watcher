@@ -50,12 +50,15 @@ from watcher_core import (
     ensure_dir, log, resource_path, sanitize_filename,
     apply_tooltips,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
     run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
     _strip_version_from_name,
     _is_valid_rom_name,
+)
+from badges import (
+    compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
+    BADGE_DEFINITIONS,
 )
 
 from ui_dialogs import SetupWizardDialog, FeedbackDialog
@@ -5657,7 +5660,6 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
     def _refresh_badge_display(self, state: dict = None):
         """Rebuild the badge grid and update count/dropdown in the Dashboard tab."""
         try:
-            from watcher_core import BADGE_DEFINITIONS
             if state is None:
                 state = self.watcher._ach_state_load()
             earned_set = set(state.get("badges") or [])
