@@ -2673,6 +2673,14 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin):
 
         layout.addWidget(grp_pos)
 
+        lbl_overlay_bg_tip = QLabel(
+            "💡 Tip: To use a custom background for the main overlay, "
+            "place an image named overlay_bg.jpg/png next to the executable."
+        )
+        lbl_overlay_bg_tip.setWordWrap(True)
+        lbl_overlay_bg_tip.setStyleSheet("color: #888; font-size: 9pt; font-style: italic; padding: 2px 4px;")
+        layout.addWidget(lbl_overlay_bg_tip)
+
         # ── Overlay Pages toggle ────────────────────────────────────────────────
         grp_pages = QGroupBox("📄 Overlay Pages")
         lay_pages = QVBoxLayout(grp_pages)
