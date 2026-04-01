@@ -37,20 +37,24 @@ from ctypes import wintypes
 import ssl
 from urllib.request import Request, urlopen
 
+from config import (
+    AppConfig, f_achievements_state, f_global_ach,
+    f_vps_mapping, f_vpsdb_cache,
+    f_custom_achievements_progress, p_aweditor,
+)
 from watcher_core import (
-    APP_DIR, AppConfig, CloudSync, Watcher,
+    APP_DIR, CloudSync, Watcher,
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
     KBDLLHOOKSTRUCT, GlobalKeyHook,
     ensure_dir, log, resource_path, sanitize_filename,
-    apply_tooltips, f_achievements_state, f_global_ach,
+    apply_tooltips,
     register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
     compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
-    f_vps_mapping, f_vpsdb_cache, run_vpxtool_get_rom,
+    run_vpxtool_get_rom,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
     _strip_version_from_name,
-    f_custom_achievements_progress, p_aweditor,
     _is_valid_rom_name,
 )
 
@@ -186,7 +190,7 @@ class AchievementBeatenDialog(QDialog):
         # Table info via VPS data
         vps_id = ""
         try:
-            from watcher_core import p_vps_img
+            from config import p_vps_img
             mapping = _load_vps_mapping(cfg)
             vps_id = mapping.get(rom, "") if mapping else ""
 
