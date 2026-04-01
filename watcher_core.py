@@ -124,8 +124,16 @@ from input_hook import (
     register_raw_input_for_window,
 )
 
-APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+if getattr(sys, 'frozen', False):
+    # Running as a PyInstaller-bundled .exe
+    # sys.executable always points to the actual .exe regardless of working directory
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    # Running as a plain Python script (development)
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+print(f"[CONFIG] APP_DIR resolved to: {APP_DIR}")
+print(f"[CONFIG] CONFIG_FILE: {CONFIG_FILE}")
 
 TABLE_EMOJI_KEYWORDS: dict[str, str] = {
     "mars":        "🛸",  "alien":      "👽",  "space":     "🚀",
@@ -307,6 +315,7 @@ class AppConfig:
     CLOUD_ENABLED: bool = False
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
+    _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
     def load(path: str = CONFIG_FILE) -> "AppConfig":
@@ -385,8 +394,11 @@ class AppConfig:
                 CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             )
         except Exception as e:
-            print(f"[LOAD ERROR] {e}")
-            return AppConfig(FIRST_RUN=True)
+            print(f"[LOAD ERROR] Failed to load config from '{path}': {e}")
+            # config.json exists but could not be parsed — keep FIRST_RUN=False so
+            # the first-run wizard is not triggered again, and signal the error via
+            # _load_error so the caller can warn the user.
+            return AppConfig(FIRST_RUN=False, _load_error=True)
 
     def save(self, path: str = CONFIG_FILE) -> None:
         try:
