@@ -485,24 +485,25 @@ class ProgressMixin:
 
         html.append(f"<div style='font-size:1.0em; color:#FF7F00; text-align:center; margin-bottom:8px; font-weight:bold;'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>")
 
-        # ── Rarity legend ──────────────────────────────────────────────────────
-        rarity_tooltips = {
-            "Common": "Unlocked by more than 50% of players",
-            "Uncommon": "Unlocked by 20–50% of players",
-            "Rare": "Unlocked by 5–20% of players",
-            "Epic": "Unlocked by 1–5% of players",
-            "Legendary": "Unlocked by less than 1% of players",
-        }
-        legend_parts = "".join(
-            f"<span style='color:{color}; margin:0 6px; cursor:help;' "
-            f"title='{rarity_tooltips.get(name, '')}'>"
-            f"■ {name}</span>"
-            for _, name, color in RARITY_TIERS
-        )
-        html.append(
-            f"<div style='text-align:center; font-size:0.78em; margin-bottom:18px;'>"
-            f"Rarity: {legend_parts}</div>"
-        )
+        # ── Rarity legend (ROM-specific only; not shown for Global) ───────────
+        if rom != "Global":
+            rarity_tooltips = {
+                "Common": "Unlocked by more than 50% of players",
+                "Uncommon": "Unlocked by 20–50% of players",
+                "Rare": "Unlocked by 5–20% of players",
+                "Epic": "Unlocked by 1–5% of players",
+                "Legendary": "Unlocked by less than 1% of players",
+            }
+            legend_parts = "".join(
+                f"<span style='color:{color}; margin:0 6px; cursor:help;' "
+                f"title='{rarity_tooltips.get(name, '')}'>"
+                f"■ {name}</span>"
+                for _, name, color in RARITY_TIERS
+            )
+            html.append(
+                f"<div style='text-align:center; font-size:0.78em; margin-bottom:18px;'>"
+                f"Rarity: {legend_parts}</div>"
+            )
 
         html.append("<table align='center' width='100%'>")
         COLUMNS = 4

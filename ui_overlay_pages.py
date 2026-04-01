@@ -356,16 +356,19 @@ class OverlayPagesMixin:
                             unlocked_count = 0
                             cells = []
                             # Pull rarity data from cache for this CAT table
+                            # (TTL-based re-fetch mirrors the progress-tab behaviour)
                             _cat_rarity: dict = {}
+                            _CAT_RARITY_TTL = 300
                             try:
                                 from cat_registry import lookup_by_table_key as _lookup_cat
                                 _cat_result = _lookup_cat(last_table)
                                 if _cat_result:
                                     _cat_firebase_key = _cat_result[0]
                                     _cat_cached = self._rarity_cache.get(f"cat:{_cat_firebase_key}")
-                                    if _cat_cached:
-                                        _cat_rarity = _cat_cached.get("data", {})
-                                    elif getattr(self.cfg, "CLOUD_ENABLED", False):
+                                    if getattr(self.cfg, "CLOUD_ENABLED", False) and (
+                                        _cat_cached is None
+                                        or (time.time() - _cat_cached.get("ts", 0)) > _CAT_RARITY_TTL
+                                    ):
                                         from cloud_sync import CloudSync as _CS
                                         def _cat_rarity_worker(_fk=_cat_firebase_key):
                                             try:
@@ -383,6 +386,8 @@ class OverlayPagesMixin:
                                                 pass
                                         import threading as _threading
                                         _threading.Thread(target=_cat_rarity_worker, daemon=True).start()
+                                    if _cat_cached:
+                                        _cat_rarity = _cat_cached.get("data", {})
                             except Exception:
                                 pass
                             for r in all_rules:
