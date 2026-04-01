@@ -37,8 +37,9 @@ from ctypes import wintypes
 import ssl
 from urllib.request import Request, urlopen
 
+from cloud_sync import CloudSync
 from watcher_core import (
-    APP_DIR, AppConfig, CloudSync, Watcher,
+    APP_DIR, AppConfig, Watcher,
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
     KBDLLHOOKSTRUCT, GlobalKeyHook,
@@ -4996,7 +4997,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin):
             return
 
         # Fetch cloud data in background
-        from watcher_core import CloudSync
+        from cloud_sync import CloudSync
 
         def _do_fetch():
             from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

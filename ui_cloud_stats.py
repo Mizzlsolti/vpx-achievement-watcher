@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, QUrl, QStringListModel
 from PyQt6.QtGui import QDesktopServices
 
-from watcher_core import CloudSync, secure_load_json, _strip_version_from_name, f_achievements_state, p_aweditor, load_json, f_custom_achievements_progress, _is_valid_rom_name
+from cloud_sync import CloudSync
+from watcher_core import secure_load_json, _strip_version_from_name, f_achievements_state, p_aweditor, load_json, f_custom_achievements_progress, _is_valid_rom_name
 from theme import get_theme_color
 
 

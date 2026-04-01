@@ -11,8 +11,9 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot
+from cloud_sync import CloudSync
 from watcher_core import (
-    CloudSync, ensure_dir, log, sanitize_filename,
+    ensure_dir, log, sanitize_filename,
     secure_load_json, secure_save_json,
     compute_player_level, WATCHER_VERSION,
 )
