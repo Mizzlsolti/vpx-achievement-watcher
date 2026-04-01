@@ -1710,6 +1710,22 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 return
         except Exception:
             pass
+        try:
+            if self._is_active_cat_table():
+                try:
+                    if self.overlay and self.overlay.isVisible():
+                        self.overlay.hide()
+                except Exception:
+                    pass
+                try:
+                    if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
+                        self._mini_overlay = MiniInfoOverlay(self)
+                    self._mini_overlay.show_info("Overlay only available after VPX end", seconds=3, color_hex="#FF3B30")
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
         if getattr(self, "_overlay_busy", False):
             return
         self._overlay_busy = True
