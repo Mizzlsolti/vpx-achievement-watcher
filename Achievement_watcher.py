@@ -297,6 +297,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
 
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
             CloudSync.cleanup_legacy_progress(self.cfg)
+            CloudSync.cleanup_uppercase_rom_progress(self.cfg)
 
         self._apply_theme()
         self._check_for_updates()

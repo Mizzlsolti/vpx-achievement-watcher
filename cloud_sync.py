@@ -20,6 +20,8 @@ from watcher_core import (
     secure_save_json,
     f_achievements_state,
     f_legacy_cleanup_marker,
+    f_rom_keys_lowercased_marker,
+    f_rom_keys_cloud_cleaned_marker,
     f_progress_upload_log,
     _load_progress_upload_log,
     _save_progress_upload_log,
@@ -245,6 +247,60 @@ class CloudSync:
                         log(cfg, f"[CLOUD] Failed to delete legacy progress for {rom}: {e}", "WARN")
             except Exception as e:
                 log(cfg, f"[CLOUD] cleanup_legacy_progress error: {e}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def cleanup_uppercase_rom_progress(cfg: AppConfig) -> None:
+        """Delete cloud progress entries whose ROM key contains uppercase letters (pre-PR-#444
+        entries).  Runs only once per installation, guarded by a marker file.
+        Executes in a background thread to avoid blocking the UI.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not cfg.CLOUD_BACKUP_ENABLED:
+            return
+
+        marker = f_rom_keys_cloud_cleaned_marker(cfg)
+        if os.path.isfile(marker):
+            return
+
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        if not pid or pid == "unknown":
+            return
+
+        def _task():
+            try:
+                # Write marker first so that a crash mid-cleanup doesn't re-run
+                # on restart (partial cleanup is better than an infinite loop).
+                try:
+                    ensure_dir(os.path.dirname(marker))
+                    with open(marker, "w", encoding="utf-8") as _f:
+                        _f.write("1")
+                except Exception as e:
+                    log(cfg, f"[CLOUD] cleanup_uppercase_rom_progress: could not write marker: {e}", "WARN")
+
+                progress_data = CloudSync.fetch_node(cfg, f"players/{pid}/progress")
+                if not isinstance(progress_data, dict):
+                    return
+
+                _url = cfg.CLOUD_URL.strip().rstrip('/')
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+
+                for rom in list(progress_data.keys()):
+                    if rom == rom.lower():
+                        continue  # already lowercase, skip
+                    # Delete the uppercase ROM entry from cloud
+                    endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
+                    try:
+                        del_req = urllib.request.Request(endpoint, method="DELETE")
+                        with urllib.request.urlopen(del_req, timeout=5, context=ctx):
+                            pass
+                        log(cfg, f"[CLOUD] Deleted uppercase ROM progress entry: {rom}")
+                    except Exception as e:
+                        log(cfg, f"[CLOUD] Failed to delete uppercase ROM progress for {rom}: {e}", "WARN")
+            except Exception as e:
+                log(cfg, f"[CLOUD] cleanup_uppercase_rom_progress error: {e}", "WARN")
 
         threading.Thread(target=_task, daemon=True).start()
 

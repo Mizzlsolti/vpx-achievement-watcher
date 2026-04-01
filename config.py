@@ -316,6 +316,12 @@ def f_custom_achievements_progress(cfg): return os.path.join(p_aweditor(cfg), "c
 def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
     """Marker file indicating that the one-time legacy progress cleanup has already run."""
     return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
+def f_rom_keys_lowercased_marker(cfg: "AppConfig") -> str:
+    """Marker file indicating that the one-time ROM-key lowercase migration has already run."""
+    return os.path.join(p_achievements(cfg), ".rom_keys_lowercased")
+def f_rom_keys_cloud_cleaned_marker(cfg: "AppConfig") -> str:
+    """Marker file indicating that the one-time cloud uppercase ROM-key cleanup has already run."""
+    return os.path.join(p_achievements(cfg), ".rom_keys_cloud_cleaned")
 def f_progress_upload_log(cfg: "AppConfig") -> str:
     """Tracks which (rom, vps_id) combos have already had progress uploaded."""
     return os.path.join(p_achievements(cfg), "progress_upload_log.json")
