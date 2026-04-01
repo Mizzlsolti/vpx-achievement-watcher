@@ -1,0 +1,463 @@
+from __future__ import annotations
+import os, sys, json, shutil
+from dataclasses import dataclass, field
+from typing import Dict, Any, List
+
+# ---------------------------------------------------------------------------
+# Runtime paths
+# ---------------------------------------------------------------------------
+
+if getattr(sys, 'frozen', False):
+    # Running as a PyInstaller-bundled .exe
+    # sys.executable always points to the actual .exe regardless of working directory
+    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    # Running as a plain Python script (development)
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_dir(path): os.makedirs(path, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Overlay defaults
+# ---------------------------------------------------------------------------
+
+DEFAULT_OVERLAY = {
+    "scale_pct": 50,
+    "background": "auto",
+    "portrait_mode": False,
+    "portrait_rotate_ccw": False,
+    "lines_per_category":12,
+    "toggle_input_source": "keyboard",
+    "toggle_vk": 120,
+    "toggle_joy_button": 2,
+    "font_family": "Segoe UI",
+    "base_title_size": 17,
+    "base_body_size": 12,
+    "base_hint_size": 10,
+    "use_xy": False,
+    "pos_x": 100,
+    "pos_y": 100,
+    "prefer_ascii_icons": False,
+    "auto_show_on_end": True,
+    "live_updates": False,
+    "ach_toast_custom": False,
+    "ach_toast_x_landscape": 100,
+    "ach_toast_y_landscape": 100,
+    "ach_toast_x_portrait": 100,
+    "ach_toast_y_portrait": 100,
+    "ach_toast_portrait": False,
+    "ach_toast_rotate_ccw": False,
+    "ch_timer_custom": False,                
+    "ch_timer_saved": False,                 
+    "ch_timer_x_landscape": 100,
+    "ch_timer_y_landscape": 100,
+    "ch_timer_x_portrait": 100,
+    "ch_timer_y_portrait": 100,
+    "ch_timer_portrait": False,               
+    "ch_timer_rotate_ccw": False,  
+    "ch_ov_custom": False,
+    "ch_ov_saved": False,
+    "ch_ov_x_landscape": 100,
+    "ch_ov_y_landscape": 100,
+    "ch_ov_x_portrait": 100,
+    "ch_ov_y_portrait": 100,
+    "ch_ov_portrait": False,
+    "ch_ov_rotate_ccw": False,
+    "overlay_auto_close": False,
+    "automatic_creation": True,
+    "heat_bar_custom": False,
+    "heat_bar_saved": False,
+    "heat_bar_x_landscape": 20,
+    "heat_bar_y_landscape": 100,
+    "heat_bar_x_portrait": 20,
+    "heat_bar_y_portrait": 100,
+    "heat_bar_portrait": False,
+    "heat_bar_rotate_ccw": False,
+}
+DEFAULT_OVERLAY.update({
+    "challenge_hotkey_input_source": "keyboard",
+    "challenge_hotkey_vk": 0x7A,   
+    "challenge_hotkey_joy_button": 3,
+    "challenge_left_input_source": "keyboard",
+    "challenge_left_vk": 0x25,
+    "challenge_left_joy_button": 4,
+    "challenge_right_input_source": "keyboard",
+    "challenge_right_vk": 0x27,
+    "challenge_right_joy_button": 5,
+})
+DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
+DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
+DEFAULT_OVERLAY.setdefault("low_performance_mode", False)
+DEFAULT_OVERLAY.setdefault("anim_main_transitions", True)
+DEFAULT_OVERLAY.setdefault("anim_main_glow", True)
+DEFAULT_OVERLAY.setdefault("anim_main_score_progress", True)
+DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
+DEFAULT_OVERLAY.setdefault("anim_toast", True)
+DEFAULT_OVERLAY.setdefault("anim_status", True)
+DEFAULT_OVERLAY.setdefault("anim_challenge", True)
+DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page5_enabled", True)
+DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
+DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
+DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
+DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
+DEFAULT_OVERLAY.setdefault("sound_enabled", False)
+DEFAULT_OVERLAY.setdefault("sound_volume", 20)
+DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
+DEFAULT_OVERLAY.setdefault("sound_events", {})
+CHALLENGES_ENABLED = True
+
+# Windows virtual key codes for flipper buttons used in Heat Challenge
+VK_LSHIFT = 0xA0
+VK_RSHIFT = 0xA1
+
+# Heat Challenge rate constants (units per second unless noted)
+HEAT_HOLD_RATE = 22.5      # heat gained per second while flipper is held
+HEAT_PRESS_BURST = 7.5     # instant heat added on initial flipper press
+HEAT_COOLDOWN_RATE = 10.0  # heat lost per second while flippers are released
+
+EXCLUDED_FIELDS = {
+    "Last Game Start", "Last Printout", "Last Replay", "Champion Reset", "Clock Last Set", "Coins Cleared",
+    "Factory Setting", "Recent Paid Cred", "Recent Serv. Cred", "Burn-in Time", "Totals Cleared", "Audits Cleared",
+     "Last Serv. Cred"
+}
+EXCLUDED_FIELDS_LC = {s.lower() for s in EXCLUDED_FIELDS}
+
+def is_excluded_field(label: str) -> bool:
+    ll = str(label or "").strip().lower()
+    return (
+        ll in EXCLUDED_FIELDS_LC or
+        "reset" in ll or
+        "cleared" in ll or
+        "factory" in ll or
+        "timestamp" in ll or
+        "game time" in ll or
+        ("last" in ll and ("printout" in ll or "replay" in ll)) or
+        ("last" in ll and "game" in ll)
+    )
+
+DEFAULT_LOG_SUPPRESS = [
+    "[HOOK] Global keyboard hook installed",
+    "[HOOK] toggle fired",
+    "[HOTKEY] Registered WM_HOTKEY",
+    "[CTRL] map miss for candidate",         
+    "[CTRL] base-map miss for candidate",    
+]
+ 
+@dataclass
+class AppConfig:
+    BASE: str = r"C:\vPinball\VPX Achievement Watcher"
+    NVRAM_DIR: str = r"C:\vPinball\VisualPinball\VPinMAME\nvram"
+    TABLES_DIR: str = r"C:\vPinball\VisualPinball\Tables"
+    OVERLAY: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_OVERLAY))
+    FIRST_RUN: bool = True
+    TUTORIAL_COMPLETED: bool = False
+    LOG_CTRL: bool = False
+    LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
+    CLOUD_ENABLED: bool = False
+    CLOUD_BACKUP_ENABLED: bool = False
+    CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
+    _load_error: bool = field(default=False, repr=False, compare=False)
+
+    @staticmethod
+    def load(path: str = CONFIG_FILE) -> "AppConfig":
+        if not os.path.exists(path):
+            return AppConfig(FIRST_RUN=True)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            ov = dict(DEFAULT_OVERLAY)
+            loaded_ov = data.get("OVERLAY", {})
+            
+            allowed_keys = [
+                "theme",
+                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
+                "lines_per_category", "font_family", "overlay_auto_close",
+                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+                "base_body_size", "base_title_size", "base_hint_size",
+                
+                "toggle_input_source", "toggle_vk", "toggle_joy_button",
+                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
+                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
+                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
+                
+                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
+                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
+                
+                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
+                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
+                
+                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
+                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
+                
+                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
+                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
+                
+                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
+                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
+                
+                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
+                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
+                
+                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
+                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
+                "status_overlay_x_portrait", "status_overlay_y_portrait",
+                
+                "player_name", "player_id", "flip_counter_goal_total", 
+                "challenges_voice_volume", "challenges_voice_mute",
+                "low_performance_mode",
+                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+                "overlay_page2_enabled", "overlay_page3_enabled",
+                "overlay_page4_enabled", "overlay_page5_enabled",
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+            ]
+            
+            for k in list(loaded_ov.keys()):
+                if k not in allowed_keys:
+                    del loaded_ov[k]
+                    
+            ov.update(loaded_ov)
+
+            cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
+            cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
+            if not cloud_enabled:
+                cloud_backup_enabled = False
+
+            return AppConfig(
+                BASE=data.get("BASE", AppConfig.BASE),
+                NVRAM_DIR=data.get("NVRAM_DIR", AppConfig.NVRAM_DIR),
+                TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
+                OVERLAY=ov,
+                FIRST_RUN=bool(data.get("FIRST_RUN", False)),
+                TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
+                CLOUD_ENABLED=cloud_enabled,
+                CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
+            )
+        except Exception as e:
+            print(f"[LOAD ERROR] Failed to load config from '{path}': {e}")
+            # config.json exists but could not be parsed — keep FIRST_RUN=False so
+            # the first-run wizard is not triggered again, and signal the error via
+            # _load_error so the caller can warn the user.
+            return AppConfig(FIRST_RUN=False, _load_error=True)
+
+    def save(self, path: str = CONFIG_FILE) -> None:
+        try:
+            clean_overlay = {}
+            ov = getattr(self, "OVERLAY", {})
+            allowed_keys = [
+                "theme",
+                "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
+                "lines_per_category", "font_family", "overlay_auto_close",
+                "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
+                "base_body_size", "base_title_size", "base_hint_size",
+                
+                "toggle_input_source", "toggle_vk", "toggle_joy_button",
+                "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
+                "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
+                "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
+                
+                "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
+                "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
+                
+                "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
+                "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
+                
+                "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
+                "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
+                
+                "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
+                "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
+                
+                "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
+                "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
+                
+                "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
+                "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
+                
+                "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
+                "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
+                "status_overlay_x_portrait", "status_overlay_y_portrait",
+                
+                "player_name", "player_id", "flip_counter_goal_total", 
+                "challenges_voice_volume", "challenges_voice_mute",
+                "low_performance_mode",
+                "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
+                "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
+                "overlay_page2_enabled", "overlay_page3_enabled",
+                "overlay_page4_enabled", "overlay_page5_enabled",
+                "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+            ]
+            
+            for k in allowed_keys:
+                if k in ov:
+                    clean_overlay[k] = ov[k]
+
+            cloud_enabled_val = getattr(self, "CLOUD_ENABLED", False)
+            cloud_backup_val = getattr(self, "CLOUD_BACKUP_ENABLED", False)
+            if not cloud_enabled_val:
+                cloud_backup_val = False
+
+            to_dump = {
+                "BASE": getattr(self, "BASE", r"C:\vPinball\VPX Achievement Watcher"),
+                "NVRAM_DIR": getattr(self, "NVRAM_DIR", r"C:\vPinball\VisualPinball\VPinMAME\nvram"),
+                "TABLES_DIR": getattr(self, "TABLES_DIR", r"C:\vPinball\VisualPinball\Tables"),
+                "CLOUD_ENABLED": cloud_enabled_val,
+                "CLOUD_BACKUP_ENABLED": cloud_backup_val,
+                "FIRST_RUN": getattr(self, "FIRST_RUN", False),
+                "TUTORIAL_COMPLETED": getattr(self, "TUTORIAL_COMPLETED", False),
+                "OVERLAY": clean_overlay
+            }
+            
+            d = os.path.dirname(path)
+            if d:
+                os.makedirs(d, exist_ok=True)
+                
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(to_dump, f, indent=2)
+        except Exception as e:
+            print(f"CRITICAL ERROR: Could not save config.json -> {e}")
+
+# ---------------------------------------------------------------------------
+# Path helpers
+# ---------------------------------------------------------------------------
+
+def p_maps(cfg):         return os.path.join(cfg.BASE, "tools", "NVRAM_Maps")
+def p_local_maps(cfg):   return os.path.join(p_maps(cfg), "maps")
+def p_session(cfg):      return os.path.join(cfg.BASE, "session_stats")
+def p_highlights(cfg):   return os.path.join(p_session(cfg), "Highlights")
+def p_achievements(cfg): return os.path.join(cfg.BASE, "Achievements")
+def p_rom_spec(cfg):     return os.path.join(p_achievements(cfg), "rom_specific_achievements")
+def f_global_ach(cfg):   return os.path.join(p_achievements(cfg), "global_achievements.json")
+def f_achievements_state(cfg: "AppConfig") -> str:
+    return os.path.join(p_achievements(cfg), "achievements_state.json")
+def f_log(cfg):          return os.path.join(cfg.BASE, "watcher.log")
+def f_index(cfg):        return os.path.join(p_maps(cfg), "index.json")
+def f_romnames(cfg):     return os.path.join(p_maps(cfg), "romnames.json")
+def p_vps(cfg):          return os.path.join(cfg.BASE, "tools", "vps")
+def p_vps_img(cfg):      return os.path.join(p_vps(cfg), "img")
+def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
+def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
+def p_aweditor(cfg):     return os.path.join(cfg.BASE, "tools", "AWeditor")
+def p_custom_events(cfg): return os.path.join(p_aweditor(cfg), "custom_events")
+def f_custom_achievements_progress(cfg): return os.path.join(p_aweditor(cfg), "custom_achievements_progress.json")
+def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
+    """Marker file indicating that the one-time legacy progress cleanup has already run."""
+    return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
+def f_progress_upload_log(cfg: "AppConfig") -> str:
+    """Tracks which (rom, vps_id) combos have already had progress uploaded."""
+    return os.path.join(p_achievements(cfg), "progress_upload_log.json")
+
+
+def _load_progress_upload_log(cfg) -> dict:
+    """Load the progress upload log dict {rom: vps_id}."""
+    path = f_progress_upload_log(cfg)
+    try:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_progress_upload_log(cfg, log_data: dict):
+    """Save the progress upload log dict {rom: vps_id}."""
+    path = f_progress_upload_log(cfg)
+    ensure_dir(os.path.dirname(path))
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(log_data, f, indent=2)
+    except Exception:
+        pass
+
+
+def _migrate_runtime_dirs(cfg):
+    """One-time migration from old flat structure to new grouped structure."""
+
+    # NVRAM_Maps: root → tools/NVRAM_Maps
+    old_maps = os.path.join(cfg.BASE, "NVRAM_Maps")
+    new_maps = p_maps(cfg)
+    if os.path.isdir(old_maps) and not os.path.isdir(new_maps):
+        ensure_dir(os.path.dirname(new_maps))
+        shutil.move(old_maps, new_maps)
+
+    # achievements_state.json: root → Achievements/
+    old_state = os.path.join(cfg.BASE, "achievements_state.json")
+    new_state = f_achievements_state(cfg)
+    if os.path.isfile(old_state) and not os.path.isfile(new_state):
+        ensure_dir(os.path.dirname(new_state))
+        shutil.move(old_state, new_state)
+
+    # global_achievements.json: root → Achievements/
+    old_global = os.path.join(cfg.BASE, "global_achievements.json")
+    new_global = f_global_ach(cfg)
+    if os.path.isfile(old_global) and not os.path.isfile(new_global):
+        ensure_dir(os.path.dirname(new_global))
+        shutil.move(old_global, new_global)
+
+    # rom_specific_achievements: root → Achievements/
+    old_rom_spec = os.path.join(cfg.BASE, "rom_specific_achievements")
+    new_rom_spec = p_rom_spec(cfg)
+    if os.path.isdir(old_rom_spec) and not os.path.isdir(new_rom_spec):
+        ensure_dir(os.path.dirname(new_rom_spec))
+        shutil.move(old_rom_spec, new_rom_spec)
+
+    # challenges: root → session_stats/challenges
+    old_challenges = os.path.join(cfg.BASE, "challenges")
+    new_challenges = os.path.join(p_session(cfg), "challenges")
+    if os.path.isdir(old_challenges) and not os.path.isdir(new_challenges):
+        ensure_dir(os.path.dirname(new_challenges))
+        shutil.move(old_challenges, new_challenges)
+
+    # vps_id_mapping.json: root → tools/vps/
+    old_vps_mapping = os.path.join(cfg.BASE, "vps_id_mapping.json")
+    new_vps_mapping = f_vps_mapping(cfg)
+    if os.path.isfile(old_vps_mapping) and not os.path.isfile(new_vps_mapping):
+        ensure_dir(os.path.dirname(new_vps_mapping))
+        shutil.move(old_vps_mapping, new_vps_mapping)
+
+    # vpsdb.json: tools/ → tools/vps/
+    old_vpsdb = os.path.join(cfg.BASE, "tools", "vpsdb.json")
+    new_vpsdb = f_vpsdb_cache(cfg)
+    if os.path.isfile(old_vpsdb) and not os.path.isfile(new_vpsdb):
+        ensure_dir(os.path.dirname(new_vpsdb))
+        shutil.move(old_vpsdb, new_vpsdb)
+
+    # Clean up old .txt session dumps
+    if os.path.isdir(p_session(cfg)):
+        for fn in os.listdir(p_session(cfg)):
+            if fn.lower().endswith(".txt"):
+                try:
+                    os.remove(os.path.join(p_session(cfg), fn))
+                except Exception:
+                    pass
+
+    # Clean up old .session.json history files in Highlights
+    if os.path.isdir(p_highlights(cfg)):
+        for fn in os.listdir(p_highlights(cfg)):
+            if fn.lower().endswith(".session.json"):
+                try:
+                    os.remove(os.path.join(p_highlights(cfg), fn))
+                except Exception:
+                    pass
+
+    # Migrate notifications: merge old files into new unified store
+    try:
+        import notifications as _notif
+        _notif.migrate_notifications(cfg)
+    except Exception:
+        pass
