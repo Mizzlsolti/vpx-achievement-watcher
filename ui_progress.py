@@ -67,7 +67,6 @@ class ProgressMixin:
         self._add_tab_help_button(layout, "progress")
         self.main_tabs.addTab(tab, "📈 Progress")
         
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(2000, self._refresh_progress_roms)
 
     def _refresh_progress_roms(self):
@@ -160,8 +159,7 @@ class ProgressMixin:
             try:
                 rarity_data, total = CloudSync.fetch_rarity_for_rom(self.cfg, rom)
                 self._rarity_cache[rom] = {"data": rarity_data, "ts": time.time(), "total_players": total}
-                from PyQt6.QtCore import QTimer as _QTimer
-                _QTimer.singleShot(0, self._on_progress_rom_changed)
+                QTimer.singleShot(0, self._on_progress_rom_changed)
             except Exception:
                 pass
         threading.Thread(target=_worker, daemon=True).start()
