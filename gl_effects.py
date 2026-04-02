@@ -973,6 +973,10 @@ class GlowSweep:
         self._elapsed = 0.0
         self._active = True
 
+    def stop(self):
+        """Deactivate sweep without resetting elapsed."""
+        self._active = False
+
     def tick(self, dt_ms: float):
         """Advance sweep elapsed time."""
         if self._active:
@@ -1026,6 +1030,10 @@ class ColorMorph:
         self._current_color = str(from_color)
         self._elapsed = 0.0
         self._active = True
+
+    def stop(self):
+        """Deactivate morph without resetting the current color."""
+        self._active = False
 
     def tick(self, dt_ms: float):
         """Advance morph and update the current interpolated color."""

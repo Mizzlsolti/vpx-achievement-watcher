@@ -2882,8 +2882,8 @@ class StatusOverlay(QWidget):
             self._status_text = new_text
             self._color = new_color
             self._scan_in.start()
-            self._sweep._active = False
-            self._morph._active = False
+            self._sweep.stop()
+            self._morph.stop()
             self._anim_timer.start()
         elif text_changed or color_changed:
             # Status changing: morph color, pop text
