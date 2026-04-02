@@ -491,20 +491,106 @@ class EffectsMixin:
                     ))
 
             elif overlay_type == "main":
-                # Main overlay: show the existing overlay window briefly
+                # Main overlay: show the existing overlay window with demo triggers
                 try:
                     if getattr(self, "overlay", None) is None:
                         from ui_overlay import OverlayWindow
                         self.overlay = OverlayWindow(self)
-                    self.overlay.show()
-                    self.overlay.raise_()
                     win = self.overlay
-                    # Auto-hide instead of close for the main overlay
-                    _add_shot(duration_ms, lambda: (
-                        self.overlay.hide() if getattr(self, "overlay", None) else None
+
+                    # Demo data for page 1 and page 2 (used in the transition)
+                    _demo_p1 = {
+                        "players": [{
+                            "id": 1, "playtime_sec": 300, "score": 10000,
+                            "deltas": {"Ramps": 5, "Jackpots": 2},
+                            "highlights": {
+                                "Power": ["🔥 Top Shot – 5k"],
+                                "Precision": ["🎯 Combo – 2"],
+                            },
+                        }]
+                    }
+                    _demo_p2 = {
+                        "players": [{
+                            "id": 1, "playtime_sec": 300, "score": 10000,
+                            "deltas": {"Ramps": 8, "Jackpots": 4},
+                            "highlights": {
+                                "Power": ["🔥 Multiball – 8k"],
+                                "Precision": ["🎯 Skill Shot – 4"],
+                            },
+                        }]
+                    }
+                    _demo_scored = {
+                        "players": [{
+                            "id": 1, "playtime_sec": 300, "score": 10500,
+                            "deltas": {"Ramps": 8, "Jackpots": 4},
+                            "highlights": {
+                                "Power": ["🔥 Multiball – 8k"],
+                                "Precision": ["🎯 Skill Shot – 4"],
+                            },
+                        }]
+                    }
+
+                    # Reset animation counters for a clean demo start
+                    try:
+                        win._score_display = 0
+                        win._score_target = 0
+                        win._progress_pct_current = 0.0
+                        win._progress_pct_target = -1.0
+                    except Exception:
+                        pass
+
+                    win.set_combined(_demo_p1, "Demo Preview")
+                    win.show()
+                    win.raise_()
+
+                    # 2s: simulate page transition
+                    # (triggers Page Slide+Fade, Glitch Frame, Accent Color Lerp)
+                    _add_shot(2000, lambda: (
+                        win.transition_to(
+                            lambda: win.set_combined(_demo_p2, "Demo — Page 2")
+                        )
+                        if win and not win.isHidden() else None
                     ))
-                    _restore()
-                    return
+
+                    # 3s: simulate score change +500
+                    # (triggers Score Counter Spin, Value Highlight Flash)
+                    _add_shot(3000, lambda: (
+                        win.set_combined(_demo_scored, "Demo — Score")
+                        if win and not win.isHidden() else None
+                    ))
+
+                    # 4s: simulate progress change +20%
+                    # (triggers Progress Bar Fill, Shine/Sweep)
+                    def _demo_progress():
+                        if not win or win.isHidden():
+                            return
+                        try:
+                            old_target = max(0.0, getattr(win, "_progress_pct_target", 0.0))
+                            win._progress_pct_current = old_target
+                            win._progress_pct_target = min(100.0, old_target + 20.0)
+                            if hasattr(win, "_progress_bar_timer"):
+                                win._progress_bar_timer.start()
+                            win._trigger_shine()
+                        except Exception:
+                            pass
+                    _add_shot(4000, _demo_progress)
+
+                    # Auto-hide (not close) at duration_ms and restore fx_* states
+                    def _hide_and_restore():
+                        try:
+                            if win and not win.isHidden():
+                                win.hide()
+                        except Exception:
+                            pass
+                        _restore()
+                        for t in timers:
+                            try:
+                                t.stop()
+                            except Exception:
+                                pass
+
+                    QTimer.singleShot(duration_ms, _hide_and_restore)
+                    return  # Bypass generic _close_and_restore below
                 except Exception:
                     _restore()
                     return
