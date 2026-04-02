@@ -554,7 +554,7 @@ class EffectsMixin:
                                 pass
 
                     QTimer.singleShot(duration_ms, _hide_overlay)
-                    return  # Bypass generic _close_overlay below
+                    return  # Bypass generic auto-close below
                 except Exception:
                     return
 
