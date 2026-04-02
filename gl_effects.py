@@ -163,10 +163,12 @@ class EffectsWidget(QWidget):
             ov = self.parent().parent_gui.cfg.OVERLAY
             low_perf = bool(ov.get("low_performance_mode", False))
             anim_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
+            anim_particles = bool(ov.get("fx_main_floating_particles", ov.get("anim_main_glow", True)))
         except Exception:
             low_perf = False
             anim_glow = True
-        if low_perf or not anim_glow:
+            anim_particles = True
+        if low_perf or (not anim_glow and not anim_particles):
             return
         if not self._particles:
             self._init_particles()
@@ -219,27 +221,42 @@ class EffectsWidget(QWidget):
         try:
             ov = self.parent().parent_gui.cfg.OVERLAY
             low_perf = bool(ov.get("low_performance_mode", False))
-            anim_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
+            fx_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
+            fx_particles = bool(ov.get("fx_main_floating_particles", ov.get("anim_main_glow", True)))
+            glow_intensity = max(0.0, min(1.0, float(ov.get("fx_main_breathing_glow_intensity", 80)) / 100.0))
+            particles_intensity = max(0.0, min(1.0, float(ov.get("fx_main_floating_particles_intensity", 80)) / 100.0))
         except Exception:
             low_perf = False
-            anim_glow = True
-        if low_perf or not anim_glow:
+            fx_glow = True
+            fx_particles = True
+            glow_intensity = 0.8
+            particles_intensity = 0.8
+        if low_perf:
+            return
+        draw_glow = fx_glow
+        draw_particles = fx_particles
+        if not draw_glow and not draw_particles:
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         try:
             amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
-            alpha_base = int(120 + 135 * amp)   # 120..255
-            layers = int(2 + 2 * amp)           # 2..4
             ac = self._accent_color
-            glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
-            draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
-            p.setPen(Qt.PenStyle.NoPen)
-            for pt in self._particles:
-                c = QColor(ac.red(), ac.green(), ac.blue(), int(pt['alpha']))
-                p.setBrush(c)
-                sz = int(pt['size'])
-                p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
+            if draw_glow:
+                alpha_base = int((120 + 135 * amp) * glow_intensity)  # scale by intensity
+                layers = max(1, int((2 + 2 * amp) * glow_intensity))  # scale layers by intensity
+                glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
+                draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
+            if draw_particles:
+                # Scale particle count by intensity (fewer particles at lower intensity)
+                particle_count = max(1, int(len(self._particles) * particles_intensity))
+                p.setPen(Qt.PenStyle.NoPen)
+                for pt in self._particles[:particle_count]:
+                    alpha = int(pt['alpha'] * particles_intensity)
+                    c = QColor(ac.red(), ac.green(), ac.blue(), alpha)
+                    p.setBrush(c)
+                    sz = int(pt['size'])
+                    p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
         finally:
             try:
                 p.end()
@@ -272,6 +289,13 @@ class ShineWidget(QWidget):
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
+        # Live check: skip drawing if fx_main_shine_sweep is disabled
+        try:
+            ov = self.parent().parent_gui.cfg.OVERLAY
+            if bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_main_shine_sweep", True)):
+                return
+        except Exception:
+            pass
         portrait = False
         try:
             portrait = bool(self.parent().portrait_mode)
@@ -335,6 +359,13 @@ class HighlightWidget(QWidget):
     def paintEvent(self, _ev):
         if self._alpha <= 0:
             return
+        # Live check: skip drawing if fx_main_highlight_flash is disabled
+        try:
+            ov = self.parent().parent_gui.cfg.OVERLAY
+            if bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_main_highlight_flash", True)):
+                return
+        except Exception:
+            pass
         p = QPainter(self)
         try:
             c = QColor(self._FLASH_COLOR)
