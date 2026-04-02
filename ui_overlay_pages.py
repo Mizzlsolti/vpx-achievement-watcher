@@ -381,14 +381,10 @@ class OverlayPagesMixin:
                                             try:
                                                 rarity_data, total = _CS.fetch_rarity_for_cat(self.cfg, _fk)
                                                 self._rarity_cache[f"cat:{_fk}"] = {"data": rarity_data, "ts": time.time(), "total_players": total}
-                                                # Refresh overlay page 2 if still visible so rarity
-                                                # labels appear without requiring a manual page flip.
-                                                if (
-                                                    getattr(self, "_overlay_page", -1) == 1
-                                                    and getattr(self, "overlay", None) is not None
-                                                    and self.overlay.isVisible()
-                                                ):
-                                                    QTimer.singleShot(0, lambda: self._show_overlay_page(1))
+                                                QMetaObject.invokeMethod(
+                                                    self, "_overlay_refresh_page2",
+                                                    Qt.ConnectionType.QueuedConnection,
+                                                )
                                             except Exception:
                                                 pass
                                         import threading as _threading
@@ -500,12 +496,10 @@ class OverlayPagesMixin:
                 try:
                     _rarity_data, _total = _CS.fetch_rarity_for_rom(self.cfg, _r)
                     self._rarity_cache[_r] = {"data": _rarity_data, "ts": time.time(), "total_players": _total}
-                    if (
-                        getattr(self, "_overlay_page", -1) == 1
-                        and getattr(self, "overlay", None) is not None
-                        and self.overlay.isVisible()
-                    ):
-                        QTimer.singleShot(0, lambda: self._show_overlay_page(1))
+                    QMetaObject.invokeMethod(
+                        self, "_overlay_refresh_page2",
+                        Qt.ConnectionType.QueuedConnection,
+                    )
                 except Exception:
                     pass
             import threading as _threading
@@ -923,5 +917,18 @@ class OverlayPagesMixin:
                     self.overlay.set_nav_arrows(True)
                 except Exception:
                     pass
+        except Exception:
+            pass
+
+    @pyqtSlot()
+    def _overlay_refresh_page2(self):
+        """Thread-safe slot to refresh the Achievement Progress page after rarity data arrives."""
+        try:
+            if (
+                getattr(self, "_overlay_page", -1) == 1
+                and getattr(self, "overlay", None) is not None
+                and self.overlay.isVisible()
+            ):
+                self._show_overlay_page(1)
         except Exception:
             pass
