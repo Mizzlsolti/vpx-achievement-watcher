@@ -1374,7 +1374,7 @@ class ConfettiShower:
         for p in self._pieces:
             if p["y"] > 1.1:
                 continue
-            alpha = _clamp(200 * fade, 0.0, 255.0) / 255.0 * self.intensity
+            alpha = _clamp(200 * fade * self.intensity, 0.0, 255.0) / 255.0
             c = p["color"]
             glColor4f(c.red() / 255.0, c.green() / 255.0, c.blue() / 255.0,
                       _clamp(alpha, 0.0, 1.0))
@@ -2157,7 +2157,7 @@ class UrgencyShake:
         return self._active
 
     def _draw_gl(self, rect: QRect):
-        alpha = _clamp(30 * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(30 * self.intensity, 0.0, 50.0) / 255.0
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -2985,7 +2985,7 @@ class MeltdownShake:
         return self._active
 
     def _draw_gl(self, rect: QRect):
-        alpha = _clamp(20 * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(20 * self.intensity, 0.0, 35.0) / 255.0
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
