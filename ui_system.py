@@ -611,11 +611,10 @@ class SystemMixin:
         try:
             from cat_registry import CAT_REGISTRY
             from config import f_custom_achievements_progress
-            from watcher_core import secure_load_json, secure_save_json, ensure_dir, _strip_version_from_name
-            import os as _os
+            from watcher_core import _strip_version_from_name
 
             cap_path = f_custom_achievements_progress(self.cfg)
-            ensure_dir(_os.path.dirname(cap_path))
+            ensure_dir(os.path.dirname(cap_path))
             existing_cap = secure_load_json(cap_path, {}) or {}
 
             for firebase_key, registry_entry in CAT_REGISTRY.items():
