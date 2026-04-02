@@ -214,6 +214,20 @@ DEFAULT_OVERLAY.setdefault("sound_volume", 20)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
 DEFAULT_OVERLAY.setdefault("sound_events", {})
 
+# Post-Processing
+DEFAULT_OVERLAY.setdefault("fx_post_bloom", False)
+DEFAULT_OVERLAY.setdefault("fx_post_bloom_intensity", 60)
+DEFAULT_OVERLAY.setdefault("fx_post_motion_blur", False)
+DEFAULT_OVERLAY.setdefault("fx_post_motion_blur_intensity", 60)
+DEFAULT_OVERLAY.setdefault("fx_post_chromatic_aberration", False)
+DEFAULT_OVERLAY.setdefault("fx_post_chromatic_aberration_intensity", 50)
+DEFAULT_OVERLAY.setdefault("fx_post_vignette", False)
+DEFAULT_OVERLAY.setdefault("fx_post_vignette_intensity", 60)
+DEFAULT_OVERLAY.setdefault("fx_post_film_grain", False)
+DEFAULT_OVERLAY.setdefault("fx_post_film_grain_intensity", 40)
+DEFAULT_OVERLAY.setdefault("fx_post_scanlines", False)
+DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
+
 _ALLOWED_OVERLAY_KEYS = [
     "theme",
     "scale_pct", "background", "portrait_mode", "portrait_rotate_ccw", 
@@ -319,6 +333,14 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_flip_electric_spark", "fx_flip_electric_spark_intensity",
     "fx_flip_goal_glow",
     "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
+
+    # Post-Processing effect toggles and intensities
+    "fx_post_bloom", "fx_post_bloom_intensity",
+    "fx_post_motion_blur", "fx_post_motion_blur_intensity",
+    "fx_post_chromatic_aberration", "fx_post_chromatic_aberration_intensity",
+    "fx_post_vignette", "fx_post_vignette_intensity",
+    "fx_post_film_grain", "fx_post_film_grain_intensity",
+    "fx_post_scanlines", "fx_post_scanlines_intensity",
 ]
 
 CHALLENGES_ENABLED = True
