@@ -105,6 +105,32 @@ def _start_topmost_timer(widget: QWidget, interval_ms: int = 3000):
     widget._topmost_timer = timer
 
 
+class _OverlayFxMixin:
+    """Mixin that provides live fx_* config read helpers for all overlay classes.
+
+    Requires the host class to have a ``parent_gui`` attribute that exposes
+    ``parent_gui.cfg.OVERLAY`` (a dict-like config object).
+    """
+
+    def _is_fx_enabled(self, fx_key: str) -> bool:
+        """Live-read whether a specific effect is enabled, respecting low_performance_mode."""
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            if bool(ov.get("low_performance_mode", False)):
+                return False
+            return bool(ov.get(fx_key, True))
+        except Exception:
+            return True
+
+    def _get_fx_intensity(self, fx_key: str) -> float:
+        """Live-read the intensity (0.0–1.0) for a specific effect."""
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return max(0.0, min(1.0, int(ov.get(fx_key + "_intensity", 80)) / 100.0))
+        except Exception:
+            return 0.8
+
+
 class OverlayNavArrows(QWidget):
     """Pulsating ice-blue navigation arrows displayed over the main overlay to indicate page cycling."""
 
@@ -218,7 +244,7 @@ _OVERLAY_PAGE_ACCENTS = [
 ]
 
 
-class OverlayWindow(QWidget):
+class OverlayWindow(_OverlayFxMixin, QWidget):
     TITLE_OFFSET_X = 0
     TITLE_OFFSET_Y = 0
     CLAMP_TITLE = True
@@ -260,7 +286,8 @@ class OverlayWindow(QWidget):
                 _ov = self.parent_gui.cfg.OVERLAY
                 _low_perf = bool(_ov.get("low_performance_mode", False))
                 _anim_glow = bool(_ov.get("fx_main_breathing_glow", _ov.get("anim_main_glow", True)))
-                if not _low_perf and _anim_glow:
+                _anim_particles = bool(_ov.get("fx_main_floating_particles", _ov.get("anim_main_glow", True)))
+                if not _low_perf and (_anim_glow or _anim_particles):
                     self._effects_widget.setGeometry(0, 0, W, H)
                     if not self._effects_widget.isVisible():
                         self._effects_widget.show()
@@ -314,7 +341,8 @@ class OverlayWindow(QWidget):
         if hasattr(self, '_effects_widget') and not _defer_effects:
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
             anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_breathing_glow", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
-            if not low_perf and anim_glow:
+            anim_particles = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_floating_particles", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
+            if not low_perf and (anim_glow or anim_particles):
                 self._effects_widget.setGeometry(0, 0, W, H)
                 self._effects_widget.show()
                 self._effects_widget.raise_()
@@ -724,12 +752,14 @@ class OverlayWindow(QWidget):
 
                 _snap_low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
                 _snap_anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_breathing_glow", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
+                _snap_anim_particles = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_floating_particles", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
                 # When the animated effects widget will be drawn on top, bake only the thin
                 # sharp inner border into the snapshot so the two borders don't stack visually.
                 # When animations are off, bake the full multi-layer glow into the snapshot.
+                _effects_active = not _snap_low_perf and (_snap_anim_glow or _snap_anim_particles)
                 _draw_glow_border(p_final, 0, 0, W, H, radius=18,
                                    color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                                   low_perf=(_snap_low_perf or _snap_anim_glow))
+                                   low_perf=(_snap_low_perf or _effects_active))
             finally:
                 p_final.end()
             self.text_container.setGeometry(old_geom)
@@ -754,7 +784,8 @@ class OverlayWindow(QWidget):
                 _ov = self.parent_gui.cfg.OVERLAY
                 _low_perf = bool(_ov.get("low_performance_mode", False))
                 _anim_glow = bool(_ov.get("fx_main_breathing_glow", _ov.get("anim_main_glow", True)))
-                if not _low_perf and _anim_glow:
+                _anim_particles = bool(_ov.get("fx_main_floating_particles", _ov.get("anim_main_glow", True)))
+                if not _low_perf and (_anim_glow or _anim_particles):
                     self._effects_widget.setGeometry(0, 0, W, H)
                     if not self._effects_widget.isVisible():
                         # Not yet visible — start it (showEvent will start the timer)
@@ -1389,7 +1420,7 @@ class OverlayWindow(QWidget):
 
     def _trigger_highlight(self):
         """Flash a brief warm highlight to signal a value change."""
-        if not self._anim_ok("fx_main_shine_sweep"):
+        if not self._anim_ok("fx_main_highlight_flash"):
             return
         W, H = self.width(), self.height()
         self._highlight_widget.setGeometry(0, 0, W, H)
@@ -1786,7 +1817,7 @@ def read_active_players(base_dir: str):
 
 
 
-class FlipCounterOverlay(QWidget):
+class FlipCounterOverlay(_OverlayFxMixin, QWidget):
     def __init__(self, parent: "MainWindow", total: int, remaining: int, goal: int):
         super().__init__(None)
         self.parent_gui = parent
@@ -1809,15 +1840,10 @@ class FlipCounterOverlay(QWidget):
 
         # Breathing glow animation (same cadence as ChallengeSelectOverlay pulse)
         self._breathing_pulse = BreathingPulse(speed=0.05)
-        ov = parent.cfg.OVERLAY or {}
-        _low_perf = bool(ov.get("low_performance_mode", False))
-        _anim = bool(ov.get("fx_flip_breathing_glow", ov.get("anim_challenge", True)))
-        self._low_perf = _low_perf or not _anim
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(50)
         self._anim_timer.timeout.connect(self._on_anim_tick)
-        if not self._check_low_perf():
-            self._anim_timer.start()
+        self._anim_timer.start()  # always run; live fx checks in _compose_image
 
         self._render_and_place()
         self.show()
@@ -1838,12 +1864,12 @@ class FlipCounterOverlay(QWidget):
         self._render_and_place()
 
     def _check_low_perf(self) -> bool:
-        """Read low-performance / anim config live so toggle takes effect immediately."""
+        """Live-read low_performance_mode master switch."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_flip_breathing_glow", ov.get("anim_challenge", True)))
+            return bool(ov.get("low_performance_mode", False))
         except Exception:
-            return self._low_perf
+            return False
 
     def closeEvent(self, e):
         try:
@@ -1893,13 +1919,13 @@ class FlipCounterOverlay(QWidget):
 
             _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=bool(ov.get("low_performance_mode", False)))
+                              low_perf=not self._is_fx_enabled("fx_flip_glow_border"))
 
             # Breathing glow ring: pulsates when animation is enabled.
             # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
             # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
             # oscillation (40→220) is visible against the dark background.
-            if not self._check_low_perf():
+            if self._is_fx_enabled("fx_flip_breathing_glow"):
                 _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                 self._breathing_pulse.draw(p, 5, 5, content_w - 10, content_h - 10,
                                            radius - 3, _pc, width=5)
@@ -2622,7 +2648,7 @@ class MiniInfoPositionPicker(QWidget):
         return int(g.x()), int(g.y())
 
 
-class StatusOverlay(QWidget):
+class StatusOverlay(_OverlayFxMixin, QWidget):
     """Compact persistent status badge reflecting tracking/cloud state.
 
     Displays one of the agreed status states using traffic-light semantics:
@@ -3193,7 +3219,7 @@ class OverlayPositionPicker(QWidget):
         g = self.geometry()
         return int(g.x()), int(g.y())
 
-class AchToastWindow(QWidget):
+class AchToastWindow(_OverlayFxMixin, QWidget):
     finished = pyqtSignal()
     def __init__(self, parent: "MainWindow", title: str, rom: str, seconds: int = 5):
         super().__init__(None)
@@ -3222,7 +3248,6 @@ class AchToastWindow(QWidget):
         self._remaining = self._seconds
 
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_toast = not low_perf and bool(parent.cfg.OVERLAY.get("fx_toast_slide_motion", parent.cfg.OVERLAY.get("anim_toast", True)))
 
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
@@ -3233,12 +3258,10 @@ class AchToastWindow(QWidget):
         self._burst_timer = QTimer(self)
         self._burst_timer.setInterval(30)
         self._burst_timer.timeout.connect(self._burst_tick)
-        if not anim_toast:
-            self._burst_img_margin = 0
-        else:
-            self._burst_img_margin = 80
-            self._burst.start()
-            self._burst_timer.start()
+        # Always allocate burst margin; live fx check in _compose_image controls drawing
+        self._burst_img_margin = 80
+        self._burst.start()
+        self._burst_timer.start()
 
         # --- Neon ring pulse (level-up only) ---
         self._ring = NeonRingExpansion(
@@ -3246,18 +3269,16 @@ class AchToastWindow(QWidget):
             delays=[0.0, 150.0, 300.0, 450.0],
             duration=550.0,
         )
-        if is_level_up and anim_toast:
+        self._ring_timer = QTimer(self)
+        self._ring_timer.setInterval(20)
+        self._ring_timer.timeout.connect(self._ring_tick)
+        if is_level_up:
             self._ring.start()
-            self._ring_timer = QTimer(self)
-            self._ring_timer.setInterval(20)
-            self._ring_timer.timeout.connect(self._ring_tick)
             self._ring_timer.start()
-        else:
-            self._ring_timer = None
 
         # --- Energy flash for level-up ---
         self._flash = EnergyFlash(duration=300.0, start_alpha=180)
-        if is_level_up and anim_toast:
+        if is_level_up:
             self._flash.start()
 
         # --- Typewriter reveal (title line1) ---
@@ -3265,30 +3286,26 @@ class AchToastWindow(QWidget):
         self._tw_cursor_timer = QTimer(self)
         self._tw_cursor_timer.setInterval(500)
         self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
-        if anim_toast:
-            self._typewriter.start()
-            self._tw_cursor_timer.start()
+        self._typewriter.start()
+        self._tw_cursor_timer.start()
 
         # --- Icon bounce animation ---
         self._bounce = IconBounce(duration=400.0, start_scale=1.3)
-        if anim_toast:
-            self._bounce.start()
+        self._bounce.start()
 
         # --- Slide-in/slide-out entry/exit animation ---
         self._slide_motion = SlideMotion(entry_duration=250.0, exit_duration=200.0, distance=60)
         self._motion_timer = QTimer(self)
         self._motion_timer.setInterval(16)
         self._motion_timer.timeout.connect(self._motion_tick)
-        if anim_toast:
-            self._slide_motion.start_entry()
-            self._motion_timer.start()
+        self._slide_motion.start_entry()
+        self._motion_timer.start()
 
         # Combined fast animation timer (typewriter + bounce + flash)
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(30)
         self._anim_timer.timeout.connect(self._anim_tick)
-        if anim_toast:
-            self._anim_timer.start()
+        self._anim_timer.start()
 
         self._render_and_place()
         self._timer.start()
@@ -3454,7 +3471,7 @@ class AchToastWindow(QWidget):
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
         title_for_size = line1  # always use full text for width calculation
-        if self._typewriter.is_active() and self._typewriter.full_text:
+        if self._is_fx_enabled("fx_toast_typewriter") and self._typewriter.is_active() and self._typewriter.full_text:
             title = self._typewriter.current_text(show_cursor=True)
         else:
             title = line1
@@ -3509,8 +3526,8 @@ class AchToastWindow(QWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(1, 1, W - 2, H - 2, radius, radius)
         
-        # Icon bounce animation: apply scale and Y-offset
-        if self._bounce.is_active():
+        # Icon bounce animation: apply scale and Y-offset when effect is enabled
+        if self._is_fx_enabled("fx_toast_icon_bounce") and self._bounce.is_active():
             icon_scale, icon_y_offset = self._bounce.get_scale_and_offset()
             actual_icon_sz = int(icon_sz * icon_scale)
         else:
@@ -3539,7 +3556,7 @@ class AchToastWindow(QWidget):
             p.drawText(QRect(x_text, line3_y, W - x_text - pad, fm_line3.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, line3)
         # Energy flash overlay for level-up entry
-        if is_level_up and self._flash.is_active():
+        if is_level_up and self._is_fx_enabled("fx_toast_energy_flash") and self._flash.is_active():
             self._flash.draw(p, W, H, radius,
                              QColor(get_theme_color(self.parent_gui.cfg, "primary")))
         p.end()
@@ -3549,7 +3566,10 @@ class AchToastWindow(QWidget):
         # Draw burst particles and neon ring — works in both landscape and portrait.
         # The expanded image is built before rotation so particle positions remain
         # consistent; rotating the whole expanded image produces correct portrait output.
-        burst_margin = self._burst_img_margin if (self._burst.is_active() or self._ring.is_active()) else 0
+        # Only expand if the relevant fx effects are enabled (live check).
+        _burst_active = self._is_fx_enabled("fx_toast_burst_particles") and self._burst.is_active()
+        _ring_active = self._is_fx_enabled("fx_toast_neon_rings") and self._ring.is_active()
+        burst_margin = self._burst_img_margin if (_burst_active or _ring_active) else 0
         if burst_margin > 0:
             EW = W + 2 * burst_margin
             EH = H + 2 * burst_margin
@@ -3562,10 +3582,12 @@ class AchToastWindow(QWidget):
                 cx = EW // 2
                 cy = EH // 2
                 # Burst particles
-                self._burst.draw(ep, cx, cy)
+                if _burst_active:
+                    self._burst.draw(ep, cx, cy)
                 # Neon rings (level-up)
-                self._ring.draw(ep, cx, cy,
-                                QColor(get_theme_color(self.parent_gui.cfg, "primary")))
+                if _ring_active:
+                    self._ring.draw(ep, cx, cy,
+                                    QColor(get_theme_color(self.parent_gui.cfg, "primary")))
             finally:
                 try:
                     ep.end()
@@ -3586,7 +3608,10 @@ class AchToastWindow(QWidget):
             ov = self.parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
             # Determine the burst margin embedded in the image (both landscape and portrait)
-            burst_margin = self._burst_img_margin if (self._burst.is_active() or self._ring.is_active()) else 0
+            burst_margin = self._burst_img_margin if (
+                (self._is_fx_enabled("fx_toast_burst_particles") and self._burst.is_active()) or
+                (self._is_fx_enabled("fx_toast_neon_rings") and self._ring.is_active())
+            ) else 0
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
@@ -3607,8 +3632,11 @@ class AchToastWindow(QWidget):
             x = max(geo.left(), min(x, geo.right() - W))
             y = max(geo.top(),  min(y,  geo.bottom() - H))
 
-            # Apply slide-in/slide-out offset and opacity
-            slide_offset, opacity = self._slide_motion.get_offset_and_opacity()
+            # Apply slide-in/slide-out offset and opacity (only when effect is enabled)
+            if self._is_fx_enabled("fx_toast_slide_motion"):
+                slide_offset, opacity = self._slide_motion.get_offset_and_opacity()
+            else:
+                slide_offset, opacity = 0, 1.0
 
             # Expand window for burst/ring area
             x_win = x - burst_margin + slide_offset
@@ -3889,7 +3917,7 @@ class ChallengeCountdownOverlay(QWidget):
             p.drawPixmap(0, 0, self._pix)
             p.end()
             
-class ChallengeSelectOverlay(QWidget):
+class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
     def __init__(self, parent: "MainWindow", selected_idx: int = 0):
         super().__init__(parent)
         self.parent_gui = parent
@@ -3905,17 +3933,13 @@ class ChallengeSelectOverlay(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._carousel = CarouselSlide(duration=180.0)
-        low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_challenge_carousel", parent.cfg.OVERLAY.get("anim_challenge", True)))
-        self._low_perf = low_perf or not anim_challenge
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
-        if not self._check_low_perf():
-            self._pulse_timer.start()
+        self._pulse_timer.start()  # always run; live fx checks in _compose_image
         self._pix = None
         self._render_and_place()
         self.show()
@@ -3945,12 +3969,12 @@ class ChallengeSelectOverlay(QWidget):
         super().closeEvent(e)
 
     def _check_low_perf(self) -> bool:
-        """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
+        """Live-read low_performance_mode master switch."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
+            return bool(ov.get("low_performance_mode", False))
         except Exception:
-            return self._low_perf
+            return False
 
     def _on_pulse_tick(self):
         self._breathing_pulse.tick(50.0)
@@ -3964,7 +3988,7 @@ class ChallengeSelectOverlay(QWidget):
 
     def set_selected(self, idx: int):
         new_idx = int(idx) % 4
-        if new_idx != self._selected and not self._check_low_perf():
+        if new_idx != self._selected and self._is_fx_enabled("fx_challenge_carousel"):
             # Determine slide direction: going "right" in list = slide left
             direction = 1 if new_idx > self._selected else -1
             self._prev_selected = self._selected
@@ -4026,9 +4050,7 @@ class ChallengeSelectOverlay(QWidget):
 
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=bool(ov.get("low_performance_mode", False)))
-
-            title_pt = scaled_body_pt + 6
+                              low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
             desc_pt = max(10, scaled_body_pt)
             min_title = 12
             min_desc = 10
@@ -4061,7 +4083,7 @@ class ChallengeSelectOverlay(QWidget):
             content_top = top_pad + max(0, (max_content_h - block_h) // 2)
 
             # Carousel slide: blend between previous and current content
-            slide_active = not self._check_low_perf() and self._carousel.is_active()
+            slide_active = self._is_fx_enabled("fx_challenge_carousel") and self._carousel.is_active()
             if slide_active:
                 eased = self._carousel.get_eased_t()
                 slide_dir = self._carousel.direction
@@ -4124,17 +4146,23 @@ class ChallengeSelectOverlay(QWidget):
 
             # Pulsating ice-blue arrows (always at static content position for stability)
             arrow_cy_rect = QRect(pad_lr, content_top, avail_w, t_h)
-            amp = self._breathing_pulse.get_amp()
-            alpha = 110 + int(120 * amp)
-            anim_scale = 0.9 + 0.2 * amp
-            wobble = 2.0 * self._breathing_pulse.get_sin()
+            if self._is_fx_enabled("fx_challenge_arrow_wobble"):
+                amp = self._breathing_pulse.get_amp()
+                alpha = 110 + int(120 * amp)
+                anim_scale = 0.9 + 0.2 * amp
+                wobble = 2.0 * self._breathing_pulse.get_sin()
+            else:
+                amp = 0.5
+                alpha = 170
+                anim_scale = 1.0
+                wobble = 0.0
             base_arr_h = max(10, int(round(18 * factor)))
             ah = int(base_arr_h * anim_scale)
             aw = max(6, int(ah * 0.6))
             cy = arrow_cy_rect.center().y()
             left_cx = pad_lr + max(12, int(round(24 * factor))) + int(-wobble)
             right_cx = w - pad_lr - max(12, int(round(24 * factor))) + int(wobble)
-            
+
             arrow_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
             arrow_color.setAlpha(alpha)
             p.setPen(Qt.PenStyle.NoPen)
@@ -4188,7 +4216,7 @@ class ChallengeSelectOverlay(QWidget):
             p.drawPixmap(0, 0, self._pix)
             p.end()
 
-class FlipDifficultyOverlay(QWidget):
+class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
     def __init__(self, parent: "MainWindow", selected_idx: int = 1,
                  options: list[tuple[str, int]] = None):
         super().__init__(parent)
@@ -4204,17 +4232,13 @@ class FlipDifficultyOverlay(QWidget):
 
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._snap = SnapScale(duration=160.0, scale_amount=0.07)
-        low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_flip_breathing_glow", parent.cfg.OVERLAY.get("anim_challenge", True)))
-        self._low_perf = low_perf or not anim_challenge
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._snap_timer = QTimer(self)
         self._snap_timer.setInterval(16)
         self._snap_timer.timeout.connect(self._on_snap_tick)
-        if not self._low_perf:
-            self._pulse_timer.start()
+        self._pulse_timer.start()  # always run; live fx checks in _compose_image
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -4264,7 +4288,7 @@ class FlipDifficultyOverlay(QWidget):
 
     def set_selected(self, idx: int):
         new_idx = max(0, min(int(idx or 0), len(self._options) - 1))
-        if new_idx != self._selected and not getattr(self, '_low_perf', False):
+        if new_idx != self._selected and self._is_fx_enabled("fx_challenge_snap_scale"):
             self._snap.start(prev_selected=self._selected)
             self._snap_timer.start()
         self._selected = new_idx
@@ -4344,7 +4368,7 @@ class FlipDifficultyOverlay(QWidget):
             p.drawRoundedRect(0, 0, w, h, radius, radius)
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=bool(ov.get("low_performance_mode", False)))
+                              low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
 
             p.setPen(hi_color)
             p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
@@ -4360,7 +4384,7 @@ class FlipDifficultyOverlay(QWidget):
                 snap_scale = 1.0
                 snap_flash_alpha = 0
                 prev_fade_alpha = 0
-                if not getattr(self, '_low_perf', False) and self._snap.is_active():
+                if self._is_fx_enabled("fx_challenge_snap_scale") and self._snap.is_active():
                     snap_scale = self._snap.get_scale(selected)
                     snap_flash_alpha = self._snap.get_flash_alpha(selected)
                     prev_fade_alpha = self._snap.get_prev_fade_alpha(ix)
@@ -4464,7 +4488,7 @@ class FlipDifficultyOverlay(QWidget):
 
 
 
-class HeatBarometerOverlay(QWidget):
+class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
     """Vertical heat barometer overlay for Heat Challenge. Fills bottom-to-top,
     colour transitions from green (0-50%) to orange (50-85%) to red (>85%)."""
 
@@ -4482,10 +4506,6 @@ class HeatBarometerOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # Reactive pulse animation timer (warning/critical)
-        ov = self.parent_gui.cfg.OVERLAY or {}
-        low_perf = bool(ov.get("low_performance_mode", False))
-        anim_challenge = bool(ov.get("fx_heat_warning_pulse", ov.get("anim_challenge", True)))
-        self._low_perf = low_perf or not anim_challenge
         self._heat_pulse = HeatPulse(threshold=65)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)
@@ -4510,8 +4530,8 @@ class HeatBarometerOverlay(QWidget):
 
     def set_heat(self, heat: int):
         self._heat = max(0, min(100, int(heat)))
-        # Start/stop pulse timer based on heat level and low_perf
-        if not self._low_perf and self._heat >= 65:
+        # Start/stop pulse timer based on heat level and live fx check
+        if self._is_fx_enabled("fx_heat_warning_pulse") and self._heat >= 65:
             if not self._pulse_timer.isActive():
                 self._pulse_timer.start()
         else:
@@ -4564,7 +4584,7 @@ class HeatBarometerOverlay(QWidget):
             ov = self.parent_gui.cfg.OVERLAY or {}
             _draw_glow_border(p, 0, 0, w, h, radius=10,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=bool(ov.get("low_performance_mode", False)))
+                              low_perf=not self._is_fx_enabled("fx_heat_glow_border"))
 
             # bar background (track)
             bx = pad
@@ -4587,9 +4607,8 @@ class HeatBarometerOverlay(QWidget):
             p.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), f"{self._heat}%")
 
             # Reactive warning/critical pulse border (no success effect for overheating)
-            ov = self.parent_gui.cfg.OVERLAY or {}
-            low_perf = bool(ov.get("low_performance_mode", False))
-            self._heat_pulse.draw(p, 1, 1, w - 2, h - 2, self._heat, low_perf)
+            self._heat_pulse.draw(p, 1, 1, w - 2, h - 2, self._heat,
+                                  not self._is_fx_enabled("fx_heat_warning_pulse"))
         finally:
             p.end()
 
@@ -4769,7 +4788,7 @@ class HeatBarPositionPicker(QWidget):
         return int(g.x()), int(g.y())
 
 
-class ChallengeStartCountdown(QWidget):
+class ChallengeStartCountdown(_OverlayFxMixin, QWidget):
     """Full-screen transparent countdown overlay: 3…2…1…GO!
 
     Each number scales from 2.0x → 1.0x with Ease-Out over 800ms.
@@ -4793,15 +4812,14 @@ class ChallengeStartCountdown(QWidget):
         geo = screen.geometry() if screen else QRect(0, 0, 1280, 720)
         self.setGeometry(geo)
 
-        self._low_perf = False
         _primary = '#00E5FF'
         _accent = '#FF7F00'
         try:
-            self._low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
+            self.parent_gui = parent
             _primary = get_theme_color(parent.cfg, "primary")
             _accent = get_theme_color(parent.cfg, "accent")
         except Exception:
-            pass
+            self.parent_gui = None
 
         # Countdown sequence: ('3', primary), ('2', primary), ('1', primary), ('GO!', accent)
         self._steps = [
@@ -4814,7 +4832,7 @@ class ChallengeStartCountdown(QWidget):
         self._step_elapsed = 0.0
 
         self._timer = QTimer(self)
-        self._timer.setInterval(50 if self._low_perf else 16)
+        self._timer.setInterval(16)
         self._timer.timeout.connect(self._tick)
 
         _start_topmost_timer(self)
@@ -4854,7 +4872,8 @@ class ChallengeStartCountdown(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
         try:
-            if self._low_perf:
+            fx_enabled = self._is_fx_enabled("fx_timer_321go")
+            if not fx_enabled:
                 scale = 1.0
                 p.setOpacity(1.0)
             elif is_go:
@@ -4871,7 +4890,7 @@ class ChallengeStartCountdown(QWidget):
             font = QFont("Segoe UI", max(12, font_size), QFont.Weight.Bold)
             p.setFont(font)
 
-            if not self._low_perf:
+            if fx_enabled:
                 # Glow effect
                 glow_col = QColor(color.red(), color.green(), color.blue(), 60)
                 for r in range(4, 0, -1):
