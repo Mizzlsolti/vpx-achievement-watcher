@@ -18,6 +18,17 @@ from PyQt6.QtGui import (
 
 from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, p_highlights, load_json, f_custom_achievements_progress
 from theme import get_theme_color, get_theme, DEFAULT_THEME
+from gl_effects import (
+    draw_glow_border as _draw_glow_border,
+    ease_out_bounce as _ease_out_bounce,
+    ease_out_cubic as _ease_out_cubic,
+    EffectsWidget as OverlayEffectsWidget,
+    ShineWidget as _OverlayShineWidget,
+    HighlightWidget as _OverlayHighlightWidget,
+    ParticleBurst, NeonRingExpansion, TypewriterReveal, IconBounce,
+    SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
+    SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
+)
 
 try:
     import sound as _sound_mod
@@ -66,48 +77,6 @@ def _get_page_accent(cfg, idx: int) -> QColor:
     return QColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 
-def _draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
-                      radius: int = 18, color: QColor = None, layers: int = 3,
-                      low_perf: bool = False):
-    """Draw a multi-layer neon glow border for a modern sci-fi look."""
-    if color is None:
-        color = QColor("#00E5FF")
-    if not low_perf:
-        # Outer glow layers
-        for i in range(layers, 0, -1):
-            alpha = int(30 * (layers + 1 - i))
-            glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), alpha))
-            glow_pen.setWidth(i * 2)
-            painter.setPen(glow_pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRoundedRect(x + i, y + i, w - 2 * i, h - 2 * i, radius, radius)
-    # Sharp inner border
-    pen = QPen(color)
-    pen.setWidth(2)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(x + 1, y + 1, w - 2, h - 2, radius, radius)
-
-
-def _ease_out_bounce(t: float) -> float:
-    """Ease-out bounce curve used for icon stamp animation."""
-    if t < 1 / 2.75:
-        return 7.5625 * t * t
-    elif t < 2 / 2.75:
-        t -= 1.5 / 2.75
-        return 7.5625 * t * t + 0.75
-    elif t < 2.5 / 2.75:
-        t -= 2.25 / 2.75
-        return 7.5625 * t * t + 0.9375
-    else:
-        t -= 2.625 / 2.75
-        return 7.5625 * t * t + 0.984375
-
-
-def _ease_out_cubic(t: float) -> float:
-    """Ease-out cubic curve used for slide transitions."""
-    return 1.0 - (1.0 - t) ** 3
-
 
 def _force_topmost(widget: QWidget):
     """Force a widget to the topmost z-order using Win32 API.
@@ -144,7 +113,7 @@ class OverlayNavArrows(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._pulse_t = 0.0
+        self._breathing_pulse = BreathingPulse(speed=0.13)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(80)
         self._pulse_timer.timeout.connect(self._on_tick)
@@ -166,11 +135,10 @@ class OverlayNavArrows(QWidget):
         self._pulse_timer.stop()
 
     def _on_tick(self):
-        self._pulse_t = (self._pulse_t + 0.13) % 1.0
+        self._breathing_pulse.tick(80.0)
         self.update()
 
     def paintEvent(self, event):
-        from math import sin, pi
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
@@ -200,10 +168,10 @@ class OverlayNavArrows(QWidget):
                 scale = 1.0
                 wobble = 0
             else:
-                amp = 0.5 + 0.5 * sin(2 * pi * self._pulse_t)
+                amp = self._breathing_pulse.get_amp()
                 alpha = 110 + int(120 * amp)
                 scale = 0.9 + 0.2 * amp
-                wobble = 2.0 * sin(2 * pi * self._pulse_t)
+                wobble = 2.0 * self._breathing_pulse.get_sin()
             base_h = 18
             ah = int(base_h * scale)
             aw = max(6, int(ah * 0.6))
@@ -237,157 +205,6 @@ class OverlayNavArrows(QWidget):
         p_main.drawImage(0, 0, img)
         p_main.end()
 
-
-
-class OverlayEffectsWidget(QWidget):
-    """Transparent overlay that draws the animated glow border and floating particles
-    over the main overlay window. Works for both portrait and landscape modes since it
-    paints in physical screen coordinates."""
-
-    _PARTICLE_COUNT = 18
-
-    def __init__(self, parent: "OverlayWindow"):
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-
-        # Breathing glow state
-        self._glow_t = 0.0
-
-        # Floating particles
-        self._particles: list = []
-
-        # Per-page accent colour (smoothly lerped)
-        try:
-            _initial_accent = QColor(get_theme_color(parent.parent_gui.cfg, "primary"))
-        except Exception:
-            _initial_accent = QColor(get_theme(DEFAULT_THEME)["primary"])
-        self._accent_color: QColor = _initial_accent
-        self._target_accent: QColor = QColor(_initial_accent)
-
-        self._tick_timer = QTimer(self)
-        self._tick_timer.setInterval(50)
-        self._tick_timer.timeout.connect(self._on_tick)
-        self.hide()
-
-    def _init_particles(self):
-        W = max(200, self.width() if self.width() > 0 else 400)
-        H = max(200, self.height() if self.height() > 0 else 600)
-        count = self._PARTICLE_COUNT
-        self._particles = []
-        for _ in range(count):
-            self._particles.append(self._make_particle(W, H, spawn_anywhere=True))
-
-    def _make_particle(self, W: int, H: int, spawn_anywhere: bool = False) -> dict:
-        return {
-            'x': random.uniform(0, W),
-            'y': random.uniform(0, H) if spawn_anywhere else random.choice([
-                random.uniform(-10, 0),        # spawn at top
-                random.uniform(H, H + 20),     # spawn at bottom
-            ]),
-            'vx': random.uniform(-15, 15),
-            'vy': random.uniform(-25, 25) if spawn_anywhere else random.uniform(-30, -10),
-            'size': random.uniform(2, 6),
-            'alpha': random.randint(30, 100),
-            'alpha_dir': random.choice([-1, 1]),
-        }
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        try:
-            ov = self.parent().parent_gui.cfg.OVERLAY
-            low_perf = bool(ov.get("low_performance_mode", False))
-            anim_glow = bool(ov.get("anim_main_glow", True))
-        except Exception:
-            low_perf = False
-            anim_glow = True
-        if low_perf or not anim_glow:
-            return
-        if not self._particles:
-            self._init_particles()
-        if not self._tick_timer.isActive():
-            self._tick_timer.start()
-
-    def hideEvent(self, event):
-        super().hideEvent(event)
-        self._tick_timer.stop()
-
-    def _on_tick(self):
-        # Advance glow breath (increment ~0.008 per 50ms => ~6.25s period)
-        self._glow_t = (self._glow_t + 0.008) % 1.0
-        # Smoothly lerp accent color toward target (~1s transition)
-        tgt = self._target_accent
-        cur = self._accent_color
-        lerp = 0.06
-        r = int(cur.red()   + (tgt.red()   - cur.red())   * lerp)
-        g = int(cur.green() + (tgt.green() - cur.green()) * lerp)
-        b = int(cur.blue()  + (tgt.blue()  - cur.blue())  * lerp)
-        self._accent_color = QColor(max(0, min(255, r)),
-                                    max(0, min(255, g)),
-                                    max(0, min(255, b)))
-        W, H = self.width(), self.height()
-        if W <= 0 or H <= 0:
-            return
-        dt = 0.05  # 50ms in seconds
-        for pt in self._particles:
-            pt['x'] += pt['vx'] * dt
-            pt['y'] += pt['vy'] * dt
-            # Shimmer alpha
-            pt['alpha'] += pt['alpha_dir'] * 2
-            if pt['alpha'] >= 100:
-                pt['alpha'] = 100
-                pt['alpha_dir'] = -1
-            elif pt['alpha'] <= 20:
-                pt['alpha'] = 20
-                pt['alpha_dir'] = 1
-            # Respawn if out of bounds on any edge
-            if pt['y'] < -10 or pt['y'] > H + 10 or pt['x'] < -10 or pt['x'] > W + 10:
-                pt.update(self._make_particle(W, H, spawn_anywhere=True))
-        self.update()
-
-    def set_accent(self, color: QColor):
-        """Set the target accent color; the glow will smoothly lerp to it."""
-        self._target_accent = QColor(color)
-
-    def paintEvent(self, event):
-        W, H = self.width(), self.height()
-        if W <= 0 or H <= 0:
-            return
-        try:
-            ov = self.parent().parent_gui.cfg.OVERLAY
-            low_perf = bool(ov.get("low_performance_mode", False))
-            anim_glow = bool(ov.get("anim_main_glow", True))
-        except Exception:
-            low_perf = False
-            anim_glow = True
-        if low_perf or not anim_glow:
-            return
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        try:
-            # Breathing glow border — use smoothly lerped accent colour
-            amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
-            alpha_base = int(120 + 135 * amp)  # 120..255
-            layers = int(2 + 2 * amp)          # 2..4
-            ac = self._accent_color
-            glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
-            _draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
-
-            # Floating particles — tinted to accent colour
-            p.setPen(Qt.PenStyle.NoPen)
-            for pt in self._particles:
-                c = QColor(ac.red(), ac.green(), ac.blue(), int(pt['alpha']))
-                p.setBrush(c)
-                sz = int(pt['size'])
-                p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
-
-
 # Per-page accent colours for the main overlay – kept only as a last-resort
 # emergency fallback.  All themes now define their own ``page_accents`` list
 # and _get_page_accents_list() derives a dynamic fallback from the theme's
@@ -399,111 +216,6 @@ _OVERLAY_PAGE_ACCENTS = [
     QColor(0, 200, 110),    # page 2: green (other views)
     QColor(180, 80, 255),   # page 3: purple (cloud/VPS)
 ]
-
-
-class _OverlayShineWidget(QWidget):
-    """Transparent overlay that draws a horizontal shine/sweep stripe
-    over the estimated progress bar area of the main overlay."""
-
-    # Progress bar is placed roughly in the upper-middle of the body content:
-    # ~25-38% down from the widget top, spanning the centred 75%-width bar.
-    _BAR_TOP_FRAC = 0.25    # fraction of widget height where bar area starts
-    _BAR_H_FRAC   = 0.13    # fraction of widget height that covers bar area
-    _STRIPE_W_FRAC = 0.22   # width of the shine stripe relative to widget width
-
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._t: float = 0.0  # 0.0..1.0 sweep position
-        self.hide()
-
-    def paintEvent(self, _ev):
-        W, H = self.width(), self.height()
-        if W <= 0 or H <= 0:
-            return
-
-        # Detect portrait mode from parent OverlayWindow so the sweep runs
-        # along the correct visual axis.  In portrait mode the widget is
-        # physically rotated 90°, so the X-axis of the widget maps to the
-        # vertical visual direction; we must sweep along Y instead.
-        portrait = False
-        try:
-            portrait = bool(self.parent().portrait_mode)
-        except Exception:
-            pass
-
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        try:
-            if portrait:
-                # In portrait mode the physical dimensions are swapped relative
-                # to the visual overlay: W is the visual height, H is the visual
-                # width.  Apply bar-area fractions to W (visual height), and
-                # sweep the stripe vertically along H (visual width → Y-axis).
-                bar_top  = int(W * self._BAR_TOP_FRAC)
-                bar_h    = int(W * self._BAR_H_FRAC)
-                stripe_w = int(H * self._STRIPE_W_FRAC)
-                y = int(-stripe_w + self._t * (H + stripe_w * 2))
-                grad = QLinearGradient(float(bar_top), float(y),
-                                       float(bar_top), float(y + stripe_w))
-                grad.setColorAt(0.0, QColor(255, 255, 255, 0))
-                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
-                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
-                grad.setColorAt(1.0, QColor(255, 255, 255, 0))
-                p.fillRect(bar_top, y, bar_h, stripe_w, QBrush(grad))
-            else:
-                bar_top  = int(H * self._BAR_TOP_FRAC)
-                bar_h    = int(H * self._BAR_H_FRAC)
-                stripe_w = int(W * self._STRIPE_W_FRAC)
-                x = int(-stripe_w + self._t * (W + stripe_w * 2))
-                grad = QLinearGradient(float(x), float(bar_top),
-                                       float(x + stripe_w), float(bar_top))
-                grad.setColorAt(0.0, QColor(255, 255, 255, 0))
-                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
-                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
-                grad.setColorAt(1.0, QColor(255, 255, 255, 0))
-                p.fillRect(x, bar_top, stripe_w, bar_h, QBrush(grad))
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
-
-
-class _OverlayHighlightWidget(QWidget):
-    """Briefly flashes a warm amber highlight over the overlay content area
-    when score or progress values change."""
-
-    # Warm amber tint used for the value-change highlight flash
-    _FLASH_COLOR = QColor(255, 200, 80)
-    # Starting alpha (0-255) for the highlight; fades to 0 over ~240 ms
-    _INITIAL_ALPHA = 45
-    # Alpha step subtracted each 16 ms tick → fade duration ≈ alpha/step*16 ms
-    _FADE_STEP = 3
-
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._alpha: int = 0
-        self.hide()
-
-    def paintEvent(self, _ev):
-        if self._alpha <= 0:
-            return
-        p = QPainter(self)
-        try:
-            c = QColor(self._FLASH_COLOR)
-            c.setAlpha(self._alpha)
-            p.fillRect(self.rect(), c)
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
 
 
 class OverlayWindow(QWidget):
@@ -791,6 +503,8 @@ class OverlayWindow(QWidget):
         self._transition_timer = QTimer(self)
         self._transition_timer.setInterval(16)
         self._transition_timer.timeout.connect(self._transition_tick)
+        # Glitch frame effect primitive
+        self._glitch_frame = GlitchFrame()
         # Effects widget (glow border + floating particles)
         self._effects_widget = OverlayEffectsWidget(self)
         # Per-page accent colour index
@@ -1640,30 +1354,7 @@ class OverlayWindow(QWidget):
 
     def _draw_glitch_frame(self, source_img, label):
         """Draw a single glitch frame on the given label by slicing source_img into strips."""
-        W = source_img.width()
-        H = source_img.height()
-        glitched = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
-        glitched.fill(Qt.GlobalColor.transparent)
-        p = QPainter(glitched)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        try:
-            n_strips = random.randint(4, 6)
-            strip_h = max(1, H // n_strips)
-            for i in range(n_strips):
-                y0 = i * strip_h
-                y1 = min(H, y0 + strip_h)
-                sh = y1 - y0
-                if sh <= 0:
-                    continue
-                offset_x = random.randint(-15, 15)
-                strip = source_img.copy(0, y0, W, sh)
-                p.drawImage(offset_x, y0, strip)
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
-        label.setPixmap(QPixmap.fromImage(glitched))
+        self._glitch_frame.draw(source_img, label)
 
     # ------------------------------------------------------------------
     # Animation helpers
@@ -2117,7 +1808,7 @@ class FlipCounterOverlay(QWidget):
         self._label.setStyleSheet("background:transparent;")
 
         # Breathing glow animation (same cadence as ChallengeSelectOverlay pulse)
-        self._pulse_t: float = 0.0
+        self._breathing_pulse = BreathingPulse(speed=0.05)
         ov = parent.cfg.OVERLAY or {}
         _low_perf = bool(ov.get("low_performance_mode", False))
         _anim = bool(ov.get("anim_challenge", True))
@@ -2143,7 +1834,7 @@ class FlipCounterOverlay(QWidget):
         _start_topmost_timer(self)
 
     def _on_anim_tick(self):
-        self._pulse_t = (self._pulse_t + 0.05) % 1.0
+        self._breathing_pulse.tick(50.0)
         self._render_and_place()
 
     def _check_low_perf(self) -> bool:
@@ -2163,7 +1854,6 @@ class FlipCounterOverlay(QWidget):
         super().closeEvent(e)
 
     def _compose_image(self) -> QImage:
-        from math import sin, pi
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         body_pt = 15
@@ -2205,19 +1895,14 @@ class FlipCounterOverlay(QWidget):
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=bool(ov.get("low_performance_mode", False)))
 
-            # Breathing glow ring: pulsates with _pulse_t when animation is enabled.
+            # Breathing glow ring: pulsates when animation is enabled.
             # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
             # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
             # oscillation (40→220) is visible against the dark background.
             if not self._check_low_perf():
-                amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, '_pulse_t', 0.0))
-                pulse_alpha = 40 + int(180 * amp)
                 _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
-                pulse_pen = QPen(QColor(_pc.red(), _pc.green(), _pc.blue(), pulse_alpha))
-                pulse_pen.setWidth(5)
-                p.setPen(pulse_pen)
-                p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawRoundedRect(5, 5, content_w - 10, content_h - 10, radius - 3, radius - 3)
+                self._breathing_pulse.draw(p, 5, 5, content_w - 10, content_h - 10,
+                                           radius - 3, _pc, width=5)
 
             p.setPen(title_color); p.setFont(f_title)
             p.drawText(QRect(0, pad, content_w, fm_title.height()),
@@ -2992,22 +2677,10 @@ class StatusOverlay(QWidget):
         low_perf = bool(ov.get("low_performance_mode", False))
         anim_status = bool(ov.get("anim_status", True))
         self._low_perf = low_perf or not anim_status
-        # Scan-in animation
-        self._scan_active: bool = False
-        self._scan_elapsed: float = 0.0
-        self._scan_duration: float = 220.0
-        # Glow sweep animation (starts after scan-in)
-        self._sweep_active: bool = False
-        self._sweep_elapsed: float = 0.0
-        self._sweep_duration: float = 350.0
-        # Color morph animation
-        self._morph_active: bool = False
-        self._morph_elapsed: float = 0.0
-        self._morph_duration: float = 200.0
-        self._morph_from_color: str = "#00C853"
-        self._morph_target_color: str = "#00C853"
-        self._morph_from_text: str = ""
-        self._morph_target_text: str = ""
+        # Scan-in, glow sweep, and color morph animation primitives
+        self._scan_in = ScanIn(duration=220.0, distance=30)
+        self._sweep = GlowSweep(duration=350.0)
+        self._morph = ColorMorph(duration=200.0)
         # Combined animation timer
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(16)
@@ -3079,19 +2752,9 @@ class StatusOverlay(QWidget):
             margin_top = (H - text_h) // 2
             tmp.render(p, QPoint(margin_left, margin_top))
             # Glow sweep animation (horizontal sweep line)
-            if not self._check_low_perf() and getattr(self, '_sweep_active', False):
-                sweep_t = min(1.0, getattr(self, '_sweep_elapsed', 0.0) / max(1.0, getattr(self, '_sweep_duration', 350.0)))
-                sweep_x = int(sweep_t * (W + 60)) - 30
-                sweep_alpha = int(160 * max(0.0, 1.0 - abs(sweep_t - 0.5) * 3.0))
-                if sweep_alpha > 0:
-                    from PyQt6.QtGui import QLinearGradient
-                    _sc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
-                    grad = QLinearGradient(float(sweep_x - 20), 0.0, float(sweep_x + 20), 0.0)
-                    grad.setColorAt(0.0, QColor(_sc.red(), _sc.green(), _sc.blue(), 0))
-                    grad.setColorAt(0.5, QColor(_sc.red(), _sc.green(), _sc.blue(), sweep_alpha))
-                    grad.setColorAt(1.0, QColor(_sc.red(), _sc.green(), _sc.blue(), 0))
-                    p.setBrush(grad)
-                    p.drawRoundedRect(0, 0, W, H, self._RADIUS, self._RADIUS)
+            if not self._check_low_perf() and self._sweep.is_active():
+                _sc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+                self._sweep.draw(p, W, H, self._RADIUS, _sc)
         finally:
             p.end()
         return img
@@ -3133,11 +2796,8 @@ class StatusOverlay(QWidget):
         # Apply scan-in x offset
         scan_offset = 0
         opacity = 1.0
-        if not self._check_low_perf() and getattr(self, '_scan_active', False):
-            scan_t = min(1.0, getattr(self, '_scan_elapsed', 0.0) / max(1.0, self._scan_duration))
-            eased = _ease_out_cubic(scan_t)
-            scan_offset = int(30 * (1.0 - eased))
-            opacity = max(0.0, min(1.0, eased))
+        if not self._check_low_perf() and self._scan_in.is_active():
+            scan_offset, opacity = self._scan_in.get_offset_and_opacity()
 
         self.setGeometry(x + scan_offset, y, W, H)
         self._snap_label.setGeometry(0, 0, W, H)
@@ -3153,49 +2813,34 @@ class StatusOverlay(QWidget):
         needs_render = False
 
         # Scan-in
-        if getattr(self, '_scan_active', False):
-            self._scan_elapsed += dt
-            if self._scan_elapsed >= self._scan_duration:
-                self._scan_active = False
-                self._scan_elapsed = self._scan_duration
+        if self._scan_in.is_active():
+            self._scan_in.tick(dt)
+            if not self._scan_in.is_active():
                 # Trigger glow sweep after scan-in
                 if not self._check_low_perf():
-                    self._sweep_active = True
-                    self._sweep_elapsed = 0.0
+                    self._sweep.start()
             needs_render = True
 
         # Glow sweep
-        if getattr(self, '_sweep_active', False):
-            self._sweep_elapsed += dt
-            if self._sweep_elapsed >= self._sweep_duration:
-                self._sweep_active = False
-                self._sweep_elapsed = self._sweep_duration
+        if self._sweep.is_active():
+            self._sweep.tick(dt)
             needs_render = True
 
         # Color morph
-        if getattr(self, '_morph_active', False):
-            self._morph_elapsed += dt
-            t = min(1.0, self._morph_elapsed / max(1.0, self._morph_duration))
-            # Interpolate color
-            fc = QColor(self._morph_from_color)
-            tc = QColor(self._morph_target_color)
-            r = int(fc.red() + (tc.red() - fc.red()) * t)
-            g = int(fc.green() + (tc.green() - fc.green()) * t)
-            b = int(fc.blue() + (tc.blue() - fc.blue()) * t)
-            self._color = f"#{r:02X}{g:02X}{b:02X}"
-            if t >= 1.0:
-                self._morph_active = False
-                self._color = self._morph_target_color
-                self._status_text = self._morph_target_text
+        if self._morph.is_active():
+            self._morph.tick(dt)
+            self._color = self._morph.current_color()
+            if not self._morph.is_active():
+                self._status_text = self._morph.current_text()
             needs_render = True
 
         if needs_render:
             self._refresh_view()
 
         # Stop timer if nothing active
-        if (not getattr(self, '_scan_active', False) and
-                not getattr(self, '_sweep_active', False) and
-                not getattr(self, '_morph_active', False)):
+        if (not self._scan_in.is_active() and
+                not self._sweep.is_active() and
+                not self._morph.is_active()):
             self._anim_timer.stop()
 
     def closeEvent(self, e):
@@ -3236,19 +2881,13 @@ class StatusOverlay(QWidget):
             # Badge newly appearing: trigger scan-in
             self._status_text = new_text
             self._color = new_color
-            self._scan_active = True
-            self._scan_elapsed = 0.0
-            self._sweep_active = False
-            self._morph_active = False
+            self._scan_in.start()
+            self._sweep._active = False
+            self._morph._active = False
             self._anim_timer.start()
         elif text_changed or color_changed:
             # Status changing: morph color, pop text
-            self._morph_from_color = self._color
-            self._morph_target_color = new_color
-            self._morph_from_text = self._status_text
-            self._morph_target_text = new_text
-            self._morph_active = True
-            self._morph_elapsed = 0.0
+            self._morph.start(self._color, new_color, self._status_text, new_text)
             # Show new text immediately for readability; color morphs smoothly
             self._status_text = new_text
             self._anim_timer.start()
@@ -3587,85 +3226,63 @@ class AchToastWindow(QWidget):
 
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
+        self._burst = ParticleBurst(
+            count=20,
+            color=QColor(get_theme_color(self.parent_gui.cfg, "accent")),
+        )
+        self._burst_timer = QTimer(self)
+        self._burst_timer.setInterval(30)
+        self._burst_timer.timeout.connect(self._burst_tick)
         if not anim_toast:
             self._burst_img_margin = 0
-            self._burst_particles = []
-            self._burst_elapsed = 0.0
-            self._burst_active = False
-            self._burst_timer = QTimer(self)
-            self._burst_timer.setInterval(30)
-            self._burst_timer.timeout.connect(self._burst_tick)
         else:
             self._burst_img_margin = 80
-            self._burst_particles = []
-            for _ in range(20):
-                angle = random.uniform(0, 2 * math.pi)
-                speed = random.uniform(80, 200)
-                self._burst_particles.append({
-                    'x': 0.0, 'y': 0.0,
-                    'vx': math.cos(angle) * speed,
-                    'vy': math.sin(angle) * speed,
-                    'size': random.uniform(3, 6),
-                    'alpha': 255,
-                    'color': QColor(get_theme_color(self.parent_gui.cfg, "accent")),
-                })
-            self._burst_elapsed = 0.0
-            self._burst_active = True
-            self._burst_timer = QTimer(self)
-            self._burst_timer.setInterval(30)
-            self._burst_timer.timeout.connect(self._burst_tick)
+            self._burst.start()
             self._burst_timer.start()
 
         # --- Neon ring pulse (level-up only) ---
-        self._ring_rings = []
-        self._ring_active = False
+        self._ring = NeonRingExpansion(
+            ring_count=4,
+            delays=[0.0, 150.0, 300.0, 450.0],
+            duration=550.0,
+        )
         if is_level_up and anim_toast:
-            self._ring_rings = [
-                {'r': 0.0, 'elapsed': 0.0, 'delay': 0.0, 'alpha': 200},
-                {'r': 0.0, 'elapsed': 0.0, 'delay': 150.0, 'alpha': 200},
-                {'r': 0.0, 'elapsed': 0.0, 'delay': 300.0, 'alpha': 180},
-                {'r': 0.0, 'elapsed': 0.0, 'delay': 450.0, 'alpha': 150},
-            ]
-            self._ring_elapsed = 0.0
-            self._ring_duration = 550.0
-            self._ring_active = True
+            self._ring.start()
             self._ring_timer = QTimer(self)
             self._ring_timer.setInterval(20)
             self._ring_timer.timeout.connect(self._ring_tick)
             self._ring_timer.start()
+        else:
+            self._ring_timer = QTimer(self)
+            self._ring_timer.setInterval(20)
+            self._ring_timer.timeout.connect(self._ring_tick)
 
         # --- Energy flash for level-up ---
-        self._flash_active: bool = is_level_up and anim_toast
-        self._flash_elapsed: float = 0.0
-        self._flash_duration: float = 300.0
+        self._flash = EnergyFlash(duration=300.0, start_alpha=180)
+        if is_level_up and anim_toast:
+            self._flash.start()
 
         # --- Typewriter reveal (title line1) ---
-        self._tw_full: str = ""
-        self._tw_idx: int = 0
-        self._tw_active: bool = anim_toast
-        self._tw_cursor_visible: bool = True
+        self._typewriter = TypewriterReveal()
         self._tw_cursor_timer = QTimer(self)
         self._tw_cursor_timer.setInterval(500)
         self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
         if anim_toast:
+            self._typewriter.start()
             self._tw_cursor_timer.start()
 
         # --- Icon bounce animation ---
-        self._bounce_elapsed: float = 0.0
-        self._bounce_duration: float = 400.0
-        self._bounce_active: bool = anim_toast
+        self._bounce = IconBounce(duration=400.0, start_scale=1.3)
+        if anim_toast:
+            self._bounce.start()
 
         # --- Slide-in/slide-out entry/exit animation ---
-        self._entry_active: bool = anim_toast
-        self._entry_elapsed: float = 0.0
-        self._entry_duration: float = 250.0
-        self._exit_active: bool = False
-        self._exit_elapsed: float = 0.0
-        self._exit_duration: float = 200.0
+        self._slide_motion = SlideMotion(entry_duration=250.0, exit_duration=200.0, distance=60)
         self._motion_timer = QTimer(self)
         self._motion_timer.setInterval(16)
         self._motion_timer.timeout.connect(self._motion_tick)
         if anim_toast:
+            self._slide_motion.start_entry()
             self._motion_timer.start()
 
         # Combined fast animation timer (typewriter + bounce + flash)
@@ -3691,10 +3308,9 @@ class AchToastWindow(QWidget):
                 pass
             # Start exit animation if available, otherwise close immediately
             if not getattr(self, "_is_closing", False):
-                if getattr(self, "_exit_active", False) is False and hasattr(self, "_motion_timer"):
+                if not self._slide_motion.is_exit_active() and hasattr(self, "_motion_timer"):
                     # Trigger exit animation
-                    self._exit_active = True
-                    self._exit_elapsed = 0.0
+                    self._slide_motion.start_exit()
                     self._motion_timer.start()
                 else:
                     self._is_closing = True
@@ -3830,8 +3446,8 @@ class AchToastWindow(QWidget):
                     line2 = table_name if table_name else _strip_version_from_name(rom)
 
         # Set typewriter full text on first call (now applies to title/line1)
-        if getattr(self, '_tw_active', False) and not getattr(self, '_tw_full', ''):
-            self._tw_full = line1
+        if self._typewriter.is_active() and not self._typewriter.full_text:
+            self._typewriter.set_text(line1)
 
         # Theme-dynamic colors
         title_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
@@ -3840,11 +3456,8 @@ class AchToastWindow(QWidget):
 
         # Apply typewriter reveal to title (line1); use full text for sizing, partial for display
         title_for_size = line1  # always use full text for width calculation
-        if getattr(self, '_tw_active', False) and getattr(self, '_tw_full', ''):
-            tw_text = self._tw_full[:self._tw_idx]
-            if self._tw_cursor_visible and self._tw_idx < len(self._tw_full):
-                tw_text += '|'
-            title = tw_text
+        if self._typewriter.is_active() and self._typewriter.full_text:
+            title = self._typewriter.current_text(show_cursor=True)
         else:
             title = line1
         # Second line is always static (no typewriter)
@@ -3899,11 +3512,8 @@ class AchToastWindow(QWidget):
         p.drawRoundedRect(1, 1, W - 2, H - 2, radius, radius)
         
         # Icon bounce animation: apply scale and Y-offset
-        if getattr(self, '_bounce_active', False):
-            bounce_t = min(1.0, getattr(self, '_bounce_elapsed', 0.0) / max(1.0, getattr(self, '_bounce_duration', 400.0)))
-            eased = _ease_out_bounce(bounce_t)
-            icon_scale = 1.3 + (1.0 - 1.3) * eased   # 1.3 -> 1.0
-            icon_y_offset = int(-30 * (1.0 - eased))  # -30 -> 0
+        if self._bounce.is_active():
+            icon_scale, icon_y_offset = self._bounce.get_scale_and_offset()
             actual_icon_sz = int(icon_sz * icon_scale)
         else:
             actual_icon_sz = icon_sz
@@ -3931,15 +3541,9 @@ class AchToastWindow(QWidget):
             p.drawText(QRect(x_text, line3_y, W - x_text - pad, fm_line3.height()),
                        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, line3)
         # Energy flash overlay for level-up entry
-        if is_level_up and getattr(self, '_flash_active', False):
-            flash_t = min(1.0, getattr(self, '_flash_elapsed', 0.0) / max(1.0, self._flash_duration))
-            flash_alpha = int(180 * (1.0 - flash_t))
-            if flash_alpha > 0:
-                p.setPen(Qt.PenStyle.NoPen)
-                _fc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
-                flash_color = QColor(_fc.red(), _fc.green(), _fc.blue(), flash_alpha)
-                p.setBrush(flash_color)
-                p.drawRoundedRect(0, 0, W, H, radius, radius)
+        if is_level_up and self._flash.is_active():
+            self._flash.draw(p, W, H, radius,
+                             QColor(get_theme_color(self.parent_gui.cfg, "primary")))
         p.end()
 
         portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
@@ -3947,9 +3551,7 @@ class AchToastWindow(QWidget):
         # Draw burst particles and neon ring — works in both landscape and portrait.
         # The expanded image is built before rotation so particle positions remain
         # consistent; rotating the whole expanded image produces correct portrait output.
-        burst_active = getattr(self, '_burst_active', False)
-        ring_active = getattr(self, '_ring_active', False)
-        burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
+        burst_margin = self._burst_img_margin if (self._burst.is_active() or self._ring.is_active()) else 0
         if burst_margin > 0:
             EW = W + 2 * burst_margin
             EH = H + 2 * burst_margin
@@ -3962,27 +3564,10 @@ class AchToastWindow(QWidget):
                 cx = EW // 2
                 cy = EH // 2
                 # Burst particles
-                ep.setPen(Qt.PenStyle.NoPen)
-                for pt in getattr(self, '_burst_particles', []):
-                    if pt['alpha'] > 0:
-                        c = QColor(pt['color'])
-                        c.setAlpha(int(max(0, min(255, pt['alpha']))))
-                        ep.setBrush(c)
-                        sz = max(1, int(pt['size']))
-                        ep.drawEllipse(cx + int(pt['x']) - sz // 2,
-                                       cy + int(pt['y']) - sz // 2, sz, sz)
+                self._burst.draw(ep, cx, cy)
                 # Neon rings (level-up)
-                for ring in getattr(self, '_ring_rings', []):
-                    r = int(ring['r'])
-                    alp = int(max(0, min(255, ring['alpha'])))
-                    if r > 0 and alp > 0:
-                        _rc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
-                        rc = QColor(_rc.red(), _rc.green(), _rc.blue(), alp)
-                        pen = QPen(rc)
-                        pen.setWidth(3)
-                        ep.setPen(pen)
-                        ep.setBrush(Qt.BrushStyle.NoBrush)
-                        ep.drawEllipse(cx - r, cy - r, 2 * r, 2 * r)
+                self._ring.draw(ep, cx, cy,
+                                QColor(get_theme_color(self.parent_gui.cfg, "primary")))
             finally:
                 try:
                     ep.end()
@@ -4003,9 +3588,7 @@ class AchToastWindow(QWidget):
             ov = self.parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
             # Determine the burst margin embedded in the image (both landscape and portrait)
-            burst_active = getattr(self, '_burst_active', False)
-            ring_active = getattr(self, '_ring_active', False)
-            burst_margin = getattr(self, '_burst_img_margin', 0) if (burst_active or ring_active) else 0
+            burst_margin = self._burst_img_margin if (self._burst.is_active() or self._ring.is_active()) else 0
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
@@ -4027,17 +3610,7 @@ class AchToastWindow(QWidget):
             y = max(geo.top(),  min(y,  geo.bottom() - H))
 
             # Apply slide-in/slide-out offset and opacity
-            slide_offset = 0
-            opacity = 1.0
-            if getattr(self, '_entry_active', False):
-                entry_t = min(1.0, getattr(self, '_entry_elapsed', 0.0) / max(1.0, self._entry_duration))
-                eased = _ease_out_cubic(entry_t)
-                slide_offset = int(60 * (1.0 - eased))
-                opacity = max(0.0, min(1.0, eased))
-            elif getattr(self, '_exit_active', False):
-                exit_t = min(1.0, getattr(self, '_exit_elapsed', 0.0) / max(1.0, self._exit_duration))
-                slide_offset = int(60 * exit_t)
-                opacity = max(0.0, min(1.0, 1.0 - exit_t))
+            slide_offset, opacity = self._slide_motion.get_offset_and_opacity()
 
             # Expand window for burst/ring area
             x_win = x - burst_margin + slide_offset
@@ -4063,63 +3636,35 @@ class AchToastWindow(QWidget):
     def _motion_tick(self):
         """Advance slide-in (entry) or slide-out (exit) animation."""
         dt = 16.0
-        if getattr(self, '_entry_active', False):
-            self._entry_elapsed += dt
-            if self._entry_elapsed >= self._entry_duration:
-                self._entry_active = False
-                self._entry_elapsed = self._entry_duration
-                self._motion_timer.stop()
-            self._render_and_place()
-        elif getattr(self, '_exit_active', False):
-            self._exit_elapsed += dt
-            if self._exit_elapsed >= self._exit_duration:
-                self._exit_active = False
-                self._motion_timer.stop()
-                if not getattr(self, "_is_closing", False):
-                    self._is_closing = True
-                    try:
-                        self.finished.emit()
-                    except Exception:
-                        pass
-                    QTimer.singleShot(50, self.close)
-                return
-            self._render_and_place()
+        was_exit = self._slide_motion.is_exit_active()
+        still_active = self._slide_motion.tick(dt)
+        if not still_active and was_exit:
+            self._motion_timer.stop()
+            if not getattr(self, "_is_closing", False):
+                self._is_closing = True
+                try:
+                    self.finished.emit()
+                except Exception:
+                    pass
+                QTimer.singleShot(50, self.close)
+            return
+        if not still_active:
+            self._motion_timer.stop()
+        self._render_and_place()
 
     def _burst_tick(self):
         """Advance burst particle positions and fade out. Stops after ~700ms."""
-        dt = 0.030  # 30ms in seconds
-        self._burst_elapsed += dt * 1000
-        duration = 700.0
-        for pt in self._burst_particles:
-            pt['x'] += pt['vx'] * dt
-            pt['y'] += pt['vy'] * dt
-            pt['vy'] += 60 * dt   # slight gravity
-            fade = 1.0 - min(1.0, self._burst_elapsed / duration)
-            pt['alpha'] = int(255 * fade)
-        if self._burst_elapsed >= duration:
-            self._burst_active = False
+        self._burst.tick(30.0)
+        if not self._burst.is_active():
             self._burst_img_margin = 0
             self._burst_timer.stop()
         self._render_and_place()
 
     def _ring_tick(self):
         """Advance neon ring expansion for level-up toasts."""
-        dt = 20.0  # 20ms
-        self._ring_elapsed += dt
         max_r = self.width() if self.width() > 0 else 300
-        all_done = True
-        for ring in self._ring_rings:
-            effective_elapsed = self._ring_elapsed - ring['delay']
-            if effective_elapsed < 0:
-                all_done = False
-                continue
-            t = min(1.0, effective_elapsed / self._ring_duration)
-            ring['r'] = t * max_r
-            ring['alpha'] = int(200 * (1.0 - t))
-            if t < 1.0:
-                all_done = False
-        if all_done:
-            self._ring_active = False
+        self._ring.tick(20.0, max_r=float(max_r))
+        if not self._ring.is_active():
             self._ring_timer.stop()
         self._render_and_place()
 
@@ -4129,48 +3674,38 @@ class AchToastWindow(QWidget):
         changed = False
 
         # Typewriter (applies to title/line1)
-        if getattr(self, '_tw_active', False) and getattr(self, '_tw_full', ''):
-            if self._tw_idx < len(self._tw_full):
-                self._tw_idx += 1
-                changed = True
-            else:
-                self._tw_active = False
+        if self._typewriter.is_active() and self._typewriter.full_text:
+            self._typewriter.tick(dt)
+            changed = True
+            if not self._typewriter.is_active():
                 if hasattr(self, '_tw_cursor_timer'):
                     self._tw_cursor_timer.stop()
-                changed = True
 
         # Icon bounce
-        if getattr(self, '_bounce_active', False):
-            self._bounce_elapsed += dt
-            if self._bounce_elapsed >= self._bounce_duration:
-                self._bounce_active = False
-                self._bounce_elapsed = self._bounce_duration
+        if self._bounce.is_active():
+            self._bounce.tick(dt)
             changed = True
 
         # Energy flash (level-up only)
-        if getattr(self, '_flash_active', False):
-            self._flash_elapsed += dt
-            if self._flash_elapsed >= self._flash_duration:
-                self._flash_active = False
-                self._flash_elapsed = self._flash_duration
+        if self._flash.is_active():
+            self._flash.tick(dt)
             changed = True
 
         if changed:
             self._render_and_place()
 
         # Stop anim timer when typewriter, bounce, and flash are all done
-        if (not getattr(self, '_tw_active', False) and
-                not getattr(self, '_bounce_active', False) and
-                not getattr(self, '_flash_active', False)):
+        if (not self._typewriter.is_active() and
+                not self._bounce.is_active() and
+                not self._flash.is_active()):
             if hasattr(self, '_anim_timer'):
                 self._anim_timer.stop()
 
     def _tw_cursor_blink(self):
         """Toggle cursor visibility for typewriter effect."""
-        self._tw_cursor_visible = not getattr(self, '_tw_cursor_visible', True)
-        if getattr(self, '_tw_active', False):
+        self._typewriter.toggle_cursor()
+        if self._typewriter.is_active():
             self._render_and_place()
-
 
 class AchToastManager(QObject):
     def __init__(self, parent: "MainWindow"):
@@ -4369,19 +3904,14 @@ class ChallengeSelectOverlay(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._pulse_t = 0.0
-        self._pulse_timer = QTimer(self)
-        self._pulse_timer.setInterval(50) 
-        self._pulse_timer.timeout.connect(self._on_pulse_tick)
+        self._breathing_pulse = BreathingPulse(speed=0.08)
+        self._carousel = CarouselSlide(duration=180.0)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
         anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
         self._low_perf = low_perf or not anim_challenge
-        # Carousel slide animation
-        self._slide_active: bool = False
-        self._slide_t: float = 0.0
-        self._slide_duration: float = 180.0
-        self._slide_elapsed: float = 0.0
-        self._slide_dir: int = 1  # 1 = right, -1 = left
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(50)
+        self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
@@ -4424,14 +3954,12 @@ class ChallengeSelectOverlay(QWidget):
             return self._low_perf
 
     def _on_pulse_tick(self):
-        self._pulse_t = (self._pulse_t + 0.08) % 1.0
+        self._breathing_pulse.tick(50.0)
         self._render_and_place()
 
     def _on_slide_tick(self):
-        self._slide_elapsed += 16.0
-        self._slide_t = min(1.0, self._slide_elapsed / max(1.0, self._slide_duration))
-        if self._slide_t >= 1.0:
-            self._slide_active = False
+        self._carousel.tick(16.0)
+        if not self._carousel.is_active():
             self._slide_timer.stop()
         self._render_and_place()
 
@@ -4439,11 +3967,9 @@ class ChallengeSelectOverlay(QWidget):
         new_idx = int(idx) % 4
         if new_idx != self._selected and not self._check_low_perf():
             # Determine slide direction: going "right" in list = slide left
-            self._slide_dir = 1 if new_idx > self._selected else -1
+            direction = 1 if new_idx > self._selected else -1
             self._prev_selected = self._selected
-            self._slide_active = True
-            self._slide_t = 0.0
-            self._slide_elapsed = 0.0
+            self._carousel.start(direction=direction)
             self._slide_timer.start()
         else:
             self._prev_selected = new_idx
@@ -4458,8 +3984,6 @@ class ChallengeSelectOverlay(QWidget):
             self._render_and_place()
 
     def _compose_image(self) -> QImage:
-        from math import sin, pi
-
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         base_body_pt = 20
@@ -4538,11 +4062,10 @@ class ChallengeSelectOverlay(QWidget):
             content_top = top_pad + max(0, (max_content_h - block_h) // 2)
 
             # Carousel slide: blend between previous and current content
-            slide_active = not self._check_low_perf() and getattr(self, '_slide_active', False)
+            slide_active = not self._check_low_perf() and self._carousel.is_active()
             if slide_active:
-                slide_t = getattr(self, '_slide_t', 0.0)
-                eased = _ease_out_cubic(slide_t)
-                slide_dir = getattr(self, '_slide_dir', 1)
+                eased = self._carousel.get_eased_t()
+                slide_dir = self._carousel.direction
                 # Current item: slides in from direction
                 cur_x_offset = int((1.0 - eased) * slide_dir * (avail_w // 2))
                 cur_alpha = int(255 * eased)
@@ -4602,10 +4125,10 @@ class ChallengeSelectOverlay(QWidget):
 
             # Pulsating ice-blue arrows (always at static content position for stability)
             arrow_cy_rect = QRect(pad_lr, content_top, avail_w, t_h)
-            amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
+            amp = self._breathing_pulse.get_amp()
             alpha = 110 + int(120 * amp)
             anim_scale = 0.9 + 0.2 * amp
-            wobble = 2.0 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
+            wobble = 2.0 * self._breathing_pulse.get_sin()
             base_arr_h = max(10, int(round(18 * factor)))
             ah = int(base_arr_h * anim_scale)
             aw = max(6, int(ah * 0.6))
@@ -4680,17 +4203,14 @@ class FlipDifficultyOverlay(QWidget):
         self._selected = max(0, min(int(selected_idx or 0), len(self._options) - 1))
         self._prev_selected = self._selected
 
-        self._pulse_t = 0.0
-        self._pulse_timer = QTimer(self)
-        self._pulse_timer.setInterval(50)
-        self._pulse_timer.timeout.connect(self._on_pulse_tick)
+        self._breathing_pulse = BreathingPulse(speed=0.08)
+        self._snap = SnapScale(duration=160.0, scale_amount=0.07)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
         anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
         self._low_perf = low_perf or not anim_challenge
-        # Slot-machine snap animation
-        self._snap_active: bool = False
-        self._snap_elapsed: float = 0.0
-        self._snap_duration: float = 160.0
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.setInterval(50)
+        self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._snap_timer = QTimer(self)
         self._snap_timer.setInterval(16)
         self._snap_timer.timeout.connect(self._on_snap_tick)
@@ -4734,23 +4254,19 @@ class FlipDifficultyOverlay(QWidget):
         super().closeEvent(e)
 
     def _on_pulse_tick(self):
-        self._pulse_t = (self._pulse_t + 0.08) % 1.0
+        self._breathing_pulse.tick(50.0)
         self._render_and_place()
 
     def _on_snap_tick(self):
-        self._snap_elapsed += 16.0
-        if self._snap_elapsed >= self._snap_duration:
-            self._snap_active = False
-            self._snap_elapsed = self._snap_duration
+        self._snap.tick(16.0)
+        if not self._snap.is_active():
             self._snap_timer.stop()
         self._render_and_place()
 
     def set_selected(self, idx: int):
         new_idx = max(0, min(int(idx or 0), len(self._options) - 1))
         if new_idx != self._selected and not getattr(self, '_low_perf', False):
-            self._prev_selected = self._selected
-            self._snap_active = True
-            self._snap_elapsed = 0.0
+            self._snap.start(prev_selected=self._selected)
             self._snap_timer.start()
         self._selected = new_idx
         self._render_and_place()
@@ -4766,7 +4282,6 @@ class FlipDifficultyOverlay(QWidget):
             self._render_and_place()
 
     def _compose_image(self) -> QImage:
-        from math import sin, pi
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
         base_body_pt = 20
@@ -4846,15 +4361,10 @@ class FlipDifficultyOverlay(QWidget):
                 snap_scale = 1.0
                 snap_flash_alpha = 0
                 prev_fade_alpha = 0
-                if not getattr(self, '_low_perf', False) and getattr(self, '_snap_active', False):
-                    snap_t = min(1.0, getattr(self, '_snap_elapsed', 0.0) / max(1.0, self._snap_duration))
-                    if selected:
-                        # Scale: 1.0 → 1.07 → 1.0 (peak at t=0.3)
-                        snap_scale = 1.0 + 0.07 * max(0.0, 1.0 - abs(snap_t - 0.3) / 0.3)
-                        snap_flash_alpha = int(120 * max(0.0, 1.0 - snap_t * 2.0))
-                    elif ix == getattr(self, '_prev_selected', -1):
-                        # Fade out previously selected box over the first half of the animation
-                        prev_fade_alpha = int(80 * max(0.0, 1.0 - snap_t * 2.0))
+                if not getattr(self, '_low_perf', False) and self._snap.is_active():
+                    snap_scale = self._snap.get_scale(selected)
+                    snap_flash_alpha = self._snap.get_flash_alpha(selected)
+                    prev_fade_alpha = self._snap.get_prev_fade_alpha(ix)
 
                 if snap_scale != 1.0:
                     expand = int((snap_scale - 1.0) * box_w / 2)
@@ -4863,7 +4373,7 @@ class FlipDifficultyOverlay(QWidget):
                     draw_rect = rect
 
                 if selected:
-                    amp = 0.5 + 0.5 * sin(2 * pi * getattr(self, "_pulse_t", 0.0))
+                    amp = self._breathing_pulse.get_amp()
                     alpha = 40 + int(60 * amp)
                     _ac = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
                     p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(_ac.red(), _ac.green(), _ac.blue(), alpha))
@@ -4977,7 +4487,7 @@ class HeatBarometerOverlay(QWidget):
         low_perf = bool(ov.get("low_performance_mode", False))
         anim_challenge = bool(ov.get("anim_challenge", True))
         self._low_perf = low_perf or not anim_challenge
-        self._pulse_t: float = 0.0
+        self._heat_pulse = HeatPulse(threshold=65)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
@@ -4996,7 +4506,7 @@ class HeatBarometerOverlay(QWidget):
         _start_topmost_timer(self)
 
     def _on_pulse_tick(self):
-        self._pulse_t = (self._pulse_t + 0.1) % 1.0
+        self._heat_pulse.tick(40.0)
         self._render_and_place()
 
     def set_heat(self, heat: int):
@@ -5080,33 +4590,7 @@ class HeatBarometerOverlay(QWidget):
             # Reactive warning/critical pulse border (no success effect for overheating)
             ov = self.parent_gui.cfg.OVERLAY or {}
             low_perf = bool(ov.get("low_performance_mode", False))
-            if self._heat >= 65:
-                if not low_perf:
-                    from math import sin, pi as _pi
-                    pulse_t = getattr(self, '_pulse_t', 0.0)
-                    amp = 0.5 + 0.5 * sin(2 * _pi * pulse_t)
-                    if self._heat > 85:
-                        # Critical zone: red, intense animated pulse
-                        pulse_alpha = int(180 + 60 * amp)
-                        pulse_width = 2 + int(2 * amp)
-                        pulse_color = QColor(255, 40, 0, min(255, pulse_alpha))
-                    else:
-                        # Warning zone (65-85%): orange, moderate animated pulse
-                        pulse_alpha = int(120 + 40 * amp)
-                        pulse_width = 2
-                        pulse_color = QColor(255, 140, 0, min(255, pulse_alpha))
-                    pulse_pen = QPen(pulse_color)
-                    pulse_pen.setWidth(pulse_width)
-                    p.setPen(pulse_pen)
-                    p.setBrush(Qt.BrushStyle.NoBrush)
-                    p.drawRoundedRect(1, 1, w - 2, h - 2, 10, 10)
-                elif self._heat > 85:
-                    # Low performance mode: static red border at critical heat only
-                    pulse_pen = QPen(QColor(255, 60, 0, 200))
-                    pulse_pen.setWidth(3)
-                    p.setPen(pulse_pen)
-                    p.setBrush(Qt.BrushStyle.NoBrush)
-                    p.drawRoundedRect(1, 1, w - 2, h - 2, 10, 10)
+            self._heat_pulse.draw(p, 1, 1, w - 2, h - 2, self._heat, low_perf)
         finally:
             p.end()
 
