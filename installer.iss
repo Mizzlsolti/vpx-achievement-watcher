@@ -2,10 +2,11 @@
 ; Builds a single installer: VPX-Achievement-Watcher-Setup.exe
 ; Run: iscc installer.iss   (or let the GitHub Action do it automatically)
 ;
-; The installer collects the three required paths on a dedicated wizard
-; page, pre-filled with sensible defaults (or existing config on upgrade).
-; On completion it writes config.json into the installation directory so
-; the user can launch Achievement_Watcher.exe directly.
+; The installer collects the two required paths (Tables, NVRAM) on a
+; dedicated wizard page, pre-filled with sensible defaults (or existing
+; config on upgrade). BASE is always the installation directory chosen
+; on page 1. On completion it writes config.json into the installation
+; directory so the user can launch Achievement_Watcher.exe directly.
 ; During silent/upgrade installs the paths page is skipped and any
 ; existing config.json is preserved.
 
@@ -58,7 +59,6 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   PathsPage:   TWizardPage;
-  EdBase:      TEdit;
   EdTables:    TEdit;
   EdNvram:     TEdit;
   SavedConfig: AnsiString;
@@ -90,19 +90,17 @@ function LoadExistingConfig: Boolean;
 var
   cfgPath: string;
   json: AnsiString;
-  baseFolder, nvram, tables: string;
+  nvram, tables: string;
 begin
   Result := False;
   cfgPath := ExpandConstant('{app}\config.json');
   if not FileExists(cfgPath) then Exit;
   if not LoadStringFromFile(cfgPath, json) then Exit;
 
-  baseFolder := GetJsonValue(json, 'BASE');
   nvram  := GetJsonValue(json, 'NVRAM_DIR');
   tables := GetJsonValue(json, 'TABLES_DIR');
 
   Result := True;
-  if baseFolder <> '' then EdBase.Text    := baseFolder;
   if nvram   <> '' then EdNvram.Text   := nvram;
   if tables  <> '' then EdTables.Text  := tables;
 end;
@@ -119,18 +117,6 @@ begin
   );
 
   top := 8;
-
-  lbl := TLabel.Create(PathsPage);
-  lbl.Caption := 'Base folder (application data):';
-  lbl.Parent  := PathsPage.Surface;
-  lbl.SetBounds(0, top, PathsPage.SurfaceWidth, 16);
-  top := top + 20;
-
-  EdBase := TEdit.Create(PathsPage);
-  EdBase.Parent := PathsPage.Surface;
-  EdBase.SetBounds(0, top, PathsPage.SurfaceWidth, 22);
-  EdBase.Text := 'C:\vPinball\VPX Achievement Watcher';
-  top := top + 36;
 
   lbl := TLabel.Create(PathsPage);
   lbl.Caption := 'Tables folder (.vpx files):';
@@ -202,12 +188,7 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (PathsPage <> nil) and (CurPageID = PathsPage.ID) then
-  begin
-    { Update EdBase to actual selected install dir - {app} is now valid }
-    EdBase.Text := ExpandConstant('{app}');
-    { Then load existing config values on top (if upgrading) }
     LoadExistingConfig;
-  end;
 end;
 
 { Skip the paths page when running silently (auto-update) }
@@ -234,13 +215,10 @@ begin
   end;
 end;
 
-{ Returns the custom_events folder path based on the base data directory }
+{ Returns the custom_events folder path based on the installation directory }
 function GetEventsPath(Param: string): string;
 begin
-  if (EdBase <> nil) and (EdBase.Text <> '') then
-    Result := EdBase.Text + '\tools\AWeditor\custom_events\'
-  else
-    Result := ExpandConstant('{app}') + '\tools\AWeditor\custom_events\';
+  Result := ExpandConstant('{app}') + '\tools\AWeditor\custom_events\';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -250,11 +228,8 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    cfgPath := ExpandConstant('{app}\config.json');
-    if WizardSilent then
-      basePath := ExpandConstant('{app}')
-    else
-      basePath := EdBase.Text;
+    cfgPath  := ExpandConstant('{app}\config.json');
+    basePath := ExpandConstant('{app}');
 
     { If the old uninstaller deleted config.json, restore the saved copy so
       the upgrade logic below can preserve all existing settings. }
