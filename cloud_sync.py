@@ -27,7 +27,6 @@ from watcher_core import (
     _load_progress_upload_log,
     _save_progress_upload_log,
     p_highlights,
-    WATCHER_VERSION,
     compute_player_level,
     _is_valid_rom_name,
     f_global_ach,
@@ -414,7 +413,7 @@ class CloudSync:
             except Exception:
                 pass 
             
-            payload = {"name": pname, "score": score, "ts": datetime.now(timezone.utc).isoformat(), "watcher_version": WATCHER_VERSION}
+            payload = {"name": pname, "score": score, "ts": datetime.now(timezone.utc).isoformat()}
             if extra_data: payload.update(extra_data)
             # Include selected badge for leaderboard display
             try:
@@ -495,7 +494,6 @@ class CloudSync:
                 "total": total,
                 "percentage": percentage,
                 "ts": datetime.now(timezone.utc).isoformat(),
-                "watcher_version": WATCHER_VERSION,
             }
             # Include selected badge for leaderboard display
             try:
@@ -969,7 +967,6 @@ class CloudSync:
             metadata_payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
-                "watcher_version": WATCHER_VERSION,
                 "global": global_entries,
                 "roms_played": roms_played,
                 "player_level": lv["level"],

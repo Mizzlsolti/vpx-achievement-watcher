@@ -56,6 +56,7 @@ from watcher_core import (
     run_vpxtool_info_show,
     _strip_version_from_name,
     _is_valid_rom_name,
+    WATCHER_VERSION,
 )
 from badges import (
     compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
@@ -159,7 +160,7 @@ def _parse_version(v_str):
 
 class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, AppearanceMixin, ChallengesMixin, ProgressMixin,
                  DashboardMixin, OverlayPagesMixin):
-    CURRENT_VERSION = "2.9"
+    CURRENT_VERSION = WATCHER_VERSION
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
     _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
 

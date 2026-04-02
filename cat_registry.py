@@ -27,7 +27,6 @@ from watcher_core import (
     ensure_dir,
     f_custom_achievements_progress,
     p_aweditor,
-    WATCHER_VERSION,
     _strip_version_from_name,
 )
 from cloud_sync import CloudSync
@@ -186,7 +185,6 @@ def upload_cat_progress(
             "percentage": percentage,
             "unlocked_titles": [str(e.get("title", "")).strip() for e in _unlocked_list if isinstance(e, dict)],
             "ts": datetime.now(timezone.utc).isoformat(),
-            "watcher_version": WATCHER_VERSION,
         }
         put_req = urllib.request.Request(
             endpoint,

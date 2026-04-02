@@ -15,7 +15,7 @@ from cloud_sync import CloudSync, _sanitize_firebase_keys
 from watcher_core import (
     ensure_dir, log, sanitize_filename,
     secure_load_json, secure_save_json,
-    compute_player_level, WATCHER_VERSION,
+    compute_player_level,
 )
 from ui_dialogs import FeedbackDialog
 from ui_vps import _load_vps_mapping, _save_vps_mapping
@@ -720,7 +720,7 @@ class SystemMixin:
 
         def _worker():
             from datetime import datetime, timezone
-            from watcher_core import compute_player_level, WATCHER_VERSION
+            from watcher_core import compute_player_level
             from config import f_custom_achievements_progress
             from watcher_core import secure_load_json
             results = []
@@ -743,7 +743,6 @@ class SystemMixin:
                 metadata_payload = {
                     "name": player_name,
                     "ts": datetime.now(timezone.utc).isoformat(),
-                    "watcher_version": WATCHER_VERSION,
                     "global": list(state.get("global", {}).get("__global__", []) or []),
                     "roms_played": list(state.get("roms_played", []) or []),
                     "player_level": lv["level"],
@@ -827,7 +826,6 @@ class SystemMixin:
                             "total": total,
                             "percentage": percentage,
                             "ts": datetime.now(timezone.utc).isoformat(),
-                            "watcher_version": WATCHER_VERSION,
                         }
                         if CloudSync.set_node(self.cfg, f"players/{pid}/progress/{rom}", progress_payload):
                             progress_uploaded += 1

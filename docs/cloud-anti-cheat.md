@@ -23,15 +23,13 @@ final arbiter of fair play — that role belongs to the server.
    allowed.
 4. **Normalise the ROM name** using the VPinMAME ROM identifier so the server
    can cross-check it against the VPS entry.
-5. **Include the `watcher_version` field** so the server can enforce minimum
-   version requirements and reject stale clients.
-6. **Enrich payloads with VPS context** where available: `vps_id`,
+5. **Enrich payloads with VPS context** where available: `vps_id`,
    `table_name`, `author`, `version` are added from the local VPS database
    cache when the ROM is linked.
-7. **Surface the submission state** (`accepted` / `flagged` / `rejected`)
+6. **Surface the submission state** (`accepted` / `flagged` / `rejected`)
    returned by the server via the **Status Overlay** so the player receives
    immediate feedback.
-8. **Apply local integrity protection** as a supporting signal (see
+7. **Apply local integrity protection** as a supporting signal (see
    [Local Integrity Protection](#local-integrity-protection) below).
 
 ### What the watcher must NOT claim
@@ -53,8 +51,8 @@ All data submitted by the client is treated as untrusted input and must be
 validated server-side before being accepted, stored, or displayed on
 leaderboards.
 
-Client-side checks (e.g. local hash signatures, the `watcher_version` field)
-are useful as *indicators* to the server and for transparency, but they are
+Client-side checks (e.g. local hash signatures) are useful as *indicators*
+to the server and for transparency, but they are
 **not sufficient proof** of a clean submission.  The definitive verdict always
 comes from the server.
 
@@ -94,7 +92,6 @@ that are missing any required field should be **rejected** immediately.
 |---|---|
 | `name` | Player display name (non-empty, not the default `"Player"`) |
 | `ts` | ISO-8601 UTC timestamp of the submission |
-| `watcher_version` | Version string of the client that created the upload |
 | `vps_id` | VPS database table ID (links the ROM to a known pinball table) |
 
 Score-specific uploads additionally require:
@@ -146,14 +143,7 @@ Achievement-progress uploads additionally require:
 - Exceeding the limit should result in a `429 Too Many Requests` response
   and the submission status being set to `"flagged"`.
 
-### 6. Watcher Version Presence / Compatibility
-- The `watcher_version` field must be present and non-empty.
-- Versions below a configurable minimum compatibility threshold should be
-  **rejected** with a clear error message instructing the user to update.
-- This prevents stale clients from uploading data in formats that the server
-  no longer supports.
-
-### 7. Challenge-Specific Plausibility Checks
+### 6. Challenge-Specific Plausibility Checks
 - For **Timed Challenges**, verify that the `target_time` value is a positive
   integer within the allowed range for that challenge type.
 - For **Flip Challenges**, verify that `target_flips` is a positive integer
@@ -162,7 +152,7 @@ Achievement-progress uploads additionally require:
   parameters (e.g. a score of `999_999_999` with only 10 flips allowed)
   should be **flagged** for manual review.
 
-### 8. Strict Weekly / Event Validation
+### 7. Strict Weekly / Event Validation
 - Weekly challenge submissions must include the correct `event_id` or
   `week_key` that was active at the time of the submission (within the
   event window).
