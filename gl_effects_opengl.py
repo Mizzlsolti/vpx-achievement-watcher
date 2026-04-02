@@ -152,7 +152,7 @@ class EffectsWidget(QWidget):
 
     Replaces ``OverlayEffectsWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects import EffectsWidget as OverlayEffectsWidget
+        from gl_effects_opengl import EffectsWidget as OverlayEffectsWidget
     """
 
     _PARTICLE_COUNT = 18
@@ -316,7 +316,7 @@ class ShineWidget(QWidget):
 
     Replaces ``_OverlayShineWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects import ShineWidget as _OverlayShineWidget
+        from gl_effects_opengl import ShineWidget as _OverlayShineWidget
     """
 
     _BAR_TOP_FRAC  = 0.25   # fraction of widget height where bar area starts
@@ -387,7 +387,7 @@ class HighlightWidget(QWidget):
 
     Replaces ``_OverlayHighlightWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects import HighlightWidget as _OverlayHighlightWidget
+        from gl_effects_opengl import HighlightWidget as _OverlayHighlightWidget
     """
 
     _FLASH_COLOR   = QColor(255, 200, 80)
