@@ -213,18 +213,15 @@ class EffectsMixin:
             grid.addWidget(grp, row, col)
         layout.addLayout(grid)
 
-        # --- Bottom buttons: Enable All / Disable All / Reset ---
+        # --- Bottom buttons: Enable All / Disable All ---
         btn_row = QHBoxLayout()
-        btn_enable = QPushButton("Enable All")
-        btn_enable.setToolTip("Enable all 60 individual effects")
-        btn_enable.clicked.connect(lambda: self._fx_set_all(True))
-        btn_disable = QPushButton("Disable All")
-        btn_disable.setToolTip("Disable all 60 individual effects")
-        btn_disable.clicked.connect(lambda: self._fx_set_all(False))
-        btn_reset = QPushButton("Reset to Defaults")
-        btn_reset.setToolTip("Restore all effects to enabled state at 80 % intensity")
-        btn_reset.clicked.connect(self._fx_reset_defaults)
-        for b in (btn_enable, btn_disable, btn_reset):
+        self._fx_btn_enable = QPushButton("Enable All")
+        self._fx_btn_enable.setToolTip("Enable all 60 individual effects")
+        self._fx_btn_enable.clicked.connect(lambda: self._fx_set_all(True))
+        self._fx_btn_disable = QPushButton("Disable All")
+        self._fx_btn_disable.setToolTip("Disable all 60 individual effects")
+        self._fx_btn_disable.clicked.connect(lambda: self._fx_set_all(False))
+        for b in (self._fx_btn_enable, self._fx_btn_disable):
             b.setStyleSheet(
                 "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00;"
                 " padding: 4px 14px; border-radius: 4px; }"
@@ -401,24 +398,6 @@ class EffectsMixin:
                 chk.blockSignals(False)
         self.cfg.save()
 
-    def _fx_reset_defaults(self):
-        for key in _ALL_FX_KEYS:
-            self.cfg.OVERLAY[key] = True
-            row = self._fx_effect_rows.get(key)
-            if row:
-                chk, slider, pct_lbl = row
-                chk.blockSignals(True)
-                chk.setChecked(True)
-                chk.blockSignals(False)
-                if slider is not None:
-                    self.cfg.OVERLAY[key + "_intensity"] = 80
-                    slider.blockSignals(True)
-                    slider.setValue(80)
-                    slider.blockSignals(False)
-                if pct_lbl is not None:
-                    pct_lbl.setText("80%")
-        self.cfg.save()
-
     def _fx_apply_low_perf_state(self, low_perf: bool):
         """Enable or disable all individual effect controls based on low_perf flag."""
         for key, (chk, slider, pct_lbl) in self._fx_effect_rows.items():
@@ -427,6 +406,8 @@ class EffectsMixin:
                 slider.setEnabled(not low_perf)
             if pct_lbl is not None:
                 pct_lbl.setEnabled(not low_perf)
+        self._fx_btn_enable.setEnabled(not low_perf)
+        self._fx_btn_disable.setEnabled(not low_perf)
 
     # ------------------------------------------------------------------
     # Preview helpers
