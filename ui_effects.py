@@ -435,12 +435,13 @@ class EffectsMixin:
                     ))
 
             elif overlay_type == "timer":
-                win = ChallengeCountdownOverlay(self, total_seconds=5)
+                win = ChallengeCountdownOverlay(self, total_seconds=6)
+                duration_ms = 9000  # Long enough to see full countdown + final explosion
 
             elif overlay_type == "heat":
                 win = HeatBarometerOverlay(self)
                 win.set_heat(50)
-                for heat, delay in [(65, 1500), (85, 3000), (95, 4500), (60, 5500)]:
+                for heat, delay in [(65, 1500), (80, 2500), (90, 3500), (100, 4500), (60, 5500)]:
                     _add_shot(delay, lambda _=False, h=heat: (
                         win.set_heat(h) if win and not win.isHidden() else None
                     ))
@@ -507,6 +508,21 @@ class EffectsMixin:
                     win.set_combined(_demo_p1, "Demo Preview")
                     win.show()
                     win.raise_()
+
+                    # Force-start the effects widget animation timer so the
+                    # breathing glow and floating particles are visible immediately.
+                    try:
+                        ew = win._effects_widget
+                        if not ew.isVisible():
+                            ew.setGeometry(0, 0, win.width(), win.height())
+                            ew.show()
+                            ew.raise_()
+                        if not ew._particles:
+                            ew._init_particles()
+                        if not ew._tick_timer.isActive():
+                            ew._tick_timer.start()
+                    except Exception:
+                        pass
 
                     # 2s: simulate page transition
                     # (triggers Page Slide+Fade, Glitch Frame, Accent Color Lerp)
