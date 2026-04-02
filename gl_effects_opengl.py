@@ -1,7 +1,6 @@
-"""gl_effects_opengl.py – New GPU-ready visual effect classes.
+"""gl_effects_opengl.py – GPU-ready visual effect classes.
 
-30 new effect primitives added by the ✨ Effects tab feature.  Each class
-follows the same public API as the primitives in ``gl_effects.py``:
+All effect primitives share a common public API:
 
     start()              – (re-)initialise and begin the effect
     tick(dt_ms: float)   – advance state by *dt_ms* milliseconds
@@ -10,12 +9,6 @@ follows the same public API as the primitives in ``gl_effects.py``:
 
 All classes accept an ``intensity`` parameter (0.0 – 1.0) that scales the
 visual output (particle count, alpha, amplitude, etc.).
-
-Architecture note
------------------
-The ``_HAS_OPENGL`` flag mirrors the one in ``gl_effects.py``.  When
-PyOpenGL and PyQt6.QtOpenGLWidgets are available, the effect classes switch
-to a GPU code-path.  The QPainter implementations serve as fallback.
 """
 from __future__ import annotations
 
