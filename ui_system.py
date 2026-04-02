@@ -606,6 +606,64 @@ class SystemMixin:
         except Exception as _vps_err:
             log(self.cfg, f"[CLOUD] VPS mapping restore failed: {_vps_err}", "WARN")
 
+        # Restore CAT achievement progress from Cloud
+        cat_progress_restored = False
+        try:
+            from cat_registry import CAT_REGISTRY
+            from config import f_custom_achievements_progress
+            from watcher_core import secure_load_json, secure_save_json, ensure_dir, _strip_version_from_name
+            import os as _os
+
+            cap_path = f_custom_achievements_progress(self.cfg)
+            ensure_dir(_os.path.dirname(cap_path))
+            existing_cap = secure_load_json(cap_path, {}) or {}
+
+            for firebase_key, registry_entry in CAT_REGISTRY.items():
+                table_key = registry_entry.get("table_key", "")
+                if not table_key:
+                    continue
+                try:
+                    cat_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/progress_cat/{firebase_key}")
+                    if not cat_data or not isinstance(cat_data, dict):
+                        continue
+
+                    unlocked_titles = cat_data.get("unlocked_titles", [])
+                    total = int(cat_data.get("total", 0))
+
+                    if not unlocked_titles:
+                        continue
+
+                    unlocked_entries = []
+                    for title in unlocked_titles:
+                        if isinstance(title, str) and title.strip():
+                            unlocked_entries.append({
+                                "title": title.strip(),
+                                "event": "",
+                                "ts": cat_data.get("ts", ""),
+                            })
+
+                    if unlocked_entries:
+                        stripped_table_key = _strip_version_from_name(table_key).strip()
+                        local_key = table_key
+                        for existing_key in existing_cap:
+                            if _strip_version_from_name(existing_key).strip() == stripped_table_key:
+                                local_key = existing_key
+                                break
+
+                        existing_cap[local_key] = {
+                            "unlocked": unlocked_entries,
+                            "total_rules": total if total > 0 else len(unlocked_entries),
+                        }
+                        cat_progress_restored = True
+                        log(self.cfg, f"[CLOUD] CAT progress restored for '{local_key}': {len(unlocked_entries)} achievements")
+                except Exception as _cat_err:
+                    log(self.cfg, f"[CLOUD] CAT restore failed for '{firebase_key}': {_cat_err}", "WARN")
+
+            if cat_progress_restored:
+                secure_save_json(cap_path, existing_cap)
+        except Exception as _cat_restore_err:
+            log(self.cfg, f"[CLOUD] CAT progress restore failed: {_cat_restore_err}", "WARN")
+
         # Refresh level display and notify listeners
         try:
             self._refresh_level_display()
@@ -616,14 +674,20 @@ class SystemMixin:
         except Exception:
             pass
 
-        if scores_restored and vps_mapping_restored:
-            msg = "Achievement data, challenge scores and VPS ID mapping successfully restored from the cloud!"
-        elif scores_restored:
-            msg = "Achievement data and challenge scores successfully restored from the cloud!"
-        elif vps_mapping_restored:
-            msg = "Achievement data and VPS ID mapping successfully restored from the cloud!"
+        parts = ["Achievement data"]
+        if scores_restored:
+            parts.append("challenge scores")
+        if vps_mapping_restored:
+            parts.append("VPS ID mapping")
+        if cat_progress_restored:
+            parts.append("CAT progress")
+        if len(parts) == 1:
+            msg = parts[0]
+        elif len(parts) == 2:
+            msg = f"{parts[0]} and {parts[1]}"
         else:
-            msg = "Achievement data successfully restored from the cloud!"
+            msg = ", ".join(parts[:-1]) + " and " + parts[-1]
+        msg += " successfully restored from the cloud!"
         self._msgbox_topmost("info", "Restore from Cloud", msg)
 
     def _manual_cloud_backup(self):
@@ -791,8 +855,10 @@ class SystemMixin:
                 if isinstance(all_cat_progress, dict):
                     for table_key in all_cat_progress:
                         try:
-                            upload_cat_progress(self.cfg, table_key)
-                            cat_uploaded += 1
+                            if upload_cat_progress(self.cfg, table_key):
+                                cat_uploaded += 1
+                            else:
+                                cat_errors += 1
                         except Exception as _cat_err:
                             cat_errors += 1
                             log(self.cfg, f"[CLOUD] Manual backup: CAT upload failed for '{table_key}': {_cat_err}", "WARN")
