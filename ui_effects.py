@@ -476,20 +476,19 @@ class EffectsMixin:
 
     def _fx_apply_low_perf_state(self, low_perf: bool):
         """Enable or disable all individual effect controls based on low_perf flag."""
-        for key, (chk, slider, pct_lbl) in self._fx_effect_rows.items():
-            chk.setEnabled(not low_perf)
-            if slider is not None:
-                slider.setEnabled(not low_perf)
-            if pct_lbl is not None:
-                pct_lbl.setEnabled(not low_perf)
-        for key, (chk, slider, pct_lbl) in self._fx_post_rows.items():
-            chk.setEnabled(not low_perf)
-            if slider is not None:
-                slider.setEnabled(not low_perf)
-            if pct_lbl is not None:
-                pct_lbl.setEnabled(not low_perf)
+        self._fx_apply_row_enabled(self._fx_effect_rows, not low_perf)
+        self._fx_apply_row_enabled(self._fx_post_rows, not low_perf)
         self._fx_btn_enable.setEnabled(not low_perf)
         self._fx_btn_disable.setEnabled(not low_perf)
+
+    def _fx_apply_row_enabled(self, rows: dict, enabled: bool):
+        """Enable or disable all controls in a row dict (key → (chk, slider, pct_lbl))."""
+        for _key, (chk, slider, pct_lbl) in rows.items():
+            chk.setEnabled(enabled)
+            if slider is not None:
+                slider.setEnabled(enabled)
+            if pct_lbl is not None:
+                pct_lbl.setEnabled(enabled)
 
     # ------------------------------------------------------------------
     # Preview helpers

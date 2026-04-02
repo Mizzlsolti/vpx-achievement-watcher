@@ -445,22 +445,27 @@ class PostFilmGrain:
     def __init__(self, intensity: float = 0.4):
         self._intensity = _clamp(intensity, 0.0, 1.0)
         self._active = False
-        self._points: list[tuple[float, float, int]] = []  # (x_frac, y_frac, alpha)
+        self._points: list[tuple[float, float, int]] = []  # (x_frac, y_frac, alpha 0-255)
 
     def set_intensity(self, intensity: float):
         self._intensity = _clamp(intensity, 0.0, 1.0)
 
     def start(self):
         self._active = True
-        self._regenerate_points(400, 400)
+        self._regenerate_points()
 
     def tick(self, dt_ms: float):
         """Regenerate grain positions each tick for animated noise."""
         if not self._active:
             return
-        self._regenerate_points(400, 400)
+        self._regenerate_points()
 
-    def _regenerate_points(self, w: int, h: int):
+    def _regenerate_points(self):
+        """Generate random grain point positions as (x_frac, y_frac, alpha) tuples.
+
+        Positions are stored as fractions (0.0–1.0) so they scale correctly
+        to any widget rect size at draw time.
+        """
         count = max(50, int(self._intensity * 1200))
         self._points = [
             (random.random(), random.random(), random.randint(40, 140))
@@ -476,8 +481,8 @@ class PostFilmGrain:
     def draw(self, painter: QPainter, rect: QRect):
         if not self._active:
             return
-        # Regenerate with actual rect dimensions
-        self._regenerate_points(rect.width(), rect.height())
+        # Regenerate each frame for animated noise
+        self._regenerate_points()
         if _HAS_OPENGL:
             try:
                 self._draw_gl(rect)
