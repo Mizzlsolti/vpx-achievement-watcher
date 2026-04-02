@@ -3253,9 +3253,7 @@ class AchToastWindow(QWidget):
             self._ring_timer.timeout.connect(self._ring_tick)
             self._ring_timer.start()
         else:
-            self._ring_timer = QTimer(self)
-            self._ring_timer.setInterval(20)
-            self._ring_timer.timeout.connect(self._ring_tick)
+            self._ring_timer = None
 
         # --- Energy flash for level-up ---
         self._flash = EnergyFlash(duration=300.0, start_alpha=180)
@@ -3665,7 +3663,8 @@ class AchToastWindow(QWidget):
         max_r = self.width() if self.width() > 0 else 300
         self._ring.tick(20.0, max_r=float(max_r))
         if not self._ring.is_active():
-            self._ring_timer.stop()
+            if self._ring_timer:
+                self._ring_timer.stop()
         self._render_and_place()
 
     def _anim_tick(self):
