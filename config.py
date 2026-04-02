@@ -239,6 +239,15 @@ DEFAULT_OVERLAY.setdefault("fx_flip_goal_glow", True)
 DEFAULT_OVERLAY.setdefault("fx_flip_goal_glow_intensity", 80)
 DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework", True)
 DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework_intensity", 80)
+
+# Status Badge
+DEFAULT_OVERLAY.setdefault("fx_status_scan_in", True)
+DEFAULT_OVERLAY.setdefault("fx_status_scan_in_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_status_glow_sweep", True)
+DEFAULT_OVERLAY.setdefault("fx_status_glow_sweep_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_status_color_morph", True)
+DEFAULT_OVERLAY.setdefault("fx_status_color_morph_intensity", 80)
+
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
@@ -360,6 +369,9 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_flip_electric_spark", "fx_flip_electric_spark_intensity",
     "fx_flip_goal_glow", "fx_flip_goal_glow_intensity",
     "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
+    "fx_status_scan_in", "fx_status_scan_in_intensity",
+    "fx_status_glow_sweep", "fx_status_glow_sweep_intensity",
+    "fx_status_color_morph", "fx_status_color_morph_intensity",
 ]
 
 CHALLENGES_ENABLED = True

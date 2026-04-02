@@ -20,26 +20,26 @@ import random
 
 from PyQt6.QtCore import QRect, Qt, QTimer
 from PyQt6.QtGui import (
-    QBrush, QColor, QFont, QImage, QLinearGradient,
-    QPainter, QPen, QPixmap,
+    QColor, QFont, QImage,
+    QPainter, QPixmap, QSurfaceFormat,
 )
+from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import QWidget
 
 from theme import get_theme, get_theme_color, DEFAULT_THEME
 
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget  # noqa: F401
 from OpenGL.GL import (
     GL_VERTEX_SHADER, GL_FRAGMENT_SHADER, GL_COMPILE_STATUS, GL_LINK_STATUS,
     GL_POINTS, GL_LINES, GL_LINE_STRIP, GL_TRIANGLES, GL_TRIANGLE_FAN,
     GL_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_BLEND,
-    GL_DEPTH_TEST,
+    GL_DEPTH_TEST, GL_COLOR_BUFFER_BIT,
     glCreateShader, glShaderSource, glCompileShader, glGetShaderiv,
     glGetShaderInfoLog, glCreateProgram, glAttachShader, glLinkProgram,
     glDeleteShader, glGetProgramiv, glGetProgramInfoLog,
     glUseProgram, glGetUniformLocation, glUniform1f, glUniform2f,
     glUniform4f, glUniform1i,
     glBegin, glEnd, glVertex2f, glColor4f, glPointSize, glLineWidth,
-    glEnable, glDisable, glBlendFunc, glClearColor,
+    glEnable, glDisable, glBlendFunc, glClearColor, glClear,
     glViewport, glMatrixMode, glLoadIdentity, glOrtho,
     GL_PROJECTION, GL_MODELVIEW,
     glEnableClientState, glDisableClientState, GL_VERTEX_ARRAY,
@@ -88,31 +88,6 @@ _GL_CIRCLE_SEGMENTS = 64
 # 1. Helper functions (public API; previously private in ui_overlay.py)
 # ===========================================================================
 
-def draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
-                     radius: int = 18, color: QColor = None, layers: int = 3,
-                     low_perf: bool = False):
-    """Draw a multi-layer neon glow border for a modern sci-fi look.
-
-    Used by ALL overlay widgets (main overlay, toast, flip counter,
-    challenge select, heat barometer, countdown timer, etc.).
-    """
-    if color is None:
-        color = QColor("#00E5FF")
-    if not low_perf:
-        for i in range(layers, 0, -1):
-            alpha = int(30 * (layers + 1 - i))
-            glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), alpha))
-            glow_pen.setWidth(i * 2)
-            painter.setPen(glow_pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRoundedRect(x + i, y + i, w - 2 * i, h - 2 * i, radius, radius)
-    pen = QPen(color)
-    pen.setWidth(2)
-    painter.setPen(pen)
-    painter.setBrush(Qt.BrushStyle.NoBrush)
-    painter.drawRoundedRect(x + 1, y + 1, w - 2, h - 2, radius, radius)
-
-
 def ease_out_bounce(t: float) -> float:
     """Ease-out bounce curve used for icon stamp animation."""
     if t < 1 / 2.75:
@@ -137,9 +112,9 @@ def ease_out_cubic(t: float) -> float:
 # 2. Overlay Effect Widgets (moved from ui_overlay.py, public names)
 # ===========================================================================
 
-class EffectsWidget(QWidget):
-    """Transparent overlay that draws the animated glow border and floating
-    particles over the main overlay window.
+class EffectsWidget(QOpenGLWidget):
+    """Transparent overlay that draws an animated SDF glow border and floating
+    particles over the main overlay window, using OpenGL shaders.
 
     Replaces ``OverlayEffectsWidget`` in ``ui_overlay.py``; import with::
 
@@ -148,19 +123,43 @@ class EffectsWidget(QWidget):
 
     _PARTICLE_COUNT = 18
 
+    # -----------------------------------------------------------------------
+    # GLSL: SDF rounded-rect glow border
+    # -----------------------------------------------------------------------
+    _GLOW_VERT = (
+        "void main() {"
+        "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+        "}"
+    )
+    _GLOW_FRAG = (
+        "uniform vec2  u_resolution;"
+        "uniform vec4  u_color;"
+        "uniform float u_radius;"
+        "float sdf_rrect(vec2 p, vec2 b, float r) {"
+        "    vec2 q = abs(p) - b + r;"
+        "    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;"
+        "}"
+        "void main() {"
+        "    vec2 p = gl_FragCoord.xy - u_resolution * 0.5;"
+        "    float d = sdf_rrect(p, u_resolution * 0.5 - 2.0, u_radius);"
+        "    float glow = exp(-max(d, 0.0) * 0.13);"
+        "    float line = smoothstep(2.5, 0.0, abs(d));"
+        "    gl_FragColor = vec4(u_color.rgb, u_color.a * max(glow * 0.7, line));"
+        "}"
+    )
+
     def __init__(self, parent):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        fmt = QSurfaceFormat()
+        fmt.setAlphaBufferSize(8)
+        self.setFormat(fmt)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-        # Breathing glow state
         self._glow_t = 0.0
-
-        # Floating particles
         self._particles: list = []
+        self._glow_prog = None
 
-        # Per-page accent colour (smoothly lerped)
         try:
             _initial_accent = QColor(get_theme_color(parent.parent_gui.cfg, "primary"))
         except Exception:
@@ -172,6 +171,28 @@ class EffectsWidget(QWidget):
         self._tick_timer.setInterval(50)
         self._tick_timer.timeout.connect(self._on_tick)
         self.hide()
+
+    # -- OpenGL lifecycle ----------------------------------------------------
+
+    def initializeGL(self):
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDisable(GL_DEPTH_TEST)
+        try:
+            self._glow_prog = _link_program(self._GLOW_VERT, self._GLOW_FRAG)
+        except Exception:
+            self._glow_prog = None
+
+    def resizeGL(self, w: int, h: int):
+        glViewport(0, 0, w, h)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, w, h, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+
+    # -- Particle helpers ----------------------------------------------------
 
     def _init_particles(self):
         W = max(200, self.width() if self.width() > 0 else 400)
@@ -193,6 +214,8 @@ class EffectsWidget(QWidget):
             'alpha': random.randint(30, 100),
             'alpha_dir': random.choice([-1, 1]),
         }
+
+    # -- Qt lifecycle --------------------------------------------------------
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -251,7 +274,10 @@ class EffectsWidget(QWidget):
         """Set the target accent color; the glow will smoothly lerp to it."""
         self._target_accent = QColor(color)
 
-    def paintEvent(self, event):
+    # -- OpenGL rendering ----------------------------------------------------
+
+    def paintGL(self):
+        glClear(GL_COLOR_BUFFER_BIT)
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
@@ -268,42 +294,42 @@ class EffectsWidget(QWidget):
             fx_particles = True
             glow_intensity = 0.8
             particles_intensity = 0.8
-        if low_perf:
+        if low_perf or (not fx_glow and not fx_particles):
             return
-        draw_glow = fx_glow
-        draw_particles = fx_particles
-        if not draw_glow and not draw_particles:
-            return
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        try:
-            amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
-            ac = self._accent_color
-            if draw_glow:
-                alpha_base = int((120 + 135 * amp) * glow_intensity)  # scale by intensity
-                layers = max(1, int((2 + 2 * amp) * glow_intensity))  # scale layers by intensity
-                glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
-                draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
-            if draw_particles:
-                # Scale particle count by intensity (fewer particles at lower intensity)
-                particle_count = max(1, int(len(self._particles) * particles_intensity))
-                p.setPen(Qt.PenStyle.NoPen)
-                for pt in self._particles[:particle_count]:
-                    alpha = int(pt['alpha'] * particles_intensity)
-                    c = QColor(ac.red(), ac.green(), ac.blue(), alpha)
-                    p.setBrush(c)
-                    sz = int(pt['size'])
-                    p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
+        amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
+        ac = self._accent_color
+        if fx_glow and self._glow_prog:
+            glUseProgram(self._glow_prog)
+            alpha = (0.47 + 0.53 * amp) * glow_intensity
+            glUniform2f(glGetUniformLocation(self._glow_prog, "u_resolution"), float(W), float(H))
+            glUniform4f(glGetUniformLocation(self._glow_prog, "u_color"),
+                        ac.red() / 255.0, ac.green() / 255.0, ac.blue() / 255.0, alpha)
+            glUniform1f(glGetUniformLocation(self._glow_prog, "u_radius"), 18.0)
+            glBegin(GL_TRIANGLE_FAN)
+            glVertex2f(0.0, 0.0)
+            glVertex2f(float(W), 0.0)
+            glVertex2f(float(W), float(H))
+            glVertex2f(0.0, float(H))
+            glEnd()
+            glUseProgram(0)
+        if fx_particles:
+            particle_count = max(1, int(len(self._particles) * particles_intensity))
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE)
+            glPointSize(4.0)
+            glBegin(GL_POINTS)
+            for pt in self._particles[:particle_count]:
+                alpha = _clamp(pt['alpha'] / 255.0 * particles_intensity, 0.0, 1.0)
+                glColor4f(ac.red() / 255.0, ac.green() / 255.0, ac.blue() / 255.0, alpha)
+                glVertex2f(float(pt['x']), float(pt['y']))
+            glEnd()
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
 
-class ShineWidget(QWidget):
+class ShineWidget(QOpenGLWidget):
     """Transparent overlay that draws a horizontal shine/sweep stripe over
-    the estimated progress bar area of the main overlay.
+    the estimated progress bar area of the main overlay, using a GLSL
+    fragment shader sweep.
 
     Replaces ``_OverlayShineWidget`` in ``ui_overlay.py``; import with::
 
@@ -314,19 +340,74 @@ class ShineWidget(QWidget):
     _BAR_H_FRAC    = 0.13   # fraction of widget height that covers bar area
     _STRIPE_W_FRAC = 0.22   # width of the shine stripe relative to widget width
 
+    # GLSL fragment shader: shine sweep
+    _SHINE_VERT = (
+        "void main() {"
+        "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+        "}"
+    )
+    _SHINE_FRAG = (
+        "uniform vec2  u_resolution;"
+        "uniform float u_t;"
+        "uniform float u_bar_top;"
+        "uniform float u_bar_h;"
+        "uniform float u_stripe_w;"
+        "uniform int   u_portrait;"
+        "void main() {"
+        "    vec2 uv = vec2(gl_FragCoord.x,"
+        "                   u_resolution.y - gl_FragCoord.y) / u_resolution;"
+        "    float alpha = 0.0;"
+        "    if (u_portrait == 0) {"
+        "        if (uv.y >= u_bar_top && uv.y <= u_bar_top + u_bar_h) {"
+        "            float x0 = -u_stripe_w + u_t * (1.0 + u_stripe_w * 2.0);"
+        "            float d = (uv.x - x0) / max(u_stripe_w, 0.001);"
+        "            alpha = max(0.0, 1.0 - abs(d) * 2.0) * (55.0 / 255.0);"
+        "        }"
+        "    } else {"
+        "        if (uv.x >= u_bar_top && uv.x <= u_bar_top + u_bar_h) {"
+        "            float y0 = -u_stripe_w + u_t * (1.0 + u_stripe_w * 2.0);"
+        "            float d = (uv.y - y0) / max(u_stripe_w, 0.001);"
+        "            alpha = max(0.0, 1.0 - abs(d) * 2.0) * (55.0 / 255.0);"
+        "        }"
+        "    }"
+        "    gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);"
+        "}"
+    )
+
     def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        fmt = QSurfaceFormat()
+        fmt.setAlphaBufferSize(8)
+        self.setFormat(fmt)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._t: float = 0.0  # 0.0..1.0 sweep position
+        self._shine_prog = None
         self.hide()
 
-    def paintEvent(self, _ev):
+    def initializeGL(self):
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDisable(GL_DEPTH_TEST)
+        try:
+            self._shine_prog = _link_program(self._SHINE_VERT, self._SHINE_FRAG)
+        except Exception:
+            self._shine_prog = None
+
+    def resizeGL(self, w: int, h: int):
+        glViewport(0, 0, w, h)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, w, h, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+
+    def paintGL(self):
+        glClear(GL_COLOR_BUFFER_BIT)
         W, H = self.width(), self.height()
         if W <= 0 or H <= 0:
             return
-        # Live check: skip drawing if fx_main_shine_sweep is disabled
         try:
             ov = self.parent().parent_gui.cfg.OVERLAY
             if bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_main_shine_sweep", True)):
@@ -338,43 +419,27 @@ class ShineWidget(QWidget):
             portrait = bool(self.parent().portrait_mode)
         except Exception:
             pass
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        try:
-            if portrait:
-                bar_top  = int(W * self._BAR_TOP_FRAC)
-                bar_h    = int(W * self._BAR_H_FRAC)
-                stripe_w = int(H * self._STRIPE_W_FRAC)
-                y = int(-stripe_w + self._t * (H + stripe_w * 2))
-                grad = QLinearGradient(float(bar_top), float(y),
-                                       float(bar_top), float(y + stripe_w))
-                grad.setColorAt(0.0,  QColor(255, 255, 255, 0))
-                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
-                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
-                grad.setColorAt(1.0,  QColor(255, 255, 255, 0))
-                p.fillRect(bar_top, y, bar_h, stripe_w, QBrush(grad))
-            else:
-                bar_top  = int(H * self._BAR_TOP_FRAC)
-                bar_h    = int(H * self._BAR_H_FRAC)
-                stripe_w = int(W * self._STRIPE_W_FRAC)
-                x = int(-stripe_w + self._t * (W + stripe_w * 2))
-                grad = QLinearGradient(float(x), float(bar_top),
-                                       float(x + stripe_w), float(bar_top))
-                grad.setColorAt(0.0,  QColor(255, 255, 255, 0))
-                grad.setColorAt(0.35, QColor(255, 255, 255, 55))
-                grad.setColorAt(0.65, QColor(255, 255, 255, 55))
-                grad.setColorAt(1.0,  QColor(255, 255, 255, 0))
-                p.fillRect(x, bar_top, stripe_w, bar_h, QBrush(grad))
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
+        if not self._shine_prog:
+            return
+        glUseProgram(self._shine_prog)
+        glUniform2f(glGetUniformLocation(self._shine_prog, "u_resolution"), float(W), float(H))
+        glUniform1f(glGetUniformLocation(self._shine_prog, "u_t"), self._t)
+        glUniform1f(glGetUniformLocation(self._shine_prog, "u_bar_top"), self._BAR_TOP_FRAC)
+        glUniform1f(glGetUniformLocation(self._shine_prog, "u_bar_h"), self._BAR_H_FRAC)
+        glUniform1f(glGetUniformLocation(self._shine_prog, "u_stripe_w"), self._STRIPE_W_FRAC)
+        glUniform1i(glGetUniformLocation(self._shine_prog, "u_portrait"), int(portrait))
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(0.0, 0.0)
+        glVertex2f(float(W), 0.0)
+        glVertex2f(float(W), float(H))
+        glVertex2f(0.0, float(H))
+        glEnd()
+        glUseProgram(0)
 
 
-class HighlightWidget(QWidget):
-    """Briefly flashes a warm amber highlight over the overlay content area
-    when score or progress values change.
+class HighlightWidget(QOpenGLWidget):
+    """Briefly flashes a warm amber radial-gradient highlight over the overlay
+    content area when score or progress values change.
 
     Replaces ``_OverlayHighlightWidget`` in ``ui_overlay.py``; import with::
 
@@ -385,34 +450,80 @@ class HighlightWidget(QWidget):
     _INITIAL_ALPHA = 45
     _FADE_STEP     = 3
 
+    # GLSL fragment shader: radial gradient highlight
+    _HL_VERT = (
+        "void main() {"
+        "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
+        "}"
+    )
+    _HL_FRAG = (
+        "uniform vec2 u_resolution;"
+        "uniform vec4 u_color;"
+        "void main() {"
+        "    vec2 uv = gl_FragCoord.xy / u_resolution;"
+        "    float dist = length(uv - vec2(0.5, 0.5));"
+        "    float gradient = 1.0 - smoothstep(0.0, 0.7, dist);"
+        "    gl_FragColor = vec4(u_color.rgb, u_color.a * (0.4 + 0.6 * gradient));"
+        "}"
+    )
+
     def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        fmt = QSurfaceFormat()
+        fmt.setAlphaBufferSize(8)
+        self.setFormat(fmt)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._alpha: int = 0
+        self._hl_prog = None
         self.hide()
 
-    def paintEvent(self, _ev):
+    def initializeGL(self):
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDisable(GL_DEPTH_TEST)
+        try:
+            self._hl_prog = _link_program(self._HL_VERT, self._HL_FRAG)
+        except Exception:
+            self._hl_prog = None
+
+    def resizeGL(self, w: int, h: int):
+        glViewport(0, 0, w, h)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, w, h, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+
+    def paintGL(self):
+        glClear(GL_COLOR_BUFFER_BIT)
         if self._alpha <= 0:
             return
-        # Live check: skip drawing if fx_main_highlight_flash is disabled
         try:
             ov = self.parent().parent_gui.cfg.OVERLAY
             if bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_main_highlight_flash", True)):
                 return
         except Exception:
             pass
-        p = QPainter(self)
-        try:
-            c = QColor(self._FLASH_COLOR)
-            c.setAlpha(self._alpha)
-            p.fillRect(self.rect(), c)
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass
+        if not self._hl_prog:
+            return
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
+            return
+        c = self._FLASH_COLOR
+        alpha = self._alpha / 255.0
+        glUseProgram(self._hl_prog)
+        glUniform2f(glGetUniformLocation(self._hl_prog, "u_resolution"), float(W), float(H))
+        glUniform4f(glGetUniformLocation(self._hl_prog, "u_color"),
+                    c.red() / 255.0, c.green() / 255.0, c.blue() / 255.0, alpha)
+        glBegin(GL_TRIANGLE_FAN)
+        glVertex2f(0.0, 0.0)
+        glVertex2f(float(W), 0.0)
+        glVertex2f(float(W), float(H))
+        glVertex2f(0.0, float(H))
+        glEnd()
+        glUseProgram(0)
 
 
 # ===========================================================================

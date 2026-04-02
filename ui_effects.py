@@ -2,7 +2,7 @@
 
 Provides the EffectsMixin class which builds the Effects sub-tab containing
 granular enable/disable controls and intensity sliders for every visual effect
-on every overlay (60 effects total: 10 per overlay × 6 overlays).
+on every overlay (63 effects total: 10 per overlay × 6 overlays + 3 Status Badge).
 
 The mixin expects the host class to provide:
     self.cfg            – AppConfig instance
@@ -98,7 +98,13 @@ _FLIP_EFFECTS = [
     ("fx_flip_completion_firework", "Completion Firework ✨"),
 ]
 
-# Ordered list of (title, overlay_type, effects_list) for the 2×3 grid
+_STATUS_EFFECTS = [
+    ("fx_status_scan_in",           "Scan-In Animation"),
+    ("fx_status_glow_sweep",        "Glow Sweep"),
+    ("fx_status_color_morph",       "Color Morph"),
+]
+
+# Ordered list of (title, overlay_type, effects_list) for the grid (7 cards)
 _OVERLAY_GROUPS = [
     ("🖥️ Main Overlay",         "main",      _MAIN_EFFECTS),
     ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
@@ -106,6 +112,7 @@ _OVERLAY_GROUPS = [
     ("⏱️ Timer / Countdown",     "timer",     _TIMER_EFFECTS),
     ("🌡️ Heat Barometer",        "heat",      _HEAT_EFFECTS),
     ("🔢 Flip Counter",          "flip",      _FLIP_EFFECTS),
+    ("🔰 Status Badge",          "status",    _STATUS_EFFECTS),
 ]
 
 # Mapping overlay_type → effects list (for solo-preview logic)
@@ -151,13 +158,13 @@ class EffectsMixin:
         lay_master.addWidget(self._fx_chk_low_perf)
         layout.addWidget(grp_master)
 
-        # --- 2×3 grid of overlay group-boxes ---
+        # --- 4+3 grid of overlay group-boxes (7 cards) ---
         self._fx_effect_rows: dict = {}  # key → (checkbox, slider, pct_label)
 
         grid = QGridLayout()
         grid.setSpacing(8)
         for idx, (title, overlay_type, effects) in enumerate(_OVERLAY_GROUPS):
-            row, col = divmod(idx, 3)
+            row, col = divmod(idx, 4)
             grp = self._build_fx_group(title, effects, overlay_type)
             grid.addWidget(grp, row, col)
         layout.addLayout(grid)
@@ -165,10 +172,10 @@ class EffectsMixin:
         # --- Bottom buttons: Enable All / Disable All / Reset ---
         btn_row = QHBoxLayout()
         btn_enable = QPushButton("Enable All")
-        btn_enable.setToolTip("Enable all 60 individual effects")
+        btn_enable.setToolTip("Enable all 63 individual effects")
         btn_enable.clicked.connect(lambda: self._fx_set_all(True))
         btn_disable = QPushButton("Disable All")
-        btn_disable.setToolTip("Disable all 60 individual effects")
+        btn_disable.setToolTip("Disable all 63 individual effects")
         btn_disable.clicked.connect(lambda: self._fx_set_all(False))
         btn_reset = QPushButton("Reset to Defaults")
         btn_reset.setToolTip("Restore all effects to enabled state at 80 % intensity")

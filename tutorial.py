@@ -179,10 +179,11 @@ _STEPS = [
         "title": "✨ Visual Effects (optional)",
         "body": (
             "Customize every visual effect on every overlay individually.\n\n"
-            "Effects are grouped by overlay in a 2×3 grid:\n\n"
+            "Effects are grouped by overlay in a 4+3 grid (7 cards):\n\n"
             "  🖥️ Main Overlay      🏆 Achievement Toast\n"
             "  ⚡ Challenge Select   ⏱️ Timer / Countdown\n"
-            "  🌡️ Heat Barometer    🔢 Flip Counter\n\n"
+            "  🌡️ Heat Barometer    🔢 Flip Counter\n"
+            "  🔰 Status Badge\n\n"
             "Each effect cell has two controls:\n"
             "  • Checkbox — enable or disable the effect\n"
             "  • Slider — adjust intensity from 0% to 100%\n\n"
@@ -195,8 +196,7 @@ _STEPS = [
             "  • 'Enable All' / 'Disable All' for quick toggling\n"
             "  • 'Reset to Defaults' restores factory settings\n\n"
             "All settings are saved automatically and persist\n"
-            "across restarts. Effects use GPU acceleration (OpenGL)\n"
-            "when available, with automatic CPU fallback."
+            "across restarts. Effects use GPU acceleration (OpenGL)."
         ),
         "tab": 2,
         "subtab": 3,  # Effects sub-tab

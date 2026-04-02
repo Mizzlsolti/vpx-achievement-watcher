@@ -19,7 +19,6 @@ from PyQt6.QtGui import (
 from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, p_highlights, load_json, f_custom_achievements_progress
 from theme import get_theme_color, get_theme, DEFAULT_THEME
 from gl_effects_opengl import (
-    draw_glow_border as _draw_glow_border,
     ease_out_bounce as _ease_out_bounce,
     ease_out_cubic as _ease_out_cubic,
     EffectsWidget as OverlayEffectsWidget,
@@ -749,17 +748,6 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 dx = (W - content_rot.width()) // 2
                 dy = (H - content_rot.height()) // 2
                 p_final.drawImage(dx, dy, content_rot)
-
-                _snap_low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-                _snap_anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_breathing_glow", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
-                _snap_anim_particles = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_floating_particles", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
-                # When the animated effects widget will be drawn on top, bake only the thin
-                # sharp inner border into the snapshot so the two borders don't stack visually.
-                # When animations are off, bake the full multi-layer glow into the snapshot.
-                _effects_active = not _snap_low_perf and (_snap_anim_glow or _snap_anim_particles)
-                _draw_glow_border(p_final, 0, 0, W, H, radius=18,
-                                   color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                                   low_perf=(_snap_low_perf or _effects_active))
             finally:
                 p_final.end()
             self.text_container.setGeometry(old_geom)
@@ -1917,14 +1905,7 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
             p.setBrush(bg)
             p.drawRoundedRect(0, 0, content_w, content_h, radius, radius)
 
-            _draw_glow_border(p, 0, 0, content_w, content_h, radius=radius,
-                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=not self._is_fx_enabled("fx_flip_glow_border"))
-
             # Breathing glow ring: pulsates when animation is enabled.
-            # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
-            # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
-            # oscillation (40→220) is visible against the dark background.
             if self._is_fx_enabled("fx_flip_breathing_glow"):
                 _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                 self._breathing_pulse.draw(p, 5, 5, content_w - 10, content_h - 10,
@@ -3884,9 +3865,6 @@ class ChallengeCountdownOverlay(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(_theme_bg_qcolor(self.parent_gui.cfg, 245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
-        _draw_glow_border(p, 0, 0, w, h, radius=16,
-                          color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                          low_perf=bool(ov.get("low_performance_mode", False)))
         # Turn accent colour when 10 seconds or fewer remain
         if self._left <= 10:
             p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
@@ -4048,9 +4026,6 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
 
-            _draw_glow_border(p, 0, 0, w, h, radius=radius,
-                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
             desc_pt = max(10, scaled_body_pt)
             min_title = 12
             min_desc = 10
@@ -4366,9 +4341,6 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
             p.setBrush(_theme_bg_qcolor(self.parent_gui.cfg, 245))
             radius = 16
             p.drawRoundedRect(0, 0, w, h, radius, radius)
-            _draw_glow_border(p, 0, 0, w, h, radius=radius,
-                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
 
             p.setPen(hi_color)
             p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
@@ -4580,13 +4552,8 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             p.setBrush(_theme_bg_qcolor(self.parent_gui.cfg, 245))
             p.drawRoundedRect(0, 0, w, h, 10, 10)
 
-            # border with glow
-            ov = self.parent_gui.cfg.OVERLAY or {}
-            _draw_glow_border(p, 0, 0, w, h, radius=10,
-                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                              low_perf=not self._is_fx_enabled("fx_heat_glow_border"))
-
             # bar background (track)
+            ov = self.parent_gui.cfg.OVERLAY or {}
             bx = pad
             by = pad
             p.setPen(Qt.PenStyle.NoPen)
