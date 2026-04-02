@@ -108,13 +108,10 @@ _OVERLAY_GROUPS = [
     ("🔢 Flip Counter",          "flip",      _FLIP_EFFECTS),
 ]
 
-# Mapping overlay_type → effects list (for solo-preview logic)
-_OVERLAY_EFFECTS_MAP = {otype: effects for _, otype, effects in _OVERLAY_GROUPS}
-
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
 _ALL_FX_KEYS = [key for _, _otype, effects in _OVERLAY_GROUPS for key, _ in effects]
 
-# Effects where the intensity slider has no visible impact — show only Checkbox + 👁
+# Effects where the intensity slider has no visible impact — show only Checkbox
 _NO_SLIDER_EFFECTS: frozenset[str] = frozenset({
     # Main Overlay — non-particle/shake effects
     "fx_main_page_transition",
@@ -295,8 +292,8 @@ class EffectsMixin:
     def _build_fx_cell(self, key: str, label: str, overlay_type: str) -> QWidget:
         """Build one 3×3-grid cell for a single effect.
 
-        Effects in ``_NO_SLIDER_EFFECTS`` get only ``[✓] Label [👁]``.
-        All other effects get the full ``[✓] Label ──●── 80% [👁]`` row.
+        Effects in ``_NO_SLIDER_EFFECTS`` get only ``[✓] Label``.
+        All other effects get the full ``[✓] Label ──●── 80%`` row.
         """
         enabled = bool(self.cfg.OVERLAY.get(key, True))
         has_slider = key not in _NO_SLIDER_EFFECTS
@@ -324,18 +321,6 @@ class EffectsMixin:
             lambda state, k=key: self._fx_save_checkbox(k, state)
         )
 
-        eye_btn = QPushButton("👁")
-        eye_btn.setFixedSize(22, 22)
-        eye_btn.setToolTip(f"Preview {label} in isolation (3 s)")
-        eye_btn.setStyleSheet(
-            "QPushButton { background-color: #1a1a1a; color: #00BFFF;"
-            " border: 1px solid #00BFFF; border-radius: 3px; font-size: 10pt; padding: 0; }"
-            "QPushButton:hover { background-color: #00BFFF; color: #000; }"
-        )
-        eye_btn.clicked.connect(
-            lambda _=False, ot=overlay_type, k=key: self._preview_single_effect(ot, k)
-        )
-
         ctrl_row.addWidget(chk)
 
         if has_slider:
@@ -361,7 +346,6 @@ class EffectsMixin:
             slider = None
             pct_lbl = None
 
-        ctrl_row.addWidget(eye_btn)
         cell_lay.addLayout(ctrl_row)
 
         self._fx_effect_rows[key] = (chk, slider, pct_lbl)
@@ -418,42 +402,17 @@ class EffectsMixin:
 
     def _preview_overlay(self, overlay_type: str):
         """▶ Preview — open overlay in demo mode, all currently enabled effects (6 s)."""
-        self._open_demo_overlay(overlay_type, solo_effect=None, duration_ms=6000)
+        self._open_demo_overlay(overlay_type, duration_ms=6000)
 
-    def _preview_single_effect(self, overlay_type: str, effect_key: str):
-        """👁 Preview — open overlay with ONLY this one effect for 3 s."""
-        grp = self._fx_group_widgets.get(overlay_type)
-        if grp and hasattr(self, '_fx_scroll'):
-            self._fx_scroll.ensureWidgetVisible(grp)
-        self._open_demo_overlay(overlay_type, solo_effect=effect_key, duration_ms=3000)
-
-    def _open_demo_overlay(self, overlay_type: str, solo_effect: str | None = None,
-                           duration_ms: int = 6000):
-        """Open an overlay in demo mode with simulated triggers.
-
-        If *solo_effect* is set, temporarily disable all other effects for this
-        overlay group, show only that single effect, then restore previous states.
-        """
+    def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
+        """Open an overlay in demo mode with simulated triggers."""
         # Lazy import avoids module-level circular dependency
         from ui_overlay import (
             AchToastWindow, ChallengeSelectOverlay, ChallengeCountdownOverlay,
             HeatBarometerOverlay, FlipCounterOverlay,
         )
 
-        effects = _OVERLAY_EFFECTS_MAP.get(overlay_type, [])
-
-        # 1. Save and optionally isolate
-        saved: dict[str, object] = {}
-        if solo_effect is not None:
-            for key, _ in effects:
-                saved[key] = self.cfg.OVERLAY.get(key, True)
-                self.cfg.OVERLAY[key] = (key == solo_effect)
-
-        def _restore():
-            for k, v in saved.items():
-                self.cfg.OVERLAY[k] = v
-
-        # 2. Open the appropriate overlay and wire simulated triggers
+        # Open the appropriate overlay and wire simulated triggers
         win = None
         timers: list[QTimer] = []
 
@@ -581,47 +540,42 @@ class EffectsMixin:
                             pass
                     _add_shot(4000, _demo_progress)
 
-                    # Auto-hide (not close) at duration_ms and restore fx_* states
-                    def _hide_and_restore():
+                    # Auto-hide (not close) at duration_ms
+                    def _hide_overlay():
                         try:
                             if win and not win.isHidden():
                                 win.hide()
                         except Exception:
                             pass
-                        _restore()
                         for t in timers:
                             try:
                                 t.stop()
                             except Exception:
                                 pass
 
-                    QTimer.singleShot(duration_ms, _hide_and_restore)
-                    return  # Bypass generic _close_and_restore below
+                    QTimer.singleShot(duration_ms, _hide_overlay)
+                    return  # Bypass generic _close_overlay below
                 except Exception:
-                    _restore()
                     return
 
         except Exception:
-            _restore()
             return
 
         if win is None:
-            _restore()
             return
 
-        # 3. Auto-close after duration and restore states
-        def _close_and_restore():
+        # Auto-close after duration
+        def _close_overlay():
             try:
                 if win and not win.isHidden():
                     win.close()
             except Exception:
                 pass
-            _restore()
             for t in timers:
                 try:
                     t.stop()
                 except Exception:
                     pass
 
-        QTimer.singleShot(duration_ms, _close_and_restore)
+        QTimer.singleShot(duration_ms, _close_overlay)
 
