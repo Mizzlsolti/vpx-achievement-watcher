@@ -28,6 +28,7 @@ from gl_effects_opengl import (
     ParticleBurst, NeonRingExpansion, TypewriterReveal, IconBounce,
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
+    GodRayBurst, ConfettiShower, HologramFlicker, ShockwaveRipple,
 )
 
 try:
@@ -3272,13 +3273,13 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._ring_timer = QTimer(self)
         self._ring_timer.setInterval(20)
         self._ring_timer.timeout.connect(self._ring_tick)
-        if is_level_up:
+        if is_level_up and self._is_fx_enabled("fx_toast_neon_rings"):
             self._ring.start()
             self._ring_timer.start()
 
         # --- Energy flash for level-up ---
         self._flash = EnergyFlash(duration=300.0, start_alpha=180)
-        if is_level_up:
+        if is_level_up and self._is_fx_enabled("fx_toast_energy_flash"):
             self._flash.start()
 
         # --- Typewriter reveal (title line1) ---
@@ -3286,8 +3287,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._tw_cursor_timer = QTimer(self)
         self._tw_cursor_timer.setInterval(500)
         self._tw_cursor_timer.timeout.connect(self._tw_cursor_blink)
-        self._typewriter.start()
-        self._tw_cursor_timer.start()
+        if self._is_fx_enabled("fx_toast_typewriter"):
+            self._typewriter.start()
+            self._tw_cursor_timer.start()
 
         # --- Icon bounce animation ---
         self._bounce = IconBounce(duration=400.0, start_scale=1.3)
@@ -3298,8 +3300,29 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._motion_timer = QTimer(self)
         self._motion_timer.setInterval(16)
         self._motion_timer.timeout.connect(self._motion_tick)
-        self._slide_motion.start_entry()
-        self._motion_timer.start()
+        if self._is_fx_enabled("fx_toast_slide_motion"):
+            self._slide_motion.start_entry()
+            self._motion_timer.start()
+
+        # --- God-Ray Burst ---
+        self._god_rays = GodRayBurst()
+        if self._is_fx_enabled("fx_toast_god_rays"):
+            self._god_rays.start()
+
+        # --- Confetti Shower ---
+        self._confetti = ConfettiShower()
+        if self._is_fx_enabled("fx_toast_confetti"):
+            self._confetti.start()
+
+        # --- Hologram Flicker ---
+        self._hologram = HologramFlicker()
+        if self._is_fx_enabled("fx_toast_hologram_flicker"):
+            self._hologram.start()
+
+        # --- Shockwave Ripple ---
+        self._shockwave = ShockwaveRipple()
+        if self._is_fx_enabled("fx_toast_shockwave"):
+            self._shockwave.start()
 
         # Combined fast animation timer (typewriter + bounce + flash)
         self._anim_timer = QTimer(self)
@@ -3321,9 +3344,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 self._timer.stop()
             except Exception:
                 pass
-            # Start exit animation if available, otherwise close immediately
+            # Start exit animation if available and enabled, otherwise close immediately
             if not getattr(self, "_is_closing", False):
-                if not self._slide_motion.is_exit_active() and hasattr(self, "_motion_timer"):
+                if self._is_fx_enabled("fx_toast_slide_motion") and not self._slide_motion.is_exit_active() and hasattr(self, "_motion_timer"):
                     # Trigger exit animation
                     self._slide_motion.start_exit()
                     self._motion_timer.start()
@@ -3559,6 +3582,18 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         if is_level_up and self._is_fx_enabled("fx_toast_energy_flash") and self._flash.is_active():
             self._flash.draw(p, W, H, radius,
                              QColor(get_theme_color(self.parent_gui.cfg, "primary")))
+        # God-Ray Burst
+        if self._is_fx_enabled("fx_toast_god_rays") and self._god_rays.is_active():
+            self._god_rays.draw(p, QRect(0, 0, W, H))
+        # Confetti Shower
+        if self._is_fx_enabled("fx_toast_confetti") and self._confetti.is_active():
+            self._confetti.draw(p, QRect(0, 0, W, H))
+        # Hologram Flicker (icon area)
+        if self._is_fx_enabled("fx_toast_hologram_flicker") and self._hologram.is_active():
+            self._hologram.draw(p, QRect(pad, iy, actual_icon_sz, actual_icon_sz))
+        # Shockwave Ripple
+        if self._is_fx_enabled("fx_toast_shockwave") and self._shockwave.is_active():
+            self._shockwave.draw(p, QRect(0, 0, W, H))
         p.end()
 
         portrait = bool(ov.get("ach_toast_portrait", ov.get("portrait_mode", True)))
@@ -3718,13 +3753,37 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self._flash.tick(dt)
             changed = True
 
+        # God-Ray Burst
+        if self._god_rays.is_active():
+            self._god_rays.tick(dt)
+            changed = True
+
+        # Confetti Shower
+        if self._confetti.is_active():
+            self._confetti.tick(dt)
+            changed = True
+
+        # Hologram Flicker
+        if self._hologram.is_active():
+            self._hologram.tick(dt)
+            changed = True
+
+        # Shockwave Ripple
+        if self._shockwave.is_active():
+            self._shockwave.tick(dt)
+            changed = True
+
         if changed:
             self._render_and_place()
 
-        # Stop anim timer when typewriter, bounce, and flash are all done
+        # Stop anim timer when all animated effects are done
         if (not self._typewriter.is_active() and
                 not self._bounce.is_active() and
-                not self._flash.is_active()):
+                not self._flash.is_active() and
+                not self._god_rays.is_active() and
+                not self._confetti.is_active() and
+                not self._hologram.is_active() and
+                not self._shockwave.is_active()):
             if hasattr(self, '_anim_timer'):
                 self._anim_timer.stop()
 
