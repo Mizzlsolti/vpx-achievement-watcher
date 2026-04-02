@@ -180,7 +180,7 @@ begin
   if FileExists(cfgPath) then
     LoadStringFromFile(cfgPath, SavedConfig);
 
-  { Look for an existing uninstall entry – check HKLM first, then HKCU. }
+  { Look for an existing uninstall entry - check HKLM first, then HKCU. }
   UninstallString := '';
   if not RegQueryStringValue(HKEY_LOCAL_MACHINE,
       'Software\Microsoft\Windows\CurrentVersion\Uninstall\' +
@@ -203,7 +203,7 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if (PathsPage <> nil) and (CurPageID = PathsPage.ID) then
   begin
-    { Update EdBase to actual selected install dir — {app} is now valid }
+    { Update EdBase to actual selected install dir - {app} is now valid }
     EdBase.Text := ExpandConstant('{app}');
     { Then load existing config values on top (if upgrading) }
     LoadExistingConfig;
