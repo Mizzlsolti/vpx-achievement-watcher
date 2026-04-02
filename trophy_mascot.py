@@ -171,15 +171,15 @@ _GUI_ZANK: list[tuple[str, str]] = [
 # Overlay Trophie comments
 # ---------------------------------------------------------------------------
 _OV_ROM_START: list[tuple[str, str]] = [
-    ("ov_go",          "Let s go! Good luck!"),
+    ("ov_go",          "Let's go! Good luck!"),
     ("ov_classic",     None),  # dynamic: "Oh! {table_name}! Classic!"
     ("ov_firsttime",   "First time on this table! Good luck!"),
-    ("ov_longago",     "Haven t seen this one in a while!"),
+    ("ov_longago",     "Haven't seen this one in a while!"),
     ("ov_fav",         "Your favourite again? No complaints!"),
     ("ov_revenge",     "Back for more revenge? I respect that!"),
     ("ov_dustoff",     "Long time no see! Dust off those flippers!"),
     ("ov_thirdtoday",  "Third table today! You are on a roll!"),
-    ("ov_firstday",    "First game of the day! Let s make it count!"),
+    ("ov_firstday",    "First game of the day! Let's make it count!"),
     ("ov_onemore",     "One more game? That is the spirit!"),
     ("ov_morning",     "Morning warm-up! Coffee + pinball!"),
     ("ov_evening",     "Evening session! The best time to play!"),
@@ -246,7 +246,7 @@ _OV_FLIP: list[tuple[str, str]] = [
 
 _OV_IDLE: list[tuple[str, str]] = [
     ("ov_idle_5m",   "Still here... waiting..."),
-    ("ov_idle_10m",  "Psst. VPX won t start itself!"),
+    ("ov_idle_10m",  "Psst. VPX won't start itself!"),
     ("ov_idle_15m",  "I could really go for a game right now..."),
     ("ov_idle_20m",  "The tables miss you. True story."),
     ("ov_idle_45m",  "At this point I am basically furniture"),
@@ -1243,7 +1243,7 @@ class OverlayTrophie(QWidget):
                 if last_played_days is not None and last_played_days >= 30:
                     key, comment = "ov_dustoff", "Long time no see! Dust off those flippers!"
                 elif last_played_days is not None and last_played_days >= 7:
-                    key, comment = "ov_longago", "Haven t seen this one in a while!"
+                    key, comment = "ov_longago", "Haven't seen this one in a while!"
                 elif table_name:
                     key, comment = "ov_classic", f"Oh! {table_name}! Classic!"
 
@@ -1260,13 +1260,13 @@ class OverlayTrophie(QWidget):
             elif weekday == 0:
                 key, comment = "ov_monday", "Monday motivation: pinball!"
             elif self._today_session_count == 1:
-                key, comment = "ov_firstday", "First game of the day! Let s make it count!"
+                key, comment = "ov_firstday", "First game of the day! Let's make it count!"
             elif self._today_session_count == 2:
                 key, comment = "ov_onemore", "One more game? That is the spirit!"
             elif self._today_session_count >= 3:
                 key, comment = "ov_thirdtoday", "Third table today! You are on a roll!"
             else:
-                key, comment = "ov_go", "Let s go! Good luck!"
+                key, comment = "ov_go", "Let's go! Good luck!"
 
         if self._memory and rom:
             self._memory.rom_play_counts[rom] = prev_count + 1
@@ -1434,7 +1434,7 @@ class OverlayTrophie(QWidget):
 
         idle_steps = [
             (5,    "ov_idle_5m",   "Still here... waiting...",                    IDLE),
-            (10,   "ov_idle_10m",  "Psst. VPX won t start itself!",               IDLE),
+            (10,   "ov_idle_10m",  "Psst. VPX won't start itself!",               IDLE),
             (15,   "ov_idle_15m",  "I could really go for a game right now...",   IDLE),
             (20,   "ov_idle_20m",  "The tables miss you. True story.",             IDLE),
             (30,   "ov_idle_zzz",  "ZZZ...",                                       SLEEPY),
