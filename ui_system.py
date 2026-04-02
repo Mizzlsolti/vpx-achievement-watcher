@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
 )
 from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot
-from cloud_sync import CloudSync
+from cloud_sync import CloudSync, _sanitize_firebase_keys
 from watcher_core import (
     ensure_dir, log, sanitize_filename,
     secure_load_json, secure_save_json,
@@ -757,7 +757,7 @@ class SystemMixin:
                     "selected_badge": selected_badge,
                 }
                 if custom_progress:
-                    metadata_payload["custom_progress"] = custom_progress
+                    metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
                 if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", metadata_payload):
                     results.append("✅ Achievements metadata")
                     log(self.cfg, "[CLOUD] Manual backup: achievements metadata uploaded")

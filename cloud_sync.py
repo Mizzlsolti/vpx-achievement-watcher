@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import ssl
 import threading
 import time
@@ -35,6 +36,13 @@ from watcher_core import (
     is_excluded_field,
 )
 from config import f_custom_achievements_progress
+
+_FIREBASE_ILLEGAL_CHARS_RE = re.compile(r'[.$#\[\]/]')
+
+def _sanitize_firebase_keys(d: dict) -> dict:
+    """Return a copy of *d* with all Firebase-illegal characters (. $ # [ ] /)
+    in the keys replaced by underscores."""
+    return {_FIREBASE_ILLEGAL_CHARS_RE.sub("_", k): v for k, v in d.items()}
 
 class CloudSync:
     _upload_skip_warned: bool = False
@@ -974,7 +982,7 @@ class CloudSync:
                 "selected_badge": selected_badge,
             }
             if custom_progress:
-                metadata_payload["custom_progress"] = custom_progress
+                metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
             if CloudSync.set_node(cfg, f"players/{pid}/achievements", metadata_payload):
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:
