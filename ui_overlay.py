@@ -28,6 +28,7 @@ from gl_effects_opengl import (
     ParticleBurst, NeonRingExpansion, TypewriterReveal, IconBounce,
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
+    ElectricArc, HoverShimmer, PlasmaNoise, HoloSweep, DifficultyColorPulse,
 )
 
 try:
@@ -3933,12 +3934,30 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._carousel = CarouselSlide(duration=180.0)
+        self._electric_arc = ElectricArc(intensity=self._get_fx_intensity("fx_challenge_electric_arc"))
+        self._hover_shimmer = HoverShimmer(intensity=self._get_fx_intensity("fx_challenge_hover_shimmer"))
+        self._plasma_noise = PlasmaNoise(intensity=self._get_fx_intensity("fx_challenge_plasma_noise"))
+        self._holo_sweep = HoloSweep(intensity=self._get_fx_intensity("fx_challenge_holo_sweep"))
+        self._color_pulse = DifficultyColorPulse(intensity=self._get_fx_intensity("fx_challenge_color_pulse"))
+        self._snap_scale = 1.0
+        self._snap_elapsed = 0.0
+        self._snap_active = False
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
+        if self._is_fx_enabled("fx_challenge_electric_arc"):
+            self._electric_arc.start()
+        if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+            self._hover_shimmer.start()
+        if self._is_fx_enabled("fx_challenge_plasma_noise"):
+            self._plasma_noise.start()
+        if self._is_fx_enabled("fx_challenge_holo_sweep"):
+            self._holo_sweep.start()
+        if self._is_fx_enabled("fx_challenge_color_pulse"):
+            self._color_pulse.start()
         self._pulse_timer.start()  # always run; live fx checks in _compose_image
         self._pix = None
         self._render_and_place()
@@ -3978,6 +3997,23 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
 
     def _on_pulse_tick(self):
         self._breathing_pulse.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_electric_arc"):
+            self._electric_arc.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+            self._hover_shimmer.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_plasma_noise"):
+            self._plasma_noise.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_holo_sweep"):
+            self._holo_sweep.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_color_pulse"):
+            self._color_pulse.tick(50.0)
+        if self._snap_active:
+            self._snap_elapsed += 50.0
+            t = min(1.0, self._snap_elapsed / 200.0)
+            self._snap_scale = 0.92 + 0.08 * t
+            if t >= 1.0:
+                self._snap_scale = 1.0
+                self._snap_active = False
         self._render_and_place()
 
     def _on_slide_tick(self):
@@ -3988,14 +4024,19 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
 
     def set_selected(self, idx: int):
         new_idx = int(idx) % 4
-        if new_idx != self._selected and self._is_fx_enabled("fx_challenge_carousel"):
-            # Determine slide direction: going "right" in list = slide left
-            direction = 1 if new_idx > self._selected else -1
-            self._prev_selected = self._selected
-            self._carousel.start(direction=direction)
-            self._slide_timer.start()
-        else:
-            self._prev_selected = new_idx
+        if new_idx != self._selected:
+            if self._is_fx_enabled("fx_challenge_carousel"):
+                # Determine slide direction: going "right" in list = slide left
+                direction = 1 if new_idx > self._selected else -1
+                self._prev_selected = self._selected
+                self._carousel.start(direction=direction)
+                self._slide_timer.start()
+            else:
+                self._prev_selected = new_idx
+            if self._is_fx_enabled("fx_challenge_snap_scale"):
+                self._snap_scale = 0.92
+                self._snap_elapsed = 0.0
+                self._snap_active = True
         self._selected = new_idx
         self._render_and_place()
 
@@ -4051,6 +4092,26 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
+
+            draw_rect = QRect(0, 0, w, h)
+            if self._is_fx_enabled("fx_challenge_selection_glow"):
+                amp = self._breathing_pulse.get_amp()
+                alpha = 30 + int(40 * amp)
+                _ac = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
+                p.setBrush(QColor(_ac.red(), _ac.green(), _ac.blue(), alpha))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawRoundedRect(0, 0, w, h, radius, radius)
+            if self._is_fx_enabled("fx_challenge_plasma_noise"):
+                self._plasma_noise.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_electric_arc"):
+                self._electric_arc.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+                self._hover_shimmer.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_holo_sweep"):
+                self._holo_sweep.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_color_pulse"):
+                self._color_pulse.draw(p, draw_rect)
+
             title_font_pt = scaled_body_pt + 6
             desc_pt = max(10, scaled_body_pt)
             min_title = 12
@@ -4085,6 +4146,17 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
 
             # Carousel slide: blend between previous and current content
             slide_active = self._is_fx_enabled("fx_challenge_carousel") and self._carousel.is_active()
+
+            # Apply snap scale transform to content area when snap is active
+            if self._snap_active and self._snap_scale != 1.0:
+                cx, content_cy = w / 2.0, content_top + block_h / 2.0
+                snap_transform = QTransform()
+                snap_transform.translate(cx, content_cy)
+                snap_transform.scale(self._snap_scale, self._snap_scale)
+                snap_transform.translate(-cx, -content_cy)
+                p.save()
+                p.setTransform(snap_transform, True)
+
             if slide_active:
                 eased = self._carousel.get_eased_t()
                 slide_dir = self._carousel.direction
@@ -4135,6 +4207,9 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
                 desc_rect = QRect(pad_lr, title_rect.bottom() + 1 + 6, avail_w, d_h)
                 p.drawText(desc_rect, flags_wrap_center, desc_text)
                 p.setClipping(False)
+
+            if self._snap_active and self._snap_scale != 1.0:
+                p.restore()
 
             p.setPen(QColor("#AAAAAA"))
             p.setFont(QFont(font_family, hint_pt))
