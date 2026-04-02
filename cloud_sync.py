@@ -679,7 +679,7 @@ class CloudSync:
                 pass
             return True
         except Exception as e:
-            log(cfg, f"[CLOUD] set_node error for {endpoint}: {e}", "WARN")
+            log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {len(payload)} bytes): {e}", "WARN")
             return False
 
     @staticmethod
@@ -734,6 +734,19 @@ class CloudSync:
             state["session"] = {}
         if not isinstance(state["roms_played"], list):
             state["roms_played"] = []
+
+        # If session is absent or empty, try fetching it from the sub-node
+        # (new chunked format stores session per-ROM under achievements/session/).
+        # fetch_node returns the merged subtree as {rom: [entries], ...} which
+        # matches the same structure as the old inline session dict.
+        # Old format stored session inline; both are handled for backward compat.
+        if not state["session"]:
+            try:
+                session_data = CloudSync.fetch_node(cfg, f"players/{pid}/achievements/session")
+                if isinstance(session_data, dict) and session_data:
+                    state["session"] = session_data
+            except Exception as e:
+                log(cfg, f"[CLOUD] restore_from_cloud: session sub-node fetch failed (non-critical): {e}", "WARN")
 
         # ── 3. Fetch progress node, enrich state, update local upload log ─────
         try:
@@ -907,7 +920,6 @@ class CloudSync:
                     log(cfg, "[CLOUD] Upload skipped: Please set a player name (not 'Player') in System tab to enable cloud uploads.", "WARN")
                     CloudSync._upload_skip_warned = True
             return
-        url = cfg.CLOUD_URL.strip().rstrip('/')
         pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
 
         # Dedup: suppress burst duplicates when multiple callers fire within the same
@@ -918,8 +930,6 @@ class CloudSync:
             if _now - _last_ts < CloudSync._FULL_ACH_DEDUP_WINDOW_SEC:
                 return
             CloudSync._recent_full_ach_uploads[pid] = _now
-
-        endpoint = f"{url}/players/{pid}/achievements.json"
 
         def _task():
             global_entries = []
@@ -947,12 +957,12 @@ class CloudSync:
                 custom_progress = secure_load_json(f_custom_achievements_progress(cfg)) or {}
             except Exception:
                 pass
-            payload = {
+            # Upload metadata without session to avoid oversized single request.
+            metadata_payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
                 "watcher_version": WATCHER_VERSION,
                 "global": global_entries,
-                "session": session_entries,
                 "roms_played": roms_played,
                 "player_level": lv["level"],
                 "player_level_name": lv["name"],
@@ -964,14 +974,16 @@ class CloudSync:
                 "selected_badge": selected_badge,
             }
             if custom_progress:
-                payload["custom_progress"] = custom_progress
-            put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
-            put_req.add_header('Content-Type', 'application/json')
-            try:
-                with urllib.request.urlopen(put_req, timeout=10) as resp:
-                    log(cfg, "[CLOUD] Full achievements backup uploaded")
-            except Exception as e:
-                log(cfg, f"[CLOUD] upload_full_achievements failed: {e}", "WARN")
+                metadata_payload["custom_progress"] = custom_progress
+            if CloudSync.set_node(cfg, f"players/{pid}/achievements", metadata_payload):
+                log(cfg, "[CLOUD] Full achievements metadata uploaded")
+            else:
+                log(cfg, "[CLOUD] upload_full_achievements: metadata upload failed", "WARN")
+            # Upload session data per ROM to keep each request small.
+            for rom, entries in session_entries.items():
+                if entries:
+                    if not CloudSync.set_node(cfg, f"players/{pid}/achievements/session/{rom}", entries):
+                        log(cfg, f"[CLOUD] upload_full_achievements: session upload failed for {rom}", "WARN")
 
         threading.Thread(target=_task, daemon=True).start()
 

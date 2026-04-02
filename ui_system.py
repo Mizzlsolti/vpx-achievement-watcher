@@ -672,17 +672,16 @@ class SystemMixin:
             except Exception:
                 pass
 
-            # 1. Upload full achievements state
+            # 1. Upload achievements metadata (without session to avoid oversized request)
             try:
                 lv = compute_player_level(state)
                 badges = list(state.get("badges") or [])
                 selected_badge = state.get("selected_badge", "")
-                payload = {
+                metadata_payload = {
                     "name": player_name,
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "watcher_version": WATCHER_VERSION,
                     "global": list(state.get("global", {}).get("__global__", []) or []),
-                    "session": dict(state.get("session", {}) or {}),
                     "roms_played": list(state.get("roms_played", []) or []),
                     "player_level": lv["level"],
                     "player_level_name": lv["name"],
@@ -694,15 +693,35 @@ class SystemMixin:
                     "selected_badge": selected_badge,
                 }
                 if custom_progress:
-                    payload["custom_progress"] = custom_progress
-                if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", payload):
-                    results.append("✅ Achievements")
-                    log(self.cfg, "[CLOUD] Manual backup: full achievements uploaded")
+                    metadata_payload["custom_progress"] = custom_progress
+                if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", metadata_payload):
+                    results.append("✅ Achievements metadata")
+                    log(self.cfg, "[CLOUD] Manual backup: achievements metadata uploaded")
                 else:
-                    errors.append("❌ Achievements: upload failed")
+                    errors.append("❌ Achievements metadata: upload failed")
             except Exception as e:
-                errors.append(f"❌ Achievements: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: achievements upload failed: {e}", "WARN")
+                errors.append(f"❌ Achievements metadata: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: achievements metadata upload failed: {e}", "WARN")
+
+            # 1b. Upload session data per ROM to keep each request small
+            session_uploaded = 0
+            session_errors = 0
+            try:
+                session = dict(state.get("session", {}) or {})
+                for rom, entries in session.items():
+                    if entries:
+                        if CloudSync.set_node(self.cfg, f"players/{pid}/achievements/session/{rom}", entries):
+                            session_uploaded += 1
+                        else:
+                            session_errors += 1
+                            log(self.cfg, f"[CLOUD] Manual backup: session upload failed for {rom}", "WARN")
+                if session_uploaded > 0:
+                    results.append(f"✅ Session for {session_uploaded} ROM(s)")
+                if session_errors > 0:
+                    errors.append(f"❌ Session: {session_errors} ROM(s) failed")
+            except Exception as e:
+                errors.append(f"❌ Session: {e}")
+                log(self.cfg, f"[CLOUD] Manual backup: session upload failed: {e}", "WARN")
 
             # 2. Upload VPS mapping
             try:
