@@ -150,10 +150,16 @@ class OverlayNavArrows(QWidget):
         super().showEvent(event)
         parent = self.parent()
         low_perf = False
+        fx_nav = True
         try:
-            low_perf = bool(parent.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            cfg_ov = parent.parent_gui.cfg.OVERLAY
+            low_perf = bool(cfg_ov.get("low_performance_mode", False))
+            fx_nav = bool(cfg_ov.get("fx_main_nav_arrows_pulse", True))
         except Exception:
             pass
+        if not fx_nav:
+            self.hide()
+            return
         if not low_perf and not self._pulse_timer.isActive():
             self._pulse_timer.start()
 
@@ -175,10 +181,16 @@ class OverlayNavArrows(QWidget):
         ccw = getattr(parent, "rotate_ccw", True)
 
         low_perf = False
+        fx_nav = True
         try:
-            low_perf = bool(parent.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
+            cfg_ov = parent.parent_gui.cfg.OVERLAY
+            low_perf = bool(cfg_ov.get("low_performance_mode", False))
+            fx_nav = bool(cfg_ov.get("fx_main_nav_arrows_pulse", True))
         except Exception:
             pass
+
+        if not fx_nav:
+            return
 
         if portrait:
             draw_w, draw_h = H, W
@@ -566,6 +578,13 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         """Show or hide the pulsating page-navigation arrows on the overlay."""
         self._nav_arrows_active = bool(active)
         if active:
+            try:
+                fx_nav = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_nav_arrows_pulse", True))
+            except Exception:
+                fx_nav = True
+            if not fx_nav:
+                self._nav_arrows.hide()
+                return
             self._nav_arrows.setGeometry(0, 0, self.width(), self.height())
             self._nav_arrows.show()
             self._nav_arrows.raise_()

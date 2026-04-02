@@ -282,9 +282,10 @@ class EffectsWidget(QWidget):
             amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._glow_t)
             ac = self._accent_color
             if draw_glow:
-                alpha_base = int((120 + 135 * amp) * glow_intensity)  # scale by intensity
-                layers = max(1, int((2 + 2 * amp) * glow_intensity))  # scale layers by intensity
-                glow_color = QColor(ac.red(), ac.green(), ac.blue(), alpha_base)
+                amp_scaled = amp * glow_intensity  # scale breathing amplitude by intensity
+                alpha_base = int((120 + 135 * amp_scaled) * glow_intensity)
+                layers = max(1, int((2 + 2 * amp_scaled) * glow_intensity))
+                glow_color = QColor(ac.red(), ac.green(), ac.blue(), max(0, min(255, alpha_base)))
                 draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
             if draw_particles:
                 # Scale particle count by intensity (fewer particles at lower intensity)
