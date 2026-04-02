@@ -4051,6 +4051,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
+            title_font_pt = scaled_body_pt + 6
             desc_pt = max(10, scaled_body_pt)
             min_title = 12
             min_desc = 10
@@ -4070,15 +4071,15 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             max_content_h = h - top_pad - bottom_pad - hint_gap - hint_h
 
             for _ in range(64):
-                t_h, d_h = measure_heights(title_pt, desc_pt, title_text, desc_text)
+                t_h, d_h = measure_heights(title_font_pt, desc_pt, title_text, desc_text)
                 total = t_h + 6 + d_h
                 if total <= max_content_h:
                     break
-                if title_pt > min_title: title_pt -= 1
+                if title_font_pt > min_title: title_font_pt -= 1
                 if desc_pt > min_desc: desc_pt -= 1
-                if title_pt <= min_title and desc_pt <= min_desc: break
+                if title_font_pt <= min_title and desc_pt <= min_desc: break
 
-            t_h, d_h = measure_heights(title_pt, desc_pt, title_text, desc_text)
+            t_h, d_h = measure_heights(title_font_pt, desc_pt, title_text, desc_text)
             block_h = t_h + 6 + d_h
             content_top = top_pad + max(0, (max_content_h - block_h) // 2)
 
@@ -4101,7 +4102,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
                 # Draw previous content (fading out, sliding away)
                 p.setOpacity(max(0.0, min(1.0, prev_alpha / 255.0)))
                 p.setPen(hi_color)
-                p.setFont(QFont(font_family, title_pt, QFont.Weight.Bold))
+                p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
                 p.drawText(QRect(pad_lr + prev_x_offset, content_top, avail_w, t_h), flags_wrap_center, prev_title)
                 p.setPen(text_color)
                 p.setFont(QFont(font_family, desc_pt))
@@ -4110,7 +4111,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
                 # Draw current content (fading in, sliding in)
                 p.setOpacity(max(0.0, min(1.0, cur_alpha / 255.0)))
                 p.setPen(hi_color)
-                p.setFont(QFont(font_family, title_pt, QFont.Weight.Bold))
+                p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
                 title_rect = QRect(pad_lr + cur_x_offset, content_top, avail_w, t_h)
                 p.drawText(title_rect, flags_wrap_center, title_text)
                 p.setPen(text_color)
@@ -4125,7 +4126,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
                 # overlay bounds if the shrink loop exhausted both minimum font sizes.
                 p.setClipRect(pad_lr, content_top, avail_w, max_content_h)
                 p.setPen(hi_color)
-                p.setFont(QFont(font_family, title_pt, QFont.Weight.Bold))
+                p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
                 title_rect = QRect(pad_lr, content_top, avail_w, t_h)
                 p.drawText(title_rect, flags_wrap_center, title_text)
 
