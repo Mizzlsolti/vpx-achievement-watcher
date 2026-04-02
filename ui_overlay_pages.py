@@ -329,10 +329,18 @@ class OverlayPagesMixin:
             if not last_table:
                 last_table = getattr(self.watcher, "current_table", "") or ""
 
+            _cat_reg_result = None
             if last_table:
                 header = f"Last Played: {_strip_version_from_name(last_table)}"
                 # Check for custom.json in AWEditor dir
                 custom_json_path = os.path.join(p_aweditor(self.cfg), f"{last_table}.custom.json")
+                # Check CAT registry once so we can suppress the "no NVRAM map"
+                # messages for officially registered custom tables.
+                try:
+                    from cat_registry import lookup_by_table_key as _lookup_cat
+                    _cat_reg_result = _lookup_cat(last_table)
+                except Exception:
+                    pass
                 if os.path.isfile(custom_json_path):
                     try:
                         with open(custom_json_path, "r", encoding="utf-8") as _cf:
@@ -360,8 +368,7 @@ class OverlayPagesMixin:
                             _cat_rarity: dict = {}
                             _CAT_RARITY_TTL = 300
                             try:
-                                from cat_registry import lookup_by_table_key as _lookup_cat
-                                _cat_result = _lookup_cat(last_table)
+                                _cat_result = _cat_reg_result
                                 if _cat_result:
                                     _cat_firebase_key = _cat_result[0]
                                     _cat_cached = self._rarity_cache.get(f"cat:{_cat_firebase_key}")
@@ -404,11 +411,15 @@ class OverlayPagesMixin:
                                 else:
                                     cells.append(f"<td class='locked'>🔒 {esc(title)}{rarity_suffix}</td>")
                             pct = round((unlocked_count / len(all_rules)) * 100, 1) if all_rules else 0.0
-                            header_html = (
-                                f"<div class='hdr'>{esc(header)}</div>"
+                            _cat_subtitle = (
+                                "" if _cat_reg_result else
                                 "<div style='text-align:center;color:#FF7F00;font-size:0.85em;"
                                 "padding:2px 0 4px;'>Custom Achievements (no NVRAM map)</div>"
-                                f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
+                            )
+                            header_html = (
+                                f"<div class='hdr'>{esc(header)}</div>"
+                                + _cat_subtitle
+                                + f"<div class='prog'>Progress: {unlocked_count} / {len(all_rules)} ({pct}%)</div>"
                             )
                             COLS = 4
                             rows = []
@@ -425,21 +436,23 @@ class OverlayPagesMixin:
                     except Exception:
                         pass
                     # custom.json exists but couldn't load rules
-                    header_html = (
-                        f"<div class='hdr'>{esc(header)}</div>"
+                    _no_nvram_div = (
+                        "" if _cat_reg_result else
                         "<div style='text-align:center;color:#888;padding:18px;'>"
                         "No NVRAM data / map available for this table. "
                         "Custom achievements are active.</div>"
                     )
+                    header_html = f"<div class='hdr'>{esc(header)}</div>" + _no_nvram_div
                     return css, header_html, []
 
             # Generic no-map / no custom events fallback
-            header_html = (
-                f"<div class='hdr'>{esc(header)}</div>"
+            _no_nvram_div2 = (
+                "" if _cat_reg_result else
                 "<div style='text-align:center;color:#888;padding:18px;'>"
                 "No NVRAM data / map available for this table. "
                 "Custom achievements are active.</div>"
             )
+            header_html = f"<div class='hdr'>{esc(header)}</div>" + _no_nvram_div2
             return css, header_html, []
 
         try:
