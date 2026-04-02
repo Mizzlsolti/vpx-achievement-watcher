@@ -276,7 +276,7 @@ class ShockwaveRipple:
 
 
 # ===========================================================================
-# Challenge Select – 5 new effects
+# Challenge Select – 6 effects (5 GPU-tier + 1 base)
 # ===========================================================================
 
 class ElectricArc:
@@ -506,9 +506,152 @@ class DifficultyColorPulse:
         self._active = False
 
 
+class ArrowWobblePulse:
+    """Sinusoidal wobble applied to navigation arrows, emphasising the
+    current selection direction."""
+
+    def __init__(self, intensity: float = 1.0):
+        self.intensity = _clamp(intensity, 0.0, 1.0)
+        self._t = 0.0
+        self._active = False
+
+    def start(self):
+        self._t = 0.0
+        self._active = True
+
+    def tick(self, dt_ms: float):
+        if not self._active:
+            return
+        self._t += dt_ms * 0.003
+
+    @property
+    def offset_x(self) -> float:
+        """Horizontal displacement in pixels for the arrow widget."""
+        if not self._active:
+            return 0.0
+        return math.sin(self._t * math.pi * 2.0) * 4.0 * self.intensity
+
+    def draw(self, painter: QPainter, rect: QRect):
+        if not self._active:
+            return
+        # Draw a faint direction hint using a translucent chevron tint
+        alpha = int(18 * abs(math.sin(self._t * math.pi * 2.0)) * self.intensity)
+        alpha = _clamp(alpha, 0, 40)
+        painter.save()
+        painter.setBrush(QBrush(QColor(255, 200, 50, alpha)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(rect)
+        painter.restore()
+
+    def is_active(self) -> bool:
+        return self._active
+
+    def stop(self):
+        self._active = False
+
+
 # ===========================================================================
-# Timer / Countdown – 6 new effects
+# Timer / Countdown – 8 effects (6 GPU-tier + 2 base)
 # ===========================================================================
+
+class CountdownScaleGlow:
+    """3-2-1-GO scale-up + glow burst for each countdown digit."""
+
+    _DURATION_MS = 500
+
+    def __init__(self, intensity: float = 1.0):
+        self.intensity = _clamp(intensity, 0.0, 1.0)
+        self._elapsed = 0.0
+        self._active = False
+
+    def trigger(self):
+        """Call once per countdown digit change."""
+        self._elapsed = 0.0
+        self._active = True
+
+    def start(self):
+        self._elapsed = 0.0
+        self._active = True
+
+    def tick(self, dt_ms: float):
+        if not self._active:
+            return
+        self._elapsed += dt_ms
+        if self._elapsed >= self._DURATION_MS:
+            self._active = False
+
+    @property
+    def scale(self) -> float:
+        """Scale factor to apply to the digit widget (1.0 = normal)."""
+        if not self._active:
+            return 1.0
+        t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
+        # Quick grow then settle
+        if t < 0.3:
+            return 1.0 + 0.35 * (t / 0.3) * self.intensity
+        return 1.0 + 0.35 * (1.0 - (t - 0.3) / 0.7) * self.intensity
+
+    def draw(self, painter: QPainter, rect: QRect):
+        if not self._active:
+            return
+        t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
+        fade = max(0.0, 1.0 - t)
+        alpha = int(80 * fade * self.intensity)
+        alpha = _clamp(alpha, 0, 120)
+        painter.save()
+        painter.setBrush(QBrush(QColor(255, 255, 150, alpha)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRect(rect)
+        painter.restore()
+
+    def is_active(self) -> bool:
+        return self._active
+
+
+class RadialPulseBackground:
+    """Expanding translucent ring drawn over the timer background,
+    reinforcing the countdown urgency with a slow radial pulse."""
+
+    def __init__(self, intensity: float = 1.0):
+        self.intensity = _clamp(intensity, 0.0, 1.0)
+        self._t = 0.0
+        self._active = False
+
+    def start(self):
+        self._t = 0.0
+        self._active = True
+
+    def tick(self, dt_ms: float):
+        if not self._active:
+            return
+        self._t += dt_ms * 0.0015
+
+    def draw(self, painter: QPainter, rect: QRect):
+        if not self._active:
+            return
+        cx = rect.left() + rect.width() // 2
+        cy = rect.top() + rect.height() // 2
+        # Two offset rings for depth
+        for phase in (0.0, 0.5):
+            t = (self._t + phase) % 1.0
+            radius = int((min(rect.width(), rect.height()) * 0.5) * t)
+            alpha = int(40 * (1.0 - t) * self.intensity)
+            alpha = _clamp(alpha, 0, 60)
+            if radius > 0 and alpha > 0:
+                pen = QPen(QColor(200, 100, 255, alpha))
+                pen.setWidth(2)
+                painter.save()
+                painter.setPen(pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
+                painter.restore()
+
+    def is_active(self) -> bool:
+        return self._active
+
+    def stop(self):
+        self._active = False
+
 
 class UrgencyShake:
     """Screen shake effect that activates in the last few seconds."""

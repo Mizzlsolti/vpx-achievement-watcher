@@ -11,7 +11,7 @@ The mixin expects the host class to provide:
 """
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox, QGroupBox, QHBoxLayout, QLabel, QPushButton,
     QScrollArea, QSlider, QVBoxLayout, QWidget, QGridLayout,
@@ -98,18 +98,21 @@ _FLIP_EFFECTS = [
     ("fx_flip_completion_firework", "Completion Firework ✨"),
 ]
 
-# Ordered list of (title, effects_list) for the 2×3 grid
+# Ordered list of (title, overlay_type, effects_list) for the 2×3 grid
 _OVERLAY_GROUPS = [
-    ("🖥️ Main Overlay",             _MAIN_EFFECTS),
-    ("🏆 Achievement Toast",         _TOAST_EFFECTS),
-    ("⚡ Challenge Select",          _CHALLENGE_EFFECTS),
-    ("⏱️ Timer / Countdown",         _TIMER_EFFECTS),
-    ("🌡️ Heat Barometer",            _HEAT_EFFECTS),
-    ("🔢 Flip Counter",              _FLIP_EFFECTS),
+    ("🖥️ Main Overlay",         "main",      _MAIN_EFFECTS),
+    ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
+    ("⚡ Challenge Select",      "challenge", _CHALLENGE_EFFECTS),
+    ("⏱️ Timer / Countdown",     "timer",     _TIMER_EFFECTS),
+    ("🌡️ Heat Barometer",        "heat",      _HEAT_EFFECTS),
+    ("🔢 Flip Counter",          "flip",      _FLIP_EFFECTS),
 ]
 
+# Mapping overlay_type → effects list (for solo-preview logic)
+_OVERLAY_EFFECTS_MAP = {otype: effects for _, otype, effects in _OVERLAY_GROUPS}
+
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
-_ALL_FX_KEYS = [key for _, effects in _OVERLAY_GROUPS for key, _ in effects]
+_ALL_FX_KEYS = [key for _, _otype, effects in _OVERLAY_GROUPS for key, _ in effects]
 
 
 class EffectsMixin:
@@ -153,9 +156,9 @@ class EffectsMixin:
 
         grid = QGridLayout()
         grid.setSpacing(8)
-        for idx, (title, effects) in enumerate(_OVERLAY_GROUPS):
+        for idx, (title, overlay_type, effects) in enumerate(_OVERLAY_GROUPS):
             row, col = divmod(idx, 3)
-            grp = self._build_fx_group(title, effects)
+            grp = self._build_fx_group(title, effects, overlay_type)
             grid.addWidget(grp, row, col)
         layout.addLayout(grid)
 
@@ -192,54 +195,114 @@ class EffectsMixin:
     # Group-box builder
     # ------------------------------------------------------------------
 
-    def _build_fx_group(self, title: str, effects: list) -> QGroupBox:
+    def _build_fx_group(self, title: str, effects: list, overlay_type: str) -> QGroupBox:
         grp = QGroupBox(title)
-        lay = QVBoxLayout(grp)
-        lay.setSpacing(2)
+        outer_lay = QVBoxLayout(grp)
+        outer_lay.setSpacing(4)
+        outer_lay.setContentsMargins(6, 6, 6, 6)
 
-        for key, label in effects:
-            enabled = bool(self.cfg.OVERLAY.get(key, True))
-            intensity = int(self.cfg.OVERLAY.get(key + "_intensity", 80))
+        # ── ▶ Preview button in the group header ──────────────────────
+        hdr = QHBoxLayout()
+        hdr.addStretch(1)
+        btn_prev = QPushButton("▶ Preview")
+        btn_prev.setToolTip(
+            "Open overlay in demo mode with all currently enabled effects (6 s)"
+        )
+        btn_prev.setFixedHeight(22)
+        btn_prev.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00;"
+            " border: 1px solid #FF7F00; padding: 2px 8px; border-radius: 3px; font-size: 9pt; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000; }"
+        )
+        btn_prev.clicked.connect(
+            lambda _=False, ot=overlay_type: self._preview_overlay(ot)
+        )
+        hdr.addWidget(btn_prev)
+        outer_lay.addLayout(hdr)
 
-            row_widget = QWidget()
-            row_lay = QHBoxLayout(row_widget)
-            row_lay.setContentsMargins(0, 0, 0, 0)
-            row_lay.setSpacing(6)
+        # ── 3×3 grid of effect cells ───────────────────────────────────
+        fx_grid = QGridLayout()
+        fx_grid.setSpacing(4)
+        n = len(effects)
+        cols = 3
+        full_rows, leftover = divmod(n, cols)
+        for i, (key, label) in enumerate(effects):
+            if i < full_rows * cols:
+                grid_row, grid_col = divmod(i, cols)
+            else:
+                # Remaining effects centred in the last row
+                extra_idx = i - full_rows * cols
+                start_col = (cols - leftover) // 2
+                grid_row = full_rows
+                grid_col = start_col + extra_idx
+            cell = self._build_fx_cell(key, label, overlay_type)
+            fx_grid.addWidget(cell, grid_row, grid_col)
 
-            chk = QCheckBox()
-            chk.setChecked(enabled)
-            chk.setFixedWidth(20)
-
-            lbl = QLabel(label)
-            lbl.setMinimumWidth(200)
-
-            slider = QSlider(Qt.Orientation.Horizontal)
-            slider.setRange(0, 100)
-            slider.setValue(intensity)
-            slider.setFixedWidth(100)
-            slider.setToolTip("Effect intensity (0 – 100 %)")
-
-            pct_lbl = QLabel(f"{intensity}%")
-            pct_lbl.setFixedWidth(36)
-            pct_lbl.setStyleSheet("color: #AAA; font-size: 9pt;")
-
-            # Wire up
-            chk.stateChanged.connect(
-                lambda state, k=key: self._fx_save_checkbox(k, state)
-            )
-            slider.valueChanged.connect(
-                lambda val, k=key, pl=pct_lbl: self._fx_save_slider(k, val, pl)
-            )
-
-            row_lay.addWidget(chk)
-            row_lay.addWidget(lbl, 1)
-            row_lay.addWidget(slider)
-            row_lay.addWidget(pct_lbl)
-
-            lay.addWidget(row_widget)
-            self._fx_effect_rows[key] = (chk, slider, pct_lbl)
-
+        outer_lay.addLayout(fx_grid)
         return grp
+
+    def _build_fx_cell(self, key: str, label: str, overlay_type: str) -> QWidget:
+        """Build one 3×3-grid cell for a single effect (label + checkbox + slider + % + 👁)."""
+        enabled = bool(self.cfg.OVERLAY.get(key, True))
+        intensity = int(self.cfg.OVERLAY.get(key + "_intensity", 80))
+
+        cell = QWidget()
+        cell_lay = QVBoxLayout(cell)
+        cell_lay.setContentsMargins(4, 2, 4, 2)
+        cell_lay.setSpacing(2)
+
+        # Effect name label
+        lbl = QLabel(label)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("font-size: 8pt; font-weight: bold;")
+        cell_lay.addWidget(lbl)
+
+        # Controls row: [✓] [slider] [pct] [👁]
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(4)
+        ctrl_row.setContentsMargins(0, 0, 0, 0)
+
+        chk = QCheckBox()
+        chk.setChecked(enabled)
+        chk.setFixedWidth(18)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(0, 100)
+        slider.setValue(intensity)
+        slider.setToolTip("Effect intensity (0 – 100 %)")
+
+        pct_lbl = QLabel(f"{intensity}%")
+        pct_lbl.setFixedWidth(32)
+        pct_lbl.setStyleSheet("color: #AAA; font-size: 8pt;")
+
+        eye_btn = QPushButton("👁")
+        eye_btn.setFixedSize(22, 22)
+        eye_btn.setToolTip(f"Preview {label} in isolation (3 s)")
+        eye_btn.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #00BFFF;"
+            " border: 1px solid #00BFFF; border-radius: 3px; font-size: 10pt; padding: 0; }"
+            "QPushButton:hover { background-color: #00BFFF; color: #000; }"
+        )
+        eye_btn.clicked.connect(
+            lambda _=False, ot=overlay_type, k=key: self._preview_single_effect(ot, k)
+        )
+
+        # Wire up save callbacks
+        chk.stateChanged.connect(
+            lambda state, k=key: self._fx_save_checkbox(k, state)
+        )
+        slider.valueChanged.connect(
+            lambda val, k=key, pl=pct_lbl: self._fx_save_slider(k, val, pl)
+        )
+
+        ctrl_row.addWidget(chk)
+        ctrl_row.addWidget(slider, 1)
+        ctrl_row.addWidget(pct_lbl)
+        ctrl_row.addWidget(eye_btn)
+        cell_lay.addLayout(ctrl_row)
+
+        self._fx_effect_rows[key] = (chk, slider, pct_lbl)
+        return cell
 
     # ------------------------------------------------------------------
     # Save helpers
@@ -297,3 +360,128 @@ class EffectsMixin:
             chk.setEnabled(not low_perf)
             slider.setEnabled(not low_perf)
             pct_lbl.setEnabled(not low_perf)
+
+    # ------------------------------------------------------------------
+    # Preview helpers
+    # ------------------------------------------------------------------
+
+    def _preview_overlay(self, overlay_type: str):
+        """▶ Preview — open overlay in demo mode, all currently enabled effects (6 s)."""
+        self._open_demo_overlay(overlay_type, solo_effect=None, duration_ms=6000)
+
+    def _preview_single_effect(self, overlay_type: str, effect_key: str):
+        """👁 Preview — open overlay with ONLY this one effect for 3 s."""
+        self._open_demo_overlay(overlay_type, solo_effect=effect_key, duration_ms=3000)
+
+    def _open_demo_overlay(self, overlay_type: str, solo_effect: str | None = None,
+                           duration_ms: int = 6000):
+        """Open an overlay in demo mode with simulated triggers.
+
+        If *solo_effect* is set, temporarily disable all other effects for this
+        overlay group, show only that single effect, then restore previous states.
+        """
+        # Lazy import avoids module-level circular dependency
+        from ui_overlay import (
+            AchToastWindow, ChallengeSelectOverlay, ChallengeCountdownOverlay,
+            HeatBarometerOverlay, FlipCounterOverlay,
+        )
+
+        effects = _OVERLAY_EFFECTS_MAP.get(overlay_type, [])
+
+        # 1. Save and optionally isolate
+        saved: dict[str, object] = {}
+        if solo_effect is not None:
+            for key, _ in effects:
+                saved[key] = self.cfg.OVERLAY.get(key, True)
+                self.cfg.OVERLAY[key] = (key == solo_effect)
+
+        def _restore():
+            for k, v in saved.items():
+                self.cfg.OVERLAY[k] = v
+
+        # 2. Open the appropriate overlay and wire simulated triggers
+        win = None
+        timers: list[QTimer] = []
+
+        def _add_shot(delay_ms: int, fn):
+            t = QTimer()
+            t.setSingleShot(True)
+            t.timeout.connect(fn)
+            t.start(delay_ms)
+            timers.append(t)
+
+        try:
+            if overlay_type == "toast":
+                win = AchToastWindow(self, "🏆 Preview Effect", "demo", seconds=5)
+
+            elif overlay_type == "challenge":
+                win = ChallengeSelectOverlay(self, selected_idx=0)
+                for i, delay in enumerate([1500, 3000, 4500], start=1):
+                    _add_shot(delay, lambda _=False, idx=i % 4: (
+                        win.set_selected(idx) if win and not win.isHidden() else None
+                    ))
+
+            elif overlay_type == "timer":
+                win = ChallengeCountdownOverlay(self, total_seconds=5)
+
+            elif overlay_type == "heat":
+                win = HeatBarometerOverlay(self)
+                win.set_heat(50)
+                for heat, delay in [(65, 1500), (85, 3000), (95, 4500), (60, 5500)]:
+                    _add_shot(delay, lambda _=False, h=heat: (
+                        win.set_heat(h) if win and not win.isHidden() else None
+                    ))
+
+            elif overlay_type == "flip":
+                win = FlipCounterOverlay(self, total=0, remaining=100, goal=100)
+                for flips, delay in [(8, 500), (16, 1000), (25, 1500),
+                                     (33, 2000), (50, 2500), (66, 3500),
+                                     (75, 4000), (84, 4500), (100, 5500)]:
+                    _add_shot(delay, lambda _=False, f=flips: (
+                        win.update_counts(f, max(0, 100 - f), 100)
+                        if win and not win.isHidden() else None
+                    ))
+
+            elif overlay_type == "main":
+                # Main overlay: show the existing overlay window briefly
+                try:
+                    if getattr(self, "overlay", None) is None:
+                        from ui_overlay import OverlayWindow
+                        self.overlay = OverlayWindow(self)
+                    self.overlay.show()
+                    self.overlay.raise_()
+                    win = self.overlay
+                    # Auto-hide instead of close for the main overlay
+                    _add_shot(duration_ms, lambda: (
+                        self.overlay.hide() if getattr(self, "overlay", None) else None
+                    ))
+                    _restore()
+                    return
+                except Exception:
+                    _restore()
+                    return
+
+        except Exception:
+            _restore()
+            return
+
+        if win is None:
+            _restore()
+            return
+
+        # 3. Auto-close after duration and restore states
+        def _close_and_restore():
+            try:
+                if win and not win.isHidden():
+                    win.close()
+            except Exception:
+                pass
+            _restore()
+            for t in timers:
+                try:
+                    t.stop()
+                except Exception:
+                    pass
+
+        QTimer.singleShot(duration_ms, _close_and_restore)
+

@@ -1811,7 +1811,7 @@ class FlipCounterOverlay(QWidget):
         self._breathing_pulse = BreathingPulse(speed=0.05)
         ov = parent.cfg.OVERLAY or {}
         _low_perf = bool(ov.get("low_performance_mode", False))
-        _anim = bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
+        _anim = bool(ov.get("fx_flip_breathing_glow", ov.get("anim_challenge", True)))
         self._low_perf = _low_perf or not _anim
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(50)
@@ -1838,10 +1838,10 @@ class FlipCounterOverlay(QWidget):
         self._render_and_place()
 
     def _check_low_perf(self) -> bool:
-        """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
+        """Read low-performance / anim config live so toggle takes effect immediately."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_flip_breathing_glow", ov.get("anim_challenge", True)))
         except Exception:
             return self._low_perf
 
@@ -4205,7 +4205,7 @@ class FlipDifficultyOverlay(QWidget):
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._snap = SnapScale(duration=160.0, scale_amount=0.07)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_challenge_carousel", parent.cfg.OVERLAY.get("anim_challenge", True)))
+        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_flip_breathing_glow", parent.cfg.OVERLAY.get("anim_challenge", True)))
         self._low_perf = low_perf or not anim_challenge
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
@@ -4484,7 +4484,7 @@ class HeatBarometerOverlay(QWidget):
         # Reactive pulse animation timer (warning/critical)
         ov = self.parent_gui.cfg.OVERLAY or {}
         low_perf = bool(ov.get("low_performance_mode", False))
-        anim_challenge = bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
+        anim_challenge = bool(ov.get("fx_heat_warning_pulse", ov.get("anim_challenge", True)))
         self._low_perf = low_perf or not anim_challenge
         self._heat_pulse = HeatPulse(threshold=65)
         self._pulse_timer = QTimer(self)
