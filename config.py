@@ -215,52 +215,71 @@ class AppConfig:
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
+    def _parse_config(data: dict) -> "AppConfig":
+        """Build an AppConfig from a parsed JSON dict."""
+        ov = dict(DEFAULT_OVERLAY)
+        loaded_ov = data.get("OVERLAY", {})
+
+        allowed_keys = _ALLOWED_OVERLAY_KEYS
+
+        for k in list(loaded_ov.keys()):
+            if k not in allowed_keys:
+                del loaded_ov[k]
+
+        ov.update(loaded_ov)
+
+        cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
+        cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
+        if not cloud_enabled:
+            cloud_backup_enabled = False
+
+        return AppConfig(
+            BASE=data.get("BASE", AppConfig.BASE),
+            NVRAM_DIR=data.get("NVRAM_DIR", AppConfig.NVRAM_DIR),
+            TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
+            OVERLAY=ov,
+            FIRST_RUN=bool(data.get("FIRST_RUN", False)),
+            TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
+            CLOUD_ENABLED=cloud_enabled,
+            CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
+        )
+
+    @staticmethod
     def load(path: str = CONFIG_FILE) -> "AppConfig":
-        if not os.path.exists(path):
+        bak_path = path + ".bak"
+        primary_missing = not os.path.exists(path)
+
+        if not primary_missing:
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return AppConfig._parse_config(data)
+            except Exception as e:
+                print(f"[LOAD ERROR] Failed to load config from '{path}': {e}")
+
+        # Primary file is missing or corrupt — try the backup.
+        if os.path.exists(bak_path):
+            try:
+                with open(bak_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                print(f"[LOAD WARN] Falling back to backup config '{bak_path}'")
+                return AppConfig._parse_config(data)
+            except Exception as e:
+                print(f"[LOAD ERROR] Failed to load backup config from '{bak_path}': {e}")
+
+        if primary_missing and not os.path.exists(bak_path):
+            # Neither file exists — genuine first run.
             return AppConfig(FIRST_RUN=True)
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
 
-            ov = dict(DEFAULT_OVERLAY)
-            loaded_ov = data.get("OVERLAY", {})
-            
-            allowed_keys = _ALLOWED_OVERLAY_KEYS
-            
-            for k in list(loaded_ov.keys()):
-                if k not in allowed_keys:
-                    del loaded_ov[k]
-                    
-            ov.update(loaded_ov)
-
-            cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
-            cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
-            if not cloud_enabled:
-                cloud_backup_enabled = False
-
-            return AppConfig(
-                BASE=data.get("BASE", AppConfig.BASE),
-                NVRAM_DIR=data.get("NVRAM_DIR", AppConfig.NVRAM_DIR),
-                TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
-                OVERLAY=ov,
-                FIRST_RUN=bool(data.get("FIRST_RUN", False)),
-                TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
-                CLOUD_ENABLED=cloud_enabled,
-                CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
-            )
-        except Exception as e:
-            print(f"[LOAD ERROR] Failed to load config from '{path}': {e}")
-            # config.json exists but could not be parsed — keep FIRST_RUN=False so
-            # the first-run wizard is not triggered again, and signal the error via
-            # _load_error so the caller can warn the user.
-            return AppConfig(FIRST_RUN=False, _load_error=True)
+        # Both files exist but are corrupt (or one exists but is corrupt and the other is missing).
+        return AppConfig(FIRST_RUN=False, _load_error=True)
 
     def save(self, path: str = CONFIG_FILE) -> None:
         try:
             clean_overlay = {}
             ov = getattr(self, "OVERLAY", {})
             allowed_keys = _ALLOWED_OVERLAY_KEYS
-            
+
             for k in allowed_keys:
                 if k in ov:
                     clean_overlay[k] = ov[k]
@@ -280,13 +299,31 @@ class AppConfig:
                 "TUTORIAL_COMPLETED": getattr(self, "TUTORIAL_COMPLETED", False),
                 "OVERLAY": clean_overlay
             }
-            
+
             d = os.path.dirname(path)
             if d:
                 os.makedirs(d, exist_ok=True)
-                
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(to_dump, f, indent=2)
+
+            tmp_path = path + ".tmp"
+            bak_path = path + ".bak"
+
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(to_dump, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                if os.path.exists(path):
+                    shutil.copy2(path, bak_path)
+
+                os.replace(tmp_path, path)
+            except Exception:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception:
+                    pass
+                raise
         except Exception as e:
             print(f"CRITICAL ERROR: Could not save config.json -> {e}")
 
