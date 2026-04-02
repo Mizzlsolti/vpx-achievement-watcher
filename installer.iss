@@ -58,6 +58,7 @@ Type: filesandordirs; Name: "{app}"
 [Code]
 var
   PathsPage:   TWizardPage;
+  EdBase:      TEdit;
   EdTables:    TEdit;
   EdNvram:     TEdit;
   SavedConfig: AnsiString;
@@ -89,17 +90,19 @@ function LoadExistingConfig: Boolean;
 var
   cfgPath: string;
   json: AnsiString;
-  nvram, tables: string;
+  baseFolder, nvram, tables: string;
 begin
   Result := False;
   cfgPath := ExpandConstant('{app}\config.json');
   if not FileExists(cfgPath) then Exit;
   if not LoadStringFromFile(cfgPath, json) then Exit;
 
+  baseFolder := GetJsonValue(json, 'BASE');
   nvram  := GetJsonValue(json, 'NVRAM_DIR');
   tables := GetJsonValue(json, 'TABLES_DIR');
 
   Result := True;
+  if baseFolder <> '' then EdBase.Text    := baseFolder;
   if nvram   <> '' then EdNvram.Text   := nvram;
   if tables  <> '' then EdTables.Text  := tables;
 end;
@@ -116,6 +119,18 @@ begin
   );
 
   top := 8;
+
+  lbl := TLabel.Create(PathsPage);
+  lbl.Caption := 'Base folder (application data):';
+  lbl.Parent  := PathsPage.Surface;
+  lbl.SetBounds(0, top, PathsPage.SurfaceWidth, 16);
+  top := top + 20;
+
+  EdBase := TEdit.Create(PathsPage);
+  EdBase.Parent := PathsPage.Surface;
+  EdBase.SetBounds(0, top, PathsPage.SurfaceWidth, 22);
+  EdBase.Text := ExpandConstant('{app}');
+  top := top + 36;
 
   lbl := TLabel.Create(PathsPage);
   lbl.Caption := 'Tables folder (.vpx files):';
@@ -214,10 +229,13 @@ begin
   end;
 end;
 
-{ Returns the custom_events folder path based on the installation directory }
+{ Returns the custom_events folder path based on the base data directory }
 function GetEventsPath(Param: string): string;
 begin
-  Result := ExpandConstant('{app}') + '\tools\AWeditor\custom_events\';
+  if (EdBase <> nil) and (EdBase.Text <> '') then
+    Result := EdBase.Text + '\tools\AWeditor\custom_events\'
+  else
+    Result := ExpandConstant('{app}') + '\tools\AWeditor\custom_events\';
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -228,7 +246,10 @@ begin
   if CurStep = ssPostInstall then
   begin
     cfgPath := ExpandConstant('{app}\config.json');
-    basePath := ExpandConstant('{app}');
+    if WizardSilent then
+      basePath := ExpandConstant('{app}')
+    else
+      basePath := EdBase.Text;
 
     { If the old uninstaller deleted config.json, restore the saved copy so
       the upgrade logic below can preserve all existing settings. }
@@ -304,6 +325,10 @@ begin
         'Software\VPX Achievement Watcher',
         'Version',
         '{#MyAppVersion}');
+      RegWriteStringValue(HKEY_CURRENT_USER,
+        'Software\VPX Achievement Watcher',
+        'InstallPath',
+        ExpandConstant('{app}'));
     end;
   end;
 end;
