@@ -201,6 +201,7 @@ class EffectsMixin:
 
         # --- 2×3 grid of overlay group-boxes ---
         self._fx_effect_rows: dict = {}  # key → (checkbox, slider, pct_label)
+        self._fx_post_rows: dict = {}    # key → (checkbox, slider, pct_label)
         self._fx_group_widgets: dict = {}  # overlay_type → QGroupBox
         self._fx_scroll = scroll
 
@@ -212,6 +213,9 @@ class EffectsMixin:
             self._fx_group_widgets[overlay_type] = grp
             grid.addWidget(grp, row, col)
         layout.addLayout(grid)
+
+        # --- Post-Processing section ---
+        layout.addWidget(self._build_fx_post_group())
 
         # --- Bottom buttons: Enable All / Disable All ---
         btn_row = QHBoxLayout()
@@ -352,6 +356,91 @@ class EffectsMixin:
         return cell
 
     # ------------------------------------------------------------------
+    # Post-Processing group builder
+    # ------------------------------------------------------------------
+
+    # Post-processing effect definitions: (config_key, display_label, default_intensity)
+    _POST_EFFECTS = [
+        ("fx_post_bloom",                "Bloom",                60),
+        ("fx_post_motion_blur",          "Motion Blur",          60),
+        ("fx_post_chromatic_aberration", "Chromatic Aberration", 50),
+        ("fx_post_vignette",             "Vignette",             60),
+        ("fx_post_film_grain",           "Film Grain",           40),
+        ("fx_post_scanlines",            "Scanlines",            50),
+    ]
+
+    def _build_fx_post_group(self) -> QGroupBox:
+        """Build the 🎬 Post-Processing QGroupBox with a 2×3 grid of effect cells."""
+        grp = QGroupBox("🎬 Post-Processing")
+        outer_lay = QVBoxLayout(grp)
+        outer_lay.setSpacing(6)
+        outer_lay.setContentsMargins(8, 8, 8, 8)
+
+        desc = QLabel(
+            "Screen-space effects applied on top of all overlays. "
+            "Requires OpenGL. Disabled automatically in Low Performance Mode."
+        )
+        desc.setWordWrap(True)
+        desc.setStyleSheet("color: #AAA; font-size: 8pt;")
+        outer_lay.addWidget(desc)
+
+        post_grid = QGridLayout()
+        post_grid.setSpacing(4)
+        for idx, (key, label, default_intensity) in enumerate(self._POST_EFFECTS):
+            row, col = divmod(idx, 3)
+            cell = self._build_fx_post_cell(key, label, default_intensity)
+            post_grid.addWidget(cell, row, col)
+        outer_lay.addLayout(post_grid)
+        return grp
+
+    def _build_fx_post_cell(self, key: str, label: str, default_intensity: int) -> QWidget:
+        """Build one post-processing effect cell with checkbox + slider."""
+        enabled = bool(self.cfg.OVERLAY.get(key, False))
+        intensity = int(self.cfg.OVERLAY.get(key + "_intensity", default_intensity))
+
+        cell = QWidget()
+        cell_lay = QVBoxLayout(cell)
+        cell_lay.setContentsMargins(4, 2, 4, 2)
+        cell_lay.setSpacing(2)
+
+        lbl = QLabel(label)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("font-size: 8pt; font-weight: bold;")
+        cell_lay.addWidget(lbl)
+
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(4)
+        ctrl_row.setContentsMargins(0, 0, 0, 0)
+
+        chk = QCheckBox()
+        chk.setChecked(enabled)
+        chk.setFixedWidth(18)
+        chk.stateChanged.connect(
+            lambda state, k=key: self._fx_save_checkbox(k, state)
+        )
+        ctrl_row.addWidget(chk)
+
+        slider = QSlider(Qt.Orientation.Horizontal)
+        slider.setRange(0, 100)
+        slider.setValue(intensity)
+        slider.setToolTip("Effect intensity (0 – 100 %)")
+
+        pct_lbl = QLabel(f"{intensity}%")
+        pct_lbl.setFixedWidth(32)
+        pct_lbl.setStyleSheet("color: #AAA; font-size: 8pt;")
+
+        slider.valueChanged.connect(
+            lambda val, k=key, pl=pct_lbl: self._fx_save_slider(k, val, pl)
+        )
+
+        ctrl_row.addWidget(slider, 1)
+        ctrl_row.addWidget(pct_lbl)
+        cell_lay.addLayout(ctrl_row)
+
+        self._fx_post_rows[key] = (chk, slider, pct_lbl)
+        return cell
+
+    # ------------------------------------------------------------------
     # Save helpers
     # ------------------------------------------------------------------
 
@@ -388,6 +477,12 @@ class EffectsMixin:
     def _fx_apply_low_perf_state(self, low_perf: bool):
         """Enable or disable all individual effect controls based on low_perf flag."""
         for key, (chk, slider, pct_lbl) in self._fx_effect_rows.items():
+            chk.setEnabled(not low_perf)
+            if slider is not None:
+                slider.setEnabled(not low_perf)
+            if pct_lbl is not None:
+                pct_lbl.setEnabled(not low_perf)
+        for key, (chk, slider, pct_lbl) in self._fx_post_rows.items():
             chk.setEnabled(not low_perf)
             if slider is not None:
                 slider.setEnabled(not low_perf)
