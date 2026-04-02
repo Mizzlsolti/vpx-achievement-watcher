@@ -28,6 +28,7 @@ from watcher_core import (
     f_custom_achievements_progress,
     p_aweditor,
     WATCHER_VERSION,
+    _strip_version_from_name,
 )
 from cloud_sync import CloudSync
 
@@ -64,9 +65,20 @@ _DEDUP_WINDOW_SEC: float = 60.0
 # ---------------------------------------------------------------------------
 
 def lookup_by_table_key(table_key: str) -> Optional[Tuple[str, dict]]:
-    """Return (firebase_key, registry_entry) for a given table_key, or None."""
+    """Return (firebase_key, registry_entry) for a given table_key, or None.
+
+    Tries exact match first, then falls back to matching with version
+    suffixes stripped (e.g. 'Table Name v1.2.1' matches 'Table Name').
+    """
+    # Exact match first
     for firebase_key, entry in CAT_REGISTRY.items():
         if entry.get("table_key") == table_key:
+            return firebase_key, entry
+    # Fuzzy match: strip version suffixes and compare
+    stripped_input = _strip_version_from_name(table_key).strip()
+    for firebase_key, entry in CAT_REGISTRY.items():
+        reg_key = entry.get("table_key", "")
+        if _strip_version_from_name(reg_key).strip() == stripped_input:
             return firebase_key, entry
     return None
 

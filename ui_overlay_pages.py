@@ -476,7 +476,27 @@ class OverlayPagesMixin:
         cells = []
         # Pull rarity data from cache for this ROM
         _overlay_rarity: dict = {}
+        _ROM_RARITY_TTL = 300
         _cached_r = self._rarity_cache.get(rom)
+        if getattr(self.cfg, "CLOUD_ENABLED", False) and (
+            _cached_r is None
+            or (time.time() - _cached_r.get("ts", 0)) > _ROM_RARITY_TTL
+        ):
+            from cloud_sync import CloudSync as _CS
+            def _rom_rarity_worker(_r=rom):
+                try:
+                    _rarity_data, _total = _CS.fetch_rarity_for_rom(self.cfg, _r)
+                    self._rarity_cache[_r] = {"data": _rarity_data, "ts": time.time(), "total_players": _total}
+                    if (
+                        getattr(self, "_overlay_page", -1) == 1
+                        and getattr(self, "overlay", None) is not None
+                        and self.overlay.isVisible()
+                    ):
+                        QTimer.singleShot(0, lambda: self._show_overlay_page(1))
+                except Exception:
+                    pass
+            import threading as _threading
+            _threading.Thread(target=_rom_rarity_worker, daemon=True).start()
         if _cached_r:
             _overlay_rarity = _cached_r.get("data", {})
         for r in all_rules:
