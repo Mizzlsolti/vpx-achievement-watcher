@@ -495,6 +495,26 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• <b>Overlay Open</b>: Plays when the stats overlay opens.<br>"
             "• <b>Overlay Close</b>: Plays when the stats overlay closes."
         ),
+        "appearance_effects": (
+            "<b>✨ Visual Effects</b><br><br>"
+            "Control every animation and visual effect across all overlays.<br><br>"
+            "• <b>Low Performance Mode</b>: Master switch — disables all effects at once.<br>"
+            "• <b>Checkbox</b>: Enable or disable individual effects.<br>"
+            "• <b>Slider</b>: Adjust effect intensity (particle count, glow strength, "
+            "shake amplitude, flash brightness, etc.).<br><br>"
+            "<b>Effects are grouped by overlay:</b><br>"
+            "• 🖥️ Main Overlay — glow border, particles, transitions, score spin, shine sweep…<br>"
+            "• 🏆 Achievement Toast — burst particles, neon rings, typewriter, god rays, confetti…<br>"
+            "• ⚡ Challenge Select — carousel, selection glow, electric arc, plasma noise…<br>"
+            "• ⏱️ Timer / Countdown — 3-2-1-GO, radial pulse, urgency shake, glitch numbers…<br>"
+            "• 🌡️ Heat Barometer — warning pulse, flame particles, heat shimmer, lava glow…<br>"
+            "• 🔢 Flip Counter — breathing glow, counter spin, milestone burst, firework…<br><br>"
+            "• <b>Enable All / Disable All</b>: Quick toggle for all 60 effects at once.<br>"
+            "• <b>Reset to Defaults</b>: Restores all effects to enabled state at 80% intensity.<br><br>"
+            "All settings are saved to config.json and persist across restarts.<br>"
+            "Effects use OpenGL GPU acceleration when available, with automatic "
+            "QPainter CPU fallback on systems without GPU drivers."
+        ),
         "available_maps": (
             "<b>📚 Available Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
@@ -530,13 +550,13 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         ),
         "system_general": (
             "<b>⚙️ General</b><br><br>"
-            "The General sub-tab is where you manage your player profile, cloud sync, performance settings, "
+            "The General sub-tab is where you manage your player profile, cloud sync, "
             "and feedback.<br><br>"
             "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
             "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
             "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
-            "• <b>Performance &amp; Animations</b>: Enable or disable overlay animations individually, "
-            "or activate Low Performance Mode to disable all animations at once.<br>"
+            "• <b>Visual Effects</b>: Use the ✨ Effects sub-tab in the Appearance tab to "
+            "control individual overlay effects and Low Performance Mode.<br>"
             "• <b>Feedback</b>: Report bugs or suggestions directly from here."
         ),
         "system_maintenance": (

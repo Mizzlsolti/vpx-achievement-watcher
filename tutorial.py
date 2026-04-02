@@ -176,6 +176,27 @@ _STEPS = [
         "subtab": 2,  # Sound sub-tab
     },
     {
+        "title": "✨ Visual Effects (optional)",
+        "body": (
+            "Customize every visual effect on every overlay individually.\n\n"
+            "Each effect has two controls:\n\n"
+            "  • Checkbox — enable or disable the effect\n"
+            "  • Slider — adjust intensity from 0% to 100%\n\n"
+            "Effects are grouped by overlay:\n\n"
+            "  🖥️ Main Overlay      🏆 Achievement Toast\n"
+            "  ⚡ Challenge Select   ⏱️ Timer / Countdown\n"
+            "  🌡️ Heat Barometer    🔢 Flip Counter\n\n"
+            "  • 🔋 Low Performance Mode disables ALL effects at once\n"
+            "  • 'Enable All' / 'Disable All' for quick toggling\n"
+            "  • 'Reset to Defaults' restores factory settings\n\n"
+            "All settings are saved automatically and persist\n"
+            "across restarts. Effects use GPU acceleration (OpenGL)\n"
+            "when available, with automatic CPU fallback."
+        ),
+        "tab": 2,
+        "subtab": 3,  # Effects sub-tab
+    },
+    {
         "title": "📊 Records & Stats",
         "body": (
             "This tab tracks your personal records across all tables:\n\n"

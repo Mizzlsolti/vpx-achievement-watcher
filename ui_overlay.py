@@ -259,7 +259,7 @@ class OverlayWindow(QWidget):
             try:
                 _ov = self.parent_gui.cfg.OVERLAY
                 _low_perf = bool(_ov.get("low_performance_mode", False))
-                _anim_glow = bool(_ov.get("anim_main_glow", True))
+                _anim_glow = bool(_ov.get("fx_main_breathing_glow", _ov.get("anim_main_glow", True)))
                 if not _low_perf and _anim_glow:
                     self._effects_widget.setGeometry(0, 0, W, H)
                     if not self._effects_widget.isVisible():
@@ -313,7 +313,7 @@ class OverlayWindow(QWidget):
         _defer_effects = self.portrait_mode and not self._ensuring
         if hasattr(self, '_effects_widget') and not _defer_effects:
             low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-            anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True))
+            anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_breathing_glow", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
             if not low_perf and anim_glow:
                 self._effects_widget.setGeometry(0, 0, W, H)
                 self._effects_widget.show()
@@ -723,7 +723,7 @@ class OverlayWindow(QWidget):
                 p_final.drawImage(dx, dy, content_rot)
 
                 _snap_low_perf = bool(self.parent_gui.cfg.OVERLAY.get("low_performance_mode", False))
-                _snap_anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True))
+                _snap_anim_glow = bool(self.parent_gui.cfg.OVERLAY.get("fx_main_breathing_glow", self.parent_gui.cfg.OVERLAY.get("anim_main_glow", True)))
                 # When the animated effects widget will be drawn on top, bake only the thin
                 # sharp inner border into the snapshot so the two borders don't stack visually.
                 # When animations are off, bake the full multi-layer glow into the snapshot.
@@ -753,7 +753,7 @@ class OverlayWindow(QWidget):
             if hasattr(self, '_effects_widget'):
                 _ov = self.parent_gui.cfg.OVERLAY
                 _low_perf = bool(_ov.get("low_performance_mode", False))
-                _anim_glow = bool(_ov.get("anim_main_glow", True))
+                _anim_glow = bool(_ov.get("fx_main_breathing_glow", _ov.get("anim_main_glow", True)))
                 if not _low_perf and _anim_glow:
                     self._effects_widget.setGeometry(0, 0, W, H)
                     if not self._effects_widget.isVisible():
@@ -1090,7 +1090,7 @@ class OverlayWindow(QWidget):
         if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
             old_pct_target = getattr(self, '_progress_pct_target', -1.0)
             self._progress_pct_target = new_pct_target
-            if not self._anim_ok("anim_main_score_progress"):
+            if not self._anim_ok("fx_main_score_spin"):
                 self._progress_pct_current = self._progress_pct_target
             else:
                 if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
@@ -1143,7 +1143,7 @@ class OverlayWindow(QWidget):
                 self._score_target = score_abs
                 if getattr(self, '_score_display', 0) == 0:
                     self._score_display = 0
-                if not self._anim_ok("anim_main_score_progress"):
+                if not self._anim_ok("fx_main_score_spin"):
                     self._score_display = self._score_target
                 elif hasattr(self, '_score_spin_timer'):
                     self._score_spin_timer.start()
@@ -1369,7 +1369,7 @@ class OverlayWindow(QWidget):
 
     def _trigger_shine(self):
         """Start a shine/sweep over the estimated progress bar area."""
-        if not self._anim_ok("anim_main_highlights"):
+        if not self._anim_ok("fx_main_shine_sweep"):
             return
         W, H = self.width(), self.height()
         self._shine_widget.setGeometry(0, 0, W, H)
@@ -1389,7 +1389,7 @@ class OverlayWindow(QWidget):
 
     def _trigger_highlight(self):
         """Flash a brief warm highlight to signal a value change."""
-        if not self._anim_ok("anim_main_highlights"):
+        if not self._anim_ok("fx_main_shine_sweep"):
             return
         W, H = self.width(), self.height()
         self._highlight_widget.setGeometry(0, 0, W, H)
@@ -1426,7 +1426,7 @@ class OverlayWindow(QWidget):
         captures the current display, runs the callback to update content, then animates
         between old and new snapshots.
         """
-        if not self._anim_ok("anim_main_transitions"):
+        if not self._anim_ok("fx_main_page_transition"):
             new_content_callback()
             return
 
@@ -1811,7 +1811,7 @@ class FlipCounterOverlay(QWidget):
         self._breathing_pulse = BreathingPulse(speed=0.05)
         ov = parent.cfg.OVERLAY or {}
         _low_perf = bool(ov.get("low_performance_mode", False))
-        _anim = bool(ov.get("anim_challenge", True))
+        _anim = bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
         self._low_perf = _low_perf or not _anim
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(50)
@@ -1841,7 +1841,7 @@ class FlipCounterOverlay(QWidget):
         """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("anim_challenge", True))
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
         except Exception:
             return self._low_perf
 
@@ -3222,7 +3222,7 @@ class AchToastWindow(QWidget):
         self._remaining = self._seconds
 
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_toast = not low_perf and bool(parent.cfg.OVERLAY.get("anim_toast", True))
+        anim_toast = not low_perf and bool(parent.cfg.OVERLAY.get("fx_toast_slide_motion", parent.cfg.OVERLAY.get("anim_toast", True)))
 
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
@@ -3906,7 +3906,7 @@ class ChallengeSelectOverlay(QWidget):
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._carousel = CarouselSlide(duration=180.0)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
+        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_challenge_carousel", parent.cfg.OVERLAY.get("anim_challenge", True)))
         self._low_perf = low_perf or not anim_challenge
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
@@ -3948,7 +3948,7 @@ class ChallengeSelectOverlay(QWidget):
         """Read low-performance / anim-challenge config live so toggle takes effect immediately."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("anim_challenge", True))
+            return bool(ov.get("low_performance_mode", False)) or not bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
         except Exception:
             return self._low_perf
 
@@ -4205,7 +4205,7 @@ class FlipDifficultyOverlay(QWidget):
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._snap = SnapScale(duration=160.0, scale_amount=0.07)
         low_perf = bool(parent.cfg.OVERLAY.get("low_performance_mode", False))
-        anim_challenge = bool(parent.cfg.OVERLAY.get("anim_challenge", True))
+        anim_challenge = bool(parent.cfg.OVERLAY.get("fx_challenge_carousel", parent.cfg.OVERLAY.get("anim_challenge", True)))
         self._low_perf = low_perf or not anim_challenge
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
@@ -4484,7 +4484,7 @@ class HeatBarometerOverlay(QWidget):
         # Reactive pulse animation timer (warning/critical)
         ov = self.parent_gui.cfg.OVERLAY or {}
         low_perf = bool(ov.get("low_performance_mode", False))
-        anim_challenge = bool(ov.get("anim_challenge", True))
+        anim_challenge = bool(ov.get("fx_challenge_carousel", ov.get("anim_challenge", True)))
         self._low_perf = low_perf or not anim_challenge
         self._heat_pulse = HeatPulse(threshold=65)
         self._pulse_timer = QTimer(self)

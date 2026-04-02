@@ -23,9 +23,10 @@ from ui_overlay import (
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
 )
+from ui_effects import EffectsMixin
 
 
-class AppearanceMixin:
+class AppearanceMixin(EffectsMixin):
     """Mixin that provides the Appearance tab (Overlay, Theme, Sound sub-tabs) and all
     related placement, orientation, font, and theme handler methods.
 
@@ -1045,6 +1046,9 @@ class AppearanceMixin:
         sound_scroll.setWidget(sound_inner)
         sound_outer.addWidget(sound_scroll)
         self.appearance_subtabs.addTab(sound_tab, "🔊 Sound")
+
+        # ── Effects sub-tab ────────────────────────────────────────────────────
+        self._build_effects_subtab()
 
         self.main_tabs.addTab(tab, "🎨 Appearance")
 
