@@ -62,6 +62,7 @@ from watcher_core import (
     f_vps_mapping,
     load_json,
     p_aweditor,
+    p_aweditor_data,
     p_custom_events,
     p_local_maps,
     run_vpxtool_get_rom,
@@ -937,7 +938,7 @@ class AWEditorMixin:
     # ------------------------------------------------------------------
 
     def _aw_cache_path(self) -> str:
-        return os.path.join(p_aweditor(self.cfg), "aweditor_scan_cache.json")
+        return os.path.join(p_aweditor_data(self.cfg), "aweditor_scan_cache.json")
 
     def _aw_load_cache(self) -> list[dict] | None:
         """Return the cached table list if it matches the current tables_dir, else None."""

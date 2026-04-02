@@ -311,8 +311,9 @@ def p_vps_img(cfg):      return os.path.join(p_vps(cfg), "img")
 def f_vps_mapping(cfg):  return os.path.join(p_vps(cfg), "vps_id_mapping.json")
 def f_vpsdb_cache(cfg):  return os.path.join(p_vps(cfg), "vpsdb.json")
 def p_aweditor(cfg):     return os.path.join(cfg.BASE, "tools", "AWeditor")
+def p_aweditor_data(cfg): return os.path.join(p_aweditor(cfg), "Data")
 def p_custom_events(cfg): return os.path.join(p_aweditor(cfg), "custom_events")
-def f_custom_achievements_progress(cfg): return os.path.join(p_aweditor(cfg), "custom_achievements_progress.json")
+def f_custom_achievements_progress(cfg): return os.path.join(p_aweditor_data(cfg), "custom_achievements_progress.json")
 def f_legacy_cleanup_marker(cfg: "AppConfig") -> str:
     """Marker file indicating that the one-time legacy progress cleanup has already run."""
     return os.path.join(p_achievements(cfg), ".legacy_progress_cleaned")
@@ -421,6 +422,21 @@ def _migrate_runtime_dirs(cfg):
                     os.remove(os.path.join(p_highlights(cfg), fn))
                 except Exception:
                     pass
+
+    # AWEditor data: AWeditor/ -> AWeditor/Data/
+    try:
+        ensure_dir(p_aweditor_data(cfg))
+        old_cache = os.path.join(p_aweditor(cfg), "aweditor_scan_cache.json")
+        new_cache = os.path.join(p_aweditor_data(cfg), "aweditor_scan_cache.json")
+        if os.path.isfile(old_cache) and not os.path.isfile(new_cache):
+            shutil.move(old_cache, new_cache)
+
+        old_cap = os.path.join(p_aweditor(cfg), "custom_achievements_progress.json")
+        new_cap = f_custom_achievements_progress(cfg)
+        if os.path.isfile(old_cap) and not os.path.isfile(new_cap):
+            shutil.move(old_cap, new_cap)
+    except Exception:
+        pass
 
     # Migrate notifications: merge old files into new unified store
     try:

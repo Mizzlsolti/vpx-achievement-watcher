@@ -182,7 +182,7 @@ from config import (
     p_maps, p_local_maps, p_session, p_highlights, p_achievements,
     p_rom_spec, f_global_ach, f_achievements_state, f_log, f_index,
     f_romnames, p_vps, p_vps_img, f_vps_mapping, f_vpsdb_cache,
-    p_aweditor, p_custom_events, f_custom_achievements_progress,
+    p_aweditor, p_aweditor_data, p_custom_events, f_custom_achievements_progress,
     f_legacy_cleanup_marker, f_progress_upload_log,
     f_rom_keys_lowercased_marker, f_rom_keys_cloud_cleaned_marker,
     _load_progress_upload_log, _save_progress_upload_log,
@@ -1607,6 +1607,7 @@ class Watcher:
             p_achievements(self.cfg),
             p_rom_spec(self.cfg),
             p_aweditor(self.cfg),
+            p_aweditor_data(self.cfg),
             p_custom_events(self.cfg),
         ]:
             ensure_dir(d)
