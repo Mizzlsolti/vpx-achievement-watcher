@@ -90,6 +90,9 @@ def _link_program(vertex_src: str, fragment_src: str):
     return prog
 
 
+# Number of line segments used to approximate a circle in GL ring effects.
+_GL_CIRCLE_SEGMENTS = 64
+
 # ===========================================================================
 # 1. Helper functions (public API; previously private in ui_overlay.py)
 # ===========================================================================
@@ -1521,7 +1524,7 @@ class ShockwaveRipple:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
         glLineWidth(max(1.0, 8.0 * fade * self.intensity))
-        N = 64
+        N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
             angle = 2 * math.pi * i / N
@@ -2080,7 +2083,7 @@ class RadialPulseBackground:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        N = 64
+        N = _GL_CIRCLE_SEGMENTS
         for phase in (0.0, 0.5):
             t = (self._t + phase) % 1.0
             max_r = min(rect.width(), rect.height()) * 0.5 * self.intensity
@@ -2228,12 +2231,12 @@ class TimeWarpDistortion:
         glLineWidth(1.0)
         for i in range(num_lines):
             y_base = rect.top() + (i + 0.5) * H / num_lines
+            glColor4f(0.0, 0.78, 1.0, alpha)
             glBegin(GL_LINE_STRIP)
             x = rect.left()
             while x < rect.right():
                 phase = (x / max(1, W)) * 2 * math.pi + self._t * 3 + i
                 y_off = math.sin(phase) * 4 * self.intensity
-                glColor4f(0.0, 0.78, 1.0, alpha)
                 glVertex2f(float(x), float(y_base + y_off))
                 x += 4
             glEnd()
@@ -2476,7 +2479,7 @@ class PulseRingCountdown:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
         glLineWidth(max(1.0, 8.0 * fade * self.intensity))
-        N = 64
+        N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
             angle = 2 * math.pi * i / N
@@ -2731,12 +2734,12 @@ class HeatShimmer:
         glLineWidth(1.0)
         for i in range(num_lines):
             y_base = rect.top() + (i + 0.5) * H / num_lines
+            glColor4f(1.0, 0.71, 0.24, alpha)
             glBegin(GL_LINE_STRIP)
             x = rect.left()
             while x < rect.right():
                 phase = (x / max(1, W)) * 3 * math.pi + self._t * 5 + i * 1.2
                 y_off = math.sin(phase) * 3 * self.intensity
-                glColor4f(1.0, 0.71, 0.24, alpha)
                 glVertex2f(float(x), float(y_base + y_off))
                 x += 3
             glEnd()
@@ -2889,7 +2892,7 @@ class LavaGlowEdge:
         y = float(rect.top())
         w = float(rect.width())
         h = float(rect.height())
-        N = 64
+        N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
             angle = 2 * math.pi * i / N
@@ -3376,7 +3379,7 @@ class GoalProximityGlow:
         y = float(rect.top())
         w = float(rect.width())
         h = float(rect.height())
-        N = 64
+        N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
             angle = 2 * math.pi * i / N
