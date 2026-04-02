@@ -129,7 +129,7 @@ begin
   EdBase := TEdit.Create(PathsPage);
   EdBase.Parent := PathsPage.Surface;
   EdBase.SetBounds(0, top, PathsPage.SurfaceWidth, 22);
-  EdBase.Text := ExpandConstant('{app}');
+  EdBase.Text := 'C:\vPinball\VPX Achievement Watcher';
   top := top + 36;
 
   lbl := TLabel.Create(PathsPage);
@@ -202,7 +202,12 @@ end;
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (PathsPage <> nil) and (CurPageID = PathsPage.ID) then
+  begin
+    { Update EdBase to actual selected install dir — {app} is now valid }
+    EdBase.Text := ExpandConstant('{app}');
+    { Then load existing config values on top (if upgrading) }
     LoadExistingConfig;
+  end;
 end;
 
 { Skip the paths page when running silently (auto-update) }
