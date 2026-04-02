@@ -114,6 +114,57 @@ _OVERLAY_EFFECTS_MAP = {otype: effects for _, otype, effects in _OVERLAY_GROUPS}
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
 _ALL_FX_KEYS = [key for _, _otype, effects in _OVERLAY_GROUPS for key, _ in effects]
 
+# Effects where the intensity slider has no visible impact — show only Checkbox + 👁
+_NO_SLIDER_EFFECTS: frozenset[str] = frozenset({
+    # Main Overlay — non-particle/shake effects
+    "fx_main_page_transition",
+    "fx_main_glitch_frame",
+    "fx_main_score_spin",
+    "fx_main_progress_fill",
+    "fx_main_shine_sweep",
+    "fx_main_highlight_flash",
+    "fx_main_nav_arrows_pulse",
+    "fx_main_accent_lerp",
+    # Achievement Toast — fixed speed/distance/alpha effects
+    "fx_toast_typewriter",
+    "fx_toast_icon_bounce",
+    "fx_toast_slide_motion",
+    "fx_toast_energy_flash",
+    "fx_toast_hologram_flicker",
+    # Challenge Select — easing/alpha-only effects
+    "fx_challenge_carousel",
+    "fx_challenge_selection_glow",
+    "fx_challenge_arrow_wobble",
+    "fx_challenge_glow_border",
+    "fx_challenge_snap_scale",
+    "fx_challenge_hover_shimmer",
+    "fx_challenge_plasma_noise",
+    "fx_challenge_holo_sweep",
+    "fx_challenge_color_pulse",
+    # Timer — subtle/alpha-only effects
+    "fx_timer_321go",
+    "fx_timer_number_spin",
+    "fx_timer_radial_pulse",
+    "fx_timer_glow_border",
+    "fx_timer_trail_afterimage",
+    "fx_timer_pulse_ring",
+    "fx_timer_glitch_numbers",
+    # Heat Barometer — threshold-based or alpha-only
+    "fx_heat_warning_pulse",
+    "fx_heat_critical_pulse",
+    "fx_heat_glow_border",
+    "fx_heat_gradient_anim",
+    "fx_heat_number_throb",
+    # Flip Counter — fixed speed/alpha/non-OpenGL effects
+    "fx_flip_breathing_glow",
+    "fx_flip_counter_spin",
+    "fx_flip_glow_border",
+    "fx_flip_progress_arc",
+    "fx_flip_impact_pulse",
+    "fx_flip_number_cascade",
+    "fx_flip_goal_glow",
+})
+
 
 class EffectsMixin:
     """Mixin that provides the ✨ Effects sub-tab for the Appearance tab.
@@ -242,9 +293,13 @@ class EffectsMixin:
         return grp
 
     def _build_fx_cell(self, key: str, label: str, overlay_type: str) -> QWidget:
-        """Build one 3×3-grid cell for a single effect (label + checkbox + slider + % + 👁)."""
+        """Build one 3×3-grid cell for a single effect.
+
+        Effects in ``_NO_SLIDER_EFFECTS`` get only ``[✓] Label [👁]``.
+        All other effects get the full ``[✓] Label ──●── 80% [👁]`` row.
+        """
         enabled = bool(self.cfg.OVERLAY.get(key, True))
-        intensity = int(self.cfg.OVERLAY.get(key + "_intensity", 80))
+        has_slider = key not in _NO_SLIDER_EFFECTS
 
         cell = QWidget()
         cell_lay = QVBoxLayout(cell)
@@ -257,7 +312,7 @@ class EffectsMixin:
         lbl.setStyleSheet("font-size: 8pt; font-weight: bold;")
         cell_lay.addWidget(lbl)
 
-        # Controls row: [✓] [slider] [pct] [👁]
+        # Controls row
         ctrl_row = QHBoxLayout()
         ctrl_row.setSpacing(4)
         ctrl_row.setContentsMargins(0, 0, 0, 0)
@@ -265,15 +320,9 @@ class EffectsMixin:
         chk = QCheckBox()
         chk.setChecked(enabled)
         chk.setFixedWidth(18)
-
-        slider = QSlider(Qt.Orientation.Horizontal)
-        slider.setRange(0, 100)
-        slider.setValue(intensity)
-        slider.setToolTip("Effect intensity (0 – 100 %)")
-
-        pct_lbl = QLabel(f"{intensity}%")
-        pct_lbl.setFixedWidth(32)
-        pct_lbl.setStyleSheet("color: #AAA; font-size: 8pt;")
+        chk.stateChanged.connect(
+            lambda state, k=key: self._fx_save_checkbox(k, state)
+        )
 
         eye_btn = QPushButton("👁")
         eye_btn.setFixedSize(22, 22)
@@ -287,17 +336,31 @@ class EffectsMixin:
             lambda _=False, ot=overlay_type, k=key: self._preview_single_effect(ot, k)
         )
 
-        # Wire up save callbacks
-        chk.stateChanged.connect(
-            lambda state, k=key: self._fx_save_checkbox(k, state)
-        )
-        slider.valueChanged.connect(
-            lambda val, k=key, pl=pct_lbl: self._fx_save_slider(k, val, pl)
-        )
-
         ctrl_row.addWidget(chk)
-        ctrl_row.addWidget(slider, 1)
-        ctrl_row.addWidget(pct_lbl)
+
+        if has_slider:
+            intensity = int(self.cfg.OVERLAY.get(key + "_intensity", 80))
+
+            slider = QSlider(Qt.Orientation.Horizontal)
+            slider.setRange(0, 100)
+            slider.setValue(intensity)
+            slider.setToolTip("Effect intensity (0 – 100 %)")
+
+            pct_lbl = QLabel(f"{intensity}%")
+            pct_lbl.setFixedWidth(32)
+            pct_lbl.setStyleSheet("color: #AAA; font-size: 8pt;")
+
+            slider.valueChanged.connect(
+                lambda val, k=key, pl=pct_lbl: self._fx_save_slider(k, val, pl)
+            )
+
+            ctrl_row.addWidget(slider, 1)
+            ctrl_row.addWidget(pct_lbl)
+        else:
+            ctrl_row.addStretch(1)
+            slider = None
+            pct_lbl = None
+
         ctrl_row.addWidget(eye_btn)
         cell_lay.addLayout(ctrl_row)
 
@@ -341,25 +404,29 @@ class EffectsMixin:
     def _fx_reset_defaults(self):
         for key in _ALL_FX_KEYS:
             self.cfg.OVERLAY[key] = True
-            self.cfg.OVERLAY[key + "_intensity"] = 80
             row = self._fx_effect_rows.get(key)
             if row:
                 chk, slider, pct_lbl = row
                 chk.blockSignals(True)
-                slider.blockSignals(True)
                 chk.setChecked(True)
-                slider.setValue(80)
-                pct_lbl.setText("80%")
                 chk.blockSignals(False)
-                slider.blockSignals(False)
+                if slider is not None:
+                    self.cfg.OVERLAY[key + "_intensity"] = 80
+                    slider.blockSignals(True)
+                    slider.setValue(80)
+                    slider.blockSignals(False)
+                if pct_lbl is not None:
+                    pct_lbl.setText("80%")
         self.cfg.save()
 
     def _fx_apply_low_perf_state(self, low_perf: bool):
         """Enable or disable all individual effect controls based on low_perf flag."""
         for key, (chk, slider, pct_lbl) in self._fx_effect_rows.items():
             chk.setEnabled(not low_perf)
-            slider.setEnabled(not low_perf)
-            pct_lbl.setEnabled(not low_perf)
+            if slider is not None:
+                slider.setEnabled(not low_perf)
+            if pct_lbl is not None:
+                pct_lbl.setEnabled(not low_perf)
 
     # ------------------------------------------------------------------
     # Preview helpers
