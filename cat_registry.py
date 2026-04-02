@@ -90,38 +90,39 @@ def upload_cat_progress(
     cfg: "AppConfig",
     table_key: str,
     bridge: Optional["Bridge"] = None,
-) -> None:
+) -> bool:
     """Upload CAT achievement progress to Firebase if the table is approved.
 
-    Silently returns when preconditions are not met (table not in registry,
-    cloud disabled, player name not set, etc.).
+    Returns True if the background upload thread was dispatched successfully.
+    Returns False at every early-return point (table not in registry,
+    cloud disabled, player name not set, dedup skip, etc.).
     """
     # 1. Registry check — table must be explicitly approved
     result = lookup_by_table_key(table_key)
     if result is None:
-        return
+        return False
     firebase_key, registry_entry = result
 
     # Validate firebase_key is a safe path segment (alphanumeric + underscores only)
     if not re.fullmatch(r"[A-Za-z0-9_]+", firebase_key):
         log(cfg, f"[CAT] upload_cat_progress blocked: invalid firebase_key '{firebase_key}'", "WARN")
-        return
+        return False
 
     # 2. Cloud feature flags
     if not cfg.CLOUD_ENABLED or not cfg.CLOUD_BACKUP_ENABLED:
-        return
+        return False
     if not cfg.CLOUD_URL:
-        return
+        return False
 
     # 3. Player name check (reuse existing helper)
     if CloudSync._warn_missing_player_name(cfg):
-        return
+        return False
 
     # 4. Player ID check
     pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
     if not pid or pid == "unknown":
         log(cfg, f"[CAT] upload_cat_progress blocked for '{table_key}': no valid player_id", "WARN")
-        return
+        return False
 
     # 5. Read progress data
     progress_path = f_custom_achievements_progress(cfg)
@@ -145,7 +146,7 @@ def upload_cat_progress(
 
     if total_count <= 0:
         log(cfg, f"[CAT] upload_cat_progress skipped for '{table_key}': total_count is 0", "WARN")
-        return
+        return False
 
     # 6. Client-side dedup
     pname = cfg.OVERLAY.get("player_name", "Player").strip()
@@ -158,7 +159,7 @@ def upload_cat_progress(
         _recent_cat_uploads.update(_pruned)
         _last_ts = _recent_cat_uploads.get(_dedup_key, 0.0)
         if _now - _last_ts < _DEDUP_WINDOW_SEC:
-            return
+            return False
         _recent_cat_uploads[_dedup_key] = _now
 
     # 7. Fire HTTP request in background thread
@@ -205,3 +206,4 @@ def upload_cat_progress(
             log(_cfg, f"[CAT] Progress upload failed for '{_table_key}': {e}", "WARN")
 
     threading.Thread(target=_task, daemon=True).start()
+    return True
