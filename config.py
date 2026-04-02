@@ -100,6 +100,145 @@ DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
 DEFAULT_OVERLAY.setdefault("anim_toast", True)
 DEFAULT_OVERLAY.setdefault("anim_status", True)
 DEFAULT_OVERLAY.setdefault("anim_challenge", True)
+
+# ---------------------------------------------------------------------------
+# Granular fx_* effect keys (replaces coarse anim_* toggles)
+# Each overlay has 10 individual effects: fx_<group>_<effect> (bool)
+# and fx_<group>_<effect>_intensity (int 0-100).
+# ---------------------------------------------------------------------------
+DEFAULT_OVERLAY.setdefault("_fx_migrated", False)
+
+# Main Overlay
+DEFAULT_OVERLAY.setdefault("fx_main_breathing_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_main_breathing_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_floating_particles", True)
+DEFAULT_OVERLAY.setdefault("fx_main_floating_particles_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_page_transition", True)
+DEFAULT_OVERLAY.setdefault("fx_main_page_transition_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_glitch_frame", True)
+DEFAULT_OVERLAY.setdefault("fx_main_glitch_frame_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_score_spin", True)
+DEFAULT_OVERLAY.setdefault("fx_main_score_spin_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_progress_fill", True)
+DEFAULT_OVERLAY.setdefault("fx_main_progress_fill_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_shine_sweep", True)
+DEFAULT_OVERLAY.setdefault("fx_main_shine_sweep_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_highlight_flash", True)
+DEFAULT_OVERLAY.setdefault("fx_main_highlight_flash_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_nav_arrows_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_main_nav_arrows_pulse_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_main_accent_lerp", True)
+DEFAULT_OVERLAY.setdefault("fx_main_accent_lerp_intensity", 80)
+
+# Achievement Toast
+DEFAULT_OVERLAY.setdefault("fx_toast_burst_particles", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_burst_particles_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_neon_rings", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_neon_rings_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_typewriter", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_typewriter_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_icon_bounce", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_icon_bounce_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_slide_motion", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_slide_motion_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_energy_flash", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_energy_flash_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_god_rays", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_god_rays_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_confetti", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_confetti_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_hologram_flicker", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_hologram_flicker_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_toast_shockwave", True)
+DEFAULT_OVERLAY.setdefault("fx_toast_shockwave_intensity", 80)
+
+# Challenge Select
+DEFAULT_OVERLAY.setdefault("fx_challenge_carousel", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_carousel_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_selection_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_selection_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_arrow_wobble", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_arrow_wobble_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_glow_border", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_glow_border_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_snap_scale", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_snap_scale_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_electric_arc", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_electric_arc_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_hover_shimmer", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_hover_shimmer_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_plasma_noise", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_plasma_noise_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_holo_sweep", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_holo_sweep_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_challenge_color_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_challenge_color_pulse_intensity", 80)
+
+# Timer / Countdown
+DEFAULT_OVERLAY.setdefault("fx_timer_321go", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_321go_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_number_spin", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_number_spin_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_radial_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_radial_pulse_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_glow_border", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_glow_border_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_urgency_shake", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_urgency_shake_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_warp_distortion", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_warp_distortion_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_trail_afterimage", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_trail_afterimage_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_final_explosion", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_final_explosion_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_pulse_ring", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_pulse_ring_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_timer_glitch_numbers", True)
+DEFAULT_OVERLAY.setdefault("fx_timer_glitch_numbers_intensity", 80)
+
+# Heat Barometer
+DEFAULT_OVERLAY.setdefault("fx_heat_warning_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_warning_pulse_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_critical_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_critical_pulse_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_glow_border", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_glow_border_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_gradient_anim", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_gradient_anim_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_flame_particles", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_flame_particles_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_shimmer", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_shimmer_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_smoke_wisps", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_smoke_wisps_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_lava_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_lava_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_number_throb", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_number_throb_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_heat_meltdown_shake", True)
+DEFAULT_OVERLAY.setdefault("fx_heat_meltdown_shake_intensity", 80)
+
+# Flip Counter
+DEFAULT_OVERLAY.setdefault("fx_flip_breathing_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_breathing_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_counter_spin", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_counter_spin_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_glow_border", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_glow_border_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_progress_arc", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_progress_arc_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_impact_pulse", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_impact_pulse_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_number_cascade", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_number_cascade_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_milestone_burst", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_milestone_burst_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_electric_spark", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_electric_spark_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_goal_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_goal_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework", True)
+DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework_intensity", 80)
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
@@ -158,9 +297,133 @@ _ALLOWED_OVERLAY_KEYS = [
     "overlay_page2_enabled", "overlay_page3_enabled",
     "overlay_page4_enabled", "overlay_page5_enabled",
     "sound_enabled", "sound_volume", "sound_pack", "sound_events",
+
+    # Granular fx_* effect toggles and intensities
+    "_fx_migrated",
+    "fx_main_breathing_glow", "fx_main_breathing_glow_intensity",
+    "fx_main_floating_particles", "fx_main_floating_particles_intensity",
+    "fx_main_page_transition", "fx_main_page_transition_intensity",
+    "fx_main_glitch_frame", "fx_main_glitch_frame_intensity",
+    "fx_main_score_spin", "fx_main_score_spin_intensity",
+    "fx_main_progress_fill", "fx_main_progress_fill_intensity",
+    "fx_main_shine_sweep", "fx_main_shine_sweep_intensity",
+    "fx_main_highlight_flash", "fx_main_highlight_flash_intensity",
+    "fx_main_nav_arrows_pulse", "fx_main_nav_arrows_pulse_intensity",
+    "fx_main_accent_lerp", "fx_main_accent_lerp_intensity",
+    "fx_toast_burst_particles", "fx_toast_burst_particles_intensity",
+    "fx_toast_neon_rings", "fx_toast_neon_rings_intensity",
+    "fx_toast_typewriter", "fx_toast_typewriter_intensity",
+    "fx_toast_icon_bounce", "fx_toast_icon_bounce_intensity",
+    "fx_toast_slide_motion", "fx_toast_slide_motion_intensity",
+    "fx_toast_energy_flash", "fx_toast_energy_flash_intensity",
+    "fx_toast_god_rays", "fx_toast_god_rays_intensity",
+    "fx_toast_confetti", "fx_toast_confetti_intensity",
+    "fx_toast_hologram_flicker", "fx_toast_hologram_flicker_intensity",
+    "fx_toast_shockwave", "fx_toast_shockwave_intensity",
+    "fx_challenge_carousel", "fx_challenge_carousel_intensity",
+    "fx_challenge_selection_glow", "fx_challenge_selection_glow_intensity",
+    "fx_challenge_arrow_wobble", "fx_challenge_arrow_wobble_intensity",
+    "fx_challenge_glow_border", "fx_challenge_glow_border_intensity",
+    "fx_challenge_snap_scale", "fx_challenge_snap_scale_intensity",
+    "fx_challenge_electric_arc", "fx_challenge_electric_arc_intensity",
+    "fx_challenge_hover_shimmer", "fx_challenge_hover_shimmer_intensity",
+    "fx_challenge_plasma_noise", "fx_challenge_plasma_noise_intensity",
+    "fx_challenge_holo_sweep", "fx_challenge_holo_sweep_intensity",
+    "fx_challenge_color_pulse", "fx_challenge_color_pulse_intensity",
+    "fx_timer_321go", "fx_timer_321go_intensity",
+    "fx_timer_number_spin", "fx_timer_number_spin_intensity",
+    "fx_timer_radial_pulse", "fx_timer_radial_pulse_intensity",
+    "fx_timer_glow_border", "fx_timer_glow_border_intensity",
+    "fx_timer_urgency_shake", "fx_timer_urgency_shake_intensity",
+    "fx_timer_warp_distortion", "fx_timer_warp_distortion_intensity",
+    "fx_timer_trail_afterimage", "fx_timer_trail_afterimage_intensity",
+    "fx_timer_final_explosion", "fx_timer_final_explosion_intensity",
+    "fx_timer_pulse_ring", "fx_timer_pulse_ring_intensity",
+    "fx_timer_glitch_numbers", "fx_timer_glitch_numbers_intensity",
+    "fx_heat_warning_pulse", "fx_heat_warning_pulse_intensity",
+    "fx_heat_critical_pulse", "fx_heat_critical_pulse_intensity",
+    "fx_heat_glow_border", "fx_heat_glow_border_intensity",
+    "fx_heat_gradient_anim", "fx_heat_gradient_anim_intensity",
+    "fx_heat_flame_particles", "fx_heat_flame_particles_intensity",
+    "fx_heat_shimmer", "fx_heat_shimmer_intensity",
+    "fx_heat_smoke_wisps", "fx_heat_smoke_wisps_intensity",
+    "fx_heat_lava_glow", "fx_heat_lava_glow_intensity",
+    "fx_heat_number_throb", "fx_heat_number_throb_intensity",
+    "fx_heat_meltdown_shake", "fx_heat_meltdown_shake_intensity",
+    "fx_flip_breathing_glow", "fx_flip_breathing_glow_intensity",
+    "fx_flip_counter_spin", "fx_flip_counter_spin_intensity",
+    "fx_flip_glow_border", "fx_flip_glow_border_intensity",
+    "fx_flip_progress_arc", "fx_flip_progress_arc_intensity",
+    "fx_flip_impact_pulse", "fx_flip_impact_pulse_intensity",
+    "fx_flip_number_cascade", "fx_flip_number_cascade_intensity",
+    "fx_flip_milestone_burst", "fx_flip_milestone_burst_intensity",
+    "fx_flip_electric_spark", "fx_flip_electric_spark_intensity",
+    "fx_flip_goal_glow", "fx_flip_goal_glow_intensity",
+    "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
 ]
 
 CHALLENGES_ENABLED = True
+
+
+def _migrate_anim_to_fx(ov: dict) -> None:
+    """One-time migration: map legacy anim_* keys to granular fx_* keys.
+
+    Called from AppConfig.load() on first load after upgrading.  Sets the
+    ``_fx_migrated`` flag so the migration only runs once.
+    """
+    if ov.get("_fx_migrated"):
+        return
+
+    anim_main_transitions = bool(ov.get("anim_main_transitions", True))
+    anim_main_glow = bool(ov.get("anim_main_glow", True))
+    anim_main_score = bool(ov.get("anim_main_score_progress", True))
+    anim_main_hi = bool(ov.get("anim_main_highlights", True))
+    anim_toast = bool(ov.get("anim_toast", True))
+    anim_challenge = bool(ov.get("anim_challenge", True))
+
+    # Main Overlay
+    ov.setdefault("fx_main_page_transition", anim_main_transitions)
+    ov.setdefault("fx_main_glitch_frame", anim_main_transitions)
+    ov.setdefault("fx_main_breathing_glow", anim_main_glow)
+    ov.setdefault("fx_main_floating_particles", anim_main_glow)
+    ov.setdefault("fx_main_score_spin", anim_main_score)
+    ov.setdefault("fx_main_progress_fill", anim_main_score)
+    ov.setdefault("fx_main_shine_sweep", anim_main_hi)
+    ov.setdefault("fx_main_highlight_flash", anim_main_hi)
+    ov.setdefault("fx_main_nav_arrows_pulse", anim_main_hi)
+    ov.setdefault("fx_main_accent_lerp", anim_main_hi)
+
+    # Achievement Toast
+    for key in [
+        "fx_toast_burst_particles", "fx_toast_neon_rings", "fx_toast_typewriter",
+        "fx_toast_icon_bounce", "fx_toast_slide_motion", "fx_toast_energy_flash",
+        "fx_toast_god_rays", "fx_toast_confetti", "fx_toast_hologram_flicker",
+        "fx_toast_shockwave",
+    ]:
+        ov.setdefault(key, anim_toast)
+
+    # Challenge / Timer / Heat / Flip
+    for key in [
+        "fx_challenge_carousel", "fx_challenge_selection_glow", "fx_challenge_arrow_wobble",
+        "fx_challenge_glow_border", "fx_challenge_snap_scale", "fx_challenge_electric_arc",
+        "fx_challenge_hover_shimmer", "fx_challenge_plasma_noise", "fx_challenge_holo_sweep",
+        "fx_challenge_color_pulse",
+        "fx_timer_321go", "fx_timer_number_spin", "fx_timer_radial_pulse",
+        "fx_timer_glow_border", "fx_timer_urgency_shake", "fx_timer_warp_distortion",
+        "fx_timer_trail_afterimage", "fx_timer_final_explosion", "fx_timer_pulse_ring",
+        "fx_timer_glitch_numbers",
+        "fx_heat_warning_pulse", "fx_heat_critical_pulse", "fx_heat_glow_border",
+        "fx_heat_gradient_anim", "fx_heat_flame_particles", "fx_heat_shimmer",
+        "fx_heat_smoke_wisps", "fx_heat_lava_glow", "fx_heat_number_throb",
+        "fx_heat_meltdown_shake",
+        "fx_flip_breathing_glow", "fx_flip_counter_spin", "fx_flip_glow_border",
+        "fx_flip_progress_arc", "fx_flip_impact_pulse", "fx_flip_number_cascade",
+        "fx_flip_milestone_burst", "fx_flip_electric_spark", "fx_flip_goal_glow",
+        "fx_flip_completion_firework",
+    ]:
+        ov.setdefault(key, anim_challenge)
+
+    ov["_fx_migrated"] = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
 VK_LSHIFT = 0xA0
@@ -227,6 +490,9 @@ class AppConfig:
                 del loaded_ov[k]
 
         ov.update(loaded_ov)
+
+        # One-time migration from legacy anim_* keys to granular fx_* keys
+        _migrate_anim_to_fx(ov)
 
         cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
         cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))

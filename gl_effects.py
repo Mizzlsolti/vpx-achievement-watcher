@@ -162,7 +162,7 @@ class EffectsWidget(QWidget):
         try:
             ov = self.parent().parent_gui.cfg.OVERLAY
             low_perf = bool(ov.get("low_performance_mode", False))
-            anim_glow = bool(ov.get("anim_main_glow", True))
+            anim_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
         except Exception:
             low_perf = False
             anim_glow = True
@@ -219,7 +219,7 @@ class EffectsWidget(QWidget):
         try:
             ov = self.parent().parent_gui.cfg.OVERLAY
             low_perf = bool(ov.get("low_performance_mode", False))
-            anim_glow = bool(ov.get("anim_main_glow", True))
+            anim_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
         except Exception:
             low_perf = False
             anim_glow = True
