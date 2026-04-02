@@ -28,6 +28,14 @@ from gl_effects_opengl import (
     ParticleBurst, NeonRingExpansion, TypewriterReveal, IconBounce,
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
+    # Timer / Countdown effects
+    CountdownScaleGlow, RadialPulseBackground, UrgencyShake, TimeWarpDistortion,
+    TrailAfterimage, FinalExplosion, PulseRingCountdown, GlitchNumbers,
+    # Heat Barometer effects
+    FlameParticles, HeatShimmer, SmokeWisps, LavaGlowEdge, NumberThrob, MeltdownShake,
+    # Flip Counter effects
+    FlipImpactPulse, NumberCascade, MilestoneBurst, ElectricSpark,
+    GoalProximityGlow, CompletionFirework,
 )
 
 try:
@@ -1824,6 +1832,7 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         self._total = int(total)
         self._remaining = int(remaining)
         self._goal = int(goal)
+        self._milestones_hit: set[int] = set()
         self.setWindowTitle("Flip Counter")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -1840,6 +1849,18 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
 
         # Breathing glow animation (same cadence as ChallengeSelectOverlay pulse)
         self._breathing_pulse = BreathingPulse(speed=0.05)
+
+        # New flip effects
+        self._flip_impact  = FlipImpactPulse(intensity=self._get_fx_intensity("fx_flip_impact_pulse"))
+        self._num_cascade  = NumberCascade(intensity=self._get_fx_intensity("fx_flip_number_cascade"))
+        self._milestone    = MilestoneBurst(intensity=self._get_fx_intensity("fx_flip_milestone_burst"))
+        self._spark        = ElectricSpark(intensity=self._get_fx_intensity("fx_flip_electric_spark"))
+        self._goal_glow    = GoalProximityGlow(intensity=self._get_fx_intensity("fx_flip_goal_glow"))
+        self._completion   = CompletionFirework(intensity=self._get_fx_intensity("fx_flip_completion_firework"))
+
+        # Start continuous effects
+        self._goal_glow.start()
+
         self._anim_timer = QTimer(self)
         self._anim_timer.setInterval(50)
         self._anim_timer.timeout.connect(self._on_anim_tick)
@@ -1861,6 +1882,12 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
 
     def _on_anim_tick(self):
         self._breathing_pulse.tick(50.0)
+        self._flip_impact.tick(50.0)
+        self._num_cascade.tick(50.0)
+        self._milestone.tick(50.0)
+        self._spark.tick(50.0)
+        self._goal_glow.tick(50.0)
+        self._completion.tick(50.0)
         self._render_and_place()
 
     def _check_low_perf(self) -> bool:
@@ -1888,7 +1915,13 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         title_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
         hi_color = QColor("#FFFFFF")
 
-        title = f"Total flips: {int(self._total)}/{int(self._goal)}"
+        # Counter spin: show cascade char instead of real count during animation
+        show_spin = (
+            self._is_fx_enabled("fx_flip_counter_spin")
+            and self._num_cascade.is_active()
+        )
+        display_count = self._num_cascade.cascade_char if show_spin else str(int(self._total))
+        title = f"Total flips: {display_count}/{int(self._goal)}"
         sub = f"Remaining: {int(max(0, self._remaining))}"
 
         f_title = QFont(font_family, title_pt, QFont.Weight.Bold)
@@ -1921,22 +1954,58 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=not self._is_fx_enabled("fx_flip_glow_border"))
 
-            # Breathing glow ring: pulsates when animation is enabled.
-            # Drawn at 5px inset to avoid overlapping the fully-opaque inner border from
-            # _draw_glow_border (which extends ~2px from the edge), ensuring the alpha
-            # oscillation (40→220) is visible against the dark background.
+            # Breathing glow ring
             if self._is_fx_enabled("fx_flip_breathing_glow"):
                 _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                 self._breathing_pulse.draw(p, 5, 5, content_w - 10, content_h - 10,
                                            radius - 3, _pc, width=5)
 
+            # Goal proximity glow (edge glow intensifying as total→goal)
+            if self._is_fx_enabled("fx_flip_goal_glow") and self._goal_glow.is_active():
+                self._goal_glow.draw(p, QRect(0, 0, content_w, content_h))
+
+            # Progress arc (inline: arc showing total/goal progress around the widget)
+            if self._is_fx_enabled("fx_flip_progress_arc") and self._goal > 0:
+                progress = min(1.0, self._total / self._goal)
+                span_deg = int(360 * progress)
+                arc_pen = QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary")), 4)
+                arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                p.save()
+                p.setPen(arc_pen)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                margin = 3
+                p.drawArc(margin, margin, content_w - 2 * margin, content_h - 2 * margin,
+                          90 * 16, -span_deg * 16)
+                p.restore()
+
+            # Flip impact flash
+            if self._is_fx_enabled("fx_flip_impact_pulse") and self._flip_impact.is_active():
+                self._flip_impact.draw(p, QRect(0, 0, content_w, content_h))
+
             p.setPen(title_color); p.setFont(f_title)
             p.drawText(QRect(0, pad, content_w, fm_title.height()),
                        int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter), title)
 
+            # Number cascade overlay
+            if self._is_fx_enabled("fx_flip_number_cascade") and self._num_cascade.is_active():
+                self._num_cascade.draw(p, QRect(0, pad, content_w, fm_title.height()))
+
             p.setPen(hi_color); p.setFont(f_body)
             p.drawText(QRect(0, pad + fm_title.height() + vgap, content_w, fm_body.height()),
                        int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter), sub)
+
+            # Electric spark on increments
+            if self._is_fx_enabled("fx_flip_electric_spark") and self._spark.is_active():
+                self._spark.draw(p, QRect(0, 0, content_w, content_h))
+
+            # Milestone burst particles
+            if self._is_fx_enabled("fx_flip_milestone_burst") and self._milestone.is_active():
+                self._milestone.draw(p, QRect(0, 0, content_w, content_h))
+
+            # Completion firework
+            if self._is_fx_enabled("fx_flip_completion_firework") and self._completion.is_active():
+                self._completion.draw(p, QRect(0, 0, content_w, content_h))
+
         finally:
             p.end()
 
@@ -1977,9 +2046,40 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         self.raise_()
 
     def update_counts(self, total: int, remaining: int, goal: int):
-        self._total = int(total)
+        new_total = int(total)
         self._remaining = int(remaining)
         self._goal = int(goal)
+        prev = self._total
+        self._total = new_total
+
+        # Trigger per-flip effects when total changes
+        if new_total != prev:
+            if self._is_fx_enabled("fx_flip_impact_pulse"):
+                self._flip_impact.trigger()
+            if self._is_fx_enabled("fx_flip_number_cascade") or self._is_fx_enabled("fx_flip_counter_spin"):
+                self._num_cascade.trigger()
+            if self._is_fx_enabled("fx_flip_electric_spark"):
+                self._spark.trigger()
+
+            # Milestone burst at 25%, 50%, 75%
+            if self._goal > 0:
+                for milestone_pct in (25, 50, 75):
+                    milestone_val = self._goal * milestone_pct // 100
+                    if (prev < milestone_val <= new_total
+                            and milestone_pct not in self._milestones_hit):
+                        self._milestones_hit.add(milestone_pct)
+                        if self._is_fx_enabled("fx_flip_milestone_burst"):
+                            self._milestone.trigger()
+
+            # Completion firework when goal is reached
+            if self._goal > 0 and new_total >= self._goal and prev < self._goal:
+                if self._is_fx_enabled("fx_flip_completion_firework"):
+                    self._completion.start()
+
+        # Update goal proximity glow
+        if self._goal > 0 and self._is_fx_enabled("fx_flip_goal_glow"):
+            self._goal_glow.set_proximity(min(1.0, new_total / self._goal))
+
         self._render_and_place()
 
     def update_font(self):
@@ -3787,7 +3887,7 @@ class AchToastManager(QObject):
         self._active_window = None
         QTimer.singleShot(250, self._show_next)
 
-class ChallengeCountdownOverlay(QWidget):
+class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
     def __init__(self, parent, total_seconds: int = 300):
         super().__init__(parent)
         self.parent_gui = parent
@@ -3795,6 +3895,26 @@ class ChallengeCountdownOverlay(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(1000)
+
+        # Effect instances
+        self._scale_glow   = CountdownScaleGlow(intensity=self._get_fx_intensity("fx_timer_number_spin"))
+        self._radial_pulse = RadialPulseBackground(intensity=self._get_fx_intensity("fx_timer_radial_pulse"))
+        self._urgency_shake = UrgencyShake(intensity=self._get_fx_intensity("fx_timer_urgency_shake"))
+        self._time_warp    = TimeWarpDistortion(intensity=self._get_fx_intensity("fx_timer_warp_distortion"))
+        self._trail        = TrailAfterimage(intensity=self._get_fx_intensity("fx_timer_trail_afterimage"))
+        self._explosion    = FinalExplosion(intensity=self._get_fx_intensity("fx_timer_final_explosion"))
+        self._pulse_ring   = PulseRingCountdown(intensity=self._get_fx_intensity("fx_timer_pulse_ring"))
+        self._glitch       = GlitchNumbers(intensity=self._get_fx_intensity("fx_timer_glitch_numbers"))
+
+        # Start continuous background effect
+        self._radial_pulse.start()
+
+        # 16 ms animation timer for smooth per-frame updates
+        self._fx_timer = QTimer(self)
+        self._fx_timer.setInterval(16)
+        self._fx_timer.timeout.connect(self._on_fx_tick)
+        self._fx_timer.start()
+
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
@@ -3817,6 +3937,18 @@ class ChallengeCountdownOverlay(QWidget):
         self._render_and_place()
         _start_topmost_timer(self)
 
+    def _on_fx_tick(self):
+        """16 ms animation tick: advance all smooth/continuous effects and repaint."""
+        self._radial_pulse.tick(16.0)
+        self._urgency_shake.tick(16.0)
+        self._time_warp.tick(16.0)
+        self._trail.tick(16.0)
+        self._scale_glow.tick(16.0)
+        self._pulse_ring.tick(16.0)
+        self._glitch.tick(16.0)
+        self._explosion.tick(16.0)
+        self._render_and_place()
+
     def _tick(self):
         self._left -= 1
         if self._left <= 0:
@@ -3828,16 +3960,37 @@ class ChallengeCountdownOverlay(QWidget):
                     pass
             try:
                 self._timer.stop()
+                # Trigger zero-second effects
+                if self._is_fx_enabled("fx_timer_final_explosion"):
+                    self._explosion.start()
+                if self._is_fx_enabled("fx_timer_glitch_numbers"):
+                    self._glitch.start()
                 self._render_and_place()
             except Exception:
                 pass
-            QTimer.singleShot(200, self.close)
+            QTimer.singleShot(2000, self.close)
             return
         if _sound_mod is not None:
             try:
                 _sound_mod.play_sound(self.parent_gui.cfg, "countdown_tick")
             except Exception:
                 pass
+        # Trigger per-second digit-change effects
+        if self._is_fx_enabled("fx_timer_number_spin"):
+            self._scale_glow.trigger()
+        if self._is_fx_enabled("fx_timer_trail_afterimage"):
+            self._trail.start()
+        if self._is_fx_enabled("fx_timer_pulse_ring"):
+            self._pulse_ring.trigger()
+        if self._is_fx_enabled("fx_timer_glitch_numbers"):
+            self._glitch.start()
+        # Activate urgency effects in the last seconds
+        if self._left <= 5 and self._is_fx_enabled("fx_timer_urgency_shake"):
+            if not self._urgency_shake.is_active():
+                self._urgency_shake.start()
+        if self._left <= 10 and self._is_fx_enabled("fx_timer_warp_distortion"):
+            if not self._time_warp.is_active():
+                self._time_warp.start()
         self._render_and_place()
 
     def _render_and_place(self):
@@ -3863,6 +4016,12 @@ class ChallengeCountdownOverlay(QWidget):
             x = int(geo.left() + pad)
             y = int(geo.bottom() - H - pad)
 
+        # Apply urgency shake window displacement
+        if self._is_fx_enabled("fx_timer_urgency_shake") and self._urgency_shake.is_active():
+            ox, oy = self._urgency_shake.shake_offset
+            x += ox
+            y += oy
+
         x = max(geo.left(), min(x, geo.right() - W))
         y = max(geo.top(),  min(y,  geo.bottom() - H))
         self.move(x, y)
@@ -3887,6 +4046,15 @@ class ChallengeCountdownOverlay(QWidget):
         _draw_glow_border(p, 0, 0, w, h, radius=16,
                           color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                           low_perf=bool(ov.get("low_performance_mode", False)))
+
+        # Radial pulse background ring
+        if self._is_fx_enabled("fx_timer_radial_pulse"):
+            self._radial_pulse.draw(p, QRect(0, 0, w, h))
+
+        # Time warp distortion (wavy lines overlay)
+        if self._is_fx_enabled("fx_timer_warp_distortion") and self._time_warp.is_active():
+            self._time_warp.draw(p, QRect(0, 0, w, h))
+
         # Turn accent colour when 10 seconds or fewer remain
         if self._left <= 10:
             p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")))
@@ -3894,9 +4062,42 @@ class ChallengeCountdownOverlay(QWidget):
             p.setPen(Qt.GlobalColor.white)
         mins, secs = divmod(self._left, 60)
         txt = f"{mins:02d}:{secs:02d}"
+
+        # Countdown Scale Glow: scale the number on each digit change
+        if self._is_fx_enabled("fx_timer_number_spin") and self._scale_glow.is_active():
+            scale = self._scale_glow.scale
+            p.save()
+            p.translate(w / 2, h / 2)
+            p.scale(scale, scale)
+            p.translate(-w / 2, -h / 2)
         font = QFont(font_family, timer_font_pt, QFont.Weight.Bold)
         p.setFont(font)
         p.drawText(QRect(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, txt)
+        if self._is_fx_enabled("fx_timer_number_spin") and self._scale_glow.is_active():
+            p.restore()
+            # Draw the glow burst rect over the text
+            self._scale_glow.draw(p, QRect(0, 0, w, h))
+
+        # Trail afterimage (fading echo circles)
+        if self._is_fx_enabled("fx_timer_trail_afterimage") and self._trail.is_active():
+            self._trail.draw(p, QRect(0, 0, w, h))
+
+        # Pulse ring (contracting ring per second)
+        if self._is_fx_enabled("fx_timer_pulse_ring") and self._pulse_ring.is_active():
+            self._pulse_ring.draw(p, QRect(0, 0, w, h))
+
+        # Digital glitch numbers
+        if self._is_fx_enabled("fx_timer_glitch_numbers") and self._glitch.is_active():
+            self._glitch.draw(p, QRect(0, 0, w, h))
+
+        # Final explosion particle burst
+        if self._is_fx_enabled("fx_timer_final_explosion") and self._explosion.is_active():
+            self._explosion.draw(p, QRect(0, 0, w, h))
+
+        # Urgency shake red overlay
+        if self._is_fx_enabled("fx_timer_urgency_shake") and self._urgency_shake.is_active():
+            self._urgency_shake.draw(p, QRect(0, 0, w, h))
+
         p.end()
         try:
             portrait = bool(ov.get("ch_timer_portrait", ov.get("portrait_mode", True)))
@@ -3906,6 +4107,17 @@ class ChallengeCountdownOverlay(QWidget):
         except Exception:
             pass
         return img
+
+    def closeEvent(self, e):
+        try:
+            self._fx_timer.stop()
+        except Exception:
+            pass
+        try:
+            self._timer.stop()
+        except Exception:
+            pass
+        super().closeEvent(e)
 
     def update_font(self):
         if self.isVisible():
@@ -4508,9 +4720,25 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # Reactive pulse animation timer (warning/critical)
         self._heat_pulse = HeatPulse(threshold=65)
+        self._heat_critical_pulse = HeatPulse(threshold=85)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
+
+        # New heat effects
+        self._flame      = FlameParticles(intensity=self._get_fx_intensity("fx_heat_flame_particles"))
+        self._shimmer    = HeatShimmer(intensity=self._get_fx_intensity("fx_heat_shimmer"))
+        self._smoke      = SmokeWisps(intensity=self._get_fx_intensity("fx_heat_smoke_wisps"))
+        self._lava_glow  = LavaGlowEdge(intensity=self._get_fx_intensity("fx_heat_lava_glow"))
+        self._num_throb  = NumberThrob(intensity=self._get_fx_intensity("fx_heat_number_throb"))
+        self._meltdown   = MeltdownShake(intensity=self._get_fx_intensity("fx_heat_meltdown_shake"))
+
+        # Continuous animation timer for new effects (runs always, regardless of heat level)
+        self._fx_anim_timer = QTimer(self)
+        self._fx_anim_timer.setInterval(40)
+        self._fx_anim_timer.timeout.connect(self._on_fx_anim_tick)
+        self._fx_anim_timer.start()
+
         self._render_and_place()
         self.show()
         self.raise_()
@@ -4527,22 +4755,54 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
 
     def _on_pulse_tick(self):
         self._heat_pulse.tick(40.0)
+        self._heat_critical_pulse.tick(40.0)
+        self._render_and_place()
+
+    def _on_fx_anim_tick(self):
+        """40 ms tick for continuous new heat effects."""
+        self._flame.tick(40.0)
+        self._shimmer.tick(40.0)
+        self._smoke.tick(40.0)
+        self._lava_glow.tick(40.0)
+        self._num_throb.tick(40.0)
+        self._meltdown.tick(40.0)
         self._render_and_place()
 
     def set_heat(self, heat: int):
         self._heat = max(0, min(100, int(heat)))
-        # Start/stop pulse timer based on heat level and live fx check
+        # Start/stop warning pulse timer
         if self._is_fx_enabled("fx_heat_warning_pulse") and self._heat >= 65:
             if not self._pulse_timer.isActive():
                 self._pulse_timer.start()
         else:
             if self._pulse_timer.isActive():
                 self._pulse_timer.stop()
+        # Start/stop new continuous effects based on heat level
+        if self._heat > 0:
+            if self._is_fx_enabled("fx_heat_flame_particles") and not self._flame.is_active():
+                self._flame.start()
+            if self._is_fx_enabled("fx_heat_shimmer") and not self._shimmer.is_active():
+                self._shimmer.start()
+            if self._is_fx_enabled("fx_heat_smoke_wisps") and not self._smoke.is_active():
+                self._smoke.start()
+            if self._is_fx_enabled("fx_heat_lava_glow") and not self._lava_glow.is_active():
+                self._lava_glow.start()
+            if self._is_fx_enabled("fx_heat_number_throb") and not self._num_throb.is_active():
+                self._num_throb.start()
+        if self._heat >= 90 and self._is_fx_enabled("fx_heat_meltdown_shake"):
+            if not self._meltdown.is_active():
+                self._meltdown.start()
+        elif self._heat < 90:
+            self._meltdown.stop()
         self._render_and_place()
 
     def closeEvent(self, e):
         try:
             self._pulse_timer.stop()
+        except Exception:
+            pass
+        try:
+            self._fx_anim_timer.stop()
         except Exception:
             pass
         super().closeEvent(e)
@@ -4587,6 +4847,10 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=not self._is_fx_enabled("fx_heat_glow_border"))
 
+            # Heat shimmer wavy distortion
+            if self._is_fx_enabled("fx_heat_shimmer") and self._shimmer.is_active():
+                self._shimmer.draw(p, QRect(0, 0, w, h))
+
             # bar background (track)
             bx = pad
             by = pad
@@ -4601,15 +4865,40 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
                 p.setBrush(self._bar_color(self._heat))
                 p.drawRoundedRect(bx, fill_y, bar_w, fill_h, 6, 6)
 
-            # label
+            # Flame particles rising from the bottom
+            if self._is_fx_enabled("fx_heat_flame_particles") and self._flame.is_active():
+                self._flame.draw(p, QRect(bx, by, bar_w, bar_h))
+
+            # Smoke wisps at the edges
+            if self._is_fx_enabled("fx_heat_smoke_wisps") and self._smoke.is_active():
+                self._smoke.draw(p, QRect(0, 0, w, h))
+
+            # Lava glow edge around the widget
+            if self._is_fx_enabled("fx_heat_lava_glow") and self._lava_glow.is_active():
+                self._lava_glow.draw(p, QRect(0, 0, w, h))
+
+            # label — scale font with NumberThrob if enabled
+            throb_scale = self._num_throb.scale if (
+                self._is_fx_enabled("fx_heat_number_throb") and self._num_throb.is_active()
+            ) else 1.0
+            label_font_pt = max(7, int(round(9 * throb_scale)))
             p.setPen(QColor("#FFFFFF"))
-            p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            p.setFont(QFont("Segoe UI", label_font_pt, QFont.Weight.Bold))
             label_rect = QRect(0, pad + bar_h, w, label_h)
             p.drawText(label_rect, int(Qt.AlignmentFlag.AlignCenter), f"{self._heat}%")
 
-            # Reactive warning/critical pulse border (no success effect for overheating)
+            # Reactive warning pulse border (65%+)
             self._heat_pulse.draw(p, 1, 1, w - 2, h - 2, self._heat,
                                   not self._is_fx_enabled("fx_heat_warning_pulse"))
+
+            # Critical pulse border (85%+)
+            self._heat_critical_pulse.draw(p, 1, 1, w - 2, h - 2, self._heat,
+                                           not self._is_fx_enabled("fx_heat_critical_pulse"))
+
+            # Meltdown shake red overlay (drawn last for maximum visibility)
+            if self._is_fx_enabled("fx_heat_meltdown_shake") and self._meltdown.is_active():
+                self._meltdown.draw(p, QRect(0, 0, w, h))
+
         finally:
             p.end()
 
@@ -4643,6 +4932,12 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         else:
             x = int(geo.left() + 20)
             y = int(geo.top() + (geo.height() - H) // 2)
+
+        # Apply meltdown shake window displacement
+        if self._is_fx_enabled("fx_heat_meltdown_shake") and self._meltdown.is_active():
+            ox, oy = self._meltdown.shake_offset
+            x += ox
+            y += oy
 
         x = max(geo.left(), min(x, geo.right() - W))
         y = max(geo.top(),  min(y,  geo.bottom() - H))
