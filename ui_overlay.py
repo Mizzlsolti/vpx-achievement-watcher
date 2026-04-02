@@ -29,6 +29,7 @@ from gl_effects_opengl import (
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
     GodRayBurst, ConfettiShower, HologramFlicker, ShockwaveRipple,
+    ElectricArc, HoverShimmer, PlasmaNoise, HoloSweep, DifficultyColorPulse,
 )
 
 try:
@@ -4011,12 +4012,31 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._carousel = CarouselSlide(duration=180.0)
+        self._electric_arc = ElectricArc(intensity=self._get_fx_intensity("fx_challenge_electric_arc"))
+        self._hover_shimmer = HoverShimmer(intensity=self._get_fx_intensity("fx_challenge_hover_shimmer"))
+        self._plasma_noise = PlasmaNoise(intensity=self._get_fx_intensity("fx_challenge_plasma_noise"))
+        self._holo_sweep = HoloSweep(intensity=self._get_fx_intensity("fx_challenge_holo_sweep"))
+        self._color_pulse = DifficultyColorPulse(intensity=self._get_fx_intensity("fx_challenge_color_pulse"))
+        # Snap scale state
+        self._snap_scale = 1.0
+        self._snap_elapsed = 0.0
+        self._snap_active = False
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._slide_timer = QTimer(self)
         self._slide_timer.setInterval(16)
         self._slide_timer.timeout.connect(self._on_slide_tick)
+        if self._is_fx_enabled("fx_challenge_electric_arc"):
+            self._electric_arc.start()
+        if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+            self._hover_shimmer.start()
+        if self._is_fx_enabled("fx_challenge_plasma_noise"):
+            self._plasma_noise.start()
+        if self._is_fx_enabled("fx_challenge_holo_sweep"):
+            self._holo_sweep.start()
+        if self._is_fx_enabled("fx_challenge_color_pulse"):
+            self._color_pulse.start()
         self._pulse_timer.start()  # always run; live fx checks in _compose_image
         self._pix = None
         self._render_and_place()
@@ -4056,6 +4076,23 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
 
     def _on_pulse_tick(self):
         self._breathing_pulse.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_electric_arc"):
+            self._electric_arc.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+            self._hover_shimmer.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_plasma_noise"):
+            self._plasma_noise.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_holo_sweep"):
+            self._holo_sweep.tick(50.0)
+        if self._is_fx_enabled("fx_challenge_color_pulse"):
+            self._color_pulse.tick(50.0)
+        if self._snap_active:
+            self._snap_elapsed += 50.0
+            t = min(1.0, self._snap_elapsed / 200.0)  # 200ms duration
+            self._snap_scale = 0.92 + 0.08 * t  # lerp back to 1.0
+            if t >= 1.0:
+                self._snap_scale = 1.0
+                self._snap_active = False
         self._render_and_place()
 
     def _on_slide_tick(self):
@@ -4074,6 +4111,10 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             self._slide_timer.start()
         else:
             self._prev_selected = new_idx
+        if new_idx != self._selected and self._is_fx_enabled("fx_challenge_snap_scale"):
+            self._snap_scale = 0.92  # start slightly shrunk
+            self._snap_elapsed = 0.0
+            self._snap_active = True
         self._selected = new_idx
         self._render_and_place()
 
@@ -4129,6 +4170,38 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             _draw_glow_border(p, 0, 0, w, h, radius=radius,
                               color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
                               low_perf=not self._is_fx_enabled("fx_challenge_glow_border"))
+
+            # Selection glow (gated by fx)
+            if self._is_fx_enabled("fx_challenge_selection_glow"):
+                amp = self._breathing_pulse.get_amp()
+                glow_alpha = int(30 * amp)
+                glow_color = QColor(hi_color)
+                glow_color.setAlpha(glow_alpha)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(glow_color)
+                p.drawRoundedRect(0, 0, w, h, radius, radius)
+
+            # Apply snap scale transform when active
+            if self._snap_active or self._snap_scale != 1.0:
+                cx_center, cy_center = w / 2.0, h / 2.0
+                t = QTransform()
+                t.translate(cx_center, cy_center)
+                t.scale(self._snap_scale, self._snap_scale)
+                t.translate(-cx_center, -cy_center)
+                p.setTransform(t)
+
+            draw_rect = QRect(0, 0, w, h)
+            if self._is_fx_enabled("fx_challenge_plasma_noise"):
+                self._plasma_noise.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_electric_arc"):
+                self._electric_arc.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_hover_shimmer"):
+                self._hover_shimmer.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_holo_sweep"):
+                self._holo_sweep.draw(p, draw_rect)
+            if self._is_fx_enabled("fx_challenge_color_pulse"):
+                self._color_pulse.draw(p, draw_rect)
+
             title_font_pt = scaled_body_pt + 6
             desc_pt = max(10, scaled_body_pt)
             min_title = 12
