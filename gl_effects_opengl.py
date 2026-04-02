@@ -102,14 +102,14 @@ def draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
         color = QColor("#00E5FF")
     if not low_perf:
         for i in range(layers, 0, -1):
-            alpha = int(30 * (layers + 1 - i))
+            alpha = min(255, int(60 * (layers + 1 - i)))
             glow_pen = QPen(QColor(color.red(), color.green(), color.blue(), alpha))
-            glow_pen.setWidth(i * 2)
+            glow_pen.setWidth(i * 3)
             painter.setPen(glow_pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(x + i, y + i, w - 2 * i, h - 2 * i, radius, radius)
     pen = QPen(color)
-    pen.setWidth(2)
+    pen.setWidth(3)
     painter.setPen(pen)
     painter.setBrush(Qt.BrushStyle.NoBrush)
     painter.drawRoundedRect(x + 1, y + 1, w - 2, h - 2, radius, radius)
@@ -148,7 +148,7 @@ class EffectsWidget(QWidget):
         from gl_effects_opengl import EffectsWidget as OverlayEffectsWidget
     """
 
-    _PARTICLE_COUNT = 18
+    _PARTICLE_COUNT = 28
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -191,8 +191,8 @@ class EffectsWidget(QWidget):
             ]),
             'vx': random.uniform(-15, 15),
             'vy': random.uniform(-25, 25) if spawn_anywhere else random.uniform(-30, -10),
-            'size': random.uniform(2, 6),
-            'alpha': random.randint(30, 100),
+            'size': random.uniform(3, 8),
+            'alpha': random.randint(60, 180),
             'alpha_dir': random.choice([-1, 1]),
         }
 
@@ -238,12 +238,12 @@ class EffectsWidget(QWidget):
         for pt in self._particles:
             pt['x'] += pt['vx'] * dt
             pt['y'] += pt['vy'] * dt
-            pt['alpha'] += pt['alpha_dir'] * 2
-            if pt['alpha'] >= 100:
-                pt['alpha'] = 100
+            pt['alpha'] += pt['alpha_dir'] * 3
+            if pt['alpha'] >= 180:
+                pt['alpha'] = 180
                 pt['alpha_dir'] = -1
-            elif pt['alpha'] <= 20:
-                pt['alpha'] = 20
+            elif pt['alpha'] <= 40:
+                pt['alpha'] = 40
                 pt['alpha_dir'] = 1
             if pt['y'] < -10 or pt['y'] > H + 10 or pt['x'] < -10 or pt['x'] > W + 10:
                 pt.update(self._make_particle(W, H, spawn_anywhere=True))
@@ -1204,13 +1204,13 @@ class GodRayBurst:
         self._rays: list[dict] = []
 
     def start(self):
-        n = max(4, int(10 * self.intensity))
+        n = max(8, int(20 * self.intensity))
         self._rays = [
             {
                 "angle": random.uniform(0, 2 * math.pi),
                 "length": random.uniform(0.3, 0.9),
-                "width": random.uniform(4, 12) * self.intensity,
-                "alpha": random.randint(80, 180),
+                "width": random.uniform(8, 20) * self.intensity,
+                "alpha": random.randint(180, 255),
             }
             for _ in range(n)
         ]
@@ -1293,7 +1293,7 @@ class ConfettiShower:
         self._pieces: list[dict] = []
 
     def start(self):
-        n = max(5, int(30 * self.intensity))
+        n = max(12, int(60 * self.intensity))
         self._pieces = [
             {
                 "x": random.uniform(0.05, 0.95),
@@ -1302,8 +1302,8 @@ class ConfettiShower:
                 "vy": random.uniform(0.1, 0.35),
                 "rot": random.uniform(0, 360),
                 "vrot": random.uniform(-180, 180),
-                "w": random.uniform(6, 14) * self.intensity,
-                "h": random.uniform(4, 8) * self.intensity,
+                "w": random.uniform(8, 20) * self.intensity,
+                "h": random.uniform(6, 12) * self.intensity,
                 "color": random.choice(self._COLORS),
             }
             for _ in range(n)
@@ -1422,11 +1422,11 @@ class HologramFlicker:
             return
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(int(80 * fade * self.intensity), 0, 255)
+        alpha = _clamp(int(160 * fade * self.intensity), 0, 255)
         scan_color = QColor(0, 229, 255, alpha)
         painter.save()
         painter.setPen(QPen(scan_color, 1))
-        step = max(2, int(6 / max(0.1, self.intensity)))
+        step = max(2, int(3 / max(0.1, self.intensity)))
         y = rect.top()
         while y < rect.bottom():
             painter.drawLine(rect.left(), y, rect.right(), y)
@@ -1441,12 +1441,12 @@ class HologramFlicker:
             return
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(fade * self.intensity * 0.31, 0.0, 1.0)
+        alpha = _clamp(fade * self.intensity * 0.63, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
         glLineWidth(1.0)
-        step = max(2, int(6 / max(0.1, self.intensity)))
+        step = max(2, int(3 / max(0.1, self.intensity)))
         glBegin(GL_LINES)
         y = float(rect.top())
         while y < rect.bottom():
@@ -1493,7 +1493,7 @@ class ShockwaveRipple:
         cx, cy = rect.center().x(), rect.center().y()
         max_r = max(rect.width(), rect.height()) * 0.6 * self.intensity
         radius = int(t * max_r)
-        thickness = max(1, int(8 * fade * self.intensity))
+        thickness = max(2, int(15 * fade * self.intensity))
         alpha = _clamp(int(220 * fade), 0, 255)
         color = QColor(0, 229, 255, alpha)
         painter.save()
@@ -1517,7 +1517,7 @@ class ShockwaveRipple:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        glLineWidth(max(1.0, 8.0 * fade * self.intensity))
+        glLineWidth(max(2.0, 15.0 * fade * self.intensity))
         N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
@@ -1552,7 +1552,7 @@ class ElectricArc:
         self._segments = []
 
     def _regen(self, rect: QRect):
-        n = max(3, int(8 * self.intensity))
+        n = max(5, int(16 * self.intensity))
         x0, y0 = rect.left() + 10, rect.top() + rect.height() // 3
         x1, y1 = rect.right() - 10, rect.bottom() - rect.height() // 3
         pts = [(x0, y0)]
@@ -1590,7 +1590,7 @@ class ElectricArc:
         color = QColor(160, 120, 255, alpha)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(color, max(1, int(2 * self.intensity)))
+        pen = QPen(color, max(2, int(4 * self.intensity)))
         painter.setPen(pen)
         for i in range(len(self._segments) - 1):
             x0, y0 = self._segments[i]
@@ -1610,7 +1610,7 @@ class ElectricArc:
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
         alpha = _clamp(fade * self.intensity, 0.0, 1.0)
-        glLineWidth(max(1.0, 2.0 * self.intensity))
+        glLineWidth(max(2.0, 4.0 * self.intensity))
         glBegin(GL_LINES)
         for i in range(len(self._segments) - 1):
             x0, y0 = self._segments[i]
@@ -1657,7 +1657,7 @@ class HoverShimmer:
         # Shimmer sweeps left to right
         sweep_x = rect.left() + int(t * rect.width())
         fade = 1.0 - t
-        alpha = _clamp(int(120 * fade * self.intensity), 0, 255)
+        alpha = _clamp(int(220 * fade * self.intensity), 0, 255)
         grad = QLinearGradient(sweep_x - 30, 0, sweep_x + 30, 0)
         grad.setColorAt(0.0, QColor(255, 255, 255, 0))
         grad.setColorAt(0.5, QColor(255, 255, 255, alpha))
@@ -1674,7 +1674,7 @@ class HoverShimmer:
     def _draw_gl(self, rect: QRect):
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(fade * self.intensity * 0.47, 0.0, 1.0)
+        alpha = _clamp(fade * self.intensity * 0.86, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -1714,7 +1714,7 @@ class PlasmaNoise:
                 return
             except Exception:
                 pass
-        alpha = _clamp(int(40 * self.intensity), 0, 60)
+        alpha = _clamp(int(120 * self.intensity), 0, 160)
         val = 0.5 + 0.5 * math.sin(self._t * 2.0)
         r = int(20 + 60 * val)
         g = int(0 + 40 * (1 - val))
@@ -1733,7 +1733,7 @@ class PlasmaNoise:
         r = (20 + 60 * val) / 255.0
         g = (0 + 40 * (1 - val)) / 255.0
         b = (60 + 120 * val) / 255.0
-        alpha = _clamp(40 * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(120 * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -1783,7 +1783,7 @@ class HoloSweep:
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
         sweep_x = rect.left() + int(t * rect.width())
-        alpha = _clamp(int(160 * fade * self.intensity), 0, 255)
+        alpha = _clamp(int(220 * fade * self.intensity), 0, 255)
         painter.save()
         painter.setClipRect(rect)
         grad = QLinearGradient(sweep_x - 20, 0, sweep_x + 20, 0)
@@ -1801,7 +1801,7 @@ class HoloSweep:
     def _draw_gl(self, rect: QRect):
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(fade * self.intensity * 0.63, 0.0, 1.0)
+        alpha = _clamp(fade * self.intensity * 0.86, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -1846,7 +1846,7 @@ class DifficultyColorPulse:
             except Exception:
                 pass
         amp = 0.5 + 0.5 * math.sin(self._t * 4.0)
-        alpha = _clamp(int(60 * amp * self.intensity), 0, 80)
+        alpha = _clamp(int(150 * amp * self.intensity), 0, 200)
         c = self._color
         painter.save()
         painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), alpha)))
@@ -1859,7 +1859,7 @@ class DifficultyColorPulse:
 
     def _draw_gl(self, rect: QRect):
         amp = 0.5 + 0.5 * math.sin(self._t * 4.0)
-        alpha = _clamp(60 * amp * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(150 * amp * self.intensity / 255.0, 0.0, 1.0)
         c = self._color
         r, g, b = c.red() / 255.0, c.green() / 255.0, c.blue() / 255.0
         glEnable(GL_BLEND)
@@ -1901,7 +1901,7 @@ class ArrowWobblePulse:
         """Horizontal displacement in pixels for the arrow widget."""
         if not self._active:
             return 0.0
-        return math.sin(self._t * math.pi * 2.0) * 4.0 * self.intensity
+        return math.sin(self._t * math.pi * 2.0) * 8.0 * self.intensity
 
     def draw(self, painter: QPainter, rect: QRect):
         if not self._active:
@@ -1913,8 +1913,8 @@ class ArrowWobblePulse:
             except Exception:
                 pass
         # Draw a faint direction hint using a translucent chevron tint
-        alpha = int(18 * abs(math.sin(self._t * math.pi * 2.0)) * self.intensity)
-        alpha = _clamp(alpha, 0, 40)
+        alpha = int(50 * abs(math.sin(self._t * math.pi * 2.0)) * self.intensity)
+        alpha = _clamp(alpha, 0, 100)
         painter.save()
         painter.setBrush(QBrush(QColor(255, 200, 50, alpha)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -1926,7 +1926,7 @@ class ArrowWobblePulse:
 
     def _draw_gl(self, rect: QRect):
         alpha = _clamp(
-            18 * abs(math.sin(self._t * math.pi * 2.0)) * self.intensity / 255.0,
+            50 * abs(math.sin(self._t * math.pi * 2.0)) * self.intensity / 255.0,
             0.0, 1.0,
         )
         glEnable(GL_BLEND)
@@ -1997,8 +1997,8 @@ class CountdownScaleGlow:
                 pass
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = max(0.0, 1.0 - t)
-        alpha = int(80 * fade * self.intensity)
-        alpha = _clamp(alpha, 0, 120)
+        alpha = int(180 * fade * self.intensity)
+        alpha = _clamp(alpha, 0, 255)
         painter.save()
         painter.setBrush(QBrush(QColor(255, 255, 150, alpha)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -2011,7 +2011,7 @@ class CountdownScaleGlow:
     def _draw_gl(self, rect: QRect):
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = max(0.0, 1.0 - t)
-        alpha = _clamp(80 * fade * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(180 * fade * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -2058,11 +2058,11 @@ class RadialPulseBackground:
         for phase in (0.0, 0.5):
             t = (self._t + phase) % 1.0
             radius = int((min(rect.width(), rect.height()) * 0.5) * t)
-            alpha = int(40 * (1.0 - t) * self.intensity)
-            alpha = _clamp(alpha, 0, 60)
+            alpha = int(100 * (1.0 - t) * self.intensity)
+            alpha = _clamp(alpha, 0, 150)
             if radius > 0 and alpha > 0:
                 pen = QPen(QColor(200, 100, 255, alpha))
-                pen.setWidth(2)
+                pen.setWidth(max(2, int(4 * self.intensity)))
                 painter.save()
                 painter.setPen(pen)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -2082,8 +2082,8 @@ class RadialPulseBackground:
             t = (self._t + phase) % 1.0
             max_r = min(rect.width(), rect.height()) * 0.5 * self.intensity
             radius = t * max_r
-            alpha = _clamp((1.0 - t) * self.intensity * 0.24, 0.0, 1.0)
-            glLineWidth(2.0)
+            alpha = _clamp((1.0 - t) * self.intensity * 0.59, 0.0, 1.0)
+            glLineWidth(max(2.0, 4.0 * self.intensity))
             glBegin(GL_LINE_STRIP)
             for i in range(N + 1):
                 angle = 2 * math.pi * i / N
@@ -2122,7 +2122,7 @@ class UrgencyShake:
         self._t += dt_ms
         self._next_shake -= dt_ms
         if self._next_shake <= 0:
-            amp = int(6 * self.intensity)
+            amp = int(15 * self.intensity)
             self._offset_x = random.randint(-amp, amp)
             self._offset_y = random.randint(-amp, amp)
             self._next_shake = 80.0
@@ -2140,7 +2140,7 @@ class UrgencyShake:
                 return
             except Exception:
                 pass
-        alpha = _clamp(int(30 * self.intensity), 0, 50)
+        alpha = _clamp(int(80 * self.intensity), 0, 120)
         painter.save()
         painter.setBrush(QBrush(QColor(255, 50, 50, alpha)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -2151,7 +2151,7 @@ class UrgencyShake:
         return self._active
 
     def _draw_gl(self, rect: QRect):
-        alpha = _clamp(30 * self.intensity, 0.0, 50.0) / 255.0
+        alpha = _clamp(80 * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -2195,18 +2195,18 @@ class TimeWarpDistortion:
             except Exception:
                 pass
         W, H = rect.width(), rect.height()
-        alpha = _clamp(int(50 * self.intensity), 0, 80)
+        alpha = _clamp(int(130 * self.intensity), 0, 180)
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         pen = QPen(QColor(0, 200, 255, alpha), 1)
         painter.setPen(pen)
-        num_lines = max(3, int(8 * self.intensity))
+        num_lines = max(5, int(15 * self.intensity))
         for i in range(num_lines):
             y_base = rect.top() + int((i + 0.5) * H / num_lines)
             pts = []
             for x in range(rect.left(), rect.right(), 4):
                 phase = (x / W) * 2 * math.pi + self._t * 3 + i
-                y_off = int(math.sin(phase) * 4 * self.intensity)
+                y_off = int(math.sin(phase) * 8 * self.intensity)
                 pts.append((x, y_base + y_off))
             for j in range(len(pts) - 1):
                 painter.drawLine(pts[j][0], pts[j][1], pts[j + 1][0], pts[j + 1][1])
@@ -2219,9 +2219,9 @@ class TimeWarpDistortion:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        alpha = _clamp(50 * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(130 * self.intensity / 255.0, 0.0, 1.0)
         W, H = rect.width(), rect.height()
-        num_lines = max(3, int(8 * self.intensity))
+        num_lines = max(5, int(15 * self.intensity))
         glLineWidth(1.0)
         for i in range(num_lines):
             y_base = rect.top() + (i + 0.5) * H / num_lines
@@ -2230,7 +2230,7 @@ class TimeWarpDistortion:
             x = rect.left()
             while x < rect.right():
                 phase = (x / max(1, W)) * 2 * math.pi + self._t * 3 + i
-                y_off = math.sin(phase) * 4 * self.intensity
+                y_off = math.sin(phase) * 8 * self.intensity
                 glVertex2f(float(x), float(y_base + y_off))
                 x += 4
             glEnd()
@@ -2286,8 +2286,8 @@ class TrailAfterimage:
         for i in range(3):
             scale = 1.0 + i * 0.15
             offset_y = int(i * 8 * t * self.intensity)
-            r = int(30 * scale * self.intensity)
-            alpha = _clamp(int(80 * fade / (i + 1)), 0, 100)
+            r = int(50 * scale * self.intensity)
+            alpha = _clamp(int(160 * fade / (i + 1)), 0, 200)
             painter.save()
             painter.setBrush(QBrush(QColor(0, 229, 255, alpha)))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -2309,8 +2309,8 @@ class TrailAfterimage:
         for i in range(3):
             scale = 1.0 + i * 0.15
             offset_y = i * 8 * t * self.intensity
-            radius = 30 * scale * self.intensity
-            alpha = _clamp(80 * fade / (i + 1) / 255.0, 0.0, 1.0)
+            radius = 50 * scale * self.intensity
+            alpha = _clamp(160 * fade / (i + 1) / 255.0, 0.0, 1.0)
             glBegin(GL_LINE_STRIP)
             for k in range(N + 1):
                 angle = 2 * math.pi * k / N
@@ -2334,12 +2334,12 @@ class FinalExplosion:
         self._particles: list[dict] = []
 
     def start(self):
-        n = max(8, int(25 * self.intensity))
+        n = max(15, int(60 * self.intensity))
         self._particles = [
             {
                 "angle": random.uniform(0, 2 * math.pi),
-                "speed": random.uniform(0.05, 0.3) * self.intensity,
-                "size": random.uniform(4, 10) * self.intensity,
+                "speed": random.uniform(0.1, 0.5) * self.intensity,
+                "size": random.uniform(6, 16) * self.intensity,
                 "color": random.choice([
                     QColor("#FF4444"), QColor("#FFD700"),
                     QColor("#00E5FF"), QColor("#FF7F00"),
@@ -2451,7 +2451,7 @@ class PulseRingCountdown:
         radius = int(max_r * (1.0 - t * 0.8))
         cx, cy = rect.center().x(), rect.center().y()
         alpha = _clamp(int(200 * fade * self.intensity), 0, 255)
-        thickness = max(1, int(4 * fade * self.intensity))
+        thickness = max(2, int(8 * fade * self.intensity))
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor(0, 229, 255, alpha), thickness))
@@ -2472,7 +2472,7 @@ class PulseRingCountdown:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        glLineWidth(max(1.0, 8.0 * fade * self.intensity))
+        glLineWidth(max(2.0, 12.0 * fade * self.intensity))
         N = _GL_CIRCLE_SEGMENTS
         glBegin(GL_LINE_STRIP)
         for i in range(N + 1):
@@ -2502,14 +2502,14 @@ class GlitchNumbers:
         self._next_regen = 0.0
 
     def _regen(self, rect: QRect):
-        n = max(2, int(5 * self.intensity))
+        n = max(4, int(10 * self.intensity))
         H = rect.height()
         self._strips = [
             {
                 "y": random.randint(rect.top(), rect.bottom() - 4),
-                "h": random.randint(2, max(2, int(10 * self.intensity))),
+                "h": random.randint(2, max(2, int(20 * self.intensity))),
                 "offset": random.randint(-10, 10),
-                "alpha": random.randint(100, 200),
+                "alpha": random.randint(150, 255),
             }
             for _ in range(n)
         ]
@@ -2599,10 +2599,10 @@ class FlameParticles:
         return {
             "x": random.uniform(rect.left(), rect.right()),
             "y": float(rect.bottom()),
-            "vx": random.uniform(-8, 8) * self.intensity,
-            "vy": random.uniform(-40, -20) * self.intensity,
+            "vx": random.uniform(-12, 12) * self.intensity,
+            "vy": random.uniform(-60, -30) * self.intensity,
             "life": 1.0,
-            "size": random.uniform(4, 10) * self.intensity,
+            "size": random.uniform(6, 16) * self.intensity,
         }
 
     def tick(self, dt_ms: float):
@@ -2611,7 +2611,7 @@ class FlameParticles:
         dt_s = dt_ms / 1000.0
         self._t += dt_s
         self._spawn_acc += dt_ms
-        spawn_interval = max(50, int(150 / max(0.1, self.intensity)))
+        spawn_interval = max(30, int(80 / max(0.1, self.intensity)))
         for p in self._particles:
             p["x"] += p["vx"] * dt_s
             p["y"] += p["vy"] * dt_s
@@ -2697,18 +2697,18 @@ class HeatShimmer:
                 return
             except Exception:
                 pass
-        alpha = _clamp(int(25 * self.intensity), 0, 40)
+        alpha = _clamp(int(80 * self.intensity), 0, 120)
         W, H = rect.width(), rect.height()
         painter.save()
         pen = QPen(QColor(255, 180, 60, alpha), 1)
         painter.setPen(pen)
-        num_lines = max(2, int(5 * self.intensity))
+        num_lines = max(3, int(10 * self.intensity))
         for i in range(num_lines):
             y_base = rect.top() + int((i + 0.5) * H / num_lines)
             prev = None
             for x in range(rect.left(), rect.right(), 3):
                 phase = (x / max(1, W)) * 3 * math.pi + self._t * 5 + i * 1.2
-                y_off = int(math.sin(phase) * 3 * self.intensity)
+                y_off = int(math.sin(phase) * 8 * self.intensity)
                 pt = (x, y_base + y_off)
                 if prev:
                     painter.drawLine(prev[0], prev[1], pt[0], pt[1])
@@ -2722,9 +2722,9 @@ class HeatShimmer:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        alpha = _clamp(25 * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(80 * self.intensity / 255.0, 0.0, 1.0)
         W, H = rect.width(), rect.height()
-        num_lines = max(2, int(5 * self.intensity))
+        num_lines = max(3, int(10 * self.intensity))
         glLineWidth(1.0)
         for i in range(num_lines):
             y_base = rect.top() + (i + 0.5) * H / num_lines
@@ -2733,7 +2733,7 @@ class HeatShimmer:
             x = rect.left()
             while x < rect.right():
                 phase = (x / max(1, W)) * 3 * math.pi + self._t * 5 + i * 1.2
-                y_off = math.sin(phase) * 3 * self.intensity
+                y_off = math.sin(phase) * 8 * self.intensity
                 glVertex2f(float(x), float(y_base + y_off))
                 x += 3
             glEnd()
@@ -2769,7 +2769,7 @@ class SmokeWisps:
             p["life"] -= dt_s * 0.8
             p["size"] *= 1.01
         self._particles = [p for p in self._particles if p["life"] > 0]
-        spawn_interval = max(120, int(300 / max(0.1, self.intensity)))
+        spawn_interval = max(80, int(200 / max(0.1, self.intensity)))
         self._do_spawn = self._spawn_acc >= spawn_interval
         if self._do_spawn:
             self._spawn_acc = 0
@@ -2791,13 +2791,13 @@ class SmokeWisps:
                 "vx": random.uniform(-5, 5),
                 "vy": random.uniform(-20, -10) * self.intensity,
                 "life": 1.0,
-                "size": random.uniform(6, 14) * self.intensity,
+                "size": random.uniform(10, 22) * self.intensity,
             })
             self._do_spawn = False
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for p in self._particles:
-            alpha = _clamp(int(80 * p["life"] * self.intensity), 0, 100)
+            alpha = _clamp(int(160 * p["life"] * self.intensity), 0, 200)
             painter.setBrush(QBrush(QColor(180, 180, 180, alpha)))
             painter.setPen(Qt.PenStyle.NoPen)
             sz = int(p["size"])
@@ -2814,7 +2814,7 @@ class SmokeWisps:
         glPointSize(8.0)
         glBegin(GL_POINTS)
         for p in self._particles:
-            alpha = _clamp(80 * p["life"] * self.intensity / 255.0, 0.0, 1.0)
+            alpha = _clamp(160 * p["life"] * self.intensity / 255.0, 0.0, 1.0)
             glColor4f(0.71, 0.71, 0.71, alpha)
             glVertex2f(float(p["x"]), float(p["y"]))
         glEnd()
@@ -2851,12 +2851,12 @@ class LavaGlowEdge:
             except Exception:
                 pass
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
-        alpha = _clamp(int((80 + 100 * amp) * self.intensity), 0, 200)
+        alpha = _clamp(int((120 + 135 * amp) * self.intensity), 0, 255)
         r = _clamp(int(255), 0, 255)
         g = _clamp(int(60 + 80 * amp), 0, 255)
         b = 0
         color = QColor(r, g, b, alpha)
-        layers = max(1, int(3 * self.intensity))
+        layers = max(2, int(5 * self.intensity))
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for i in range(layers, 0, -1):
@@ -2876,7 +2876,7 @@ class LavaGlowEdge:
 
     def _draw_gl(self, rect: QRect):
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
-        alpha = _clamp((80 + 100 * amp) * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp((120 + 135 * amp) * self.intensity / 255.0, 0.0, 1.0)
         g_val = (60 + 80 * amp) / 255.0
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
@@ -2925,7 +2925,7 @@ class NumberThrob:
         if not self._active:
             return 1.0
         pulse = 0.5 + 0.5 * math.sin(self._t * 6.0)
-        return 1.0 + 0.06 * pulse * self.intensity
+        return 1.0 + 0.12 * pulse * self.intensity
 
     def draw(self, painter: QPainter, rect: QRect):
         pass  # Effect applied externally via .scale property
@@ -2958,7 +2958,7 @@ class MeltdownShake:
             return
         self._next_shake -= dt_ms
         if self._next_shake <= 0:
-            amp = int(8 * self.intensity)
+            amp = int(20 * self.intensity)
             self._ox = random.randint(-amp, amp)
             self._oy = random.randint(-amp, amp)
             self._next_shake = 50.0
@@ -2968,7 +2968,7 @@ class MeltdownShake:
         return (self._ox, self._oy)
 
     def draw(self, painter: QPainter, rect: QRect):
-        alpha = _clamp(int(20 * self.intensity), 0, 40)
+        alpha = _clamp(int(60 * self.intensity), 0, 100)
         painter.save()
         painter.setBrush(QBrush(QColor(255, 30, 30, alpha)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -2979,7 +2979,7 @@ class MeltdownShake:
         return self._active
 
     def _draw_gl(self, rect: QRect):
-        alpha = _clamp(20 * self.intensity, 0.0, 35.0) / 255.0
+        alpha = _clamp(60 * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -3035,7 +3035,7 @@ class FlipImpactPulse:
                 pass
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(int(120 * fade * self.intensity), 0, 180)
+        alpha = _clamp(int(220 * fade * self.intensity), 0, 255)
         painter.save()
         painter.setBrush(QBrush(QColor(255, 255, 255, alpha)))
         painter.setPen(Qt.PenStyle.NoPen)
@@ -3048,7 +3048,7 @@ class FlipImpactPulse:
     def _draw_gl(self, rect: QRect):
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(120 * fade * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(220 * fade * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -3103,7 +3103,7 @@ class NumberCascade:
                 pass
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(int(100 * fade * self.intensity), 0, 150)
+        alpha = _clamp(int(200 * fade * self.intensity), 0, 255)
         painter.save()
         painter.setOpacity(alpha / 255.0)
         painter.setPen(QPen(QColor(0, 229, 255)))
@@ -3117,7 +3117,7 @@ class NumberCascade:
     def _draw_gl(self, rect: QRect):
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(100 * fade * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(200 * fade * self.intensity / 255.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
@@ -3143,12 +3143,12 @@ class MilestoneBurst:
         self._particles: list[dict] = []
 
     def trigger(self, rect: QRect = None):
-        n = max(6, int(20 * self.intensity))
+        n = max(12, int(40 * self.intensity))
         self._particles = [
             {
                 "angle": random.uniform(0, 2 * math.pi),
-                "speed": random.uniform(0.1, 0.5) * self.intensity,
-                "size": random.uniform(3, 8) * self.intensity,
+                "speed": random.uniform(0.15, 0.7) * self.intensity,
+                "size": random.uniform(5, 14) * self.intensity,
                 "color": random.choice([
                     QColor("#FFD700"), QColor("#FF7F00"), QColor("#00E5FF"),
                 ]),
@@ -3233,12 +3233,12 @@ class ElectricSpark:
         self._sparks: list[dict] = []
 
     def trigger(self):
-        n = max(3, int(8 * self.intensity))
+        n = max(6, int(16 * self.intensity))
         self._sparks = [
             {
                 "angle": random.uniform(0, 2 * math.pi),
-                "speed": random.uniform(0.05, 0.25) * self.intensity,
-                "alpha": random.randint(150, 255),
+                "speed": random.uniform(0.1, 0.4) * self.intensity,
+                "alpha": random.randint(200, 255),
             }
             for _ in range(n)
         ]
@@ -3275,7 +3275,7 @@ class ElectricSpark:
             ex = cx + int(math.cos(s["angle"]) * dist)
             ey = cy + int(math.sin(s["angle"]) * dist)
             alpha = _clamp(int(s["alpha"] * fade), 0, 255)
-            painter.setPen(QPen(QColor(200, 180, 255, alpha), max(1, int(2 * self.intensity))))
+            painter.setPen(QPen(QColor(200, 180, 255, alpha), max(2, int(3 * self.intensity))))
             painter.drawLine(cx, cy, ex, ey)
         painter.restore()
 
@@ -3290,7 +3290,7 @@ class ElectricSpark:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        glLineWidth(max(1.0, 2.0 * self.intensity))
+        glLineWidth(max(2.0, 3.0 * self.intensity))
         glBegin(GL_LINES)
         for s in self._sparks:
             dist = t * max_r * s["speed"] / 0.12
@@ -3337,13 +3337,13 @@ class GoalProximityGlow:
             except Exception:
                 pass
         pulse = 0.5 + 0.5 * math.sin(self._t * (2 + self._proximity * 6))
-        alpha = _clamp(int(80 * pulse * self._proximity * self.intensity), 0, 120)
+        alpha = _clamp(int(160 * pulse * self._proximity * self.intensity), 0, 220)
         r = int(255)
         g = int(200 * (1 - self._proximity))
         b = int(50 * (1 - self._proximity))
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        layers = max(1, int(3 * self.intensity))
+        layers = max(2, int(5 * self.intensity))
         for i in range(layers, 0, -1):
             layer_alpha = alpha // i
             pen = QPen(QColor(r, g, b, _clamp(layer_alpha, 0, 255)), i * 2)
@@ -3361,7 +3361,7 @@ class GoalProximityGlow:
 
     def _draw_gl(self, rect: QRect):
         pulse = 0.5 + 0.5 * math.sin(self._t * (2 + self._proximity * 6))
-        alpha = _clamp(80 * pulse * self._proximity * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp(160 * pulse * self._proximity * self.intensity / 255.0, 0.0, 1.0)
         r = 1.0
         g = (200 * (1 - self._proximity)) / 255.0
         b = (50 * (1 - self._proximity)) / 255.0
@@ -3403,9 +3403,9 @@ class CompletionFirework:
     def start(self):
         self._elapsed = 0.0
         self._bursts = []
-        n_bursts = max(2, int(4 * self.intensity))
+        n_bursts = max(3, int(8 * self.intensity))
         for _ in range(n_bursts):
-            n_p = max(8, int(20 * self.intensity))
+            n_p = max(15, int(40 * self.intensity))
             color = random.choice([
                 QColor("#FFD700"), QColor("#FF4444"), QColor("#00E5FF"),
                 QColor("#FF7F00"), QColor("#FF69B4"),
@@ -3418,7 +3418,7 @@ class CompletionFirework:
                 "particles": [
                     {
                         "angle": random.uniform(0, 2 * math.pi),
-                        "speed": random.uniform(0.15, 0.5) * self.intensity,
+                        "speed": random.uniform(0.2, 0.7) * self.intensity,
                     }
                     for _ in range(n_p)
                 ],
@@ -3461,7 +3461,7 @@ class CompletionFirework:
                 alpha = _clamp(int(220 * fade), 0, 255)
                 painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), alpha)))
                 painter.setPen(Qt.PenStyle.NoPen)
-                sz = max(2, int(5 * fade * self.intensity))
+                sz = max(3, int(8 * fade * self.intensity))
                 painter.drawEllipse(px - sz // 2, py - sz // 2, sz, sz)
         painter.restore()
 
