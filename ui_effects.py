@@ -204,12 +204,15 @@ class EffectsMixin:
 
         # --- 2×3 grid of overlay group-boxes ---
         self._fx_effect_rows: dict = {}  # key → (checkbox, slider, pct_label)
+        self._fx_group_widgets: dict = {}  # overlay_type → QGroupBox
+        self._fx_scroll = scroll
 
         grid = QGridLayout()
         grid.setSpacing(8)
         for idx, (title, overlay_type, effects) in enumerate(_OVERLAY_GROUPS):
             row, col = divmod(idx, 3)
             grp = self._build_fx_group(title, effects, overlay_type)
+            self._fx_group_widgets[overlay_type] = grp
             grid.addWidget(grp, row, col)
         layout.addLayout(grid)
 
@@ -419,6 +422,9 @@ class EffectsMixin:
 
     def _preview_single_effect(self, overlay_type: str, effect_key: str):
         """👁 Preview — open overlay with ONLY this one effect for 3 s."""
+        grp = self._fx_group_widgets.get(overlay_type)
+        if grp and hasattr(self, '_fx_scroll'):
+            self._fx_scroll.ensureWidgetVisible(grp)
         self._open_demo_overlay(overlay_type, solo_effect=effect_key, duration_ms=3000)
 
     def _open_demo_overlay(self, overlay_type: str, solo_effect: str | None = None,
