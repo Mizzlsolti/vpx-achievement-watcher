@@ -223,8 +223,8 @@ class EffectsWidget(QWidget):
             low_perf = bool(ov.get("low_performance_mode", False))
             fx_glow = bool(ov.get("fx_main_breathing_glow", ov.get("anim_main_glow", True)))
             fx_particles = bool(ov.get("fx_main_floating_particles", ov.get("anim_main_glow", True)))
-            glow_intensity = max(0.0, min(1.0, int(ov.get("fx_main_breathing_glow_intensity", 80)) / 100.0))
-            particles_intensity = max(0.0, min(1.0, int(ov.get("fx_main_floating_particles_intensity", 80)) / 100.0))
+            glow_intensity = max(0.0, min(1.0, float(ov.get("fx_main_breathing_glow_intensity", 80)) / 100.0))
+            particles_intensity = max(0.0, min(1.0, float(ov.get("fx_main_floating_particles_intensity", 80)) / 100.0))
         except Exception:
             low_perf = False
             fx_glow = True

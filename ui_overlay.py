@@ -126,7 +126,7 @@ class _OverlayFxMixin:
         """Live-read the intensity (0.0–1.0) for a specific effect."""
         try:
             ov = self.parent_gui.cfg.OVERLAY or {}
-            return max(0.0, min(1.0, int(ov.get(fx_key + "_intensity", 80)) / 100.0))
+            return max(0.0, min(1.0, float(ov.get(fx_key + "_intensity", 80)) / 100.0))
         except Exception:
             return 0.8
 
