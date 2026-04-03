@@ -778,12 +778,13 @@ class _SpeechBubble(QWidget):
     _RADIUS = 10
     _PTR_H = 10
 
-    def __init__(self, parent: QWidget, text: str, memory: _TrophieMemory) -> None:
+    def __init__(self, parent: QWidget, text: str, memory: _TrophieMemory, rotation: int = 0) -> None:
         super().__init__(parent)
         self._memory = memory
         self._text = text
         self._opacity = 0.0
         self._shown_at_ms = int(time.time() * 1000)
+        self._rotation = rotation  # 0, 90 or -90 degrees
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.SubWindow)
 
@@ -798,6 +799,9 @@ class _SpeechBubble(QWidget):
         )
         bw = max(120, text_rect.width() + self._PAD * 2 + 30)  # +30 for close button
         bh = text_rect.height() + self._PAD * 2 + self._PTR_H
+        # Swap dimensions when rotated so the widget occupies the right layout space
+        if self._rotation != 0:
+            bw, bh = bh, bw
         self.setFixedSize(bw, bh)
 
         # Fade-in timer
@@ -846,6 +850,13 @@ class _SpeechBubble(QWidget):
                 owner._schedule_quiet_msg(msg)
             except Exception:
                 pass
+        # Reset owner animation state to IDLE when bubble auto-dismisses
+        owner = getattr(self, '_owner', None) or self.parent()
+        if owner:
+            try:
+                owner._draw.set_state(IDLE)
+            except Exception:
+                pass
         self.hide()
         self.deleteLater()
 
@@ -854,6 +865,9 @@ class _SpeechBubble(QWidget):
         self._begin_fade_out()
 
     def paintEvent(self, event) -> None:
+        if self._rotation != 0:
+            self._paint_rotated()
+            return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setOpacity(self._opacity)
@@ -898,6 +912,56 @@ class _SpeechBubble(QWidget):
         )
         p.end()
 
+    def _paint_rotated(self) -> None:
+        """Render the bubble content at normal orientation then rotate to paint."""
+        # Compute the unrotated dimensions (swap back)
+        uw = self.height()
+        uh = self.width()
+        img = QImage(uw, uh, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        ip = QPainter(img)
+        ip.setRenderHint(QPainter.RenderHint.Antialiasing)
+        ip.setOpacity(self._opacity)
+
+        bh_content = uh - self._PTR_H
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, uw, bh_content, self._RADIUS, self._RADIUS)
+        ip.fillPath(path, self._BG)
+        pen = QPen(self._BORDER, 2)
+        ip.setPen(pen)
+        ip.drawPath(path)
+
+        tri = QPainterPath()
+        cx = uw // 2
+        tri.moveTo(cx - 8, bh_content)
+        tri.lineTo(cx + 8, bh_content)
+        tri.lineTo(cx, bh_content + self._PTR_H)
+        tri.closeSubpath()
+        ip.fillPath(tri, self._BG)
+        ip.setPen(QPen(self._BORDER, 1))
+        ip.drawLine(cx - 8, bh_content, cx, bh_content + self._PTR_H)
+        ip.drawLine(cx + 8, bh_content, cx, bh_content + self._PTR_H)
+
+        ip.setPen(QPen(self._BORDER, 1))
+        ip.setFont(QFont("Segoe UI", 8))
+        ip.drawText(uw - self._PAD - 8, self._PAD + 8, "x")
+
+        ip.setPen(QPen(self._TEXT_COLOR))
+        ip.setFont(QFont("Segoe UI", 9))
+        ip.drawText(
+            QRect(self._PAD, self._PAD, uw - self._PAD * 2 - 14, bh_content - self._PAD * 2),
+            Qt.TextFlag.TextWordWrap,
+            self._text,
+        )
+        ip.end()
+
+        rotated = img.transformed(QTransform().rotate(self._rotation), Qt.TransformationMode.SmoothTransformation)
+        p = QPainter(self)
+        try:
+            p.drawImage(0, 0, rotated)
+        finally:
+            p.end()
+
 
 # ---------------------------------------------------------------------------
 # Trophy drawing widget (shared base)
@@ -920,6 +984,7 @@ class _TrophieDrawWidget(QWidget):
     _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle", "yawn"]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
+    _PASSIVE_MODE_OFFSET_MS = 5000  # max extra random offset so two instances desynchronize
     # Yawn threshold: above this value the mouth is drawn wide open (surprised shape)
     _YAWN_FULL_OPEN_THRESHOLD = 0.7
 
@@ -971,11 +1036,13 @@ class _TrophieDrawWidget(QWidget):
 
         # Passive animation mode — cycles through variety animations independently
         # of the emotion state to keep the trophy visually interesting.
-        self._passive_mode: str = "float"
+        self._passive_mode: str = random.choice(self._PASSIVE_MODES)
         self._passive_t: float = 0.0      # phase timer within current passive mode
         self._passive_mode_timer = QTimer(self)
         self._passive_mode_timer.timeout.connect(self._cycle_passive_mode)
-        self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
+        # Add random initial offset so two instances don't sync up
+        initial_delay = random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS) + random.randint(0, self._PASSIVE_MODE_OFFSET_MS)
+        self._passive_mode_timer.start(initial_delay)
 
         # Main animation tick
         self._tick_timer = QTimer(self)
@@ -1418,6 +1485,10 @@ class _TrophieDrawWidget(QWidget):
 class _PinballDrawWidget(_TrophieDrawWidget):
     """Draws Steely the pinball mascot — a metallic chrome sphere."""
 
+    # Use different timer ranges from base class so the two mascots desynchronize
+    _PASSIVE_MODE_MIN_MS = 6000
+    _PASSIVE_MODE_MAX_MS = 15000
+
     def _draw_shimmer(self, p: QPainter) -> None:
         """Silver shimmer sweep across the pinball."""
         sweep_speed = 1.2
@@ -1848,6 +1919,7 @@ class GUITrophie(QWidget):
             except Exception:
                 pass
             self._current_bubble = None
+        self._draw.set_state(IDLE)
 
     def _schedule_quiet_msg(self, msg: str) -> None:
         QTimer.singleShot(500, lambda: self._show_comment(msg, TALKING))
@@ -2325,6 +2397,8 @@ class OverlayTrophie(QWidget):
             self._show_comment_key(tip[0], tip[1], IDLE)
 
     def _fire_zank_comment(self) -> None:
+        if not _TROPHIE_SHARED["gui_visible"]:
+            return
         if self._memory:
             tip = self._memory.pick_unseen(_OV_ZANK)
         else:
@@ -2366,7 +2440,8 @@ class OverlayTrophie(QWidget):
         if bicker_key and bicker_text:
             _TROPHIE_SHARED["idle_bicker_ov_key"] = None
             _TROPHIE_SHARED["idle_bicker_ov_text"] = None
-            QTimer.singleShot(2000, lambda t=bicker_text, k=bicker_key: self._show_comment_key(k, t, TALKING))
+            if _TROPHIE_SHARED["gui_visible"]:
+                QTimer.singleShot(2000, lambda t=bicker_text, k=bicker_key: self._show_comment_key(k, t, TALKING))
 
     def _days_since_last_played(self, rom: str) -> Optional[int]:
         # Simple: we don't track dates directly — use play_count heuristic
@@ -2394,7 +2469,14 @@ class OverlayTrophie(QWidget):
             mem._told_quiet = False
         else:
             mem = self._memory
-        bubble = _SpeechBubble(None, text, mem)
+        ov = self._cfg.OVERLAY or {}
+        portrait = bool(ov.get("trophie_overlay_portrait", False))
+        if portrait:
+            ccw = bool(ov.get("trophie_overlay_rotate_ccw", False))
+            rotation = -90 if ccw else 90
+        else:
+            rotation = 0
+        bubble = _SpeechBubble(None, text, mem, rotation=rotation)
         bubble._owner = self  # so _do_dismiss can still call _schedule_quiet_msg
         bubble.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -2443,6 +2525,7 @@ class OverlayTrophie(QWidget):
             except Exception:
                 pass
             self._current_bubble = None
+        self._draw.set_state(IDLE)
 
     def _schedule_quiet_msg(self, msg: str) -> None:
         QTimer.singleShot(500, lambda: self._show_comment(msg, TALKING))
