@@ -5231,13 +5231,16 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
                     # with a phase offset to create shimmer motion
                     grad = QLinearGradient(float(bx), float(fill_y + fill_h),
                                            float(bx), float(fill_y))
-                    phase = (math.sin(self._anim_t * 2.0) * 0.08)
-                    heat_frac = self._heat / 100.0
-                    # Color stops: green at bottom, heat-dependent color at top
-                    grad.setColorAt(max(0.0, 0.0 + phase),  QColor(0,  200, 0))
-                    grad.setColorAt(max(0.0, min(1.0, 0.35 + phase)), QColor(200, 200, 0))
-                    grad.setColorAt(max(0.0, min(1.0, 0.65 + phase)), QColor(255, 120, 0))
-                    grad.setColorAt(min(1.0, 1.0 + phase),  QColor(220,  30, 0))
+                    phase = math.sin(self._anim_t * 2.0) * 0.08
+                    # Color stops clamped to [0.0, 1.0] and kept in ascending order
+                    s0 = max(0.0, min(1.0, 0.00 + phase))
+                    s1 = max(0.0, min(1.0, 0.35 + phase))
+                    s2 = max(0.0, min(1.0, 0.65 + phase))
+                    s3 = max(0.0, min(1.0, 1.00 + phase))
+                    grad.setColorAt(s0, QColor(0,   200, 0))
+                    grad.setColorAt(s1, QColor(200, 200, 0))
+                    grad.setColorAt(s2, QColor(255, 120, 0))
+                    grad.setColorAt(s3, QColor(220,  30, 0))
                     p.setBrush(QBrush(grad))
                 else:
                     p.setBrush(self._bar_color(self._heat))
