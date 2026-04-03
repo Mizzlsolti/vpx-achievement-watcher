@@ -20,7 +20,6 @@ from trophy_mascot import _TrophieDrawWidget, _PinballDrawWidget
 # ---------------------------------------------------------------------------
 TROPHIE_SKINS = [
     {"id": "classic",     "name": "Classic",      "icon": "🏆",    "accessory": None},
-    {"id": "crown",       "name": "Golden King",  "icon": "🏆👑",  "accessory": "crown"},
     {"id": "top_hat",     "name": "Top Hat",      "icon": "🏆🎩",  "accessory": "top_hat"},
     {"id": "sunglasses",  "name": "Cool Shades",  "icon": "🏆🕶️", "accessory": "sunglasses"},
     {"id": "party_hat",   "name": "Party Time",   "icon": "🏆🎉",  "accessory": "party_hat"},
@@ -32,21 +31,16 @@ TROPHIE_SKINS = [
     {"id": "flame",       "name": "Inferno",      "icon": "🏆🔥",  "accessory": "flame"},
     {"id": "sparks",      "name": "Electric",     "icon": "🏆⚡",  "accessory": "sparks"},
     {"id": "rainbow",     "name": "Rainbow",      "icon": "🏆🌈",  "accessory": "rainbow"},
-    {"id": "gears",       "name": "Steampunk",    "icon": "🏆⚙️",  "accessory": "gears"},
-    {"id": "helmet",      "name": "Astronaut",    "icon": "🏆🚀",  "accessory": "helmet"},
     {"id": "detective",   "name": "Detective",    "icon": "🏆🔍",  "accessory": "detective"},
     {"id": "chef_hat",    "name": "Chef",         "icon": "🏆👨‍🍳", "accessory": "chef_hat"},
-    {"id": "cape",        "name": "Vampire",      "icon": "🏆🧛",  "accessory": "cape"},
     {"id": "antenna",     "name": "Robot",        "icon": "🏆🤖",  "accessory": "antenna"},
     {"id": "crystal",     "name": "Diamond",      "icon": "🏆💎",  "accessory": "crystal"},
     {"id": "neon_glow",   "name": "Neon",         "icon": "🏆✨",  "accessory": "neon_glow"},
     {"id": "medal",       "name": "Champion",     "icon": "🏆🏅",  "accessory": "medal"},
     # Clothing skins
     {"id": "suit",        "name": "Tuxedo",       "icon": "🏆🤵",  "accessory": "suit"},
-    {"id": "hoodie",      "name": "Hoodie",       "icon": "🏆🧥",  "accessory": "hoodie"},
     {"id": "superhero",   "name": "Superhero",    "icon": "🏆🦸",  "accessory": "superhero"},
     {"id": "armor",       "name": "Knight",       "icon": "🏆⚔️",  "accessory": "armor"},
-    {"id": "lab_coat",    "name": "Lab Coat",     "icon": "🏆🧪",  "accessory": "lab_coat"},
 ]
 
 STEELY_SKINS = [
@@ -297,7 +291,7 @@ class MascotsMixin:
 
         # ── Right: live preview ───────────────────────────────────────────────
         preview_panel = QWidget()
-        preview_panel.setFixedWidth(140)
+        preview_panel.setFixedWidth(160)
         preview_panel.setStyleSheet("background-color: #161616; border-radius: 6px;")
         preview_layout = QVBoxLayout(preview_panel)
         preview_layout.setContentsMargins(6, 6, 6, 6)

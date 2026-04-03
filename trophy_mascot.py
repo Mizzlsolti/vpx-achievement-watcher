@@ -1329,7 +1329,7 @@ class _TrophieDrawWidget(QWidget):
         total_offset = bob + jump
 
         cx = self._tw // 2
-        cy_base = self._th // 2 + int(self._th * 0.15)
+        cy_base = self._th // 2 + int(self._th * 0.20)
 
         # ── Tilt / rotation angle (degrees) ──────────────────────────────────
         if self._state == TALKING:
@@ -1670,31 +1670,7 @@ class _TrophieDrawWidget(QWidget):
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        if skin == "crown":
-            # Golden crown on top of cup
-            cw = int(tw * 0.45)
-            ch = int(th * 0.14)
-            bx = cx - cw // 2
-            by = cup_y_top - ch
-            grad = QLinearGradient(float(bx), float(by), float(bx), float(by + ch))
-            grad.setColorAt(0.0, QColor("#FFD700"))
-            grad.setColorAt(1.0, QColor("#B8860B"))
-            p.setBrush(grad)
-            p.setPen(QPen(QColor("#8B6914"), 1))
-            p.drawRect(bx, by + ch // 2, cw, ch // 2)
-            # Three crown points
-            tip_w = cw // 5
-            for i in range(3):
-                tx = bx + (i * cw // 2) - tip_w // 2 + cw // 4
-                path = QPainterPath()
-                path.moveTo(tx, by + ch // 2)
-                path.lineTo(tx + tip_w // 2, by)
-                path.lineTo(tx + tip_w, by + ch // 2)
-                path.closeSubpath()
-                p.fillPath(path, QColor("#FFD700"))
-                p.strokePath(path, QPen(QColor("#8B6914"), 1))
-
-        elif skin == "top_hat":
+        if skin == "top_hat":
             hw = int(tw * 0.35)
             hh = int(th * 0.22)
             brim_w = int(tw * 0.50)
@@ -1880,32 +1856,6 @@ class _TrophieDrawWidget(QWidget):
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawArc(cx - r, cup_y_top - r, r * 2, r * 2, 0, 180 * 16)
 
-        elif skin == "gears":
-            # Small gear near cup
-            gr = int(tw * 0.08)
-            gx = cx + int(tw * 0.28)
-            gy = cup_y_top + int(th * 0.10)
-            p.setBrush(QColor("#888888"))
-            p.setPen(QPen(QColor("#555555"), 1))
-            p.drawEllipse(gx - gr, gy - gr, gr * 2, gr * 2)
-            for t in range(8):
-                a = t * 45.0
-                tx2 = gx + int(math.cos(math.radians(a)) * gr * 1.5)
-                ty2 = gy + int(math.sin(math.radians(a)) * gr * 1.5)
-                p.drawLine(gx, gy, tx2, ty2)
-
-        elif skin == "helmet":
-            # Astronaut helmet
-            h_r = int(tw * 0.36)
-            p.setBrush(QColor(200, 220, 255, 180))
-            p.setPen(QPen(QColor("#AABBDD"), 2))
-            p.drawEllipse(cx - h_r, cup_y_top - h_r // 2, h_r * 2, int(h_r * 1.4))
-            # Visor
-            p.setBrush(QColor(100, 180, 255, 120))
-            p.setPen(Qt.PenStyle.NoPen)
-            vr = int(h_r * 0.55)
-            p.drawEllipse(cx - vr, cup_y_top, vr * 2, int(vr * 1.2))
-
         elif skin == "detective":
             # Detective hat (fedora style)
             hw = int(tw * 0.38)
@@ -1937,22 +1887,6 @@ class _TrophieDrawWidget(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.drawRect(hx, cup_y_top - 6, hw, 6)
 
-        elif skin == "cape":
-            # Vampire cape draped behind
-            cape_w = int(tw * 0.65)
-            cape_h = int(th * 0.45)
-            cap_x = cx - cape_w // 2
-            cap_y = cup_y_top - int(th * 0.05)
-            path = QPainterPath()
-            path.moveTo(cx - cape_w // 2, cap_y)
-            path.lineTo(cx + cape_w // 2, cap_y)
-            path.lineTo(cx + cape_w // 2, cap_y + cape_h)
-            path.lineTo(cx, cap_y + cape_h - int(cape_h * 0.25))
-            path.lineTo(cx - cape_w // 2, cap_y + cape_h)
-            path.closeSubpath()
-            p.fillPath(path, QColor(80, 0, 0, 180))
-            p.strokePath(path, QPen(QColor("#CC0000"), 1))
-
         elif skin == "antenna":
             # Robot antenna
             ax = cx
@@ -1978,12 +1912,19 @@ class _TrophieDrawWidget(QWidget):
             p.strokePath(path, QPen(QColor("#AAEEFF"), 1))
 
         elif skin == "neon_glow":
-            # Neon glow halo around cup
-            glow_r = int(tw * 0.40)
-            for alpha, width in [(30, 10), (60, 6), (120, 3)]:
-                p.setPen(QPen(QColor(0, 229, 255, alpha), width))
-                p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawEllipse(cx - glow_r, cup_y_top - glow_r // 3, glow_r * 2, glow_r)
+            # Neon glow ring centered at the cup top rim
+            glow_r = min(int(tw * 0.32), int(th * 0.22))
+            glow_cx = cx
+            glow_cy = cup_y_top + glow_r // 2
+            # Clamp radius so all ring layers stay within widget bounds
+            max_r = min(glow_cx, tw - glow_cx, glow_cy, th - glow_cy) - 6
+            if max_r > 4:
+                glow_r = min(glow_r, max_r)
+                for alpha, width in [(30, 10), (60, 6), (120, 3)]:
+                    p.setPen(QPen(QColor(0, 229, 255, alpha), width))
+                    p.setBrush(Qt.BrushStyle.NoBrush)
+                    p.drawEllipse(glow_cx - glow_r, glow_cy - glow_r,
+                                  glow_r * 2, glow_r * 2)
 
         elif skin == "medal":
             # Champion medal hanging from cup handle
@@ -2045,46 +1986,6 @@ class _TrophieDrawWidget(QWidget):
             p.setBrush(QColor("#990000"))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(cx - 3, bt_y - 3, 6, 6)
-
-        elif skin == "hoodie":
-            # Grey hoodie with raised hood above cup and kangaroo pocket
-            cup_w_h = int(tw * 0.62)
-            cup_h_h = int(th * 0.52)
-            cup_x_h = cx - cup_w_h // 2
-            top_ex = int(cup_w_h * 0.1)
-            hood_color = QColor("#4A4A4A")
-            # Hood raised above the cup top (always above the face)
-            hood_w = int(tw * 0.52)
-            hood_h = int(th * 0.16)
-            p.setBrush(hood_color)
-            p.setPen(QPen(QColor("#333333"), 1))
-            p.drawRoundedRect(cx - hood_w // 2, cup_y_top - hood_h,
-                              hood_w, hood_h + 4, hood_w // 3, hood_w // 3)
-            # Hoodie body over cup (clipped to avoid face)
-            p.save()
-            p.setClipPath(self._cup_safe_clip(cx, cy))
-            p.setBrush(hood_color)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawRect(cup_x_h - top_ex, cup_y_top, cup_w_h + top_ex * 2, cup_h_h)
-            # Kangaroo pocket at bottom of hoodie body
-            pkt_w = int(cup_w_h * 0.42)
-            pkt_h = int(cup_h_h * 0.18)
-            pkt_y = cup_y_top + cup_h_h - pkt_h - int(cup_h_h * 0.05)
-            p.setBrush(QColor("#3A3A3A"))
-            p.setPen(QPen(QColor("#555555"), 1))
-            p.drawRoundedRect(cx - pkt_w // 2, pkt_y, pkt_w, pkt_h, 3, 3)
-            p.restore()
-            # Drawstrings
-            str_y = cup_y_top + int(cup_h_h * 0.12)
-            p.setPen(QPen(QColor("#BBBBBB"), 1))
-            p.drawLine(cx - 5, str_y, cx - 8, str_y + int(cup_h_h * 0.18))
-            p.drawLine(cx + 5, str_y, cx + 8, str_y + int(cup_h_h * 0.18))
-            # Aglets
-            p.setBrush(QColor("#CCCCCC"))
-            p.setPen(Qt.PenStyle.NoPen)
-            aglet_y = str_y + int(cup_h_h * 0.18)
-            p.drawEllipse(cx - 10, aglet_y - 2, 4, 4)
-            p.drawEllipse(cx + 6, aglet_y - 2, 4, 4)
 
         elif skin == "superhero":
             # Red cape strips on cup sides + gold star emblem at collar
@@ -2170,45 +2071,6 @@ class _TrophieDrawWidget(QWidget):
             p.setBrush(QColor("#8888AA"))
             p.setPen(QPen(QColor("#555566"), 1))
             p.drawRoundedRect(cx - gorg_w // 2, cup_y_top - gorg_h // 2, gorg_w, gorg_h, 2, 2)
-
-        elif skin == "lab_coat":
-            # White lab coat panels on cup sides + collar + pocket
-            cup_w_l = int(tw * 0.62)
-            cup_h_l = int(th * 0.52)
-            cup_x_l = cx - cup_w_l // 2
-            top_ex = int(cup_w_l * 0.1)
-            collar_hw = max(5, int(cup_w_l * 0.18))
-            p.save()
-            p.setClipPath(self._cup_safe_clip(cx, cy))
-            p.setBrush(QColor("#EEEEEE"))
-            p.setPen(QPen(QColor("#CCCCCC"), 1))
-            # Left coat panel
-            p.drawRect(cup_x_l - top_ex, cup_y_top,
-                       cx - collar_hw - (cup_x_l - top_ex), cup_h_l)
-            # Right coat panel
-            p.drawRect(cx + collar_hw, cup_y_top,
-                       cup_x_l + cup_w_l + top_ex - cx - collar_hw, cup_h_l)
-            # Breast pocket on right side
-            pkt_w = max(4, int(cup_w_l * 0.16))
-            pkt_h = int(cup_h_l * 0.18)
-            pkt_x = cx + collar_hw + max(2, int((cup_w_l // 2 - collar_hw) * 0.25))
-            pkt_y = cup_y_top + int(cup_h_l * 0.55)
-            p.setBrush(QColor("#DDDDDD"))
-            p.setPen(QPen(QColor("#BBBBBB"), 1))
-            p.drawRect(pkt_x, pkt_y, pkt_w, pkt_h)
-            # Pen in pocket
-            p.setBrush(QColor("#2244AA"))
-            p.setPen(Qt.PenStyle.NoPen)
-            pen_x = pkt_x + pkt_w // 4
-            p.drawRect(pen_x, pkt_y - int(pkt_h * 0.3), max(2, pkt_w // 6), int(pkt_h * 0.45))
-            p.restore()
-            # Collar lapels at top of cup (above face zone)
-            lap_w = max(5, int(cup_w_l * 0.20))
-            lap_h = max(4, int(cup_h_l * 0.12))
-            p.setBrush(QColor("#EEEEEE"))
-            p.setPen(QPen(QColor("#CCCCCC"), 1))
-            p.drawRect(cup_x_l - top_ex, cup_y_top, lap_w, lap_h)
-            p.drawRect(cup_x_l + cup_w_l + top_ex - lap_w, cup_y_top, lap_w, lap_h)
 
         p.restore()
 
@@ -3210,9 +3072,9 @@ class GUITrophie(QWidget):
             bw = bubble.width()
             bh = bubble.height()
             # Place bubble just above the trophy cup top (not the widget top).
-            # cy_base is shifted down by 15% to give accessories headroom, so the
-            # cup top is at widget-y + (trophy_h/2 + trophy_h*0.15 - trophy_h*0.36).
-            cup_top = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.15) - int(self._TROPHY_H * 0.36)
+            # cy_base is shifted down by 20% to give accessories headroom, so the
+            # cup top is at widget-y + (trophy_h/2 + trophy_h*0.20 - trophy_h*0.36).
+            cup_top = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.20) - int(self._TROPHY_H * 0.36)
             bx = max(0, self.x() + self._TROPHY_W // 2 - bw // 2)
             by_raw = self.y() + cup_top - bh - 7
             if by_raw < 0:
