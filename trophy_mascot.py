@@ -917,7 +917,7 @@ class _TrophieDrawWidget(QWidget):
     }
 
     # Passive animation modes — cycle through these to keep the trophy lively
-    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle"]
+    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle", "yawn"]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
 
