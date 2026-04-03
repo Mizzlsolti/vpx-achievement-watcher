@@ -213,6 +213,10 @@ DEFAULT_OVERLAY.setdefault("sound_enabled", False)
 DEFAULT_OVERLAY.setdefault("sound_volume", 20)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
 DEFAULT_OVERLAY.setdefault("sound_events", {})
+DEFAULT_OVERLAY.setdefault("trophie_gui_enabled", True)
+DEFAULT_OVERLAY.setdefault("trophie_overlay_enabled", True)
+DEFAULT_OVERLAY.setdefault("trophie_overlay_x", -1)
+DEFAULT_OVERLAY.setdefault("trophie_overlay_y", -1)
 
 # Post-Processing
 DEFAULT_OVERLAY.setdefault("fx_post_bloom", False)
@@ -333,6 +337,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_flip_electric_spark", "fx_flip_electric_spark_intensity",
     "fx_flip_goal_glow",
     "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
+    "trophie_gui_enabled", "trophie_overlay_enabled",
+    "trophie_overlay_x", "trophie_overlay_y",
 
     # Post-Processing effect toggles and intensities
     "fx_post_bloom", "fx_post_bloom_intensity",

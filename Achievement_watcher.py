@@ -85,6 +85,8 @@ from ui_available_maps import _AvailableMapsWorker
 import notifications as _notif
 import sound
 
+from trophy_mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
+
 from ui_overlay import (
     OverlayWindow,
     MiniInfoOverlay,
@@ -134,6 +136,7 @@ class Bridge(QObject):
     status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
     close_secondary_overlays = pyqtSignal()
     session_ended = pyqtSignal(str)  # (rom)
+    session_started = pyqtSignal(str, str)  # (rom, table_name)
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -306,6 +309,37 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self._init_overlay_tooltips()
 
         self._refresh_input_bindings()
+
+        # ── Trophie mascot ──────────────────────────────────────────────────
+        try:
+            _trophie_memory = _TrophieMemory(self.cfg.BASE)
+            self._trophie_gui = GUITrophie(self.centralWidget(), self.cfg)
+            self._trophie_gui.set_memory(_trophie_memory)
+            self._trophie_overlay = OverlayTrophie(self, self.cfg)
+            self._trophie_overlay.set_memory(_trophie_memory)
+
+            self.main_tabs.currentChanged.connect(self._trophie_gui.on_tab_changed)
+
+            self.bridge.session_ended.connect(self._trophie_overlay.on_session_ended)
+            self.bridge.session_started.connect(
+                lambda rom, table: self._trophie_overlay.on_rom_start(rom, table or None)
+            )
+            self.bridge.challenge_timer_start.connect(
+                lambda *a: self._trophie_overlay.on_challenge_start()
+            )
+            self.bridge.challenge_timer_stop.connect(
+                lambda *a: self._trophie_overlay.on_challenge_stop()
+            )
+
+            if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
+                self._trophie_gui.show()
+                QTimer.singleShot(800, self._trophie_gui.greet)
+            if self.cfg.OVERLAY.get("trophie_overlay_enabled", True):
+                self._trophie_overlay.show()
+                QTimer.singleShot(1200, self._trophie_overlay.greet)
+        except Exception:
+            self._trophie_gui = None
+            self._trophie_overlay = None
 
     def _in_game_now(self) -> bool:
         try:
@@ -1451,7 +1485,33 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.activateWindow()
         self.raise_()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        _TROPHIE_SHARED["gui_visible"] = True
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.update_position(self.centralWidget().size())
+        except Exception:
+            pass
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        _TROPHIE_SHARED["gui_visible"] = self.isVisible()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        _TROPHIE_SHARED["gui_visible"] = self.isVisible()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.update_position(self.centralWidget().size())
+        except Exception:
+            pass
+
     def closeEvent(self, event):
+        _TROPHIE_SHARED["gui_visible"] = False
         self.cfg.save()
         try:
             if getattr(self, "tray", None) and self.tray and self.tray.isVisible():
@@ -1905,6 +1965,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             self._ach_toast_mgr.enqueue(title, rom, max(1, int(seconds)))
         except Exception:
             pass
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_achievement()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_achievement()
+        except Exception:
+            pass
 
     def _on_level_up(self, level_name: str, level_number: int):
         try:
@@ -1914,6 +1984,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             pass
         try:
             self._refresh_level_display()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_level_up()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_level_up()
         except Exception:
             pass
 

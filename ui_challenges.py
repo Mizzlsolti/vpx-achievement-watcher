@@ -68,6 +68,11 @@ class ChallengesMixin:
                 self._heat_bar_win.set_heat(heat)
         except Exception:
             pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_heat_changed(int(heat))
+        except Exception:
+            pass
 
     def _on_heat_bar_hide(self):
         try:
@@ -110,6 +115,11 @@ class ChallengesMixin:
                 self._on_flip_total_show(total, remaining, goal)
             else:
                 self._flip_total_win.update_counts(total, remaining, goal)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_flip_progress(int(total), int(goal))
         except Exception:
             pass
 

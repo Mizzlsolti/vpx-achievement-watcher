@@ -171,6 +171,28 @@ class SystemMixin:
         if self.cfg.CLOUD_ENABLED:
             self._lock_player_identity_fields(True)
 
+        # --- 🏆 Trophie Mascot ---
+        grp_trophie = QGroupBox("🏆 Trophie Mascot")
+        lay_trophie = QVBoxLayout(grp_trophie)
+
+        self.chk_trophie_gui = QCheckBox("Show Trophie in the main window (GUI)")
+        self.chk_trophie_gui.setChecked(bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)))
+        self.chk_trophie_gui.setToolTip(
+            "Shows the animated Trophie mascot in the bottom-left corner of the main window."
+        )
+        self.chk_trophie_gui.stateChanged.connect(self._on_trophie_gui_toggled)
+        lay_trophie.addWidget(self.chk_trophie_gui)
+
+        self.chk_trophie_overlay = QCheckBox("Show Trophie on the desktop (Overlay)")
+        self.chk_trophie_overlay.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True)))
+        self.chk_trophie_overlay.setToolTip(
+            "Shows the Trophie mascot as a desktop overlay — always visible, reacts to game events."
+        )
+        self.chk_trophie_overlay.stateChanged.connect(self._on_trophie_overlay_toggled)
+        lay_trophie.addWidget(self.chk_trophie_overlay)
+
+        layout.addWidget(grp_trophie)
+
         # --- 🐛 Feedback & Bug Reports ---
         grp_feedback = QGroupBox("🐛 Feedback & Bug Reports")
         lay_feedback = QVBoxLayout(grp_feedback)
@@ -243,6 +265,30 @@ class SystemMixin:
     # ==========================================
     # CLEAN SAVE METHODS
     # ==========================================
+    def _on_trophie_gui_toggled(self):
+        enabled = self.chk_trophie_gui.isChecked()
+        self.cfg.OVERLAY["trophie_gui_enabled"] = enabled
+        self.cfg.save()
+        try:
+            if enabled:
+                self._trophie_gui.show()
+            else:
+                self._trophie_gui.hide()
+        except Exception:
+            pass
+
+    def _on_trophie_overlay_toggled(self):
+        enabled = self.chk_trophie_overlay.isChecked()
+        self.cfg.OVERLAY["trophie_overlay_enabled"] = enabled
+        self.cfg.save()
+        try:
+            if enabled:
+                self._trophie_overlay.show()
+            else:
+                self._trophie_overlay.hide()
+        except Exception:
+            pass
+
     def _save_cloud_settings(self):
         QTimer.singleShot(0, self._apply_cloud_settings)
 

@@ -4909,6 +4909,14 @@ class Watcher:
         except Exception as e:
             log(self.cfg, f"[BALL] reset failed: {e}", "WARN")
 
+        try:
+            if hasattr(self.bridge, "session_started"):
+                _rom = self.current_rom or ""
+                _table = self.current_table or ""
+                self.bridge.session_started.emit(_rom, _table)
+        except Exception:
+            pass
+
     def _ensure_singleplayer_min_playtime(self, nplayers: int, duration_sec: int) -> None:
         try:
             if int(nplayers) == 1:
