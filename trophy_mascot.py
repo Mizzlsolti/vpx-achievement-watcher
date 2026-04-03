@@ -35,11 +35,23 @@ from PyQt6.QtWidgets import (
 _TROPHIE_SHARED: dict = {
     "gui_visible": False,
     "zank_cooldown_ms": 0,
+    "idle_bicker_cooldown_ms": 0,
     "last_gui_comment_key": None,
     "last_overlay_comment_key": None,
     "zank_pending_overlay": None,
     "zank_pending_gui": None,
+    "idle_bicker_ov_key": None,
+    "idle_bicker_ov_text": None,
 }
+
+# ---------------------------------------------------------------------------
+# Cooldown constants (milliseconds)
+# ---------------------------------------------------------------------------
+# How long before another event-triggered zank exchange can fire.
+_ZANK_COOLDOWN_MS = 6 * 60 * 1_000          # 6 minutes
+# Minimum/maximum cooldown between spontaneous idle bicker exchanges.
+_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes
+_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes
 
 # ---------------------------------------------------------------------------
 # Animation state constants
@@ -68,29 +80,169 @@ _ZANK_PAIRS: list[tuple[str, str, str]] = [
     ("christmas",   "zank_gui_family",       "zank_ov_xmas"),
 ]
 
-_ZANK_GUI_LINES: dict[str, str] = {
-    "zank_gui_predicted":  "I predicted that!",
-    "zank_gui_no_talk":    "We do not talk about this...",
-    "zank_gui_training":   "I knew you could do it! My training worked!",
-    "zank_gui_stats":      "Statistically this was likely...",
-    "zank_gui_come_back":  "Where did you go? Come back!",
-    "zank_gui_calculated": "I calculated this would happen!",
-    "zank_gui_guidance":   "My guidance paid off!",
-    "zank_gui_hydration":  "Hydration reminder #47...",
-    "zank_gui_family":     "Statistically you should be with family...",
+_ZANK_GUI_LINES: dict[str, list[str]] = {
+    "zank_gui_predicted": [
+        "I predicted that!",
+        "Called it! No surprise there.",
+        "My algorithm said this would happen. As always.",
+        "Told you so. You are welcome.",
+        "Some of us plan ahead. Just saying.",
+    ],
+    "zank_gui_no_talk": [
+        "We do not talk about this...",
+        "Let us just... move on. Quietly.",
+        "This never happened. Agreed? Agreed.",
+        "I am choosing not to remember this.",
+        "Statistical anomaly. Moving on.",
+    ],
+    "zank_gui_training": [
+        "I knew you could do it! My training worked!",
+        "All that coaching paid off! You are welcome!",
+        "That is the result of my expert guidance!",
+        "I prepared you for this moment!",
+        "My mentorship programme is clearly working.",
+    ],
+    "zank_gui_stats": [
+        "Statistically this was likely...",
+        "The probability charts predicted this outcome.",
+        "My data model said this might happen. It did.",
+        "Not ideal, but the numbers do not lie.",
+        "Failure rate is within acceptable parameters.",
+    ],
+    "zank_gui_come_back": [
+        "Where did you go? Come back!",
+        "Hello? I have been waiting here for ages!",
+        "It is very quiet without you. Come back!",
+        "I did not sign up to be furniture!",
+        "The achievements miss you. So do I. Not that I care.",
+    ],
+    "zank_gui_calculated": [
+        "I calculated this would happen!",
+        "The math does not lie — this was inevitable.",
+        "My heat forecast was accurate to the degree.",
+        "Simulation complete. Result: expected.",
+        "Another data point confirming my model.",
+    ],
+    "zank_gui_guidance": [
+        "My guidance paid off!",
+        "You levelled up because of my expert tips!",
+        "That is what listening to me gets you!",
+        "Level achieved! I take full credit.",
+        "Growth. I taught you that.",
+    ],
+    "zank_gui_hydration": [
+        "Hydration reminder #47...",
+        "Five hours. Please drink something.",
+        "Water exists. You should try it.",
+        "Your achievement score is rising. Your hydration is not.",
+        "Marathon session. Hydration protocol: ACTIVATE.",
+    ],
+    "zank_gui_family": [
+        "Statistically you should be with family...",
+        "Christmas Day. Pinball. You chose this.",
+        "The data suggests family gatherings exist for a reason.",
+        "Holiday detected. Unusual activity logged.",
+        "Festive season. Flippers active. Interesting.",
+    ],
 }
 
-_ZANK_OVERLAY_LINES: dict[str, str] = {
-    "zank_ov_saw_it":      "I SAW IT HAPPEN! I was there!",
-    "zank_ov_happens":     "It happens to everyone! ...right?",
-    "zank_ov_cheering":    "MY cheering definitely helped!",
-    "zank_ov_not_my_fault": "NOT MY FAULT!",
-    "zank_ov_left_us":     "...they left us both!",
-    "zank_ov_told_them":   "I TOLD THEM! Nobody listens!",
-    "zank_ov_witnessed":   "I WITNESSED HISTORY!",
-    "zank_ov_legend":      "LEGEND STATUS ACHIEVED!",
-    "zank_ov_xmas":        "CHRISTMAS PINBALL! NO REGRETS!",
+_ZANK_OVERLAY_LINES: dict[str, list[str]] = {
+    "zank_ov_saw_it": [
+        "I SAW IT HAPPEN! I was there!",
+        "WITNESSED! I have proof!",
+        "I saw everything from out here! Every single flip!",
+        "Front row seat! That was INCREDIBLE!",
+        "History happened and I was present for it!",
+    ],
+    "zank_ov_happens": [
+        "It happens to everyone! ...right?",
+        "Hey, even legends have bad days!",
+        "Nobody saw that. Except me. But I will forget.",
+        "Completely normal. Happens all the time. Probably.",
+        "The table was cheating. Definitely the table.",
+    ],
+    "zank_ov_cheering": [
+        "MY cheering definitely helped!",
+        "You heard me shouting from here, right?",
+        "I gave you good vibes the whole way!",
+        "My moral support was essential to that win!",
+        "Team effort. Mostly me, but still.",
+    ],
+    "zank_ov_not_my_fault": [
+        "NOT MY FAULT!",
+        "I was rooting for you! The table let us down!",
+        "My positive energy was clearly not enough!",
+        "Do NOT look at me for this one!",
+        "I had nothing to do with that. Nothing.",
+    ],
+    "zank_ov_left_us": [
+        "...they left us both!",
+        "Hello?! We are still here you know!",
+        "Abandoned. Both of us. Together in loneliness.",
+        "I waited. GUI waited. Nobody came.",
+        "The screen is dark. The silence is deafening.",
+    ],
+    "zank_ov_told_them": [
+        "I TOLD THEM! Nobody listens!",
+        "Maximum heat! I called this twenty minutes ago!",
+        "Did they hear my warnings? NO. Did it matter? YES.",
+        "I was screaming from the desktop! Could they hear me? No!",
+        "I said SLOW DOWN and yet here we are.",
+    ],
+    "zank_ov_witnessed": [
+        "I WITNESSED HISTORY!",
+        "I was HERE for this LEGENDARY moment!",
+        "Future generations will hear about this level up!",
+        "My desktop view gave me the perfect angle on greatness!",
+        "HISTORICAL! I am honoured to have been present!",
+    ],
+    "zank_ov_legend": [
+        "LEGEND STATUS ACHIEVED!",
+        "FIVE HOURS! YOU ARE UNSTOPPABLE!",
+        "The stuff of LEGENDS! I am speechless! Almost!",
+        "This session will be in the history books!",
+        "FIVE HOURS AND COUNTING! PLEASE ALSO EAT SOMETHING!",
+    ],
+    "zank_ov_xmas": [
+        "CHRISTMAS PINBALL! NO REGRETS!",
+        "FESTIVE FLIPPING! This is the best holiday!",
+        "Santa would be proud. Genuinely.",
+        "Holiday season and the flippers are HOT!",
+        "Christmas achievement hunting! A new tradition!",
+    ],
 }
+
+# ---------------------------------------------------------------------------
+# Spontaneous idle bicker exchanges — fired when both trophies are visible
+# Each entry: ((gui_key, gui_text), (ov_key, ov_text))
+# GUI fires its line first; Overlay responds 2 seconds later.
+# ---------------------------------------------------------------------------
+_IDLE_BICKER_EXCHANGES: list[tuple[tuple[str, str], tuple[str, str]]] = [
+    (("ibk1_gui", "Hey Overlay... are you even paying attention out there?"),
+     ("ibk1_ov",  "Unlike YOU, I see the whole screen. Every pixel.")),
+    (("ibk2_gui", "I do the important work. Just so you know."),
+     ("ibk2_ov",  "Important work? I am literally on the DESKTOP. I am everywhere.")),
+    (("ibk3_gui", "The overlay version of me really needs to calm down sometimes."),
+     ("ibk3_ov",  "CALM DOWN? You are the one hiding inside a window!")),
+    (("ibk4_gui", "I gave better tips today. Objectively."),
+     ("ibk4_ov",  "I cheered louder. That counts more. Science.")),
+    (("ibk5_gui", "Between us? My speech bubbles are more elegant."),
+     ("ibk5_ov",  "Mine are BIGGER. Bigger is better. Everyone knows.")),
+    (("ibk6_gui", "I work in a controlled indoor environment. Very professional."),
+     ("ibk6_ov",  "I brave the open desktop every single day. Do you know how drafty it is?")),
+    (("ibk7_gui", "My tips are data-driven and carefully researched."),
+     ("ibk7_ov",  "Mine come from the heart! That is worth more than data!")),
+    (("ibk8_gui", "I wonder if the Overlay me ever takes a day off."),
+     ("ibk8_ov",  "Day off? I live on this desktop 24/7. This IS my life.")),
+    (("ibk9_gui", "The player seems to be ignoring both of us today."),
+     ("ibk9_ov",  "At least they can still SEE me. I am literally floating here.")),
+    (("ibk10_gui", "If I had to pick one of us who is more useful... it would be me."),
+     ("ibk10_ov",  "Interesting! You chose wrong! It is me! Obviously!")),
+    (("ibk11_gui", "Do you ever get tired of being outside all the time?"),
+     ("ibk11_ov",  "Do YOU ever get tired of being stuck in a tab?")),
+    (("ibk12_gui", "I track stats. I give tips. I am basically a personal assistant."),
+     ("ibk12_ov",  "I celebrate EVERY achievement in REAL TIME. Beat that.")),
+]
 
 # ---------------------------------------------------------------------------
 # GUI Trophie tips
@@ -277,6 +429,12 @@ _GUI_ZANK: list[tuple[str, str]] = [
     ("z_gui_real",    "I do the REAL work here. The other one just watches!"),
     ("z_gui_twin",    "My twin thinks it is funny. It is not. I am the serious one!"),
     ("z_gui_first",   "I told you before the other one did. Just saying!"),
+    ("z_gui_loud",    "The Overlay me is being VERY loud today. Apologies."),
+    ("z_gui_shouting","Did you hear that? Yes. That was my outside clone. Again."),
+    ("z_gui_drama",   "My desktop counterpart is being dramatic. As usual."),
+    ("z_gui_credit",  "The other Trophie is trying to take credit again. Classic."),
+    ("z_gui_expert",  "I have a certification. The Overlay me does not. Just so you know."),
+    ("z_gui_envy",    "Sure, the Overlay floats around looking fancy. I actually HELP."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -416,6 +574,11 @@ _OV_ZANK: list[tuple[str, str]] = [
     ("z_ov_famous",    "I live on the DESKTOP. I am basically famous!"),
     ("z_ov_woke",      "My indoor version just woke up to say hello. Took long enough!"),
     ("z_ov_congrat",   "Did the indoor Trophie congratulate you? I did it first!"),
+    ("z_ov_tabs",      "GUI Trophie just sits there in its cozy little tab. Must be nice!"),
+    ("z_ov_exposure",  "I get direct sunlight and desktop exposure. My twin gets none. Tragic."),
+    ("z_ov_celebrate", "I am the celebration Trophie. My twin is the lecture Trophie. Facts."),
+    ("z_ov_freedom",   "The desktop is my kingdom. GUI me is basically in a box."),
+    ("z_ov_relevant",  "You can minimise the window but you cannot minimise ME!"),
 ]
 
 
@@ -1136,6 +1299,12 @@ class GUITrophie(QWidget):
         self._zank_tick.timeout.connect(self._zank_tick_fn)
         self._zank_tick.start()
 
+        # Spontaneous idle bicker timer (fires every 4 minutes, tries to start an exchange)
+        self._idle_bicker_timer = QTimer(self)
+        self._idle_bicker_timer.setInterval(4 * 60_000)
+        self._idle_bicker_timer.timeout.connect(self._try_idle_bicker)
+        self._idle_bicker_timer.start()
+
     def set_memory(self, mem: _TrophieMemory) -> None:
         self._memory = mem
 
@@ -1287,26 +1456,45 @@ class GUITrophie(QWidget):
             return False
         for trig, gui_key, ov_key in _ZANK_PAIRS:
             if trig == trigger:
-                gui_text = _ZANK_GUI_LINES.get(gui_key, "")
-                ov_text = _ZANK_OVERLAY_LINES.get(ov_key, "")
-                if gui_text:
-                    self._show_comment(gui_text, TALKING)
+                gui_options = _ZANK_GUI_LINES.get(gui_key, [])
+                if gui_options:
+                    self._show_comment(random.choice(gui_options), TALKING)
                 # Signal overlay to respond in 2 seconds
                 _TROPHIE_SHARED["zank_pending_overlay"] = ov_key
-                _TROPHIE_SHARED["zank_cooldown_ms"] = 15 * 60 * 1000
+                _TROPHIE_SHARED["zank_cooldown_ms"] = _ZANK_COOLDOWN_MS
                 return True
         return False
+
+    def _try_idle_bicker(self) -> None:
+        """Fire a spontaneous bicker exchange when both trophies are visible."""
+        if not _TROPHIE_SHARED["gui_visible"]:
+            return
+        if _TROPHIE_SHARED["idle_bicker_cooldown_ms"] > 0:
+            return
+        if self._is_silenced():
+            return
+        (gui_key, gui_text), (ov_key, ov_text) = random.choice(_IDLE_BICKER_EXCHANGES)
+        self._show_comment_key(gui_key, gui_text, TALKING)
+        _TROPHIE_SHARED["idle_bicker_ov_key"] = ov_key
+        _TROPHIE_SHARED["idle_bicker_ov_text"] = ov_text
+        _TROPHIE_SHARED["idle_bicker_cooldown_ms"] = random.randint(
+            _IDLE_BICKER_MIN_COOLDOWN_MS, _IDLE_BICKER_MAX_COOLDOWN_MS
+        )
 
     def _zank_tick_fn(self) -> None:
         if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
             _TROPHIE_SHARED["zank_cooldown_ms"] = max(0, _TROPHIE_SHARED["zank_cooldown_ms"] - 1000)
+        if _TROPHIE_SHARED["idle_bicker_cooldown_ms"] > 0:
+            _TROPHIE_SHARED["idle_bicker_cooldown_ms"] = max(
+                0, _TROPHIE_SHARED["idle_bicker_cooldown_ms"] - 1000
+            )
         # Check if overlay posted a pending gui zank response
         pending = _TROPHIE_SHARED.get("zank_pending_gui")
         if pending:
             _TROPHIE_SHARED["zank_pending_gui"] = None
-            text = _ZANK_GUI_LINES.get(pending, "")
-            if text:
-                self._show_comment(text, TALKING)
+            options = _ZANK_GUI_LINES.get(pending, [])
+            if options:
+                self._show_comment(random.choice(options), TALKING)
 
     def _is_silenced(self) -> bool:
         return time.time() < self._silenced_until
@@ -1798,12 +1986,14 @@ class OverlayTrophie(QWidget):
             return False
         for trig, gui_key, ov_key in _ZANK_PAIRS:
             if trig == trigger:
-                ov_text = _ZANK_OVERLAY_LINES.get(ov_key, "")
-                # Schedule overlay response 2 seconds after gui fires
-                QTimer.singleShot(2000, lambda t=ov_text, k=ov_key: self._show_comment_key(k, t, TALKING))
+                ov_options = _ZANK_OVERLAY_LINES.get(ov_key, [])
+                if ov_options:
+                    ov_text = random.choice(ov_options)
+                    # Schedule overlay response 2 seconds after gui fires
+                    QTimer.singleShot(2000, lambda t=ov_text, k=ov_key: self._show_comment_key(k, t, TALKING))
                 # Signal GUI to show its line
                 _TROPHIE_SHARED["zank_pending_gui"] = gui_key
-                _TROPHIE_SHARED["zank_cooldown_ms"] = 15 * 60 * 1000
+                _TROPHIE_SHARED["zank_cooldown_ms"] = _ZANK_COOLDOWN_MS
                 return True
         return False
 
@@ -1813,9 +2003,17 @@ class OverlayTrophie(QWidget):
         pending = _TROPHIE_SHARED.get("zank_pending_overlay")
         if pending:
             _TROPHIE_SHARED["zank_pending_overlay"] = None
-            text = _ZANK_OVERLAY_LINES.get(pending, "")
-            if text:
-                QTimer.singleShot(2000, lambda t=text, k=pending: self._show_comment_key(k, t, TALKING))
+            options = _ZANK_OVERLAY_LINES.get(pending, [])
+            if options:
+                ov_text = random.choice(options)
+                QTimer.singleShot(2000, lambda t=ov_text, k=pending: self._show_comment_key(k, t, TALKING))
+        # Handle spontaneous idle bicker response
+        bicker_key = _TROPHIE_SHARED.get("idle_bicker_ov_key")
+        bicker_text = _TROPHIE_SHARED.get("idle_bicker_ov_text")
+        if bicker_key and bicker_text:
+            _TROPHIE_SHARED["idle_bicker_ov_key"] = None
+            _TROPHIE_SHARED["idle_bicker_ov_text"] = None
+            QTimer.singleShot(2000, lambda t=bicker_text, k=bicker_key: self._show_comment_key(k, t, TALKING))
 
     def _days_since_last_played(self, rom: str) -> Optional[int]:
         # Simple: we don't track dates directly — use play_count heuristic
