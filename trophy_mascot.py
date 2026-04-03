@@ -48,10 +48,10 @@ _TROPHIE_SHARED: dict = {
 # Cooldown constants (milliseconds)
 # ---------------------------------------------------------------------------
 # How long before another event-triggered zank exchange can fire.
-_ZANK_COOLDOWN_MS = 6 * 60 * 1_000         # 6 minutes
+_ZANK_COOLDOWN_MS = 6 * 60 * 1_000          # 6 minutes
 # Minimum/maximum cooldown between spontaneous idle bicker exchanges.
-_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60_000   # 3 minutes
-_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60_000   # 5 minutes
+_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes
+_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes
 
 # ---------------------------------------------------------------------------
 # Animation state constants
