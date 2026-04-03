@@ -48,10 +48,10 @@ _TROPHIE_SHARED: dict = {
 # Cooldown constants (milliseconds)
 # ---------------------------------------------------------------------------
 # How long before another event-triggered zank exchange can fire.
-_ZANK_COOLDOWN_MS = 6 * 60 * 1_000          # 6 minutes
+_ZANK_COOLDOWN_MS = 2 * 60 * 1_000          # 2 minutes
 # Minimum/maximum cooldown between spontaneous idle bicker exchanges.
-_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes
-_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes
+_IDLE_BICKER_MIN_COOLDOWN_MS = 1 * 60 * 1_000  # 1 minute
+_IDLE_BICKER_MAX_COOLDOWN_MS = 2 * 60 * 1_000  # 2 minutes
 
 # ---------------------------------------------------------------------------
 # Animation state constants
@@ -800,9 +800,11 @@ class _SpeechBubble(QWidget):
         msg = self._memory.record_dismiss(elapsed)
         self._memory.save()
         if msg:
-            # Schedule a brief "quiet" message on parent Trophie after dismissal
+            # Schedule a brief "quiet" message on parent Trophie after dismissal.
+            # _owner is set when the bubble is a top-level window with no Qt parent.
+            owner = getattr(self, '_owner', None) or self.parent()
             try:
-                self.parent()._schedule_quiet_msg(msg)
+                owner._schedule_quiet_msg(msg)
             except Exception:
                 pass
         self.hide()
@@ -1303,9 +1305,9 @@ class GUITrophie(QWidget):
         self._zank_tick.timeout.connect(self._zank_tick_fn)
         self._zank_tick.start()
 
-        # Spontaneous idle bicker timer (fires every 4 minutes, tries to start an exchange)
+        # Spontaneous idle bicker timer (fires every 2 minutes, tries to start an exchange)
         self._idle_bicker_timer = QTimer(self)
-        self._idle_bicker_timer.setInterval(4 * 60_000)
+        self._idle_bicker_timer.setInterval(2 * 60_000)
         self._idle_bicker_timer.timeout.connect(self._try_idle_bicker)
         self._idle_bicker_timer.start()
 
@@ -1429,7 +1431,7 @@ class GUITrophie(QWidget):
                 self._draw.set_state(IDLE)
 
     def _schedule_random(self) -> None:
-        base_ms = random.randint(8 * 60_000, 15 * 60_000)
+        base_ms = random.randint(3 * 60_000, 6 * 60_000)
         mult = self._memory.comment_frequency_multiplier() if self._memory else 1.0
         self._rand_timer.start(int(base_ms / max(0.1, mult)))
 
@@ -2003,7 +2005,7 @@ class OverlayTrophie(QWidget):
             QTimer.singleShot(8000, lambda: self._show_comment_key(key, text, IDLE))
 
     def _schedule_random(self) -> None:
-        base_ms = random.randint(8 * 60_000, 15 * 60_000)
+        base_ms = random.randint(3 * 60_000, 6 * 60_000)
         mult = self._memory.comment_frequency_multiplier() if self._memory else 1.0
         self._rand_timer.start(int(base_ms / max(0.1, mult)))
 
@@ -2079,7 +2081,8 @@ class OverlayTrophie(QWidget):
             return
         self._dismiss_bubble()
         self._draw.set_state(state)
-        # Bubble is a child of THIS widget so it floats above it
+        # Create bubble as a top-level window so it is visible above the small
+        # overlay widget (child widgets with negative Y coords get clipped).
         if self._memory is None:
             mem = _TrophieMemory.__new__(_TrophieMemory)
             mem.seen_tips = set()
@@ -2090,7 +2093,15 @@ class OverlayTrophie(QWidget):
             mem._told_quiet = False
         else:
             mem = self._memory
-        bubble = _SpeechBubble(self, text, mem)
+        bubble = _SpeechBubble(None, text, mem)
+        bubble._owner = self  # so _do_dismiss can still call _schedule_quiet_msg
+        bubble.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        bubble.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        bubble.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self._current_bubble = bubble
         self._position_bubble(bubble)
         bubble.show()
@@ -2104,20 +2115,21 @@ class OverlayTrophie(QWidget):
         try:
             bw = bubble.width()
             bh = bubble.height()
-            # Place bubble above the trophy widget
-            bx = self._TROPHY_W // 2 - bw // 2
-            by = -bh - 4
+            # Use absolute screen coordinates because the bubble is a top-level window.
+            origin = self.mapToGlobal(QPoint(0, 0))
+            abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
+            abs_y = origin.y() - bh - 4
             # Clamp to screen
             screen_geom = QApplication.primaryScreen().geometry()
-            abs_x = self.x() + bx
-            abs_y = self.y() + by
-            if abs_x < 0:
-                bx -= abs_x
-            if abs_y < 0:
-                by = self._TROPHY_H + 4  # flip below
-            if abs_x + bw > screen_geom.width():
-                bx -= (abs_x + bw - screen_geom.width())
-            bubble.move(bx, by)
+            if abs_x < screen_geom.x():
+                abs_x = screen_geom.x()
+            if abs_y < screen_geom.y():
+                abs_y = origin.y() + self._TROPHY_H + 4  # flip below
+            if abs_x + bw > screen_geom.right():
+                abs_x = screen_geom.right() - bw
+            if abs_y + bh > screen_geom.bottom():
+                abs_y = screen_geom.bottom() - bh
+            bubble.move(abs_x, abs_y)
         except Exception:
             pass
 

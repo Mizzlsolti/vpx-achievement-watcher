@@ -19,6 +19,7 @@ from watcher_core import (
 )
 from ui_dialogs import FeedbackDialog
 from ui_vps import _load_vps_mapping, _save_vps_mapping
+from trophy_mascot import _TROPHIE_SHARED
 
 
 def _parse_version(v_str):
@@ -292,6 +293,8 @@ class SystemMixin:
                 self._trophie_gui.hide()
         except Exception:
             pass
+        ov_enabled = bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True))
+        _TROPHIE_SHARED["gui_visible"] = enabled and ov_enabled
 
     def _on_trophie_overlay_toggled(self):
         enabled = self.chk_trophie_overlay.isChecked()
@@ -304,6 +307,8 @@ class SystemMixin:
                 self._trophie_overlay.hide()
         except Exception:
             pass
+        gui_enabled = bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True))
+        _TROPHIE_SHARED["gui_visible"] = enabled and gui_enabled
 
     def _on_trophie_overlay_portrait_toggled(self):
         enabled = self.chk_trophie_overlay_portrait.isChecked()
