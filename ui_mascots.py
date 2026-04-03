@@ -41,6 +41,12 @@ TROPHIE_SKINS = [
     {"id": "crystal",     "name": "Diamond",      "icon": "🏆💎",  "accessory": "crystal"},
     {"id": "neon_glow",   "name": "Neon",         "icon": "🏆✨",  "accessory": "neon_glow"},
     {"id": "medal",       "name": "Champion",     "icon": "🏆🏅",  "accessory": "medal"},
+    # Clothing skins
+    {"id": "suit",        "name": "Tuxedo",       "icon": "🏆🤵",  "accessory": "suit"},
+    {"id": "hoodie",      "name": "Hoodie",       "icon": "🏆🧥",  "accessory": "hoodie"},
+    {"id": "superhero",   "name": "Superhero",    "icon": "🏆🦸",  "accessory": "superhero"},
+    {"id": "armor",       "name": "Knight",       "icon": "🏆⚔️",  "accessory": "armor"},
+    {"id": "lab_coat",    "name": "Lab Coat",     "icon": "🏆🧪",  "accessory": "lab_coat"},
 ]
 
 STEELY_SKINS = [
@@ -66,6 +72,12 @@ STEELY_SKINS = [
     {"id": "rubber",     "name": "Rubber",       "icon": "⚫",  "accessory": "rubber"},
     {"id": "beach",      "name": "Beach Ball",   "icon": "🏖️", "accessory": "beach"},
     {"id": "skull",      "name": "Skull Ball",   "icon": "💀",  "accessory": "skull"},
+    # Clothing / wearable skins
+    {"id": "scarf",      "name": "Scarf",        "icon": "🎱🧣", "accessory": "scarf"},
+    {"id": "bow_tie",    "name": "Bow Tie",      "icon": "🎱🎀", "accessory": "bow_tie"},
+    {"id": "bandana",    "name": "Bandana",      "icon": "🎱🪢", "accessory": "bandana"},
+    {"id": "monocle",    "name": "Monocle",      "icon": "🎱🧐", "accessory": "monocle"},
+    {"id": "headphones", "name": "Headphones",   "icon": "🎱🎧", "accessory": "headphones"},
 ]
 
 # ---------------------------------------------------------------------------
@@ -173,7 +185,7 @@ class MascotsMixin:
         grp = QGroupBox("🏆 Trophie (GUI Mascot)")
         grp.setStyleSheet(_GRP_CSS)
         grp_layout = QVBoxLayout(grp)
-        grp_layout.setSpacing(10)
+        grp_layout.setSpacing(6)
 
         # Settings row
         self.chk_trophie_gui = QCheckBox("Show Trophie in the main window (GUI)")
@@ -202,7 +214,7 @@ class MascotsMixin:
         grp = QGroupBox("🎱 Steely (Desktop Overlay Mascot)")
         grp.setStyleSheet(_GRP_CSS)
         grp_layout = QVBoxLayout(grp)
-        grp_layout.setSpacing(8)
+        grp_layout.setSpacing(6)
 
         # Settings checkboxes
         self.chk_trophie_overlay = QCheckBox("Show Steely on the desktop (Overlay)")
@@ -267,31 +279,30 @@ class MascotsMixin:
         container = QWidget()
         container.setStyleSheet("background: transparent;")
         h_layout = QHBoxLayout(container)
-        h_layout.setContentsMargins(0, 4, 0, 4)
-        h_layout.setSpacing(10)
+        h_layout.setContentsMargins(0, 2, 0, 2)
+        h_layout.setSpacing(8)
 
         # ── Left: scrollable skin grid ────────────────────────────────────────
         gallery_scroll = QScrollArea()
         gallery_scroll.setWidgetResizable(True)
         gallery_scroll.setFrameShape(QFrame.Shape.NoFrame)
         gallery_scroll.setStyleSheet(_SCROLL_CSS)
-        gallery_scroll.setMaximumHeight(260)
 
         gallery_inner = QWidget()
         gallery_inner.setStyleSheet("background-color: #161616;")
         grid = QGridLayout(gallery_inner)
-        grid.setContentsMargins(6, 6, 6, 6)
-        grid.setSpacing(6)
+        grid.setContentsMargins(4, 4, 4, 4)
+        grid.setSpacing(4)
 
         gallery_scroll.setWidget(gallery_inner)
 
         # ── Right: live preview ───────────────────────────────────────────────
         preview_panel = QWidget()
-        preview_panel.setFixedWidth(160)
+        preview_panel.setFixedWidth(140)
         preview_panel.setStyleSheet("background-color: #161616; border-radius: 6px;")
         preview_layout = QVBoxLayout(preview_panel)
-        preview_layout.setContentsMargins(8, 8, 8, 8)
-        preview_layout.setSpacing(6)
+        preview_layout.setContentsMargins(6, 6, 6, 6)
+        preview_layout.setSpacing(4)
         preview_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter)
 
         preview_lbl_title = QLabel("Live Preview")
@@ -354,7 +365,7 @@ class MascotsMixin:
         btn_apply.clicked.connect(_apply)
 
         # Build skin cards
-        COLS = 4
+        COLS = 6
         for idx, skin in enumerate(skins):
             sid = skin["id"]
             card = _make_skin_card(skin, applied=(sid == current_skin))
@@ -405,27 +416,27 @@ def _skin_name(skins: list, skin_id: str) -> str:
 
 
 def _make_skin_card(skin: dict, applied: bool = False) -> QWidget:
-    """Build a single skin selection card (~80×90 px)."""
+    """Build a single skin selection card (~64×72 px)."""
     card = QWidget()
     card.setObjectName("skinCard")
-    card.setFixedSize(82, 92)
+    card.setFixedSize(64, 72)
     if applied:
         card.setStyleSheet(_CARD_APPLIED)
     else:
         card.setStyleSheet(_CARD_NORMAL)
 
     layout = QVBoxLayout(card)
-    layout.setContentsMargins(4, 4, 4, 4)
-    layout.setSpacing(2)
+    layout.setContentsMargins(2, 2, 2, 2)
+    layout.setSpacing(1)
 
     icon_lbl = QLabel(skin["icon"])
     icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    icon_lbl.setStyleSheet("font-size: 20pt; background: transparent; color: #E0E0E0;")
+    icon_lbl.setStyleSheet("font-size: 16pt; background: transparent; color: #E0E0E0;")
     layout.addWidget(icon_lbl)
 
     name_lbl = QLabel(skin["name"])
     name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    name_lbl.setStyleSheet("font-size: 7pt; color: #CCC; background: transparent;")
+    name_lbl.setStyleSheet("font-size: 6pt; color: #CCC; background: transparent;")
     name_lbl.setWordWrap(True)
     layout.addWidget(name_lbl)
 
