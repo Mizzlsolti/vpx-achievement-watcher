@@ -3090,6 +3090,7 @@ class NumberCascade:
 
     _DURATION_MS = 400
     _DIGITS = "0123456789"
+    _CASCADE_N = 5  # number of vertically-stacked rolling digits
 
     def __init__(self, intensity: float = 1.0):
         self.intensity = _clamp(intensity, 0.0, 1.0)
@@ -3126,11 +3127,25 @@ class NumberCascade:
                 pass
         t = _clamp(self._elapsed / self._DURATION_MS, 0.0, 1.0)
         fade = 1.0 - t
-        alpha = _clamp(int(200 * fade * self.intensity), 0, 255)
+        alpha = _clamp(int(220 * fade * self.intensity), 0, 255)
+        if alpha <= 0:
+            return
         painter.save()
-        painter.setOpacity(alpha / 255.0)
-        painter.setPen(QPen(QColor(0, 229, 255)))
-        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.cascade_char)
+        painter.setClipRect(rect)
+        # Rolling digits: draw N digits stacked vertically, scrolling upward
+        digit_h = max(rect.height(), 1)
+        # Scroll offset: digits shift upward over the animation (0 → digit_h)
+        y_scroll = int(t * digit_h)
+        font = QFont(painter.font())
+        font.setPointSize(max(8, digit_h - 4))
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QPen(QColor(0, 229, 255, alpha)))
+        for i in range(self._CASCADE_N + 1):
+            y_top = rect.top() + (i - 1) * digit_h - y_scroll
+            digit_rect = QRect(rect.left(), y_top, rect.width(), digit_h)
+            painter.setOpacity(alpha / 255.0)
+            painter.drawText(digit_rect, int(Qt.AlignmentFlag.AlignCenter), random.choice(self._DIGITS))
         painter.setOpacity(1.0)
         painter.restore()
 
@@ -3415,7 +3430,7 @@ class GoalProximityGlow:
 class CompletionFirework:
     """Firework particles when goal is reached."""
 
-    _DURATION_MS = 1500
+    _DURATION_MS = 3000
 
     def __init__(self, intensity: float = 1.0):
         self.intensity = _clamp(intensity, 0.0, 1.0)
@@ -3426,22 +3441,22 @@ class CompletionFirework:
     def start(self):
         self._elapsed = 0.0
         self._bursts = []
-        n_bursts = max(3, int(8 * self.intensity))
+        n_bursts = max(5, int(12 * self.intensity))
         for _ in range(n_bursts):
-            n_p = max(15, int(40 * self.intensity))
+            n_p = max(20, int(60 * self.intensity))
             color = random.choice([
                 QColor("#FFD700"), QColor("#FF4444"), QColor("#00E5FF"),
                 QColor("#FF7F00"), QColor("#FF69B4"),
             ])
             self._bursts.append({
-                "cx_frac": random.uniform(0.2, 0.8),
-                "cy_frac": random.uniform(0.2, 0.8),
-                "delay_ms": random.uniform(0, 600),
+                "cx_frac": random.uniform(0.15, 0.85),
+                "cy_frac": random.uniform(0.15, 0.85),
+                "delay_ms": random.uniform(0, 400),
                 "color": color,
                 "particles": [
                     {
                         "angle": random.uniform(0, 2 * math.pi),
-                        "speed": random.uniform(0.2, 0.7) * self.intensity,
+                        "speed": random.uniform(0.5, 1.0),
                     }
                     for _ in range(n_p)
                 ],
@@ -3465,7 +3480,7 @@ class CompletionFirework:
             except Exception:
                 pass
         W, H = rect.width(), rect.height()
-        max_r = max(W, H) * 0.4
+        max_r = max(W, H) * 0.6
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for burst in self._bursts:
@@ -3478,13 +3493,13 @@ class CompletionFirework:
             cy = rect.top() + int(burst["cy_frac"] * H)
             c = burst["color"]
             for p in burst["particles"]:
-                dist = t * max_r * p["speed"] / 0.3
+                dist = t * max_r * p["speed"]
                 px = cx + int(math.cos(p["angle"]) * dist)
                 py = cy + int(math.sin(p["angle"]) * dist)
                 alpha = _clamp(int(220 * fade), 0, 255)
                 painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), alpha)))
                 painter.setPen(Qt.PenStyle.NoPen)
-                sz = max(3, int(8 * fade * self.intensity))
+                sz = max(4, int(14 * fade * self.intensity))
                 painter.drawEllipse(px - sz // 2, py - sz // 2, sz, sz)
         painter.restore()
 
@@ -3493,7 +3508,7 @@ class CompletionFirework:
 
     def _draw_gl(self, rect: QRect):
         W, H = rect.width(), rect.height()
-        max_r = max(W, H) * 0.4
+        max_r = max(W, H) * 0.6
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
@@ -3509,7 +3524,7 @@ class CompletionFirework:
             cy = float(rect.top() + burst["cy_frac"] * H)
             c = burst["color"]
             for p in burst["particles"]:
-                dist = t * max_r * p["speed"] / 0.3
+                dist = t * max_r * p["speed"]
                 px = cx + math.cos(p["angle"]) * dist
                 py = cy + math.sin(p["angle"]) * dist
                 alpha = _clamp(220 * fade / 255.0, 0.0, 1.0)

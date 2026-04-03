@@ -21,8 +21,8 @@ from PyQt6.QtCore import (
     QPoint, QRect, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen,
-    QRadialGradient,
+    QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen,
+    QPixmap, QRadialGradient, QTransform,
 )
 from PyQt6.QtWidgets import (
     QApplication, QLabel, QMenu, QSizePolicy,
@@ -914,6 +914,10 @@ class _TrophieDrawWidget(QWidget):
         self._tick_timer.timeout.connect(self._tick)
         self._tick_timer.start()
 
+    def add_tick_listener(self, callback) -> None:
+        """Register an additional callback to fire on every animation tick."""
+        self._tick_timer.timeout.connect(callback)
+
         # Jump animation
         self._jump_offset = 0.0
         self._jump_vel = 0.0
@@ -1598,6 +1602,12 @@ class OverlayTrophie(QWidget):
         self._draw = _TrophieDrawWidget(self, self._TROPHY_W, self._TROPHY_H)
         self._draw.move(0, 0)
 
+        # Apply portrait mode on startup
+        self.apply_portrait_from_cfg()
+
+        # Connect draw tick to trigger our paintEvent update in portrait mode
+        self._draw.add_tick_listener(self.update)
+
         # Drag support
         self._drag_start: Optional[QPoint] = None
         self._drag_pos_start: Optional[QPoint] = None
@@ -1660,7 +1670,42 @@ class OverlayTrophie(QWidget):
         self._draw.set_state(HAPPY)
         self._show_comment("Hey! I am Trophie! Ready to watch your games!", HAPPY)
 
-    # ── Session event handlers ────────────────────────────────────────────────
+    def apply_portrait_from_cfg(self) -> None:
+        """Apply portrait/landscape mode based on current config."""
+        ov = self._cfg.OVERLAY or {}
+        portrait = bool(ov.get("trophie_overlay_portrait", False))
+        if portrait:
+            # Swap dimensions for portrait (rotated 90°)
+            self.setFixedSize(self._TROPHY_H, self._TROPHY_W)
+            self._draw.setVisible(False)
+        else:
+            self.setFixedSize(self._TROPHY_W, self._TROPHY_H)
+            self._draw.setVisible(True)
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        ov = self._cfg.OVERLAY or {}
+        portrait = bool(ov.get("trophie_overlay_portrait", False))
+        if not portrait:
+            super().paintEvent(event)
+            return
+        # Portrait mode: render _draw widget to offscreen image, rotate, then paint
+        img = QImage(self._TROPHY_W, self._TROPHY_H, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        render_painter = QPainter(img)
+        try:
+            self._draw.render(render_painter, QPoint(0, 0))
+        finally:
+            render_painter.end()
+        ccw = bool(ov.get("trophie_overlay_rotate_ccw", False))
+        angle = -90 if ccw else 90
+        img = img.transformed(QTransform().rotate(angle), Qt.TransformationMode.SmoothTransformation)
+        painter = QPainter(self)
+        try:
+            painter.drawImage(0, 0, img)
+        finally:
+            painter.end()
+
 
     def on_rom_start(self, rom: str, table_name: Optional[str] = None) -> None:
         self._session_start = time.time()
@@ -2043,6 +2088,7 @@ class OverlayTrophie(QWidget):
         bubble = _SpeechBubble(self, text, mem)
         self._current_bubble = bubble
         self._position_bubble(bubble)
+        bubble.show()
 
     def _show_comment_key(self, key: str, text: str, state: str = TALKING) -> None:
         if self._memory:
