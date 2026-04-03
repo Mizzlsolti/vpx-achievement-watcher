@@ -1340,7 +1340,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
             old_pct_target = getattr(self, '_progress_pct_target', -1.0)
             self._progress_pct_target = new_pct_target
-            if not self._anim_ok("fx_main_score_spin"):
+            if not self._anim_ok("fx_main_progress_fill"):
                 self._progress_pct_current = self._progress_pct_target
             else:
                 if not hasattr(self, '_progress_bar_timer_started') or not getattr(self, '_progress_bar_timer_started', False):
