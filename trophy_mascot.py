@@ -1331,6 +1331,11 @@ class GUITrophie(QWidget):
         self._last_interaction = time.time()
         self._fire_tab_tip(tab_name)
 
+    def on_subtab_changed(self, tab_name: str) -> None:
+        """Called when the user switches to a sub-tab; tab_name is the sub-tab label text."""
+        self._last_interaction = time.time()
+        self._fire_tab_tip(tab_name.lower())
+
     def on_achievement(self) -> None:
         self._last_interaction = time.time()
         self._draw.set_state(HAPPY)
