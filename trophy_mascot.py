@@ -694,6 +694,7 @@ class _TrophieDrawWidget(QWidget):
                     self._dismiss_cb()
                 return
         else:
+            # Not dismissing — run all motion physics.
             # Jump physics (runs for any jumping state)
             if self._jumping:
                 self._jump_offset += self._jump_vel * dt * 60
@@ -740,9 +741,9 @@ class _TrophieDrawWidget(QWidget):
             self._scale = 1.0
             self._opacity_val = 1.0
         # Reset secondary animations on state change for clean transitions
-        if state not in (TALKING,):
+        if state != TALKING:
             self._tilt_t = 0.0
-        if state not in (SURPRISED,):
+        if state != SURPRISED:
             self._wiggle_t = 0.0
 
     def start_dismiss(self, callback=None) -> None:
@@ -797,9 +798,9 @@ class _TrophieDrawWidget(QWidget):
         sy *= self._scale
 
         p.save()
-        # Translate origin to the draw centre (incorporating vertical bob/jump
+        # Translate origin to the draw center (incorporating vertical bob/jump
         # and horizontal wiggle), then apply rotation and scale around that
-        # centre before drawing.
+        # center before drawing.
         p.translate(cx + wiggle_x, cy_base + int(total_offset))
         if angle != 0.0:
             p.rotate(angle)
