@@ -54,9 +54,8 @@ STEELY_SKINS = [
     {"id": "chrome",     "name": "Chrome",       "icon": "🪩",  "accessory": "chrome"},
     {"id": "gold_ball",  "name": "Gold Ball",    "icon": "🥇",  "accessory": "gold"},
     {"id": "8ball",      "name": "8-Ball",       "icon": "🎱",  "accessory": "8ball"},
-    {"id": "soccer",     "name": "Soccer Ball",  "icon": "⚽",  "accessory": "soccer"},
+    {"id": "spotted",    "name": "Spotted Ball", "icon": "⚫",  "accessory": "spotted"},
     {"id": "basketball", "name": "Basketball",   "icon": "🏀",  "accessory": "basketball"},
-    {"id": "baseball",   "name": "Baseball",     "icon": "⚾",  "accessory": "baseball"},
     {"id": "tennis",     "name": "Tennis Ball",  "icon": "🎾",  "accessory": "tennis"},
     {"id": "bowling",    "name": "Bowling Ball",  "icon": "🎳", "accessory": "bowling"},
     {"id": "eyeball",    "name": "Eyeball",      "icon": "👁️", "accessory": "eyeball"},
@@ -202,7 +201,7 @@ class MascotsMixin:
         split = self._build_skin_gallery_split(
             skins=TROPHIE_SKINS,
             current_skin=current_skin,
-            draw_widget_factory=lambda parent: _TrophieDrawWidget(parent, 120, 140),
+            draw_widget_factory=lambda parent: _TrophieDrawWidget(parent, 140, 160),
             on_apply=self._apply_trophie_skin,
             attr_prefix="trophie",
         )
