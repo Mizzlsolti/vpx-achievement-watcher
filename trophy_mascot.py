@@ -3148,6 +3148,9 @@ class OverlayTrophie(QWidget):
     _TROPHY_H = 90
     _MARGIN = 20
 
+    _ROM_START_POLL_INTERVAL_MS = 250   # ms between VPX-visible checks on rom start
+    _ROM_START_POLL_MAX_TRIES   = 60    # 60 × 250 ms ≈ 15 s fallback timeout
+
     _STEELY_GREETINGS = [
         "Hey! I am Steely! Ready to watch your games!",
         "Steely here! The flippers are calling!",
@@ -3245,6 +3248,14 @@ class OverlayTrophie(QWidget):
         """Apply a visual skin to the Steely overlay mascot."""
         self._draw.set_skin(skin_id)
         self.update()
+
+    def _vp_visible(self) -> bool:
+        """Return True when the Visual Pinball Player window is currently visible."""
+        try:
+            w = getattr(self._parent, "watcher", None)
+            return bool(w and w._vp_player_visible())
+        except Exception:
+            return False
 
     def greet(self) -> None:
         if self._greeted:
@@ -3353,7 +3364,24 @@ class OverlayTrophie(QWidget):
             self._memory.save()
 
         if comment:
-            self._show_comment_key(key or "ov_go", comment, HAPPY)
+            _key = key or "ov_go"
+            _comment = comment
+            _tries = {"n": 0}
+
+            def _poll():
+                try:
+                    if self._vp_visible():
+                        self._show_comment_key(_key, _comment, HAPPY)
+                        return
+                    _tries["n"] += 1
+                    if _tries["n"] < self._ROM_START_POLL_MAX_TRIES:
+                        QTimer.singleShot(self._ROM_START_POLL_INTERVAL_MS, _poll)
+                    else:
+                        self._show_comment_key(_key, _comment, HAPPY)
+                except Exception:
+                    self._show_comment_key(_key, _comment, HAPPY)
+
+            QTimer.singleShot(self._ROM_START_POLL_INTERVAL_MS, _poll)
 
     def on_session_ended(self, rom: str) -> None:
         if self._session_start is None:
