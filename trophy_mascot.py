@@ -2463,19 +2463,19 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.setClipPath(ball_path)
             p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
             pix = max(6, int(radius * 0.28))
-            colors_px2 = [QColor("#FF00FF"), QColor("#00FFFF"), QColor("#FFFF00"),
-                          QColor("#FF8800"), QColor("#00FF88"), QColor("#8800FF")]
+            pixel_colors = [QColor("#FF00FF"), QColor("#00FFFF"), QColor("#FFFF00"),
+                            QColor("#FF8800"), QColor("#00FF88"), QColor("#8800FF")]
             p.setPen(Qt.PenStyle.NoPen)
             for row in range(-6, 7):
                 for col in range(-6, 7):
-                    px2 = cx + col * pix
-                    py2 = cy + row * pix
-                    tile_cx = px2 + pix // 2
-                    tile_cy = py2 + pix // 2
+                    tile_x = cx + col * pix
+                    tile_y = cy + row * pix
+                    tile_cx = tile_x + pix // 2
+                    tile_cy = tile_y + pix // 2
                     d = math.sqrt((tile_cx - cx) ** 2 + (tile_cy - cy) ** 2)
                     if d < radius * 0.90:
-                        p.setBrush(colors_px2[(row + col) % len(colors_px2)])
-                        p.drawRect(px2, py2, pix - 1, pix - 1)
+                        p.setBrush(pixel_colors[(row + col) % len(pixel_colors)])
+                        p.drawRect(tile_x, tile_y, pix - 1, pix - 1)
             p.restore()
 
         # ── Eyes ─────────────────────────────────────────────────────────────
