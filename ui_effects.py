@@ -233,7 +233,7 @@ class EffectsMixin:
             )
             btn_row.addWidget(b)
         self._fx_btn_preview_all = QPushButton("▶ Preview All")
-        self._fx_btn_preview_all.setToolTip("Open all overlay windows simultaneously to preview all effects")
+        self._fx_btn_preview_all.setToolTip("Open all overlay windows (including Main Overlay) simultaneously to preview all effects")
         self._fx_btn_preview_all.clicked.connect(self._preview_all_overlays)
         self._fx_btn_preview_all.setStyleSheet(
             "QPushButton { background-color: #1a1a1a; color: #00E5FF; border: 1px solid #00E5FF;"
