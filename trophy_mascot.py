@@ -431,6 +431,16 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("aw_test",       "Test your custom achievements thoroughly — every edge case matters!"),
         ("aw_rules",      "Well-crafted achievement rules reward skill, creativity, and persistence!"),
     ],
+    "tab_maps": [
+        ("maps_browse",   "Browse the Available Maps list to see which tables have NVRAM tracking!"),
+        ("maps_filter",   "Filter to local tables only to focus on what you actually have installed!"),
+        ("maps_vps",      "The VPS-ID column links tables to the Virtual Pinball Spreadsheet database!"),
+        ("maps_refresh",  "Hit Refresh if you just installed a new table — it should appear in the list!"),
+        ("maps_nvram",    "Tables with NVRAM maps can track achievements automatically while you play!"),
+        ("maps_local",    "Local tables with an NVRAM map are the ones the watcher monitors in real time!"),
+        ("maps_author",   "Achievement map authors put a lot of work in — give them a round of applause!"),
+        ("maps_missing",  "Missing a map for your favourite table? Check for updates or request one!"),
+    ],
 }
 
 _GUI_EVENT_TIPS: list[tuple[str, str]] = [
@@ -768,7 +778,7 @@ class _TrophieMemory:
 class _SpeechBubble(QWidget):
     """Floating speech bubble that auto-dismisses after 4 seconds."""
 
-    _AUTO_DISMISS_MS = 4000
+    _AUTO_DISMISS_MS = 5000
     _FADE_MS = 300
     _BG = QColor("#1A1A1A")
     _BORDER = QColor("#FF7F00")
@@ -842,18 +852,18 @@ class _SpeechBubble(QWidget):
         elapsed = int(time.time() * 1000) - self._shown_at_ms
         msg = self._memory.record_dismiss(elapsed)
         self._memory.save()
+        owner = getattr(self, '_owner', None) or self.parent()
         if msg:
             # Schedule a brief "quiet" message on parent Trophie after dismissal.
             # _owner is set when the bubble is a top-level window with no Qt parent.
-            owner = getattr(self, '_owner', None) or self.parent()
             try:
                 owner._schedule_quiet_msg(msg)
             except Exception:
                 pass
-        # Reset owner animation state to IDLE when bubble auto-dismisses
-        owner = getattr(self, '_owner', None) or self.parent()
+        # Reset owner animation state to IDLE and clear the stale bubble reference
         if owner:
             try:
+                owner._current_bubble = None
                 owner._draw.set_state(IDLE)
             except Exception:
                 pass
@@ -1034,6 +1044,11 @@ class _TrophieDrawWidget(QWidget):
         self._eye_roll_phase: float = 0.0  # for eye_roll passive mode
         self._yawn_amount: float = 0.0     # 0.0=closed, 1.0=full yawn
 
+        # Subclass-settable passive offsets (used for Steely-specific modes)
+        self._passive_extra_x: float = 0.0
+        self._passive_extra_y: float = 0.0
+        self._passive_angle: float = 0.0
+
         # Passive animation mode — cycles through variety animations independently
         # of the emotion state to keep the trophy visually interesting.
         self._passive_mode: str = random.choice(self._PASSIVE_MODES)
@@ -1074,6 +1089,9 @@ class _TrophieDrawWidget(QWidget):
         self._passive_mode = random.choice(choices)
         self._passive_t = 0.0
         self._eye_roll_phase = 0.0
+        self._passive_extra_x = 0.0
+        self._passive_extra_y = 0.0
+        self._passive_angle = 0.0
         # Restore normal pupil position only when leaving eye_roll mode
         if current == "eye_roll":
             dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
@@ -1208,6 +1226,9 @@ class _TrophieDrawWidget(QWidget):
             angle = math.sin(self._passive_t * 2.5) * 18.0
         elif self._state == IDLE and self._passive_mode == "nod":
             angle = math.sin(self._passive_t * 2.5) * 10.0
+        elif self._state == IDLE and self._passive_angle != 0.0:
+            # Subclass-provided angle for passive modes like "roll"
+            angle = self._passive_angle
         else:
             angle = 0.0
 
@@ -1242,10 +1263,11 @@ class _TrophieDrawWidget(QWidget):
         sy *= self._scale
 
         p.save()
-        # Translate origin to the draw center (incorporating vertical bob/jump
-        # and horizontal wiggle), then apply rotation and scale around that
-        # center before drawing.
-        p.translate(cx + wiggle_x, cy_base + int(total_offset))
+        # Translate origin to the draw center (incorporating vertical bob/jump,
+        # horizontal wiggle, and subclass passive extra offsets), then apply
+        # rotation and scale around that center before drawing.
+        p.translate(cx + wiggle_x + int(self._passive_extra_x),
+                    cy_base + int(total_offset + self._passive_extra_y))
         if angle != 0.0:
             p.rotate(angle)
         if sx != 1.0 or sy != 1.0:
@@ -1485,9 +1507,51 @@ class _TrophieDrawWidget(QWidget):
 class _PinballDrawWidget(_TrophieDrawWidget):
     """Draws Steely the pinball mascot — a metallic chrome sphere."""
 
+    # Steely-specific passive modes — distinct from Trophie's list
+    _PASSIVE_MODES = [
+        "float", "pulse", "shimmer", "wobble", "bounce", "eye_roll",
+        "roll", "vibrate", "zigzag", "orbit", "sparkle", "nod",
+    ]
+
     # Use different timer ranges from base class so the two mascots desynchronize
     _PASSIVE_MODE_MIN_MS = 6000
     _PASSIVE_MODE_MAX_MS = 15000
+
+    def _tick(self) -> None:
+        super()._tick()
+        dt = 0.016
+        if self._state == IDLE:
+            mode = self._passive_mode
+            if mode == "roll":
+                # Gentle continuous roll — updates angle used in paintEvent
+                self._passive_angle = (self._passive_angle + dt * 30.0) % 360.0
+                self._passive_extra_x = 0.0
+                self._passive_extra_y = 0.0
+            elif mode == "vibrate":
+                # Rapid small jitter in both X and Y
+                self._passive_extra_x = random.uniform(-3.0, 3.0)
+                self._passive_extra_y = random.uniform(-2.0, 2.0)
+                self._passive_angle = 0.0
+            elif mode == "zigzag":
+                # Horizontal zigzag/wave pattern
+                cycle = (self._passive_t * 0.8) % 1.0
+                self._passive_extra_x = ((cycle / 0.5) * 12.0 - 6.0) if cycle < 0.5 \
+                    else (((1.0 - cycle) / 0.5) * 12.0 - 6.0)
+                self._passive_extra_y = 0.0
+                self._passive_angle = 0.0
+            elif mode == "orbit":
+                # Small elliptical orbit around the rest position
+                self._passive_extra_x = math.cos(self._passive_t * 1.2) * 8.0
+                self._passive_extra_y = math.sin(self._passive_t * 1.2) * 5.0
+                self._passive_angle = 0.0
+            else:
+                self._passive_extra_x = 0.0
+                self._passive_extra_y = 0.0
+                self._passive_angle = 0.0
+        else:
+            self._passive_extra_x = 0.0
+            self._passive_extra_y = 0.0
+            self._passive_angle = 0.0
 
     def _draw_shimmer(self, p: QPainter) -> None:
         """Silver shimmer sweep across the pinball."""
@@ -1636,6 +1700,14 @@ class GUITrophie(QWidget):
     _TROPHY_H = 70
     _MARGIN = 8
 
+    _TROPHIE_GREETINGS = [
+        "Hey! I am Trophie! Welcome back!",
+        "Trophie reporting for duty! Let's chase some achievements!",
+        "Hello there! Ready to track your progress today?",
+        "Welcome back, champion! I have been keeping score!",
+        "Trophie online! Your achievement journey continues!",
+    ]
+
     def __init__(self, central_widget, cfg) -> None:
         """central_widget is the MainWindow's centralWidget() (the QTabWidget)."""
         super().__init__(central_widget)
@@ -1691,7 +1763,12 @@ class GUITrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment("Hey! I am Trophie! Welcome back!", HAPPY)
+        self._show_comment(random.choice(self._TROPHIE_GREETINGS), HAPPY)
+
+    def re_greet(self) -> None:
+        """Reset the greeted flag and show a fresh greeting (e.g. when restoring from tray)."""
+        self._greeted = False
+        self.greet()
 
     def on_tab_changed(self, idx: int) -> None:
         try:
@@ -1740,22 +1817,24 @@ class GUITrophie(QWidget):
 
     def _fire_tab_tip(self, tab_name: str) -> None:
         tab_map = {
-            "dashboard":   "tab_dashboard",
-            "effects":     "tab_effects",
-            "overlay":     "tab_overlay",
-            "theme":       "tab_theme",
-            "sound":       "tab_sound",
-            "appearance":  "tab_appearance",
-            "controls":    "tab_controls",
-            "progress":    "tab_progress",
-            "cloud":       "tab_cloud",
-            "general":     "tab_general",
-            "maintenance": "tab_maintenance",
-            "system":      "tab_system",
-            "player":      "tab_player",
-            "records":     "tab_records",
-            "stats":       "tab_records",
-            "aweditor":    "tab_aweditor",
+            "dashboard":        "tab_dashboard",
+            "effects":          "tab_effects",
+            "overlay":          "tab_overlay",
+            "theme":            "tab_theme",
+            "sound":            "tab_sound",
+            "appearance":       "tab_appearance",
+            "controls":         "tab_controls",
+            "progress":         "tab_progress",
+            "cloud":            "tab_cloud",
+            "general":          "tab_general",
+            "maintenance":      "tab_maintenance",
+            "system":           "tab_system",
+            "player":           "tab_player",
+            "records":          "tab_records",
+            "stats":            "tab_records",
+            "aweditor":         "tab_aweditor",
+            "available maps":   "tab_maps",
+            "maps":             "tab_maps",
         }
         for key_part, tip_cat in tab_map.items():
             if key_part in tab_name:
@@ -1888,6 +1967,7 @@ class GUITrophie(QWidget):
         self._dismiss_bubble()
         self._draw.set_state(state)
         bubble = _SpeechBubble(self._central, text, self._memory or _TrophieMemory.__new__(_TrophieMemory))
+        bubble._owner = self  # so _do_dismiss can reliably reset our state
         self._current_bubble = bubble
         self._position_bubble(bubble)
         bubble.show()
@@ -1901,9 +1981,11 @@ class GUITrophie(QWidget):
         try:
             bw = bubble.width()
             bh = bubble.height()
-            # Place bubble above the trophy
+            # Place bubble just above the trophy cup top (not the widget top).
+            # The cup top is approximately at widget-y + (trophy_h/2 - trophy_h*0.36).
+            cup_top = self._TROPHY_H // 2 - int(self._TROPHY_H * 0.36)
             bx = max(0, self.x() + self._TROPHY_W // 2 - bw // 2)
-            by = max(0, self.y() - bh - 4)
+            by = max(0, self.y() + cup_top - bh - 2)
             # Clamp to central widget
             if bx + bw > self._central.width():
                 bx = self._central.width() - bw - 4
@@ -1958,6 +2040,14 @@ class OverlayTrophie(QWidget):
     _TROPHY_W = 80
     _TROPHY_H = 90
     _MARGIN = 20
+
+    _STEELY_GREETINGS = [
+        "Hey! I am Steely! Ready to watch your games!",
+        "Steely here! The flippers are calling!",
+        "Yo! Your favourite pinball is back on duty!",
+        "Steely reporting in! Let's roll some high scores!",
+        "The ball is back! Time for some serious pinball action!",
+    ]
 
     def __init__(self, parent_window, cfg) -> None:
         super().__init__(None)
@@ -2048,7 +2138,7 @@ class OverlayTrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment("Hey! I am Steely! Ready to watch your games!", HAPPY)
+        self._show_comment(random.choice(self._STEELY_GREETINGS), HAPPY)
 
     def apply_portrait_from_cfg(self) -> None:
         """Apply portrait/landscape mode based on current config."""
@@ -2500,15 +2590,37 @@ class OverlayTrophie(QWidget):
             bh = bubble.height()
             screen_geom = QApplication.primaryScreen().geometry()
             origin = self.mapToGlobal(QPoint(0, 0))
-            w = self.width()   # already accounts for portrait swap
-            h = self.height()  # already accounts for portrait swap
-            abs_x = origin.x() + w // 2 - bw // 2
-            abs_y = origin.y() - bh - 4
+            ov = self._cfg.OVERLAY or {}
+            portrait = bool(ov.get("trophie_overlay_portrait", False))
+            # Ball top offset in landscape widget coordinates:
+            # ball center is at (tw/2, th/2), radius ≈ min(tw,th)*0.38
+            ball_top = self._TROPHY_H // 2 - int(min(self._TROPHY_W, self._TROPHY_H) * 0.38)
+            if not portrait:
+                # Landscape: bubble centered above ball top
+                abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
+                abs_y = origin.y() + ball_top - bh - 2
+                # If no room above, flip below the ball
+                if abs_y < screen_geom.y():
+                    abs_y = origin.y() + self._TROPHY_H + 4
+            else:
+                # Portrait: widget is _TROPHY_H wide × _TROPHY_W tall.
+                # After CW rotation the ball "head" moves to the left edge;
+                # after CCW rotation it moves to the right edge.
+                ccw = bool(ov.get("trophie_overlay_rotate_ccw", False))
+                mid_y = origin.y() + self.height() // 2
+                if ccw:
+                    # CCW: head is on the right — place bubble to the right
+                    abs_x = origin.x() + self.width() + 4
+                    abs_y = mid_y - bh // 2
+                else:
+                    # CW: head is on the left — place bubble to the left
+                    abs_x = origin.x() - bw - 4
+                    abs_y = mid_y - bh // 2
             # Clamp to screen
             if abs_x < screen_geom.x():
                 abs_x = screen_geom.x()
             if abs_y < screen_geom.y():
-                abs_y = origin.y() + h + 4  # flip below
+                abs_y = screen_geom.y()
             if abs_x + bw > screen_geom.right():
                 abs_x = screen_geom.right() - bw
             if abs_y + bh > screen_geom.bottom():
