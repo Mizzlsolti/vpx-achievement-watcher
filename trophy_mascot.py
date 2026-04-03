@@ -1952,7 +1952,7 @@ class _PinballDrawWidget(_TrophieDrawWidget):
 
         # ── Metallic sphere body ─────────────────────────────────────────────
         # Choose colors based on skin
-        if skin == "gold" or skin == "gold_ball":
+        if skin in ("gold", "gold_ball"):
             c0, c1, c2, c3, c4 = "#FFFACD", "#FFD700", "#DAA520", "#B8860B", "#705000"
             pen_color = "#8B6914"
         elif skin == "chrome":

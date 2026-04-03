@@ -361,7 +361,9 @@ class MascotsMixin:
             state["cards"][sid] = card
 
             def _make_handler(s=sid):
-                return lambda _=None: _select_card(s)
+                def handler(_=None):
+                    _select_card(s)
+                return handler
 
             card.mousePressEvent = _make_handler()
             grid.addWidget(card, idx // COLS, idx % COLS)
