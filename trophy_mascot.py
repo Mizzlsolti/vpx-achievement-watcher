@@ -45,6 +45,15 @@ _TROPHIE_SHARED: dict = {
 }
 
 # ---------------------------------------------------------------------------
+# Cooldown constants (milliseconds)
+# ---------------------------------------------------------------------------
+# How long before another event-triggered zank exchange can fire.
+_ZANK_COOLDOWN_MS = 6 * 60 * 1_000         # 6 minutes
+# Minimum/maximum cooldown between spontaneous idle bicker exchanges.
+_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60_000   # 3 minutes
+_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60_000   # 5 minutes
+
+# ---------------------------------------------------------------------------
 # Animation state constants
 # ---------------------------------------------------------------------------
 IDLE = "idle"
@@ -1452,7 +1461,7 @@ class GUITrophie(QWidget):
                     self._show_comment(random.choice(gui_options), TALKING)
                 # Signal overlay to respond in 2 seconds
                 _TROPHIE_SHARED["zank_pending_overlay"] = ov_key
-                _TROPHIE_SHARED["zank_cooldown_ms"] = 6 * 60 * 1000
+                _TROPHIE_SHARED["zank_cooldown_ms"] = _ZANK_COOLDOWN_MS
                 return True
         return False
 
@@ -1468,7 +1477,9 @@ class GUITrophie(QWidget):
         self._show_comment_key(gui_key, gui_text, TALKING)
         _TROPHIE_SHARED["idle_bicker_ov_key"] = ov_key
         _TROPHIE_SHARED["idle_bicker_ov_text"] = ov_text
-        _TROPHIE_SHARED["idle_bicker_cooldown_ms"] = random.randint(3 * 60_000, 5 * 60_000)
+        _TROPHIE_SHARED["idle_bicker_cooldown_ms"] = random.randint(
+            _IDLE_BICKER_MIN_COOLDOWN_MS, _IDLE_BICKER_MAX_COOLDOWN_MS
+        )
 
     def _zank_tick_fn(self) -> None:
         if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
@@ -1982,7 +1993,7 @@ class OverlayTrophie(QWidget):
                     QTimer.singleShot(2000, lambda t=ov_text, k=ov_key: self._show_comment_key(k, t, TALKING))
                 # Signal GUI to show its line
                 _TROPHIE_SHARED["zank_pending_gui"] = gui_key
-                _TROPHIE_SHARED["zank_cooldown_ms"] = 6 * 60 * 1000
+                _TROPHIE_SHARED["zank_cooldown_ms"] = _ZANK_COOLDOWN_MS
                 return True
         return False
 

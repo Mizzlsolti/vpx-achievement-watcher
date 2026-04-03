@@ -2583,6 +2583,14 @@ class GlitchNumbers:
 # Heat Barometer – 6 new effects
 # ===========================================================================
 
+# Non-linear intensity curve exponent applied to all heat barometer effects.
+# Using a value < 1 (0.7) means medium slider values produce more noticeable
+# visuals than a purely linear scale would, making the slider feel more impactful.
+_HEAT_FX_CURVE = 0.7
+
+# Colour used for smoke wisp particles (light grey).
+_SMOKE_WISP_RGB = (200, 200, 200)
+
 class FlameParticles:
     """Rising flame particles from the bottom of the heat bar."""
 
@@ -2600,7 +2608,7 @@ class FlameParticles:
         self._active = True
 
     def _spawn(self, rect: QRect):
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         return {
             "x": random.uniform(rect.left(), rect.right()),
             "y": float(rect.bottom()),
@@ -2616,7 +2624,7 @@ class FlameParticles:
         dt_s = dt_ms / 1000.0
         self._t += dt_s
         self._spawn_acc += dt_ms
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         spawn_interval = max(20, int(60 / max(0.1, eff)))
         for p in self._particles:
             p["x"] += p["vx"] * dt_s
@@ -2642,7 +2650,7 @@ class FlameParticles:
             self._do_spawn = False
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         for p in self._particles:
             life = p["life"]
             r = _clamp(int(255), 0, 255)
@@ -2663,7 +2671,7 @@ class FlameParticles:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
         glPointSize(6.0)
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         glBegin(GL_POINTS)
         for p in self._particles:
             life = p["life"]
@@ -2705,7 +2713,7 @@ class HeatShimmer:
                 return
             except Exception:
                 pass
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         alpha = _clamp(int(150 * eff), 0, 200)
         W, H = rect.width(), rect.height()
         painter.save()
@@ -2731,7 +2739,7 @@ class HeatShimmer:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         alpha = _clamp(150 * eff / 255.0, 0.0, 1.0)
         W, H = rect.width(), rect.height()
         num_lines = max(4, int(18 * eff))
@@ -2779,7 +2787,7 @@ class SmokeWisps:
             p["life"] -= dt_s * 0.8
             p["size"] *= 1.01
         self._particles = [p for p in self._particles if p["life"] > 0]
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         spawn_interval = max(50, int(150 / max(0.1, eff)))
         self._do_spawn = self._spawn_acc >= spawn_interval
         if self._do_spawn:
@@ -2794,7 +2802,7 @@ class SmokeWisps:
                 return
             except Exception:
                 pass
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         if getattr(self, "_do_spawn", False):
             side = random.choice([rect.left() + 5, rect.right() - 5])
             self._particles.append({
@@ -2810,7 +2818,7 @@ class SmokeWisps:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for p in self._particles:
             alpha = _clamp(int(220 * p["life"] * eff), 0, 220)
-            painter.setBrush(QBrush(QColor(200, 200, 200, alpha)))
+            painter.setBrush(QBrush(QColor(*_SMOKE_WISP_RGB, alpha)))
             painter.setPen(Qt.PenStyle.NoPen)
             sz = int(p["size"])
             painter.drawEllipse(int(p["x"]) - sz // 2, int(p["y"]) - sz // 2, sz, sz)
@@ -2824,7 +2832,7 @@ class SmokeWisps:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
         glPointSize(10.0)
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         glBegin(GL_POINTS)
         for p in self._particles:
             alpha = _clamp(220 * p["life"] * eff / 255.0, 0.0, 1.0)
@@ -2863,7 +2871,7 @@ class LavaGlowEdge:
                 return
             except Exception:
                 pass
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
         alpha = _clamp(int((160 + 95 * amp) * eff), 0, 255)
         r = _clamp(int(255), 0, 255)
@@ -2889,7 +2897,7 @@ class LavaGlowEdge:
         return self._active
 
     def _draw_gl(self, rect: QRect):
-        eff = self.intensity ** 0.7
+        eff = self.intensity ** _HEAT_FX_CURVE
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
         alpha = _clamp((160 + 95 * amp) * eff / 255.0, 0.0, 1.0)
         g_val = (60 + 80 * amp) / 255.0
