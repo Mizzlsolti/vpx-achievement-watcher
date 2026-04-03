@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Optional
 
 import trophy_animations
+import steely_animations
 
 from PyQt6.QtCore import (
     QPoint, QRect, QRectF, QSize, Qt, QTimer,
@@ -980,6 +981,9 @@ class _SpeechBubble(QWidget):
             try:
                 owner._current_bubble = None
                 owner._draw.set_state(IDLE)
+                # Trigger offended personality animation on quick dismiss (Steely only)
+                if elapsed < 1500 and hasattr(owner._draw, "start_event_anim"):
+                    owner._draw.start_event_anim("offended")
             except Exception:
                 pass
         self.hide()
@@ -2130,15 +2134,67 @@ class _PinballDrawWidget(_TrophieDrawWidget):
     _PASSIVE_MODES = [
         "float", "pulse", "shimmer", "wobble", "bounce", "eye_roll",
         "roll", "vibrate", "zigzag", "orbit", "sparkle", "nod",
+        "roll_out", "magnet", "bumper_hit", "spin_out", "drain",
+        "multiball", "plunger_launch", "ramp_jump", "tilt_warning", "flipper_catch",
     ]
 
     # Use different timer ranges from base class so the two mascots desynchronize
     _PASSIVE_MODE_MIN_MS = 6000
     _PASSIVE_MODE_MAX_MS = 15000
 
+    def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int, pad: int = 0) -> None:
+        super().__init__(parent, trophy_w, trophy_h, pad)
+        # Steely-specific particle/state for steely_animations
+        self._smoke_particles: list = []
+        self._ghost_particles: list = []
+        self._jackpot_particles: list = []
+        self._rust_amount: float = 0.0
+        # Event-driven / personality animation state
+        self._event_anim: str = ""
+        self._event_anim_t: float = 0.0
+
+    def _cycle_passive_mode(self) -> None:
+        super()._cycle_passive_mode()
+        self._smoke_particles = []
+        self._ghost_particles = []
+        self._jackpot_particles = []
+
+    def start_event_anim(self, name: str) -> None:
+        """Trigger a named event or personality animation on Steely."""
+        self._event_anim = name
+        self._event_anim_t = 0.0
+        # Reset associated particle lists for a clean start
+        if name == "jackpot_glow":
+            self._jackpot_particles = []
+        elif name == "overheat":
+            self._smoke_particles = []
+        elif name == "multiball":
+            self._ghost_particles = []
+
     def _tick(self) -> None:
         super()._tick()
         dt = 0.016
+        # Advance event animation timer and auto-expire when duration is reached
+        if self._event_anim:
+            self._event_anim_t += dt
+            duration = steely_animations.EVENT_ANIM_DURATIONS.get(self._event_anim, 0.0)
+            if duration > 0.0 and self._event_anim_t >= duration:
+                self._event_anim = ""
+                self._event_anim_t = 0.0
+                self._passive_extra_x = 0.0
+                self._passive_extra_y = 0.0
+                self._passive_angle = 0.0
+        # Dispatch event/personality animation tick (always, while active)
+        if self._event_anim:
+            tick_fn = getattr(steely_animations, f"tick_event_{self._event_anim}", None)
+            if tick_fn:
+                tick_fn(self)
+            # Position-controlling event animations set _passive_extra_* themselves;
+            # skip the passive position logic so they don't conflict.
+            if self._event_anim in {"victory_lap", "drain_fall", "plunger_entry",
+                                    "proud", "offended"}:
+                return
+        # Passive mode position updates
         if self._state == IDLE:
             mode = self._passive_mode
             if mode == "roll":
@@ -2163,6 +2219,26 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 self._passive_extra_x = math.cos(self._passive_t * 1.2) * 8.0
                 self._passive_extra_y = math.sin(self._passive_t * 1.2) * 5.0
                 self._passive_angle = 0.0
+            elif mode == "roll_out":
+                steely_animations.tick_roll_out(self)
+            elif mode == "magnet":
+                steely_animations.tick_magnet(self)
+            elif mode == "bumper_hit":
+                steely_animations.tick_bumper_hit(self)
+            elif mode == "spin_out":
+                steely_animations.tick_spin_out(self)
+            elif mode == "drain":
+                steely_animations.tick_drain(self)
+            elif mode == "multiball":
+                steely_animations.tick_multiball(self)
+            elif mode == "plunger_launch":
+                steely_animations.tick_plunger_launch(self)
+            elif mode == "ramp_jump":
+                steely_animations.tick_ramp_jump(self)
+            elif mode == "tilt_warning":
+                steely_animations.tick_tilt_warning(self)
+            elif mode == "flipper_catch":
+                steely_animations.tick_flipper_catch(self)
             else:
                 self._passive_extra_x = 0.0
                 self._passive_extra_y = 0.0
@@ -2196,6 +2272,36 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         p.setBrush(grad)
         p.drawRect(sweep_x, 0, sweep_w, widget_h)
         p.restore()
+
+    def paintEvent(self, event) -> None:
+        """Extend base paintEvent with Steely-specific overlay draws."""
+        super().paintEvent(event)
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # ── Passive mode overlays ────────────────────────────────────────────
+        if self._state == IDLE and self._passive_mode == "multiball":
+            steely_animations.draw_multiball(p, self)
+        if self._state == IDLE and self._passive_mode == "tilt_warning":
+            steely_animations.draw_tilt_warning(p, self)
+        # ── Rust overlay (persistent, driven by _rust_amount) ────────────────
+        if self._rust_amount > 0.05:
+            steely_animations.draw_event_rust(p, self)
+        # ── Event / personality animation overlays ───────────────────────────
+        if self._event_anim == "jackpot_glow":
+            steely_animations.draw_event_jackpot_glow(p, self)
+        elif self._event_anim == "victory_lap":
+            steely_animations.draw_event_victory_lap(p, self)
+        elif self._event_anim == "drain_fall":
+            steely_animations.draw_event_drain_fall(p, self)
+        elif self._event_anim == "overheat":
+            steely_animations.draw_event_overheat(p, self)
+        elif self._event_anim == "plunger_entry":
+            steely_animations.draw_event_plunger_entry(p, self)
+        elif self._event_anim == "show_off":
+            steely_animations.draw_event_show_off(p, self)
+        elif self._event_anim == "nervous":
+            steely_animations.draw_event_nervous(p, self)
+        p.end()
 
     def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
         """Draw Steely as a metallic chrome pinball with eyes and handlebar mustache."""
@@ -3386,6 +3492,9 @@ class OverlayTrophie(QWidget):
         self._today_session_count += 1
         self._last_game_ts = time.time()
         self._idle_shown.clear()
+        # Reset idle rust and launch Steely into view
+        self._draw._rust_amount = max(0.0, self._draw._rust_amount - 0.8)
+        self._draw.start_event_anim("plunger_entry")
 
         if self._memory:
             self._memory.play_times.append(datetime.now().hour)
@@ -3513,13 +3622,17 @@ class OverlayTrophie(QWidget):
         self._session_ach_count += 1
         self._today_ach_count += 1
         self._last_game_ts = time.time()
+        # Clear any rust accumulated during idle on new activity
+        self._draw._rust_amount = max(0.0, self._draw._rust_amount - 0.5)
         self._draw.set_state(HAPPY)
+        self._draw.start_event_anim("jackpot_glow")
         if self._try_zank("achievement"):
             return
         if self._today_ach_count == 1:
             self._show_comment_key("ov_first_blood", "First blood! The hunt is on!", HAPPY)
         elif self._today_ach_count >= 5:
             self._show_comment_key("ov_5today", "5 achievements today! Beast mode!", SURPRISED)
+            self._draw.start_event_anim("proud")
         else:
             self._show_comment_key("ov_got_one", "NICE! You got one!", HAPPY)
 
@@ -3531,6 +3644,7 @@ class OverlayTrophie(QWidget):
         self._challenge_count_today += 1
         self._last_game_ts = time.time()
         self._draw.set_state(HAPPY)
+        self._draw.start_event_anim("nervous")
         now = datetime.now()
         if now.hour < 10:
             self._show_comment_key("ov_ch_morning", "Morning challenge! Warm those fingers up!", HAPPY)
@@ -3551,18 +3665,21 @@ class OverlayTrophie(QWidget):
     def on_challenge_won(self, margin_pct: float = 50.0) -> None:
         self._last_game_ts = time.time()
         self._challenge_losses_streak = 0
+        self._draw.start_event_anim("victory_lap")
         if self._try_zank("challenge_win"):
             return
         if margin_pct < 5.0:
             self._show_comment_key("ov_ch_heartattack", "THAT WAS CLOSE! Heart attack!", SURPRISED)
         elif margin_pct > 50.0:
             self._show_comment_key("ov_ch_dominant", "Dominant performance!", HAPPY)
+            self._draw.start_event_anim("show_off")
         else:
             self._show_comment_key("ov_ch_win", "YOU WIN! I knew you could do it!", HAPPY)
 
     def on_challenge_lost(self, attempts: int = 1, margin_pct: float = 10.0) -> None:
         self._last_game_ts = time.time()
         self._challenge_losses_streak += 1
+        self._draw.start_event_anim("drain_fall")
         if self._try_zank("challenge_lose"):
             return
         if margin_pct < 2.0:
@@ -3578,6 +3695,7 @@ class OverlayTrophie(QWidget):
         self._last_game_ts = time.time()
         if heat_pct >= 100 and not self._heat_notified_100:
             self._heat_notified_100 = True
+            self._draw.start_event_anim("overheat")
             self._try_zank("heat_100") or self._show_comment_key("ov_heat_100", "TOO HOT! Give those flippers a rest!", SURPRISED)
         elif heat_pct >= 85 and not self._heat_notified_85:
             self._heat_notified_85 = True
@@ -3641,12 +3759,19 @@ class OverlayTrophie(QWidget):
                 self._show_comment_key(key, text, state)
                 if mins == 30:
                     self._try_zank("idle_30m")
+                    # Start rust accumulation after 30 min idle
+                    if self._draw._event_anim != "rust":
+                        self._draw.start_event_anim("rust")
                 break
 
         if elapsed_min < 5:
             self._idle_shown.clear()
             if self._draw._state == SLEEPY:
                 self._draw.set_state(IDLE)
+            # Clear rust when activity resumes
+            if self._draw._event_anim == "rust":
+                self._draw._event_anim = ""
+                self._draw._event_anim_t = 0.0
 
     def _fire_daytime_comment(self) -> None:
         now = datetime.now()
