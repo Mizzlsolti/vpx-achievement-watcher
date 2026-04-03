@@ -2183,15 +2183,12 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         elif skin == "rubber":
             c0, c1, c2, c3, c4 = "#555555", "#333333", "#222222", "#111111", "#000000"
             pen_color = "#444444"
-        elif skin == "soccer":
+        elif skin == "spotted":
             c0, c1, c2, c3, c4 = "#FFFFFF", "#F8F8F8", "#EBEBEB", "#D0D0D0", "#B0B0B0"
             pen_color = "#888888"
         elif skin == "basketball":
             c0, c1, c2, c3, c4 = "#FF9944", "#FF6600", "#CC4400", "#882200", "#441100"
             pen_color = "#662200"
-        elif skin == "baseball":
-            c0, c1, c2, c3, c4 = "#FFFEF0", "#F5F0DC", "#E8DCC8", "#C8B090", "#907060"
-            pen_color = "#806050"
         elif skin == "tennis":
             c0, c1, c2, c3, c4 = "#FFFF88", "#CCDD00", "#AACC00", "#669900", "#446600"
             pen_color = "#557700"
@@ -2211,8 +2208,8 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             c0, c1, c2, c3, c4 = "#8040C0", "#4820A0", "#281070", "#180840", "#0C0420"
             pen_color = "#301060"
         elif skin == "disco":
-            c0, c1, c2, c3, c4 = "#FFFFFF", "#F8F8FF", "#D8D8F8", "#B0B0D8", "#6868A0"
-            pen_color = "#8080B0"
+            c0, c1, c2, c3, c4 = "#FF80FF", "#CC44CC", "#883399", "#441166", "#180828"
+            pen_color = "#662288"
         elif skin == "moon":
             c0, c1, c2, c3, c4 = "#C0C0C0", "#909090", "#606060", "#363636", "#1C1C1C"
             pen_color = "#404040"
@@ -2275,8 +2272,8 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         p.setBrush(hl2_grad)
         p.drawEllipse(hl2_x - hl2_r, hl2_y - hl2_r, hl2_r * 2, hl2_r * 2)
 
-        # ── Soccer ball patches (drawn before face so face renders on top) ──────
-        if skin == "soccer":
+        # ── Spotted ball patches (drawn before face so face renders on top) ─────
+        if skin == "spotted":
             ball_path = QPainterPath()
             ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
             p.save()
@@ -2291,6 +2288,56 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 px2 = cx + int(math.cos(a) * dist)
                 py2 = cy + int(math.sin(a) * dist)
                 p.drawEllipse(px2 - patch_r, py2 - patch_r, patch_r * 2, patch_r * 2)
+            p.restore()
+
+        # ── Disco ball tiles (drawn before face so face renders on top) ──────────
+        elif skin == "disco":
+            ball_path = QPainterPath()
+            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+            p.save()
+            p.setClipPath(ball_path)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            sq = max(8, int(radius * 0.35))
+            step = sq + 2
+            colors_disco = [QColor("#FF44FF"), QColor("#44FFFF"), QColor("#FFFF44"),
+                            QColor("#FF4488"), QColor("#44FF88"), QColor("#8844FF"),
+                            QColor("#FF8844"), QColor("#44FF44")]
+            ci = 0
+            p.setPen(QPen(QColor(0, 0, 0, 60), 1))
+            for row in range(-6, 7):
+                for col in range(-6, 7):
+                    tx = cx + col * step - sq // 2
+                    ty = cy + row * step - sq // 2
+                    tile_cx = tx + sq // 2
+                    tile_cy = ty + sq // 2
+                    d = math.sqrt((tile_cx - cx) ** 2 + (tile_cy - cy) ** 2)
+                    if d < radius * 0.92:
+                        p.setBrush(colors_disco[ci % len(colors_disco)])
+                        p.drawRect(tx, ty, sq, sq)
+                        ci += 1
+            p.restore()
+
+        # ── Pixel ball grid (drawn before face so face renders on top) ───────────
+        elif skin == "pixel":
+            ball_path = QPainterPath()
+            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+            p.save()
+            p.setClipPath(ball_path)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            pix = max(6, int(radius * 0.28))
+            pixel_colors = [QColor("#FF00FF"), QColor("#00FFFF"), QColor("#FFFF00"),
+                            QColor("#FF8800"), QColor("#00FF88"), QColor("#8800FF")]
+            p.setPen(Qt.PenStyle.NoPen)
+            for row in range(-6, 7):
+                for col in range(-6, 7):
+                    tile_x = cx + col * pix
+                    tile_y = cy + row * pix
+                    tile_cx = tile_x + pix // 2
+                    tile_cy = tile_y + pix // 2
+                    d = math.sqrt((tile_cx - cx) ** 2 + (tile_cy - cy) ** 2)
+                    if d < radius * 0.90:
+                        p.setBrush(pixel_colors[(row + col) % len(pixel_colors)])
+                        p.drawRect(tile_x, tile_y, pix - 1, pix - 1)
             p.restore()
 
         # ── Eyes ─────────────────────────────────────────────────────────────
@@ -2397,7 +2444,7 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         """Draw Steely skin-specific surface decorations."""
         skin = getattr(self, "_skin", "classic")
         if skin in ("classic", "chrome", "gold", "gold_ball", "fireball",
-                    "iceball", "marble", "rubber"):
+                    "iceball", "marble", "rubber", "disco", "pixel"):
             # These are handled purely by gradient — no extra overlay needed
             return
         tw = self._tw
@@ -2425,7 +2472,7 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.drawText(cx - cr, cy_8 - cr, cr * 2, cr * 2,
                        Qt.AlignmentFlag.AlignCenter, "8")
 
-        elif skin == "soccer":
+        elif skin == "spotted":
             # Outer ring patches — ball circle clip, no face exclusion
             # (inner ring patches were drawn before the face in _draw_trophy_pinball)
             ball_clip = QPainterPath()
@@ -2453,36 +2500,6 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.drawLine(cx, cy - radius, cx, cy + radius)
             p.drawArc(cx - radius, cy - radius // 2, radius * 2, radius, 0, 180 * 16)
             p.drawArc(cx - radius, cy - radius // 2, radius * 2, radius, 180 * 16, 180 * 16)
-            p.restore()
-
-        elif skin == "baseball":
-            # Prominent C-curve seam stitching — clipped to ball circle, no face exclusion
-            ball_path = QPainterPath()
-            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
-            p.save()
-            p.setClipPath(ball_path)
-            seam_pen = QPen(QColor("#CC2200"), max(3, radius // 13),
-                            Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-            p.setPen(seam_pen)
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            # Left C-curve seam (concave right)
-            left_seam = QPainterPath()
-            left_seam.moveTo(cx - int(radius * 0.15), cy - int(radius * 0.68))
-            left_seam.cubicTo(
-                cx - int(radius * 0.78), cy - int(radius * 0.22),
-                cx - int(radius * 0.78), cy + int(radius * 0.22),
-                cx - int(radius * 0.15), cy + int(radius * 0.68),
-            )
-            p.drawPath(left_seam)
-            # Right C-curve seam (concave left, mirror of left)
-            right_seam = QPainterPath()
-            right_seam.moveTo(cx + int(radius * 0.15), cy - int(radius * 0.68))
-            right_seam.cubicTo(
-                cx + int(radius * 0.78), cy - int(radius * 0.22),
-                cx + int(radius * 0.78), cy + int(radius * 0.22),
-                cx + int(radius * 0.15), cy + int(radius * 0.68),
-            )
-            p.drawPath(right_seam)
             p.restore()
 
         elif skin == "tennis":
@@ -2526,27 +2543,6 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.setBrush(QColor("#FFFFFF"))
             shine_r = max(2, pr // 3)
             p.drawEllipse(cx - pr // 3, iris_cy - pr // 3, shine_r, shine_r)
-
-        elif skin == "disco":
-            # Tiled mirror squares — face area excluded via clip
-            safe = self._steely_safe_clip(cx, cy)
-            p.save()
-            p.setClipPath(safe)
-            sq = max(4, int(radius * 0.18))
-            colors = [QColor("#FF88FF"), QColor("#88FFFF"), QColor("#FFFF88"),
-                      QColor("#FF8888"), QColor("#88FF88")]
-            ci = 0
-            for row in range(-2, 3):
-                for col in range(-2, 3):
-                    sx2 = cx + col * (sq + 1) - sq // 2
-                    sy2 = cy + row * (sq + 1) - sq // 2
-                    dist = math.sqrt((sx2 - cx) ** 2 + (sy2 - cy) ** 2)
-                    if dist < radius * 0.85:
-                        p.setBrush(colors[ci % len(colors)])
-                        p.setPen(Qt.PenStyle.NoPen)
-                        p.drawRect(sx2, sy2, sq, sq)
-                        ci += 1
-            p.restore()
 
         elif skin == "planet":
             # Front half of Saturn ring — lower arc drawn in front of ball
@@ -2616,24 +2612,6 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 br = int(radius * 0.22)
                 p.setBrush(camo_colors[i % len(camo_colors)])
                 p.drawEllipse(bx2 - br, by2 - br, br * 2, br * 2)
-            p.restore()
-
-        elif skin == "pixel":
-            # Pixel grid — face area excluded via clip
-            safe = self._steely_safe_clip(cx, cy)
-            p.save()
-            p.setClipPath(safe)
-            pix = max(4, int(radius * 0.22))
-            colors_px = [QColor("#FF00FF"), QColor("#00FFFF"), QColor("#FFFF00")]
-            p.setPen(Qt.PenStyle.NoPen)
-            for row in range(-2, 3):
-                for col in range(-2, 3):
-                    px2 = cx + col * pix - pix // 2
-                    py2 = cy + row * pix - pix // 2
-                    dist = math.sqrt((px2 + pix // 2 - cx) ** 2 + (py2 + pix // 2 - cy) ** 2)
-                    if dist < radius * 0.8:
-                        p.setBrush(colors_px[(row + col) % len(colors_px)])
-                        p.drawRect(px2, py2, pix - 1, pix - 1)
             p.restore()
 
         elif skin == "galaxy":
