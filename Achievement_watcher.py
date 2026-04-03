@@ -320,6 +320,14 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
 
             self.main_tabs.currentChanged.connect(self._trophie_gui.on_tab_changed)
 
+            # Connect sub-tab signals so Trophie also reacts to sub-tab changes
+            if hasattr(self, 'appearance_subtabs'):
+                self.appearance_subtabs.currentChanged.connect(self._on_subtab_changed_appearance)
+            if hasattr(self, 'system_subtabs'):
+                self.system_subtabs.currentChanged.connect(self._on_subtab_changed_system)
+            if hasattr(self, '_aw_inner_tabs'):
+                self._aw_inner_tabs.currentChanged.connect(self._on_subtab_changed_aweditor)
+
             self.bridge.session_ended.connect(self._trophie_overlay.on_session_ended)
             self.bridge.session_started.connect(
                 lambda rom, table: self._trophie_overlay.on_rom_start(rom, table or None)
@@ -347,7 +355,24 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             return bool(w and (w.game_active or w._vp_player_visible()))
         except Exception:
             return False
-  
+
+    def _on_subtab_changed_appearance(self, idx: int) -> None:
+        self._notify_trophie_subtab(self.appearance_subtabs.tabText(idx))
+
+    def _on_subtab_changed_system(self, idx: int) -> None:
+        self._notify_trophie_subtab(self.system_subtabs.tabText(idx))
+
+    def _on_subtab_changed_aweditor(self, _idx: int) -> None:
+        self._notify_trophie_subtab("aweditor")
+
+    def _notify_trophie_subtab(self, tab_name: str) -> None:
+        if not getattr(self, '_trophie_gui', None):
+            return
+        try:
+            self._trophie_gui.on_subtab_changed(tab_name)
+        except Exception:
+            pass
+
     def _get_hotkey_mods_now(self) -> int:
         import ctypes
         user32 = ctypes.windll.user32
