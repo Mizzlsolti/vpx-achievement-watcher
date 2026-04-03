@@ -908,16 +908,6 @@ class _TrophieDrawWidget(QWidget):
         # Eye half-close for sleepy
         self._eye_half = False
 
-        # Main animation tick
-        self._tick_timer = QTimer(self)
-        self._tick_timer.setInterval(16)
-        self._tick_timer.timeout.connect(self._tick)
-        self._tick_timer.start()
-
-    def add_tick_listener(self, callback) -> None:
-        """Register an additional callback to fire on every animation tick."""
-        self._tick_timer.timeout.connect(callback)
-
         # Jump animation
         self._jump_offset = 0.0
         self._jump_vel = 0.0
@@ -939,6 +929,16 @@ class _TrophieDrawWidget(QWidget):
         self._passive_mode_timer = QTimer(self)
         self._passive_mode_timer.timeout.connect(self._cycle_passive_mode)
         self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
+
+        # Main animation tick
+        self._tick_timer = QTimer(self)
+        self._tick_timer.setInterval(16)
+        self._tick_timer.timeout.connect(self._tick)
+        self._tick_timer.start()
+
+    def add_tick_listener(self, callback) -> None:
+        """Register an additional callback to fire on every animation tick."""
+        self._tick_timer.timeout.connect(callback)
 
     def _schedule_blink(self) -> None:
         delay_ms = random.randint(3000, 6000)
