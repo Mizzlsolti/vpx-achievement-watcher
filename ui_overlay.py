@@ -45,6 +45,11 @@ try:
 except Exception:
     _sound_mod = None
 
+from post_processing import (
+    PostBloom, PostMotionBlur, PostChromaticAberration,
+    PostVignette, PostFilmGrain, PostScanlines,
+)
+
 
 def _theme_bg_qcolor(cfg, alpha: int = 245) -> QColor:
     """Return the active theme bg colour as a QColor with *alpha* (0–255)."""
@@ -266,6 +271,146 @@ _OVERLAY_PAGE_ACCENTS = [
 ]
 
 
+class PostProcessingWidget(QWidget):
+    """Transparent overlay widget that renders post-processing screen-space
+    effects (bloom, motion blur, chromatic aberration, vignette, film grain,
+    scanlines) on top of all overlay content.
+
+    Must be a child of a widget whose parent chain includes a ``parent_gui``
+    attribute that exposes ``parent_gui.cfg.OVERLAY``.
+
+    All 6 effects default to *disabled* in config — users must opt in.
+    The widget respects ``low_performance_mode`` and stops its timer when
+    no effects are enabled, keeping CPU usage at zero in the common case.
+    """
+
+    _TICK_MS = 33  # ~30 fps
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+        self._fx_bloom        = PostBloom()
+        self._fx_motion_blur  = PostMotionBlur()
+        self._fx_chromatic    = PostChromaticAberration()
+        self._fx_vignette     = PostVignette()
+        self._fx_film_grain   = PostFilmGrain()
+        self._fx_scanlines    = PostScanlines()
+
+        self._all_fx = [
+            ("fx_post_bloom",                self._fx_bloom),
+            ("fx_post_motion_blur",          self._fx_motion_blur),
+            ("fx_post_chromatic_aberration", self._fx_chromatic),
+            ("fx_post_vignette",             self._fx_vignette),
+            ("fx_post_film_grain",           self._fx_film_grain),
+            ("fx_post_scanlines",            self._fx_scanlines),
+        ]
+
+        self._tick_timer = QTimer(self)
+        self._tick_timer.setInterval(self._TICK_MS)
+        self._tick_timer.timeout.connect(self._on_tick)
+        self.hide()
+
+    # ------------------------------------------------------------------
+    # Config helpers
+    # ------------------------------------------------------------------
+
+    def _cfg_ov(self) -> dict:
+        try:
+            return self.parent().parent_gui.cfg.OVERLAY or {}
+        except Exception:
+            return {}
+
+    def _is_pp_enabled(self, key: str) -> bool:
+        ov = self._cfg_ov()
+        if bool(ov.get("low_performance_mode", False)):
+            return False
+        return bool(ov.get(key, False))
+
+    def _pp_intensity(self, key: str) -> float:
+        ov = self._cfg_ov()
+        return max(0.0, min(1.0, float(ov.get(key + "_intensity", 50)) / 100.0))
+
+    def _any_pp_enabled(self) -> bool:
+        ov = self._cfg_ov()
+        if bool(ov.get("low_performance_mode", False)):
+            return False
+        return any(bool(ov.get(key, False)) for key, _ in self._all_fx)
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self._any_pp_enabled():
+            return
+        for key, fx in self._all_fx:
+            if self._is_pp_enabled(key):
+                fx.set_intensity(self._pp_intensity(key))
+                if not fx.is_active():
+                    fx.start()
+        if not self._tick_timer.isActive():
+            self._tick_timer.start()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._tick_timer.stop()
+        for _, fx in self._all_fx:
+            fx.stop()
+
+    def stop_timer(self):
+        """Explicitly stop the tick timer (e.g. when parent closes)."""
+        self._tick_timer.stop()
+
+    # ------------------------------------------------------------------
+    # Tick
+    # ------------------------------------------------------------------
+
+    def _on_tick(self):
+        dt = float(self._TICK_MS)
+        any_active = False
+        for key, fx in self._all_fx:
+            if self._is_pp_enabled(key):
+                fx.set_intensity(self._pp_intensity(key))
+                if not fx.is_active():
+                    fx.start()
+                fx.tick(dt)
+                any_active = True
+            else:
+                if fx.is_active():
+                    fx.stop()
+        if any_active:
+            self.update()
+        else:
+            self._tick_timer.stop()
+
+    # ------------------------------------------------------------------
+    # Paint
+    # ------------------------------------------------------------------
+
+    def paintEvent(self, event):
+        W, H = self.width(), self.height()
+        if W <= 0 or H <= 0:
+            return
+        if not self._any_pp_enabled():
+            return
+        rect = self.rect()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        try:
+            for key, fx in self._all_fx:
+                if self._is_pp_enabled(key) and fx.is_active():
+                    fx.draw(p, rect)
+        finally:
+            try:
+                p.end()
+            except Exception:
+                pass
+
+
 class OverlayWindow(_OverlayFxMixin, QWidget):
     TITLE_OFFSET_X = 0
     TITLE_OFFSET_Y = 0
@@ -323,6 +468,11 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         if (getattr(self, '_transition_label', None) is not None
                 and self._transition_label.isVisible()):
             self._transition_label.raise_()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def _icon_local(self, key: str) -> str:
         use_emojis = not bool(self.parent_gui.cfg.OVERLAY.get("prefer_ascii_icons", False))
@@ -373,6 +523,12 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             self._shine_widget.setGeometry(0, 0, W, H)
         if hasattr(self, '_highlight_widget'):
             self._highlight_widget.setGeometry(0, 0, W, H)
+        # Start post-processing widget (shown above all other widgets)
+        if hasattr(self, '_pp_widget') and not _defer_effects:
+            if self._pp_widget._any_pp_enabled():
+                self._pp_widget.setGeometry(0, 0, W, H)
+                self._pp_widget.show()
+                self._pp_widget.raise_()
         # Resume animation timers that were interrupted by hideEvent
         if hasattr(self, '_score_spin_timer') and hasattr(self, '_score_display') and hasattr(self, '_score_target'):
             if self._score_display != self._score_target:
@@ -396,6 +552,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         super().hideEvent(e)
         if hasattr(self, '_effects_widget'):
             self._effects_widget.hide()
+        if hasattr(self, '_pp_widget'):
+            self._pp_widget.hide()
         if hasattr(self, '_score_spin_timer'):
             self._score_spin_timer.stop()
         if hasattr(self, '_progress_bar_timer'):
@@ -557,6 +715,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self._glitch_frame = GlitchFrame()
         # Effects widget (glow border + floating particles)
         self._effects_widget = OverlayEffectsWidget(self)
+        # Post-processing effects widget (bloom, vignette, scanlines, etc.)
+        self._pp_widget = PostProcessingWidget(self)
         # Per-page accent colour index
         self._page_index: int = 0
         # Shine/sweep effect for progress bar
@@ -645,6 +805,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             self._shine_widget.setGeometry(0, 0, w, h)
         if hasattr(self, '_highlight_widget'):
             self._highlight_widget.setGeometry(0, 0, w, h)
+        if hasattr(self, '_pp_widget'):
+            self._pp_widget.setGeometry(0, 0, w, h)
 
     def _layout_positions(self):
         if getattr(self, '_rot_in_progress', False):
@@ -831,6 +993,12 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                     and self._transition_state is not None):
                 self._transition_label.setGeometry(0, 0, W, H)
                 self._transition_label.raise_()
+            # Post-processing widget must be topmost at all times
+            if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+                self._pp_widget.setGeometry(0, 0, W, H)
+                if not self._pp_widget.isVisible():
+                    self._pp_widget.show()
+                self._pp_widget.raise_()
         except Exception as e:
             print("[overlay] portrait render failed:", e)
             self.rotated_label.hide()
@@ -925,6 +1093,9 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 and self._transition_label.isVisible()):
             self._transition_label.setGeometry(0, 0, self.width(), self.height())
             self._transition_label.raise_()
+        if hasattr(self, '_pp_widget') and self._pp_widget.isVisible():
+            self._pp_widget.setGeometry(0, 0, self.width(), self.height())
+            self._pp_widget.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
         self._fullsize_mode = False
@@ -3457,6 +3628,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._anim_timer.timeout.connect(self._anim_tick)
         self._anim_timer.start()
 
+        # Post-processing widget (drawn on top of toast content)
+        self._pp_widget = PostProcessingWidget(self)
+
         self._render_and_place()
         self._timer.start()
         self.show()
@@ -3503,6 +3677,13 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                     t.stop()
                 except Exception:
                     pass
+        # Stop post-processing timer
+        pp = getattr(self, '_pp_widget', None)
+        if pp is not None:
+            try:
+                pp.stop_timer()
+            except Exception:
+                pass
         super().closeEvent(e)
 
     def _icon_pixmap(self, size: int = 40) -> QPixmap:
@@ -3809,6 +3990,12 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self.setWindowOpacity(opacity)
             self.show()
             self.raise_()
+            # Size and raise the post-processing widget above the label
+            if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+                self._pp_widget.setGeometry(0, 0, EW, EH)
+                if not self._pp_widget.isVisible():
+                    self._pp_widget.show()
+                self._pp_widget.raise_()
             try:
                 import win32gui, win32con 
                 hwnd = int(self.winId())
