@@ -50,8 +50,8 @@ _TROPHIE_SHARED: dict = {
 # How long before another event-triggered zank exchange can fire.
 _ZANK_COOLDOWN_MS = 2 * 60 * 1_000          # 2 minutes
 # Cooldowns between spontaneous idle bicker exchanges.
-_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes (default)
-_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes (default)
+_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes (when GUI is not open)
+_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes (when GUI is not open)
 # Shorter cooldowns when both characters are visible (GUI is open)
 _IDLE_BICKER_MIN_COOLDOWN_GUI_MS = 30 * 1_000   # 30 seconds
 _IDLE_BICKER_MAX_COOLDOWN_GUI_MS = 45 * 1_000   # 45 seconds
@@ -920,6 +920,8 @@ class _TrophieDrawWidget(QWidget):
     _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle", "yawn"]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
+    # Yawn threshold: above this value the mouth is drawn wide open (surprised shape)
+    _YAWN_FULL_OPEN_THRESHOLD = 0.7
 
     def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int) -> None:
         super().__init__(parent)
@@ -1005,10 +1007,11 @@ class _TrophieDrawWidget(QWidget):
         self._passive_mode = random.choice(choices)
         self._passive_t = 0.0
         self._eye_roll_phase = 0.0
-        # Restore normal pupil position when leaving eye_roll mode
-        dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
-        self._pupil_dx = dx
-        self._pupil_dy = dy
+        # Restore normal pupil position only when leaving eye_roll mode
+        if current == "eye_roll":
+            dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
+            self._pupil_dx = dx
+            self._pupil_dy = dy
         # Schedule next mode change at a random interval
         self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
 
@@ -1366,7 +1369,7 @@ class _TrophieDrawWidget(QWidget):
 
         p.setPen(QPen(QColor("#333333"), 1))
         p.setBrush(QColor("#333333"))
-        if self._state == SURPRISED or (yawn_open and self._yawn_amount > 0.7):
+        if self._state == SURPRISED or (yawn_open and self._yawn_amount > self._YAWN_FULL_OPEN_THRESHOLD):
             ow = int(mouth_w * 0.7)
             oh = int(mouth_h * (1.0 + self._yawn_amount * 0.5))
             p.setBrush(QColor("#111111"))
@@ -1391,7 +1394,7 @@ class _TrophieDrawWidget(QWidget):
             th2 = int(mouth_h * 0.6)
             p.setBrush(QColor("#111111"))
             p.drawEllipse(mouth_cx - tw2 // 2, mouth_y - th2 // 4, tw2, th2)
-        elif self._state == SLEEPY or (yawn_open and self._yawn_amount <= 0.7):
+        elif self._state == SLEEPY or (yawn_open and self._yawn_amount <= self._YAWN_FULL_OPEN_THRESHOLD):
             ow = int(mouth_w * 0.3 + self._yawn_amount * mouth_w * 0.4)
             oh = int(mouth_h * 0.4 + self._yawn_amount * mouth_h * 0.5)
             p.setBrush(QColor("#333333"))
@@ -1603,7 +1606,7 @@ class GUITrophie(QWidget):
         self._zank_tick.timeout.connect(self._zank_tick_fn)
         self._zank_tick.start()
 
-        # Spontaneous idle bicker timer (fires every 30s, tries to start an exchange)
+        # Spontaneous idle bicker timer (checks every 30s whether the cooldown has elapsed)
         self._idle_bicker_timer = QTimer(self)
         self._idle_bicker_timer.setInterval(30_000)
         self._idle_bicker_timer.timeout.connect(self._try_idle_bicker)
