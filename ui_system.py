@@ -192,18 +192,18 @@ class SystemMixin:
         self.chk_trophie_overlay.stateChanged.connect(self._on_trophie_overlay_toggled)
         lay_trophie.addWidget(self.chk_trophie_overlay)
 
-        self.chk_trophie_overlay_portrait = QCheckBox("Overlay Portrait Mode (90°) — for cabinet screens")
+        self.chk_trophie_overlay_portrait = QCheckBox("Steely Portrait Mode (90°) — for cabinet screens")
         self.chk_trophie_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_portrait", False)))
         self.chk_trophie_overlay_portrait.setToolTip(
-            "Rotates the Overlay Trophie 90° — use on vertical/portrait arcade cabinet displays."
+            "Rotates Steely 90° — use on vertical/portrait arcade cabinet displays."
         )
         self.chk_trophie_overlay_portrait.stateChanged.connect(self._on_trophie_overlay_portrait_toggled)
         lay_trophie.addWidget(self.chk_trophie_overlay_portrait)
 
-        self.chk_trophie_overlay_ccw = QCheckBox("Overlay Rotate Counter-Clockwise (default: clockwise)")
+        self.chk_trophie_overlay_ccw = QCheckBox("Steely Rotate Counter-Clockwise (default: clockwise)")
         self.chk_trophie_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_rotate_ccw", False)))
         self.chk_trophie_overlay_ccw.setToolTip(
-            "When Portrait Mode is on, rotate counter-clockwise (CCW) instead of clockwise."
+            "When Steely Portrait Mode is on, rotate counter-clockwise (CCW) instead of clockwise."
         )
         self.chk_trophie_overlay_ccw.stateChanged.connect(self._on_trophie_overlay_ccw_toggled)
         lay_trophie.addWidget(self.chk_trophie_overlay_ccw)

@@ -655,9 +655,13 @@ class EffectsMixin:
                         try:
                             win._progress_pct_current = max(0.0, getattr(win, "_progress_pct_target", 0.0))
                             win._progress_pct_target = target_pct
-                            if hasattr(win, "_progress_bar_timer"):
-                                win._progress_bar_timer.start()
-                            win._trigger_shine()
+                            if self.cfg.OVERLAY.get("fx_main_progress_fill", True):
+                                if hasattr(win, "_progress_bar_timer"):
+                                    win._progress_bar_timer.start()
+                            else:
+                                win._progress_pct_current = target_pct
+                            if self.cfg.OVERLAY.get("fx_main_shine_sweep", True):
+                                win._trigger_shine()
                         except Exception:
                             pass
 
