@@ -712,6 +712,11 @@ class _TrophieDrawWidget(QWidget):
         DISMISSING:(0, 0),
     }
 
+    # Passive animation modes — cycle through these to keep the trophy lively
+    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade"]
+    _PASSIVE_MODE_MIN_MS = 8000
+    _PASSIVE_MODE_MAX_MS = 20000
+
     def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int) -> None:
         super().__init__(parent)
         self._tw = trophy_w
@@ -762,12 +767,11 @@ class _TrophieDrawWidget(QWidget):
 
         # Passive animation mode — cycles through variety animations independently
         # of the emotion state to keep the trophy visually interesting.
-        _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade"]
         self._passive_mode: str = "float"
         self._passive_t: float = 0.0      # phase timer within current passive mode
         self._passive_mode_timer = QTimer(self)
         self._passive_mode_timer.timeout.connect(self._cycle_passive_mode)
-        self._passive_mode_timer.start(random.randint(10000, 18000))
+        self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
 
     def _schedule_blink(self) -> None:
         delay_ms = random.randint(3000, 6000)
@@ -784,13 +788,12 @@ class _TrophieDrawWidget(QWidget):
         self._schedule_blink()
 
     def _cycle_passive_mode(self) -> None:
-        _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade"]
         current = self._passive_mode
-        choices = [m for m in _PASSIVE_MODES if m != current]
+        choices = [m for m in self._PASSIVE_MODES if m != current]
         self._passive_mode = random.choice(choices)
         self._passive_t = 0.0
         # Schedule next mode change at a random interval
-        self._passive_mode_timer.start(random.randint(8000, 20000))
+        self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
 
     def _tick(self) -> None:
         dt = 0.016  # ~16ms
