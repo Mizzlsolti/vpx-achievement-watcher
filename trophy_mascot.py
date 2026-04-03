@@ -21,7 +21,7 @@ from PyQt6.QtCore import (
     QPoint, QRect, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
-    QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen,
+    QColor, QFont, QFontMetrics, QImage, QLinearGradient, QPainter, QPainterPath, QPen,
     QPixmap, QRadialGradient, QTransform,
 )
 from PyQt6.QtWidgets import (
@@ -780,6 +780,109 @@ class _TrophieMemory:
 
 
 # ---------------------------------------------------------------------------
+# Action-confirmed Toast (✅ feedback after context-menu actions)
+# ---------------------------------------------------------------------------
+class _ActionToast(QWidget):
+    """Small ✅ toast that fades in, stays ~1 s, then fades out."""
+
+    _BG     = QColor("#1A1A1A")
+    _BORDER = QColor("#FF7F00")
+    _TEXT   = QColor("#FFFFFF")
+    _RADIUS = 8
+    _PAD    = 8
+    _FADE_MS      = 200
+    _VISIBLE_MS   = 1000
+
+    def __init__(self, parent) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        if parent is None:
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.Tool,
+            )
+            self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        else:
+            self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.SubWindow)
+
+        font = QFont("Segoe UI", 11)
+        self.setFont(font)
+        fm = QFontMetrics(font)
+        r  = fm.boundingRect("✅")
+        w  = r.width()  + self._PAD * 2
+        h  = r.height() + self._PAD * 2
+        self.setFixedSize(max(w, 44), max(h, 36))
+
+        self._opacity    = 0.0
+        self._fading_out = False
+
+        self._fade_timer = QTimer(self)
+        self._fade_timer.setInterval(16)
+        self._fade_timer.timeout.connect(self._on_fade)
+
+        self._hold_timer = QTimer(self)
+        self._hold_timer.setSingleShot(True)
+        self._hold_timer.timeout.connect(self._begin_fade_out)
+
+    # ── painting ──────────────────────────────────────────────────────────────
+
+    def paintEvent(self, _event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setOpacity(self._opacity)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        path = QPainterPath()
+        path.addRoundedRect(
+            float(rect.x()), float(rect.y()),
+            float(rect.width()), float(rect.height()),
+            self._RADIUS, self._RADIUS,
+        )
+        p.fillPath(path, self._BG)
+        pen = QPen(self._BORDER, 1.5)
+        p.setPen(pen)
+        p.drawPath(path)
+        p.setPen(self._TEXT)
+        p.setFont(self.font())
+        p.drawText(rect, Qt.AlignmentFlag.AlignCenter, "✅")
+
+    # ── animation ─────────────────────────────────────────────────────────────
+
+    def _on_fade(self) -> None:
+        step = 16.0 / self._FADE_MS
+        if not self._fading_out:
+            self._opacity = min(1.0, self._opacity + step)
+            if self._opacity >= 1.0:
+                self._fade_timer.stop()
+                self._hold_timer.start(self._VISIBLE_MS)
+        else:
+            self._opacity = max(0.0, self._opacity - step)
+            if self._opacity <= 0.0:
+                self._fade_timer.stop()
+                self.hide()
+                self.deleteLater()
+        self.update()
+
+    def _begin_fade_out(self) -> None:
+        self._fading_out = True
+        if not self._fade_timer.isActive():
+            self._fade_timer.start()
+
+    # ── public show helper ────────────────────────────────────────────────────
+
+    def popup(self, global_pos: QPoint) -> None:
+        """Position the toast at global_pos and start the fade-in."""
+        if self.parent() is not None:
+            local = self.parent().mapFromGlobal(global_pos)
+            self.move(local)
+        else:
+            self.move(global_pos)
+        self.raise_()
+        self.show()
+        self._fade_timer.start()
+
+
+# ---------------------------------------------------------------------------
 # Speech Bubble widget
 # ---------------------------------------------------------------------------
 class _SpeechBubble(QWidget):
@@ -807,7 +910,6 @@ class _SpeechBubble(QWidget):
 
         # Measure required size
         font = QFont("Segoe UI", 9)
-        from PyQt6.QtGui import QFontMetrics
         fm = QFontMetrics(font)
         text_rect = fm.boundingRect(
             QRect(0, 0, self._MAX_W - self._PAD * 2, 10000),
@@ -2613,9 +2715,19 @@ class GUITrophie(QWidget):
 
     def _show_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
-        menu.addAction("Dismiss", self._dismiss_bubble)
-        menu.addAction("Silence for 10 minutes", self._silence_10m)
-        menu.exec(self.mapToGlobal(pos))
+        gpos = self.mapToGlobal(pos)
+        menu.addAction("Dismiss", lambda: (self._dismiss_bubble(), self._show_action_toast(gpos)))
+        menu.addAction("Silence for 10 minutes", lambda: (self._silence_10m(), self._show_action_toast(gpos)))
+        menu.exec(gpos)
+
+    def _show_action_toast(self, global_pos: QPoint) -> None:
+        toast = _ActionToast(self._central)
+        # Position above the trophie, centred horizontally
+        cx = self.x() + self._TROPHY_W // 2
+        ty = self.y() - toast.height() - 4
+        if ty < 0:
+            ty = self.y() + self._TROPHY_H + 4
+        toast.popup(self._central.mapToGlobal(QPoint(cx - toast.width() // 2, ty)))
 
     def _silence_10m(self) -> None:
         self._silenced_until = time.time() + 600
@@ -3284,14 +3396,30 @@ class OverlayTrophie(QWidget):
 
     def _show_context_menu(self, pos: QPoint) -> None:
         menu = QMenu(self)
-        menu.addAction("Dismiss comment", self._dismiss_bubble)
-        menu.addAction("Silence for 10 minutes", self._silence_10m)
+        gpos = self.mapToGlobal(pos)
+        menu.addAction("Dismiss comment", lambda: (self._dismiss_bubble(), self._show_action_toast(gpos)))
+        menu.addAction("Silence for 10 minutes", lambda: (self._silence_10m(), self._show_action_toast(gpos)))
         move_menu = menu.addMenu("Move to corner...")
-        move_menu.addAction("Bottom Left",  lambda: self._move_to_corner("bl"))
-        move_menu.addAction("Bottom Right", lambda: self._move_to_corner("br"))
-        move_menu.addAction("Top Left",     lambda: self._move_to_corner("tl"))
-        move_menu.addAction("Top Right",    lambda: self._move_to_corner("tr"))
-        menu.exec(self.mapToGlobal(pos))
+        move_menu.addAction("Bottom Left",  lambda: (self._move_to_corner("bl"), self._show_action_toast(gpos)))
+        move_menu.addAction("Bottom Right", lambda: (self._move_to_corner("br"), self._show_action_toast(gpos)))
+        move_menu.addAction("Top Left",     lambda: (self._move_to_corner("tl"), self._show_action_toast(gpos)))
+        move_menu.addAction("Top Right",    lambda: (self._move_to_corner("tr"), self._show_action_toast(gpos)))
+        menu.exec(gpos)
+
+    def _show_action_toast(self, global_pos: QPoint) -> None:
+        toast = _ActionToast(None)
+        # Centre the toast above the mascot widget
+        tx = self.x() + self._TROPHY_W // 2 - toast.width() // 2
+        ty = self.y() - toast.height() - 4
+        try:
+            screen = QApplication.primaryScreen().geometry()
+            if ty < screen.y():
+                ty = self.y() + self._TROPHY_H + 4
+            tx = max(screen.x(), min(tx, screen.x() + screen.width()  - toast.width()))
+            ty = max(screen.y(), min(ty, screen.y() + screen.height() - toast.height()))
+        except Exception:
+            pass
+        toast.popup(QPoint(tx, ty))
 
     def _silence_10m(self) -> None:
         self._silenced_until = time.time() + 600
