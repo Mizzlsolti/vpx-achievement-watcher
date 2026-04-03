@@ -298,8 +298,9 @@ class PostProcessingWidget(QWidget):
 
     _TICK_MS = 33  # ~30 fps
 
-    def __init__(self, parent):
+    def __init__(self, parent, overlay_type: str = "main"):
         super().__init__(parent)
+        self._overlay_type = overlay_type
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -339,6 +340,8 @@ class PostProcessingWidget(QWidget):
         ov = self._cfg_ov()
         if bool(ov.get("low_performance_mode", False)):
             return False
+        if not bool(ov.get(f"pp_overlay_{self._overlay_type}", True)):
+            return False
         return bool(ov.get(key, False))
 
     def _pp_intensity(self, key: str) -> float:
@@ -348,6 +351,8 @@ class PostProcessingWidget(QWidget):
     def _any_pp_enabled(self) -> bool:
         ov = self._cfg_ov()
         if bool(ov.get("low_performance_mode", False)):
+            return False
+        if not bool(ov.get(f"pp_overlay_{self._overlay_type}", True)):
             return False
         return any(bool(ov.get(key, False)) for key, _ in self._all_fx)
 
@@ -728,7 +733,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         # Effects widget (glow border + floating particles)
         self._effects_widget = OverlayEffectsWidget(self)
         # Post-processing effects widget (bloom, vignette, scanlines, etc.)
-        self._pp_widget = PostProcessingWidget(self)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="main")
         # Per-page accent colour index
         self._page_index: int = 0
         # Shine/sweep effect for progress bar
@@ -2101,6 +2106,9 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         self._anim_timer.timeout.connect(self._on_anim_tick)
         self._anim_timer.start()  # always run; live fx checks in _compose_image
 
+        # Post-processing widget (drawn on top of flip counter content)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="flip")
+
         self._render_and_place()
         self.show()
         self.raise_()
@@ -2146,6 +2154,12 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
             self._fx_goal_glow.stop()
         except Exception:
             pass
+        pp = getattr(self, '_pp_widget', None)
+        if pp is not None:
+            try:
+                pp.stop_timer()
+            except Exception:
+                pass
         super().closeEvent(e)
 
     def _compose_image(self) -> QImage:
@@ -2285,6 +2299,11 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         self._label.setPixmap(QPixmap.fromImage(img))
         self.show()
         self.raise_()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def update_counts(self, total: int, remaining: int, goal: int):
         old_total = self._total
@@ -3666,7 +3685,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._anim_timer.start()
 
         # Post-processing widget (drawn on top of toast content)
-        self._pp_widget = PostProcessingWidget(self)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="toast")
 
         self._render_and_place()
         self._timer.start()
@@ -4233,6 +4252,8 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         self._fx_timer.setInterval(50)
         self._fx_timer.timeout.connect(self._on_fx_tick)
         self._fx_timer.start()
+        # Post-processing widget (drawn on top of timer content)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="timer")
         self.show()
         try:
             import win32gui, win32con
@@ -4324,6 +4345,11 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         self.move(x, y)
         self._pix = QPixmap.fromImage(img)
         self.update()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def _compose_image(self):
         ov = self.parent_gui.cfg.OVERLAY or {}
@@ -4392,6 +4418,12 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
             self._fx_timer.stop()
         except Exception:
             pass
+        pp = getattr(self, '_pp_widget', None)
+        if pp is not None:
+            try:
+                pp.stop_timer()
+            except Exception:
+                pass
         super().closeEvent(e)
 
     def paintEvent(self, _evt):
@@ -4399,6 +4431,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
             p = QPainter(self)
             p.drawPixmap(0, 0, self._pix)
             p.end()
+
 class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
     def __init__(self, parent: "MainWindow", selected_idx: int = 0):
         super().__init__(parent)
@@ -4445,6 +4478,8 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             self._color_pulse.start()
         self._pulse_timer.start()  # always run; live fx checks in _compose_image
         self._pix = None
+        # Post-processing widget (drawn on top of challenge select content)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="challenge")
         self._render_and_place()
         self.show()
         self.raise_()
@@ -4470,6 +4505,12 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
                 self._slide_timer.stop()
         except Exception:
             pass
+        pp = getattr(self, '_pp_widget', None)
+        if pp is not None:
+            try:
+                pp.stop_timer()
+            except Exception:
+                pass
         super().closeEvent(e)
 
     def _check_low_perf(self) -> bool:
@@ -5101,6 +5142,11 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         self.move(x, y)
         self._pix = QPixmap.fromImage(img)
         self.update()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def paintEvent(self, _evt):
         if hasattr(self, "_pix") and self._pix:
@@ -5156,6 +5202,8 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._pulse_timer.start()
         self._anim_t = 0.0
+        # Post-processing widget (drawn on top of heat barometer content)
+        self._pp_widget = PostProcessingWidget(self, overlay_type="heat")
         self._render_and_place()
         self.show()
         self.raise_()
@@ -5206,6 +5254,12 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             self._fx_meltdown.stop()
         except Exception:
             pass
+        pp = getattr(self, '_pp_widget', None)
+        if pp is not None:
+            try:
+                pp.stop_timer()
+            except Exception:
+                pass
         super().closeEvent(e)
 
     def _bar_color(self, heat: int) -> QColor:
@@ -5350,6 +5404,11 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         self.move(x, y)
         self._pix = QPixmap.fromImage(img)
         self.update()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def paintEvent(self, _evt):
         if hasattr(self, "_pix") and self._pix:
