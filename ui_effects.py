@@ -581,7 +581,9 @@ class EffectsMixin:
                                 "Power": ["🔥 Top Shot – 5k"],
                                 "Precision": ["🎯 Combo – 2"],
                             },
-                        }]
+                        }],
+                        "_demo_total_achs": 10,
+                        "_demo_unlocked": 3,
                     }
                     _demo_p2 = {
                         "players": [{
@@ -591,7 +593,9 @@ class EffectsMixin:
                                 "Power": ["🔥 Multiball – 8k"],
                                 "Precision": ["🎯 Skill Shot – 4"],
                             },
-                        }]
+                        }],
+                        "_demo_total_achs": 10,
+                        "_demo_unlocked": 6,
                     }
                     _demo_scored = {
                         "players": [{
@@ -601,7 +605,9 @@ class EffectsMixin:
                                 "Power": ["🔥 Multiball – 8k"],
                                 "Precision": ["🎯 Skill Shot – 4"],
                             },
-                        }]
+                        }],
+                        "_demo_total_achs": 10,
+                        "_demo_unlocked": 8,
                     }
 
                     # Reset animation counters for a clean demo start
