@@ -24,9 +24,10 @@ from ui_overlay import (
     StatusOverlayPositionPicker,
 )
 from ui_effects import EffectsMixin
+from ui_mascots import MascotsMixin
 
 
-class AppearanceMixin(EffectsMixin):
+class AppearanceMixin(MascotsMixin, EffectsMixin):
     """Mixin that provides the Appearance tab (Overlay, Theme, Sound sub-tabs) and all
     related placement, orientation, font, and theme handler methods.
 
@@ -1054,6 +1055,9 @@ class AppearanceMixin(EffectsMixin):
 
         # ── Effects sub-tab ────────────────────────────────────────────────────
         self._build_effects_subtab()
+
+        # ── Mascots sub-tab ────────────────────────────────────────────────────
+        self._build_mascots_subtab()
 
         self.main_tabs.addTab(tab, "🎨 Appearance")
 

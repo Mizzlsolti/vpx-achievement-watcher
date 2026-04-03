@@ -649,6 +649,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
             "• <b>Visual Effects</b>: Use the ✨ Effects sub-tab in the Appearance tab to "
             "control individual overlay effects and Low Performance Mode.<br>"
+            "• <b>Mascots</b>: Trophie &amp; Steely settings have moved to the "
+            "🎨 Appearance → 🏆 Mascots sub-tab.<br>"
             "• <b>Feedback</b>: Report bugs or suggestions directly from here."
         ),
         "system_maintenance": (
@@ -721,6 +723,21 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• Generated scripts &amp; JSON: {BASE}/tools/AWeditor/<br>"
             "• Trigger files: {BASE}/tools/AWeditor/custom_events/<br>"
             "• Copy the aw_*.vbs to: Your Tables directory (next to .vpx)"
+        ),
+        "appearance_mascots": (
+            "<b>🏆 Mascots</b><br><br>"
+            "Customize your Trophie and Steely mascots.<br><br>"
+            "<b>🏆 Trophie (GUI Mascot)</b><br>"
+            "• <b>Show/Hide</b>: Toggle Trophie visibility in the main window.<br>"
+            "• <b>Skin Gallery</b>: Browse 22 unique skins. Click a skin card to preview it live. "
+            "Click <b>✓ Apply Skin</b> to make it permanent.<br>"
+            "• <b>Live Preview</b>: See the selected skin animated in real-time before applying.<br><br>"
+            "<b>🎱 Steely (Desktop Overlay Mascot)</b><br>"
+            "• <b>Show/Hide</b>: Toggle the desktop overlay widget.<br>"
+            "• <b>Portrait Mode</b>: Rotate Steely 90° for vertical cabinet screens.<br>"
+            "• <b>Skin Gallery</b>: Browse 22 unique skins with accessories. Click a card to preview, "
+            "then <b>✓ Apply Skin</b>.<br>"
+            "• <b>Live Preview</b>: See Steely animated with the selected skin before committing."
         ),
     }
 

@@ -172,43 +172,17 @@ class SystemMixin:
         if self.cfg.CLOUD_ENABLED:
             self._lock_player_identity_fields(True)
 
-        # --- 🏆 Trophie Mascot ---
-        grp_trophie = QGroupBox("🏆 Trophie Mascot")
-        lay_trophie = QVBoxLayout(grp_trophie)
-
-        self.chk_trophie_gui = QCheckBox("Show Trophie in the main window (GUI)")
-        self.chk_trophie_gui.setChecked(bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)))
-        self.chk_trophie_gui.setToolTip(
-            "Shows the animated Trophie mascot in the bottom-left corner of the main window."
+        # --- 🏆 Mascot settings moved ---
+        lbl_mascot_moved = QLabel(
+            "💡 Mascot settings (Trophie &amp; Steely) have moved to "
+            "<b>🎨 Appearance → 🏆 Mascots</b>"
         )
-        self.chk_trophie_gui.stateChanged.connect(self._on_trophie_gui_toggled)
-        lay_trophie.addWidget(self.chk_trophie_gui)
-
-        self.chk_trophie_overlay = QCheckBox("Show Trophie on the desktop (Overlay)")
-        self.chk_trophie_overlay.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True)))
-        self.chk_trophie_overlay.setToolTip(
-            "Shows the Trophie mascot as a desktop overlay — always visible, reacts to game events."
+        lbl_mascot_moved.setWordWrap(True)
+        lbl_mascot_moved.setTextFormat(Qt.TextFormat.RichText)
+        lbl_mascot_moved.setStyleSheet(
+            "color: #888; font-size: 9pt; font-style: italic; padding: 6px 4px;"
         )
-        self.chk_trophie_overlay.stateChanged.connect(self._on_trophie_overlay_toggled)
-        lay_trophie.addWidget(self.chk_trophie_overlay)
-
-        self.chk_trophie_overlay_portrait = QCheckBox("Steely Portrait Mode (90°) — for cabinet screens")
-        self.chk_trophie_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_portrait", False)))
-        self.chk_trophie_overlay_portrait.setToolTip(
-            "Rotates Steely 90° — use on vertical/portrait arcade cabinet displays."
-        )
-        self.chk_trophie_overlay_portrait.stateChanged.connect(self._on_trophie_overlay_portrait_toggled)
-        lay_trophie.addWidget(self.chk_trophie_overlay_portrait)
-
-        self.chk_trophie_overlay_ccw = QCheckBox("Steely Rotate Counter-Clockwise (default: clockwise)")
-        self.chk_trophie_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("trophie_overlay_rotate_ccw", False)))
-        self.chk_trophie_overlay_ccw.setToolTip(
-            "When Steely Portrait Mode is on, rotate counter-clockwise (CCW) instead of clockwise."
-        )
-        self.chk_trophie_overlay_ccw.stateChanged.connect(self._on_trophie_overlay_ccw_toggled)
-        lay_trophie.addWidget(self.chk_trophie_overlay_ccw)
-
-        layout.addWidget(grp_trophie)
+        layout.addWidget(lbl_mascot_moved)
 
         # --- 🐛 Feedback & Bug Reports ---
         grp_feedback = QGroupBox("🐛 Feedback & Bug Reports")
