@@ -2,7 +2,7 @@
 notifications.py – CRUD helpers for the Dashboard notification feed.
 
 Storage: {cfg.BASE}/Achievements/notifications.json  (Windows Hidden attribute set)
-Format:  JSON object – {"notifications": [...]}
+Format:  JSON object – {"notifications": [...], "dismissed_keys": {"key": "iso-timestamp", ...}}
          notifications are not scored data.
 """
 
@@ -17,6 +17,7 @@ from typing import Optional
 
 _MAX_ENTRIES = 50
 _DISPLAY_LIMIT = 10
+_DISMISSED_TTL_HOURS = 24
 
 
 # ── Windows hidden-attribute helper ──────────────────────────────────────────
@@ -39,7 +40,7 @@ def _notifications_path(cfg) -> str:
 # ── low-level I/O ─────────────────────────────────────────────────────────────
 
 def _load_store(cfg) -> dict:
-    """Return the raw store dict {"notifications": [...]}."""
+    """Return the raw store dict {"notifications": [...], "dismissed_keys": {...}}."""
     path = _notifications_path(cfg)
     try:
         if os.path.isfile(path):
@@ -47,15 +48,17 @@ def _load_store(cfg) -> dict:
                 data = json.load(f)
             if isinstance(data, dict):
                 notifs = data.get("notifications", [])
+                dismissed = data.get("dismissed_keys", {})
                 return {
                     "notifications": notifs if isinstance(notifs, list) else [],
+                    "dismissed_keys": dismissed if isinstance(dismissed, dict) else {},
                 }
             # Legacy: plain list (old notifications.json format)
             if isinstance(data, list):
-                return {"notifications": data}
+                return {"notifications": data, "dismissed_keys": {}}
     except Exception:
         pass
-    return {"notifications": []}
+    return {"notifications": [], "dismissed_keys": {}}
 
 
 def _save_store(cfg, store: dict):
@@ -149,9 +152,37 @@ def add_notification(
     - ``vps_missing``:          replace any existing ``vps_missing`` entry (title may change).
     - ``update_available``:     skip if an entry with same type *and* same title already exists.
     - ``leaderboard_rank`` / ``achievement_beaten``:  deduplicated by the caller (per ROM).
+
+    Dismissal
+    ---------
+    If a notification was recently dismissed (via ``clear_all``), it is suppressed for
+    ``_DISMISSED_TTL_HOURS`` hours so it does not immediately reappear.
     """
     store = _load_store(cfg)
     items = store["notifications"]
+
+    # ── Prune expired dismissed keys and check dismissal ──────────────────────
+    now = datetime.now(timezone.utc)
+    dismissed = store.get("dismissed_keys", {})
+    pruned: dict = {}
+    for dk, ts_str in dismissed.items():
+        try:
+            ts = datetime.fromisoformat(ts_str)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if (now - ts).total_seconds() < _DISMISSED_TTL_HOURS * 3600:
+                pruned[dk] = ts_str
+        except Exception:
+            pass
+    dismissed = pruned
+    store["dismissed_keys"] = dismissed
+
+    # Check dedup_key dismissal
+    if dedup_key and dedup_key in dismissed:
+        _save_store(cfg, store)  # persist pruned keys
+        return None
+
+    # ── Existing deduplication logic ──────────────────────────────────────────
     if type == "vps_missing":
         items = [n for n in items if n.get("type") != "vps_missing"]
 
@@ -214,9 +245,20 @@ def mark_all_read(cfg):
 
 
 def clear_all(cfg):
-    """Delete all notifications (does not dismiss them)."""
+    """Delete all notifications and remember their dedup_keys to prevent re-creation."""
     store = _load_store(cfg)
+    items = store["notifications"]
+
+    # Collect dedup_keys from cleared notifications
+    dismissed = store.get("dismissed_keys", {})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for n in items:
+        dk = n.get("dedup_key")
+        if dk:
+            dismissed[dk] = now_iso
+
     store["notifications"] = []
+    store["dismissed_keys"] = dismissed
     _save_store(cfg, store)
 
 
