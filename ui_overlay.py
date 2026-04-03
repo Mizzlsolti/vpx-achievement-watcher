@@ -3554,7 +3554,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         # --- Burst particle animation ---
         is_level_up = (self._rom == "__levelup__")
         self._burst = ParticleBurst(
-            count=20,
+            count=max(5, int(20 * self._get_fx_intensity("fx_toast_burst_particles"))),
             color=QColor(get_theme_color(self.parent_gui.cfg, "accent")),
         )
         self._burst_timer = QTimer(self)
@@ -3566,10 +3566,11 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._burst_timer.start()
 
         # --- Neon ring pulse (level-up only) ---
+        _neon_intensity = self._get_fx_intensity("fx_toast_neon_rings")
         self._ring = NeonRingExpansion(
-            ring_count=4,
+            ring_count=max(1, int(4 * _neon_intensity)),
             delays=[0.0, 150.0, 300.0, 450.0],
-            duration=550.0,
+            duration=max(200.0, 550.0 * _neon_intensity),
         )
         self._ring_timer = QTimer(self)
         self._ring_timer.setInterval(20)
@@ -3606,12 +3607,12 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self._motion_timer.start()
 
         # --- God-Ray Burst ---
-        self._god_rays = GodRayBurst()
+        self._god_rays = GodRayBurst(intensity=self._get_fx_intensity("fx_toast_god_rays"))
         if self._is_fx_enabled("fx_toast_god_rays"):
             self._god_rays.start()
 
         # --- Confetti Shower ---
-        self._confetti = ConfettiShower()
+        self._confetti = ConfettiShower(intensity=self._get_fx_intensity("fx_toast_confetti"))
         if self._is_fx_enabled("fx_toast_confetti"):
             self._confetti.start()
 
@@ -3621,7 +3622,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self._hologram.start()
 
         # --- Shockwave Ripple ---
-        self._shockwave = ShockwaveRipple()
+        self._shockwave = ShockwaveRipple(intensity=self._get_fx_intensity("fx_toast_shockwave"))
         if self._is_fx_enabled("fx_toast_shockwave"):
             self._shockwave.start()
 

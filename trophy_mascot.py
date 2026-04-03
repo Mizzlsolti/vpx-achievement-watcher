@@ -103,6 +103,9 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("dash_sessions", "Your session history shows your best gaming streaks — watch them grow!"),
         ("dash_stats",    "The dashboard tracks your all-time trophy count. Keep it climbing!"),
         ("dash_export",   "Tip: you can scroll the notification feed to see older events too!"),
+        ("dash_streak",   "Consecutive gaming sessions build your streak — don't break the chain!"),
+        ("dash_history",  "Every session is a chance to beat your personal record. Go for it!"),
+        ("dash_pinball",  "The ball never lies — your stats tell the whole story of your pinball journey!"),
     ],
     "tab_effects": [
         ("eff_lowperf",   "Too many effects active? Enable Low Performance Mode to save CPU!"),
@@ -110,6 +113,9 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("eff_opengl",    "Post-Processing effects require OpenGL to look their best!"),
         ("eff_grain",     "Film Grain + Scanlines = retro CRT monitor feeling!"),
         ("eff_particle",  "Particle effects add that extra pop to every unlock — try them!"),
+        ("eff_confetti",  "Confetti shower on every achievement unlock? Yes please!"),
+        ("eff_shockwave", "The shockwave ripple effect makes every unlock feel like a real event!"),
+        ("eff_godrays",   "God-Ray Burst makes rare achievements feel truly legendary!"),
     ],
     "tab_appearance": [
         ("app_synthwave", "Try the Synthwave theme — it looks amazing with Bloom enabled!"),
@@ -117,6 +123,37 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("app_portrait",  "Portrait mode rotates the overlay for cabinet screens!"),
         ("app_font",      "Bigger font sizes work great on a real arcade cabinet — try it!"),
         ("app_color",     "Customize the overlay accent colour to match your room's lighting!"),
+        ("app_theme",     "The right theme can make your achievements look even more impressive!"),
+        ("app_sound",     "Unlock sounds make achievements feel real — don't forget to enable them!"),
+        ("app_dark",      "Dark themes are easier on the eyes during late-night pinball sessions!"),
+    ],
+    "tab_overlay": [
+        ("ov_place",      "Position the overlay exactly where you want it — even on a cabinet screen!"),
+        ("ov_portrait",   "Portrait mode is perfect for vertical cabinet displays!"),
+        ("ov_size",       "Adjust overlay font size to match your screen distance and resolution!"),
+        ("ov_accent",     "The accent colour ties the whole overlay together — make it yours!"),
+        ("ov_toast",      "The achievement toast tells you exactly what you unlocked and when!"),
+        ("ov_timer",      "Challenge timer overlay keeps the pressure on — just how pinball should be!"),
+        ("ov_layout",     "Try different overlay layouts to find what works best for your setup!"),
+        ("ov_transparent","A transparent overlay blends perfectly without blocking the playfield!"),
+    ],
+    "tab_theme": [
+        ("theme_pick",    "Your theme, your style — pinball should look as good as it plays!"),
+        ("theme_neon",    "Neon themes look incredible on dark arcade cabinet screens!"),
+        ("theme_gold",    "Gold accents give your achievements a legendary championship feel!"),
+        ("theme_match",   "Match your overlay theme to your favourite pinball table aesthetic!"),
+        ("theme_update",  "New themes get added with updates — keep an eye out for new styles!"),
+        ("theme_blend",   "A consistent theme across all overlays creates an immersive experience!"),
+        ("theme_classic", "Classic themes are timeless — sometimes simple is the most powerful!"),
+    ],
+    "tab_sound": [
+        ("snd_enable",    "Achievement sounds make every unlock feel like a true pinball victory!"),
+        ("snd_volume",    "Adjust sound volume so it fits perfectly with your VPX audio setup!"),
+        ("snd_custom",    "Custom unlock sounds can match the theme of your favourite tables!"),
+        ("snd_fanfare",   "A great fanfare makes rare achievements feel truly special!"),
+        ("snd_ambient",   "Subtle sounds keep you aware of progress without breaking immersion!"),
+        ("snd_level",     "Level-up sounds deserve to be louder — you earned that celebration!"),
+        ("snd_mute",      "You can mute sounds during stream sessions without losing visual effects!"),
     ],
     "tab_controls": [
         ("ctrl_joy",      "You can bind a joystick button instead of keyboard to toggle the overlay!"),
@@ -124,6 +161,9 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("ctrl_overlay",  "The overlay toggle key works even while VPX is running — very handy!"),
         ("ctrl_remap",    "Changed your button layout? Re-bind your overlay toggle here!"),
         ("ctrl_gamepad",  "Gamepad users: almost any button can be assigned as the overlay toggle!"),
+        ("ctrl_shortcut", "Quick hotkey access means you never miss an achievement notification!"),
+        ("ctrl_toggle",   "Toggle the overlay mid-game to check your progress without pausing!"),
+        ("ctrl_cabinet",  "Cabinet players: map the overlay toggle to a flipper button for easy access!"),
     ],
     "tab_progress": [
         ("prog_tab",      "The Progress tab shows how close you are to every achievement!"),
@@ -131,6 +171,9 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("prog_filter",   "Filter achievements by status to focus only on what is still locked!"),
         ("prog_percent",  "Completion percentage is tracked per table — can you reach 100%?"),
         ("prog_sort",     "Sort your achievements by unlock date to relive your greatest moments!"),
+        ("prog_hunt",     "Achievement hunting is a marathon, not a sprint — enjoy the journey!"),
+        ("prog_rare",     "Some achievements require hundreds of games — the rarest are the best!"),
+        ("prog_milestone","Every 10% completion milestone is worth celebrating. You are making progress!"),
     ],
     "tab_cloud": [
         ("cloud_backup",  "Back up your achievements to the cloud — do not lose your progress!"),
@@ -138,6 +181,9 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("cloud_sync",    "Cloud Sync runs automatically in the background — always protected!"),
         ("cloud_leader",  "Check the online leaderboard to see how you rank globally!"),
         ("cloud_share",   "Share your Player ID with friends and compare achievement counts!"),
+        ("cloud_compete", "Compete with players worldwide — pinball skill is a global language!"),
+        ("cloud_safe",    "Your pinball legacy is safe in the cloud — every flip, every unlock!"),
+        ("cloud_rank",    "Climb the global rankings one achievement at a time — every unlock counts!"),
     ],
     "tab_system": [
         ("sys_nvram",     "Use Force Cache NVRAM Maps if a new table is not being tracked!"),
@@ -145,6 +191,54 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("sys_logs",      "Check the system log if something is not tracking correctly!"),
         ("sys_paths",     "Verify your NVRAM and ROM paths here if tables are not being detected!"),
         ("sys_update",    "Keep VPX Achievement Watcher updated for the latest table support!"),
+        ("sys_cache",     "Clear the NVRAM cache if a table starts acting strange — fresh start!"),
+        ("sys_backup",    "Regular system backups mean you never lose hard-earned achievements!"),
+        ("sys_perf",      "Check performance settings if your system runs hot during long sessions!"),
+    ],
+    "tab_general": [
+        ("gen_profile",   "Set up your player profile to personalise your achievement journey!"),
+        ("gen_name",      "Your display name is how the world sees your pinball legacy!"),
+        ("gen_language",  "Adjust language and locale settings for the best experience!"),
+        ("gen_startup",   "Configure startup behaviour so VPX Achievement Watcher is always ready!"),
+        ("gen_paths",     "Correct ROM and NVRAM paths are the foundation of perfect tracking!"),
+        ("gen_check",     "Run the system check to make sure everything is working perfectly!"),
+        ("gen_support",   "Check the logs first if something seems wrong — the answer is usually there!"),
+    ],
+    "tab_maintenance": [
+        ("maint_clean",   "Occasional cache clearing keeps the watcher running at peak performance!"),
+        ("maint_rebuild", "Rebuilding the achievement index fixes most tracking problems instantly!"),
+        ("maint_backup",  "Always back up before performing maintenance — better safe than sorry!"),
+        ("maint_update",  "Keeping maps up to date means new tables are tracked immediately!"),
+        ("maint_logs",    "Maintenance logs are your best friend when troubleshooting tricky tables!"),
+        ("maint_nvram",   "Force-refreshing NVRAM maps helps if a newly installed table is not detected!"),
+        ("maint_reset",   "A clean reset can solve mystery bugs — and your achievements are cloud-safe!"),
+    ],
+    "tab_player": [
+        ("player_id",     "Your Player ID is unique to you — protect it like a high score!"),
+        ("player_name",   "Choose a name that represents your pinball legacy — make it memorable!"),
+        ("player_stats",  "Your personal stats track every flip and every win — it is all yours!"),
+        ("player_rank",   "Every achievement moves you up the global rankings. Keep pushing!"),
+        ("player_history","Your play history is a testament to your dedication. Wear it proudly!"),
+        ("player_profile","A complete player profile makes your achievements shine on the leaderboard!"),
+        ("player_cloud",  "Link your cloud account to protect every achievement you have ever earned!"),
+    ],
+    "tab_records": [
+        ("rec_global",    "Global records show you the best pinball players in the world!"),
+        ("rec_compare",   "Compare your scores with other players — pinball is always better together!"),
+        ("rec_session",   "Session delta records show your improvement over time — progress is real!"),
+        ("rec_personal",  "Personal records are the benchmarks you set for yourself. Smash them!"),
+        ("rec_challenge", "Challenge leaderboards are where pinball legends are made!"),
+        ("rec_rank",      "Your current global rank is just the beginning of the climb!"),
+        ("rec_history",   "Historical records prove that every session made you a better player!"),
+    ],
+    "tab_aweditor": [
+        ("aw_custom",     "AWEditor lets you create custom achievements for any table you love!"),
+        ("aw_trigger",    "Custom trigger files let you unlock achievements from any in-game event!"),
+        ("aw_script",     "Export the full VPX script to create the most accurate custom rules!"),
+        ("aw_share",      "Share your custom achievement packs with the community!"),
+        ("aw_creative",   "The best custom achievements make you think differently about a table!"),
+        ("aw_test",       "Test your custom achievements thoroughly — every edge case matters!"),
+        ("aw_rules",      "Well-crafted achievement rules reward skill, creativity, and persistence!"),
     ],
 }
 
@@ -618,6 +712,11 @@ class _TrophieDrawWidget(QWidget):
         DISMISSING:(0, 0),
     }
 
+    # Passive animation modes — cycle through these to keep the trophy lively
+    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade"]
+    _PASSIVE_MODE_MIN_MS = 8000
+    _PASSIVE_MODE_MAX_MS = 20000
+
     def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int) -> None:
         super().__init__(parent)
         self._tw = trophy_w
@@ -666,6 +765,14 @@ class _TrophieDrawWidget(QWidget):
         self._squash_t = 0.0        # squash-and-stretch phase (post-jump landing)
         self._squash_active = False  # True while squash/stretch is playing
 
+        # Passive animation mode — cycles through variety animations independently
+        # of the emotion state to keep the trophy visually interesting.
+        self._passive_mode: str = "float"
+        self._passive_t: float = 0.0      # phase timer within current passive mode
+        self._passive_mode_timer = QTimer(self)
+        self._passive_mode_timer.timeout.connect(self._cycle_passive_mode)
+        self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
+
     def _schedule_blink(self) -> None:
         delay_ms = random.randint(3000, 6000)
         self._blink_timer.start(delay_ms)
@@ -680,10 +787,19 @@ class _TrophieDrawWidget(QWidget):
         self.update()
         self._schedule_blink()
 
+    def _cycle_passive_mode(self) -> None:
+        current = self._passive_mode
+        choices = [m for m in self._PASSIVE_MODES if m != current]
+        self._passive_mode = random.choice(choices)
+        self._passive_t = 0.0
+        # Schedule next mode change at a random interval
+        self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
+
     def _tick(self) -> None:
         dt = 0.016  # ~16ms
         speed = 0.4 if self._state == SLEEPY else 1.2
         self._bob_t += dt * speed
+        self._passive_t += dt
 
         if self._state == DISMISSING:
             self._scale = max(0.0, self._scale - 0.04)
@@ -753,7 +869,13 @@ class _TrophieDrawWidget(QWidget):
     def paintEvent(self, event) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setOpacity(self._opacity_val)
+
+        # Passive fade mode modulates opacity independently of dismiss fade-out
+        if self._state != DISMISSING and self._passive_mode == "fade":
+            fade_opacity = 0.55 + 0.45 * (0.5 + 0.5 * math.sin(self._passive_t * 1.5))
+            p.setOpacity(self._opacity_val * fade_opacity)
+        else:
+            p.setOpacity(self._opacity_val)
 
         bob = math.sin(self._bob_t) * 3.0
         jump = self._jump_offset if self._jumping else 0.0
@@ -772,6 +894,12 @@ class _TrophieDrawWidget(QWidget):
         elif self._state == SLEEPY:
             # Slow exaggerated sway
             angle = math.sin(self._bob_t * 0.25) * 12.0
+        elif self._state == IDLE and self._passive_mode == "spin":
+            # Slow continuous spin in idle mode
+            angle = (self._passive_t * 45.0) % 360.0
+        elif self._state == IDLE and self._passive_mode == "wobble":
+            # Pronounced side-to-side wobble in idle mode
+            angle = math.sin(self._passive_t * 2.5) * 18.0
         else:
             angle = 0.0
 
@@ -784,6 +912,11 @@ class _TrophieDrawWidget(QWidget):
             sq = math.sin(self._squash_t * math.pi)
             sx = 1.0 + sq * 0.25   # momentarily wider
             sy = 1.0 - sq * 0.20   # momentarily shorter
+        elif self._state == IDLE and self._passive_mode == "pulse":
+            # Stronger breathing pulse in pulse mode
+            s = 1.0 + math.sin(self._passive_t * 2.0) * 0.12
+            sx = s
+            sy = s
         elif self._state == IDLE:
             # Subtle breathe / pulse while idle
             s = 1.0 + math.sin(self._bob_t * 0.7) * 0.025
@@ -808,7 +941,38 @@ class _TrophieDrawWidget(QWidget):
             p.scale(sx, sy)
         self._draw_trophy(p, 0, 0)
         p.restore()
+
+        # ── Shimmer/shine sweep overlay ───────────────────────────────────────
+        if self._state == IDLE and self._passive_mode == "shimmer":
+            self._draw_shimmer(p)
+
         p.end()
+
+    def _draw_shimmer(self, p: QPainter) -> None:
+        """Draw a golden shimmer sweep across the trophy."""
+        sweep_speed = 1.2
+        # Normalized sweep position cycles 0→1 over ~2s
+        sweep_pos = (self._passive_t * sweep_speed) % 2.0
+        if sweep_pos > 1.0:
+            # Return sweep — invisible
+            return
+        tw = self._tw
+        th = self._th
+        # Map sweep_pos 0→1 to x position across the widget
+        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20
+        sweep_w = max(12, int(tw * 0.25))
+        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(th))
+        grad.setColorAt(0.0, QColor(255, 220, 80, 0))
+        grad.setColorAt(0.3, QColor(255, 220, 80, 80))
+        grad.setColorAt(0.5, QColor(255, 240, 120, 120))
+        grad.setColorAt(0.7, QColor(255, 220, 80, 80))
+        grad.setColorAt(1.0, QColor(255, 220, 80, 0))
+        p.save()
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(grad)
+        p.drawRect(sweep_x, 0, sweep_w, th)
+        p.restore()
 
     def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
         tw = self._tw
@@ -1024,13 +1188,22 @@ class GUITrophie(QWidget):
 
     def _fire_tab_tip(self, tab_name: str) -> None:
         tab_map = {
-            "dashboard": "tab_dashboard",
-            "effects":   "tab_effects",
-            "appearance":"tab_appearance",
-            "controls":  "tab_controls",
-            "progress":  "tab_progress",
-            "cloud":     "tab_cloud",
-            "system":    "tab_system",
+            "dashboard":   "tab_dashboard",
+            "effects":     "tab_effects",
+            "overlay":     "tab_overlay",
+            "theme":       "tab_theme",
+            "sound":       "tab_sound",
+            "appearance":  "tab_appearance",
+            "controls":    "tab_controls",
+            "progress":    "tab_progress",
+            "cloud":       "tab_cloud",
+            "general":     "tab_general",
+            "maintenance": "tab_maintenance",
+            "system":      "tab_system",
+            "player":      "tab_player",
+            "records":     "tab_records",
+            "stats":       "tab_records",
+            "aweditor":    "tab_aweditor",
         }
         for key_part, tip_cat in tab_map.items():
             if key_part in tab_name:
