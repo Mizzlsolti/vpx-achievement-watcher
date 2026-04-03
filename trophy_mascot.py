@@ -49,9 +49,12 @@ _TROPHIE_SHARED: dict = {
 # ---------------------------------------------------------------------------
 # How long before another event-triggered zank exchange can fire.
 _ZANK_COOLDOWN_MS = 2 * 60 * 1_000          # 2 minutes
-# Minimum/maximum cooldown between spontaneous idle bicker exchanges.
-_IDLE_BICKER_MIN_COOLDOWN_MS = 1 * 60 * 1_000  # 1 minute
-_IDLE_BICKER_MAX_COOLDOWN_MS = 2 * 60 * 1_000  # 2 minutes
+# Cooldowns between spontaneous idle bicker exchanges.
+_IDLE_BICKER_MIN_COOLDOWN_MS = 3 * 60 * 1_000  # 3 minutes (default)
+_IDLE_BICKER_MAX_COOLDOWN_MS = 5 * 60 * 1_000  # 5 minutes (default)
+# Shorter cooldowns when both characters are visible (GUI is open)
+_IDLE_BICKER_MIN_COOLDOWN_GUI_MS = 30 * 1_000   # 30 seconds
+_IDLE_BICKER_MAX_COOLDOWN_GUI_MS = 45 * 1_000   # 45 seconds
 
 # ---------------------------------------------------------------------------
 # Animation state constants
@@ -218,11 +221,11 @@ _ZANK_OVERLAY_LINES: dict[str, list[str]] = {
 # GUI fires its line first; Overlay responds 2 seconds later.
 # ---------------------------------------------------------------------------
 _IDLE_BICKER_EXCHANGES: list[tuple[tuple[str, str], tuple[str, str]]] = [
-    (("ibk1_gui", "Hey Overlay... are you even paying attention out there?"),
+    (("ibk1_gui", "Steely... are you even paying attention out there?"),
      ("ibk1_ov",  "Unlike YOU, I see the whole screen. Every pixel.")),
     (("ibk2_gui", "I do the important work. Just so you know."),
      ("ibk2_ov",  "Important work? I am literally on the DESKTOP. I am everywhere.")),
-    (("ibk3_gui", "The overlay version of me really needs to calm down sometimes."),
+    (("ibk3_gui", "Steely really needs to calm down sometimes."),
      ("ibk3_ov",  "CALM DOWN? You are the one hiding inside a window!")),
     (("ibk4_gui", "I gave better tips today. Objectively."),
      ("ibk4_ov",  "I cheered louder. That counts more. Science.")),
@@ -232,7 +235,7 @@ _IDLE_BICKER_EXCHANGES: list[tuple[tuple[str, str], tuple[str, str]]] = [
      ("ibk6_ov",  "I brave the open desktop every single day. Do you know how drafty it is?")),
     (("ibk7_gui", "My tips are data-driven and carefully researched."),
      ("ibk7_ov",  "Mine come from the heart! That is worth more than data!")),
-    (("ibk8_gui", "I wonder if the Overlay me ever takes a day off."),
+    (("ibk8_gui", "I wonder if Steely ever takes a day off."),
      ("ibk8_ov",  "Day off? I live on this desktop 24/7. This IS my life.")),
     (("ibk9_gui", "The player seems to be ignoring both of us today."),
      ("ibk9_ov",  "At least they can still SEE me. I am literally floating here.")),
@@ -242,6 +245,42 @@ _IDLE_BICKER_EXCHANGES: list[tuple[tuple[str, str], tuple[str, str]]] = [
      ("ibk11_ov",  "Do YOU ever get tired of being stuck in a tab?")),
     (("ibk12_gui", "I track stats. I give tips. I am basically a personal assistant."),
      ("ibk12_ov",  "I celebrate EVERY achievement in REAL TIME. Beat that.")),
+    (("ibk13_gui", "Nice mustache, Steely... did a caterpillar land on your face?"),
+     ("ibk13_ov",  "At least I HAVE a distinguishing feature. You are just... gold.")),
+    (("ibk14_gui", "I am clearly the player's favourite. Look — they click on ME!"),
+     ("ibk14_ov",  "They LOOK at me. All the time. I am unavoidable.")),
+    (("ibk15_gui", "I do the real work. You just float around looking smug."),
+     ("ibk15_ov",  "Without me there is no celebration! I AM the hype!")),
+    (("ibk16_gui", "You are so round you could roll off the screen."),
+     ("ibk16_ov",  "At least I am not stuck on a pedestal like a museum piece!")),
+    (("ibk17_gui", "I have been a trophy for ages. Timeless. Classic."),
+     ("ibk17_ov",  "I am a PINBALL. Born to roll. You are just... decorative.")),
+    (("ibk18_gui", "My gold colour is very prestigious, you know."),
+     ("ibk18_ov",  "My chrome finish is literally more shiny. Facts.")),
+    (("ibk19_gui", "Don't tilt, Steely. You always overreact."),
+     ("ibk19_ov",  "TILT? ME? I have never tilted in my life!")),
+    (("ibk20_gui", "I am having a perfectly productive day, thank you."),
+     ("ibk20_ov",  "I am having a BALL today! Literally! Get it?")),
+    (("ibk21_gui", "You know, Steely, sometimes less is more."),
+     ("ibk21_ov",  "You are on a roll... wait, that is ME. I am on a roll!")),
+    (("ibk22_gui", "I track every stat. I never miss a thing."),
+     ("ibk22_ov",  "I SEE everything from out here. EVERYTHING.")),
+    (("ibk23_gui", "The player has been playing for hours. They need hydration."),
+     ("ibk23_ov",  "I already told them! Nobody ever listens to the ball!")),
+    (("ibk24_gui", "You know what, Steely? You are not so bad. For a ball."),
+     ("ibk24_ov",  "Careful, Trophie. That almost sounded like a compliment.")),
+    (("ibk25_gui", "I give advice. You give noise. We make a great team."),
+     ("ibk25_ov",  "The BEST team. Even if one of us is shinier than the other.")),
+    (("ibk26_gui", "Sometimes I think the player prefers you. It bothers me slightly."),
+     ("ibk26_ov",  "Only slightly? Come on, Trophie. Admit it. I am irresistible.")),
+    (("ibk27_gui", "Your mustache is very... dramatic."),
+     ("ibk27_ov",  "Thank you! I grew it myself. Do NOT touch it.")),
+    (("ibk28_gui", "I am the symbol of achievement. Respect that."),
+     ("ibk28_ov",  "I am the reason achievements exist! Someone has to play the game!")),
+    (("ibk29_gui", "You should come inside sometime. Get out of the elements."),
+     ("ibk29_ov",  "And give up the freedom of the desktop? Never.")),
+    (("ibk30_gui", "We should work together more. United front."),
+     ("ibk30_ov",  "Agreed. But I am still the better looking one. Just for the record.")),
 ]
 
 # ---------------------------------------------------------------------------
@@ -420,21 +459,21 @@ _GUI_RANDOM: list[tuple[str, str]] = [
 ]
 
 _GUI_ZANK: list[tuple[str, str]] = [
-    ("z_gui_weird",   "My outdoor colleague just said something weird again..."),
-    ("z_gui_smart",   "Do not listen to the other me. I am the smart one!"),
-    ("z_gui_filter",  "The overlay version of me has NO filter. Sorry about that!"),
-    ("z_gui_toomuch", "Between us? The other Trophie talks WAY too much!"),
-    ("z_gui_unprof",  "My outside version just said something unprofessional. Embarrassing!"),
-    ("z_gui_moving",  "We do not talk about the other Trophie. Moving on!"),
-    ("z_gui_real",    "I do the REAL work here. The other one just watches!"),
-    ("z_gui_twin",    "My twin thinks it is funny. It is not. I am the serious one!"),
-    ("z_gui_first",   "I told you before the other one did. Just saying!"),
-    ("z_gui_loud",    "The Overlay me is being VERY loud today. Apologies."),
-    ("z_gui_shouting","Did you hear that? Yes. That was my outside clone. Again."),
-    ("z_gui_drama",   "My desktop counterpart is being dramatic. As usual."),
-    ("z_gui_credit",  "The other Trophie is trying to take credit again. Classic."),
-    ("z_gui_expert",  "I have a certification. The Overlay me does not. Just so you know."),
-    ("z_gui_envy",    "Sure, the Overlay floats around looking fancy. I actually HELP."),
+    ("z_gui_weird",   "Steely just said something weird again..."),
+    ("z_gui_smart",   "Do not listen to Steely. I am the smart one!"),
+    ("z_gui_filter",  "Steely has NO filter. Sorry about that!"),
+    ("z_gui_toomuch", "Between us? Steely talks WAY too much!"),
+    ("z_gui_unprof",  "Steely just said something unprofessional. Embarrassing!"),
+    ("z_gui_moving",  "We do not talk about Steely. Moving on!"),
+    ("z_gui_real",    "I do the REAL work here. Steely just watches!"),
+    ("z_gui_twin",    "Steely thinks it is funny. It is not. I am the serious one!"),
+    ("z_gui_first",   "I told you before Steely did. Just saying!"),
+    ("z_gui_loud",    "Steely is being VERY loud today. Apologies."),
+    ("z_gui_shouting","Did you hear that? Yes. That was Steely. Again."),
+    ("z_gui_drama",   "Steely is being dramatic. As usual."),
+    ("z_gui_credit",  "Steely is trying to take credit again. Classic."),
+    ("z_gui_expert",  "I have a certification. Steely does not. Just so you know."),
+    ("z_gui_envy",    "Sure, Steely floats around looking fancy. I actually HELP."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -564,20 +603,20 @@ _OV_RANDOM: list[tuple[str, str]] = [
 ]
 
 _OV_ZANK: list[tuple[str, str]] = [
-    ("z_ov_indoor",    "The indoor me is giving you tips again huh? Classic!"),
-    ("z_ov_twin",      "My GUI twin thinks it knows everything. Adorable!"),
-    ("z_ov_funone",    "I am the fun one. The other Trophie is just... there!"),
-    ("z_ov_better",    "Do not tell my indoor clone but... I am the better looking one!"),
-    ("z_ov_lecture",   "The other me is probably lecturing you about settings right now!"),
-    ("z_ov_boring",    "My twin is SO boring. Tips tips tips! I do the real action!"),
-    ("z_ov_novideo",   "Between us? GUI Trophie has never seen a real game!"),
+    ("z_ov_indoor",    "Trophie is giving you tips again huh? Classic!"),
+    ("z_ov_twin",      "Trophie thinks it knows everything. Adorable!"),
+    ("z_ov_funone",    "I am the fun one. Trophie is just... there!"),
+    ("z_ov_better",    "Do not tell Trophie but... I am the better looking one!"),
+    ("z_ov_lecture",   "Trophie is probably lecturing you about settings right now!"),
+    ("z_ov_boring",    "Trophie is SO boring. Tips tips tips! I do the real action!"),
+    ("z_ov_novideo",   "Between us? Trophie has never seen a real game!"),
     ("z_ov_famous",    "I live on the DESKTOP. I am basically famous!"),
-    ("z_ov_woke",      "My indoor version just woke up to say hello. Took long enough!"),
-    ("z_ov_congrat",   "Did the indoor Trophie congratulate you? I did it first!"),
-    ("z_ov_tabs",      "GUI Trophie just sits there in its cozy little tab. Must be nice!"),
-    ("z_ov_exposure",  "I get direct sunlight and desktop exposure. My twin gets none. Tragic."),
-    ("z_ov_celebrate", "I am the celebration Trophie. My twin is the lecture Trophie. Facts."),
-    ("z_ov_freedom",   "The desktop is my kingdom. GUI me is basically in a box."),
+    ("z_ov_woke",      "Trophie just woke up to say hello. Took long enough!"),
+    ("z_ov_congrat",   "Did Trophie congratulate you? I did it first!"),
+    ("z_ov_tabs",      "Trophie just sits in its cozy little tab. Must be nice!"),
+    ("z_ov_exposure",  "I get direct desktop exposure. Trophie gets none. Tragic."),
+    ("z_ov_celebrate", "I am the celebration one. Trophie is the lecture one. Facts."),
+    ("z_ov_freedom",   "The desktop is my kingdom. Trophie is basically in a box."),
     ("z_ov_relevant",  "You can minimise the window but you cannot minimise ME!"),
 ]
 
@@ -878,7 +917,7 @@ class _TrophieDrawWidget(QWidget):
     }
 
     # Passive animation modes — cycle through these to keep the trophy lively
-    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade"]
+    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle"]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
 
@@ -924,6 +963,10 @@ class _TrophieDrawWidget(QWidget):
         self._squash_t = 0.0        # squash-and-stretch phase (post-jump landing)
         self._squash_active = False  # True while squash/stretch is playing
 
+        # Extra animation state for new passive modes
+        self._eye_roll_phase: float = 0.0  # for eye_roll passive mode
+        self._yawn_amount: float = 0.0     # 0.0=closed, 1.0=full yawn
+
         # Passive animation mode — cycles through variety animations independently
         # of the emotion state to keep the trophy visually interesting.
         self._passive_mode: str = "float"
@@ -961,6 +1004,11 @@ class _TrophieDrawWidget(QWidget):
         choices = [m for m in self._PASSIVE_MODES if m != current]
         self._passive_mode = random.choice(choices)
         self._passive_t = 0.0
+        self._eye_roll_phase = 0.0
+        # Restore normal pupil position when leaving eye_roll mode
+        dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
+        self._pupil_dx = dx
+        self._pupil_dy = dy
         # Schedule next mode change at a random interval
         self._passive_mode_timer.start(random.randint(self._PASSIVE_MODE_MIN_MS, self._PASSIVE_MODE_MAX_MS))
 
@@ -1010,6 +1058,22 @@ class _TrophieDrawWidget(QWidget):
             else:
                 self._wiggle_t = 0.0
 
+            # Eye roll passive mode
+            if self._state == IDLE and self._passive_mode == "eye_roll":
+                self._eye_roll_phase += dt * 1.5
+                roll_r = 3
+                self._pupil_dx = int(roll_r * math.cos(self._eye_roll_phase))
+                self._pupil_dy = int(roll_r * math.sin(self._eye_roll_phase))
+
+            # Yawn passive mode
+            if self._state == IDLE and self._passive_mode == "yawn":
+                if self._passive_t < 1.5:
+                    self._yawn_amount = min(1.0, self._passive_t / 1.0)
+                else:
+                    self._yawn_amount = max(0.0, 1.0 - (self._passive_t - 1.5) / 1.0)
+            else:
+                self._yawn_amount = max(0.0, self._yawn_amount - dt * 2.0)
+
         self.update()
 
     def set_state(self, state: str) -> None:
@@ -1046,7 +1110,10 @@ class _TrophieDrawWidget(QWidget):
         else:
             p.setOpacity(self._opacity_val)
 
-        bob = math.sin(self._bob_t) * 3.0
+        if self._state == IDLE and self._passive_mode == "bounce":
+            bob = -abs(math.sin(self._bob_t * 2.0)) * 10.0
+        else:
+            bob = math.sin(self._bob_t) * 3.0
         jump = self._jump_offset if self._jumping else 0.0
         total_offset = bob + jump
 
@@ -1069,6 +1136,8 @@ class _TrophieDrawWidget(QWidget):
         elif self._state == IDLE and self._passive_mode == "wobble":
             # Pronounced side-to-side wobble in idle mode
             angle = math.sin(self._passive_t * 2.5) * 18.0
+        elif self._state == IDLE and self._passive_mode == "nod":
+            angle = math.sin(self._passive_t * 2.5) * 10.0
         else:
             angle = 0.0
 
@@ -1086,6 +1155,9 @@ class _TrophieDrawWidget(QWidget):
             s = 1.0 + math.sin(self._passive_t * 2.0) * 0.12
             sx = s
             sy = s
+        elif self._state == IDLE and self._passive_mode == "stretch":
+            sx = 1.0 - abs(math.sin(self._passive_t * 1.5)) * 0.08
+            sy = 1.0 + abs(math.sin(self._passive_t * 1.5)) * 0.18
         elif self._state == IDLE:
             # Subtle breathe / pulse while idle
             s = 1.0 + math.sin(self._bob_t * 0.7) * 0.025
@@ -1110,6 +1182,10 @@ class _TrophieDrawWidget(QWidget):
             p.scale(sx, sy)
         self._draw_trophy(p, 0, 0)
         p.restore()
+
+        # ── Sparkle overlay ───────────────────────────────────────────────────
+        if self._state == IDLE and self._passive_mode == "sparkle":
+            self._draw_sparkles(p, cx, int(cy_base + total_offset))
 
         # ── Shimmer/shine sweep overlay ───────────────────────────────────────
         if self._state == IDLE and self._passive_mode == "shimmer":
@@ -1142,6 +1218,33 @@ class _TrophieDrawWidget(QWidget):
         p.setBrush(grad)
         p.drawRect(sweep_x, 0, sweep_w, th)
         p.restore()
+
+    def _draw_sparkles(self, p: QPainter, cx: int, cy: int) -> None:
+        """Draw animated star sparkles around the character."""
+        t = self._passive_t
+        offsets = [(-30, -38), (28, -35), (-26, 28), (30, 26), (0, -48), (34, -10), (-34, -8)]
+        for i, (ox, oy) in enumerate(offsets):
+            phase = (t * 2.5 + i * 0.9) % (math.pi * 2)
+            alpha = int(200 * abs(math.sin(phase)))
+            if alpha < 20:
+                continue
+            size = 2.5 + 1.5 * abs(math.sin(phase))
+            sx = cx + ox
+            sy = cy + oy
+            color = QColor(255, 240, 80, alpha)
+            p.setPen(Qt.PenStyle.NoPen)
+            # 4-pointed star shape
+            star = QPainterPath()
+            star.moveTo(sx, sy - size)
+            star.lineTo(sx + size * 0.3, sy - size * 0.3)
+            star.lineTo(sx + size, sy)
+            star.lineTo(sx + size * 0.3, sy + size * 0.3)
+            star.lineTo(sx, sy + size)
+            star.lineTo(sx - size * 0.3, sy + size * 0.3)
+            star.lineTo(sx - size, sy)
+            star.lineTo(sx - size * 0.3, sy - size * 0.3)
+            star.closeSubpath()
+            p.fillPath(star, color)
 
     def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
         tw = self._tw
@@ -1253,6 +1356,201 @@ class _TrophieDrawWidget(QWidget):
                 shine_r = max(1, pr // 3)
                 p.drawEllipse(px - pr // 3, py - pr // 3, shine_r, shine_r)
 
+        # ── Mouth ────────────────────────────────────────────────────────────
+        mouth_cx = cx
+        mouth_y = eye_y + eye_r + 6
+        mouth_w = int(tw * 0.28)
+        mouth_h = int(tw * 0.14)
+        talk_pulse = (math.sin(self._tilt_t * 3.0) > 0) if self._state == TALKING else False
+        yawn_open = self._yawn_amount > 0.1 if self._state == IDLE and self._passive_mode == "yawn" else False
+
+        p.setPen(QPen(QColor("#333333"), 1))
+        p.setBrush(QColor("#333333"))
+        if self._state == SURPRISED or (yawn_open and self._yawn_amount > 0.7):
+            ow = int(mouth_w * 0.7)
+            oh = int(mouth_h * (1.0 + self._yawn_amount * 0.5))
+            p.setBrush(QColor("#111111"))
+            p.drawEllipse(mouth_cx - ow // 2, mouth_y - oh // 4, ow, oh)
+        elif self._state == HAPPY:
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor("#333333"), 2))
+            path = QPainterPath()
+            path.moveTo(mouth_cx - mouth_w // 2, mouth_y)
+            path.quadTo(mouth_cx, mouth_y + mouth_h, mouth_cx + mouth_w // 2, mouth_y)
+            p.drawPath(path)
+        elif self._state == SAD:
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor("#333333"), 2))
+            frown_y = mouth_y + mouth_h
+            path = QPainterPath()
+            path.moveTo(mouth_cx - mouth_w // 2, frown_y)
+            path.quadTo(mouth_cx, mouth_y, mouth_cx + mouth_w // 2, frown_y)
+            p.drawPath(path)
+        elif self._state == TALKING and talk_pulse:
+            tw2 = int(mouth_w * 0.5)
+            th2 = int(mouth_h * 0.6)
+            p.setBrush(QColor("#111111"))
+            p.drawEllipse(mouth_cx - tw2 // 2, mouth_y - th2 // 4, tw2, th2)
+        elif self._state == SLEEPY or (yawn_open and self._yawn_amount <= 0.7):
+            ow = int(mouth_w * 0.3 + self._yawn_amount * mouth_w * 0.4)
+            oh = int(mouth_h * 0.4 + self._yawn_amount * mouth_h * 0.5)
+            p.setBrush(QColor("#333333"))
+            p.drawEllipse(mouth_cx - ow // 2, mouth_y - oh // 4, ow, oh)
+        elif self._state == DISMISSING:
+            p.setPen(QPen(QColor("#333333"), 2))
+            p.drawLine(mouth_cx - mouth_w // 3, mouth_y + mouth_h // 2,
+                       mouth_cx + mouth_w // 3, mouth_y + mouth_h // 2)
+        else:
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor("#333333"), 2))
+            path = QPainterPath()
+            path.moveTo(mouth_cx - mouth_w // 3, mouth_y)
+            path.quadTo(mouth_cx, mouth_y + mouth_h // 2, mouth_cx + mouth_w // 3, mouth_y)
+            p.drawPath(path)
+
+
+# ---------------------------------------------------------------------------
+# Pinball (Steely) drawing widget
+# ---------------------------------------------------------------------------
+class _PinballDrawWidget(_TrophieDrawWidget):
+    """Draws Steely the pinball mascot — a metallic chrome sphere."""
+
+    def _draw_shimmer(self, p: QPainter) -> None:
+        """Silver shimmer sweep across the pinball."""
+        sweep_speed = 1.2
+        sweep_pos = (self._passive_t * sweep_speed) % 2.0
+        if sweep_pos > 1.0:
+            return
+        tw = self._tw
+        th = self._th
+        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20
+        sweep_w = max(12, int(tw * 0.25))
+        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(th))
+        grad.setColorAt(0.0, QColor(220, 220, 240, 0))
+        grad.setColorAt(0.3, QColor(220, 220, 240, 70))
+        grad.setColorAt(0.5, QColor(240, 240, 255, 110))
+        grad.setColorAt(0.7, QColor(220, 220, 240, 70))
+        grad.setColorAt(1.0, QColor(220, 220, 240, 0))
+        p.save()
+        p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(grad)
+        p.drawRect(sweep_x, 0, sweep_w, th)
+        p.restore()
+
+    def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
+        """Draw Steely as a metallic chrome pinball with eyes and handlebar mustache."""
+        tw = self._tw
+        th = self._th
+
+        radius = int(min(tw, th) * 0.38)
+
+        # ── Metallic sphere body ─────────────────────────────────────────────
+        grad = QRadialGradient(float(cx - radius // 4), float(cy - radius // 3), float(radius * 1.4))
+        grad.setColorAt(0.0,  QColor("#FFFFFF"))
+        grad.setColorAt(0.15, QColor("#E8E8F0"))
+        grad.setColorAt(0.45, QColor("#A0A8B8"))
+        grad.setColorAt(0.75, QColor("#606880"))
+        grad.setColorAt(1.0,  QColor("#303040"))
+        p.setBrush(grad)
+        p.setPen(QPen(QColor("#404050"), 2))
+        p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
+
+        # ── Specular highlight (small bright spot top-left) ──────────────────
+        hl_r = max(3, radius // 4)
+        hl_x = cx - radius // 3
+        hl_y = cy - radius // 2
+        hl_grad = QRadialGradient(float(hl_x), float(hl_y), float(hl_r * 1.5))
+        hl_grad.setColorAt(0.0, QColor(255, 255, 255, 220))
+        hl_grad.setColorAt(1.0, QColor(255, 255, 255, 0))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(hl_grad)
+        p.drawEllipse(hl_x - hl_r, hl_y - hl_r, hl_r * 2, hl_r * 2)
+
+        # Secondary soft highlight (lower right)
+        hl2_r = max(2, radius // 5)
+        hl2_x = cx + radius // 3
+        hl2_y = cy + radius // 3
+        hl2_grad = QRadialGradient(float(hl2_x), float(hl2_y), float(hl2_r * 2))
+        hl2_grad.setColorAt(0.0, QColor(180, 200, 255, 80))
+        hl2_grad.setColorAt(1.0, QColor(180, 200, 255, 0))
+        p.setBrush(hl2_grad)
+        p.drawEllipse(hl2_x - hl2_r, hl2_y - hl2_r, hl2_r * 2, hl2_r * 2)
+
+        # ── Eyes ─────────────────────────────────────────────────────────────
+        eye_y = cy - radius // 5
+        eye_r = max(4, int(tw * 0.08))
+        left_eye_x = cx - int(tw * 0.12)
+        right_eye_x = cx + int(tw * 0.12)
+
+        for ex in (left_eye_x, right_eye_x):
+            p.setBrush(QColor("#FFFFFF"))
+            p.setPen(QPen(QColor("#333333"), 1))
+            if self._blink or self._state == SLEEPY:
+                blink_h = eye_r if self._eye_half else 2
+                p.drawEllipse(ex - eye_r, eye_y - eye_r, eye_r * 2, eye_r * 2)
+                p.setBrush(QColor("#8090A8"))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawRect(ex - eye_r - 1, eye_y - eye_r - 1, eye_r * 2 + 2, blink_h + 2)
+            else:
+                p.drawEllipse(ex - eye_r, eye_y - eye_r, eye_r * 2, eye_r * 2)
+
+            if not self._blink:
+                pr = max(2, int(eye_r * 0.55))
+                if self._state == SURPRISED:
+                    pr = eye_r - 1
+                px = ex + self._pupil_dx
+                py = eye_y + self._pupil_dy
+                p.setBrush(QColor("#111111"))
+                p.setPen(Qt.PenStyle.NoPen)
+                p.drawEllipse(px - pr, py - pr, pr * 2, pr * 2)
+                # Eye shine
+                p.setBrush(QColor("#FFFFFF"))
+                shine_r = max(1, pr // 3)
+                p.drawEllipse(px - pr // 3, py - pr // 3, shine_r, shine_r)
+
+        # ── Handlebar mustache ────────────────────────────────────────────────
+        mst_y = eye_y + eye_r + 3
+        mst_cx = cx
+        mst_w = int(tw * 0.34)
+        mst_h = int(tw * 0.12)
+
+        p.setPen(QPen(QColor("#1A1A1A"), 2, Qt.PenStyle.SolidLine,
+                      Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+        p.setBrush(QColor("#1A1A1A"))
+
+        # Left side of mustache (curls left and up)
+        left_mst = QPainterPath()
+        left_mst.moveTo(mst_cx, mst_y)
+        left_mst.cubicTo(
+            mst_cx - mst_w * 0.3, mst_y + mst_h * 0.8,
+            mst_cx - mst_w * 0.7, mst_y + mst_h * 1.0,
+            mst_cx - mst_w * 0.5, mst_y - mst_h * 0.3
+        )
+        left_mst.cubicTo(
+            mst_cx - mst_w * 0.4, mst_y - mst_h * 0.7,
+            mst_cx - mst_w * 0.1, mst_y + mst_h * 0.1,
+            mst_cx, mst_y
+        )
+        p.fillPath(left_mst, QColor("#1A1A1A"))
+        p.drawPath(left_mst)
+
+        # Right side of mustache (mirror)
+        right_mst = QPainterPath()
+        right_mst.moveTo(mst_cx, mst_y)
+        right_mst.cubicTo(
+            mst_cx + mst_w * 0.3, mst_y + mst_h * 0.8,
+            mst_cx + mst_w * 0.7, mst_y + mst_h * 1.0,
+            mst_cx + mst_w * 0.5, mst_y - mst_h * 0.3
+        )
+        right_mst.cubicTo(
+            mst_cx + mst_w * 0.4, mst_y - mst_h * 0.7,
+            mst_cx + mst_w * 0.1, mst_y + mst_h * 0.1,
+            mst_cx, mst_y
+        )
+        p.fillPath(right_mst, QColor("#1A1A1A"))
+        p.drawPath(right_mst)
+
 
 # ---------------------------------------------------------------------------
 # GUI Trophie
@@ -1305,9 +1603,9 @@ class GUITrophie(QWidget):
         self._zank_tick.timeout.connect(self._zank_tick_fn)
         self._zank_tick.start()
 
-        # Spontaneous idle bicker timer (fires every 2 minutes, tries to start an exchange)
+        # Spontaneous idle bicker timer (fires every 30s, tries to start an exchange)
         self._idle_bicker_timer = QTimer(self)
-        self._idle_bicker_timer.setInterval(2 * 60_000)
+        self._idle_bicker_timer.setInterval(30_000)
         self._idle_bicker_timer.timeout.connect(self._try_idle_bicker)
         self._idle_bicker_timer.start()
 
@@ -1319,7 +1617,7 @@ class GUITrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment("Hey! I am Trophie! Welcome back!", HAPPY)
+        self._show_comment_topleft("Hey! I am Trophie! Welcome back!", HAPPY)
 
     def on_tab_changed(self, idx: int) -> None:
         try:
@@ -1489,7 +1787,7 @@ class GUITrophie(QWidget):
         _TROPHIE_SHARED["idle_bicker_ov_key"] = ov_key
         _TROPHIE_SHARED["idle_bicker_ov_text"] = ov_text
         _TROPHIE_SHARED["idle_bicker_cooldown_ms"] = random.randint(
-            _IDLE_BICKER_MIN_COOLDOWN_MS, _IDLE_BICKER_MAX_COOLDOWN_MS
+            _IDLE_BICKER_MIN_COOLDOWN_GUI_MS, _IDLE_BICKER_MAX_COOLDOWN_GUI_MS
         )
 
     def _zank_tick_fn(self) -> None:
@@ -1524,6 +1822,20 @@ class GUITrophie(QWidget):
         if self._memory:
             self._memory.seen_tips.add(key)
         self._show_comment(text, state)
+
+    def _show_comment_topleft(self, text: str, state: str = TALKING) -> None:
+        """Show comment with bubble positioned at top-left of central widget."""
+        if self._is_silenced():
+            return
+        self._dismiss_bubble()
+        self._draw.set_state(state)
+        bubble = _SpeechBubble(self._central, text, self._memory or _TrophieMemory.__new__(_TrophieMemory))
+        self._current_bubble = bubble
+        try:
+            bubble.move(8, 8)
+        except Exception:
+            self._position_bubble(bubble)
+        bubble.show()
 
     def _position_bubble(self, bubble: _SpeechBubble) -> None:
         try:
@@ -1606,7 +1918,7 @@ class OverlayTrophie(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setFixedSize(self._TROPHY_W, self._TROPHY_H)
 
-        self._draw = _TrophieDrawWidget(self, self._TROPHY_W, self._TROPHY_H)
+        self._draw = _PinballDrawWidget(self, self._TROPHY_W, self._TROPHY_H)
         self._draw.move(0, 0)
 
         # Apply portrait mode on startup
@@ -1675,7 +1987,7 @@ class OverlayTrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment("Hey! I am Trophie! Ready to watch your games!", HAPPY)
+        self._show_comment("Hey! I am Steely! Ready to watch your games!", HAPPY)
 
     def apply_portrait_from_cfg(self) -> None:
         """Apply portrait/landscape mode based on current config."""
@@ -2115,20 +2427,26 @@ class OverlayTrophie(QWidget):
         try:
             bw = bubble.width()
             bh = bubble.height()
-            # Use absolute screen coordinates because the bubble is a top-level window.
-            origin = self.mapToGlobal(QPoint(0, 0))
-            abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
-            abs_y = origin.y() - bh - 4
-            # Clamp to screen
+            ov = self._cfg.OVERLAY or {}
+            portrait = bool(ov.get("trophie_overlay_portrait", False))
             screen_geom = QApplication.primaryScreen().geometry()
-            if abs_x < screen_geom.x():
-                abs_x = screen_geom.x()
-            if abs_y < screen_geom.y():
-                abs_y = origin.y() + self._TROPHY_H + 4  # flip below
-            if abs_x + bw > screen_geom.right():
-                abs_x = screen_geom.right() - bw
-            if abs_y + bh > screen_geom.bottom():
-                abs_y = screen_geom.bottom() - bh
+            if portrait:
+                # In portrait mode, position bubble at top-left of screen
+                abs_x = screen_geom.x() + 8
+                abs_y = screen_geom.y() + 8
+            else:
+                origin = self.mapToGlobal(QPoint(0, 0))
+                abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
+                abs_y = origin.y() - bh - 4
+                # Clamp to screen
+                if abs_x < screen_geom.x():
+                    abs_x = screen_geom.x()
+                if abs_y < screen_geom.y():
+                    abs_y = origin.y() + self._TROPHY_H + 4  # flip below
+                if abs_x + bw > screen_geom.right():
+                    abs_x = screen_geom.right() - bw
+                if abs_y + bh > screen_geom.bottom():
+                    abs_y = screen_geom.bottom() - bh
             bubble.move(abs_x, abs_y)
         except Exception:
             pass
