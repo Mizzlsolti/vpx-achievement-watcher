@@ -233,6 +233,13 @@ DEFAULT_OVERLAY.setdefault("fx_post_film_grain", False)
 DEFAULT_OVERLAY.setdefault("fx_post_film_grain_intensity", 40)
 DEFAULT_OVERLAY.setdefault("fx_post_scanlines", False)
 DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
+# Per-overlay post-processing toggles
+DEFAULT_OVERLAY.setdefault("pp_overlay_main", True)
+DEFAULT_OVERLAY.setdefault("pp_overlay_toast", True)
+DEFAULT_OVERLAY.setdefault("pp_overlay_challenge", False)
+DEFAULT_OVERLAY.setdefault("pp_overlay_timer", False)
+DEFAULT_OVERLAY.setdefault("pp_overlay_heat", False)
+DEFAULT_OVERLAY.setdefault("pp_overlay_flip", False)
 
 _ALLOWED_OVERLAY_KEYS = [
     "theme",
@@ -350,6 +357,9 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_post_vignette", "fx_post_vignette_intensity",
     "fx_post_film_grain", "fx_post_film_grain_intensity",
     "fx_post_scanlines", "fx_post_scanlines_intensity",
+    # Per-overlay post-processing toggles
+    "pp_overlay_main", "pp_overlay_toast", "pp_overlay_challenge",
+    "pp_overlay_timer", "pp_overlay_heat", "pp_overlay_flip",
 ]
 
 CHALLENGES_ENABLED = True

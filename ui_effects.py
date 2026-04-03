@@ -202,6 +202,7 @@ class EffectsMixin:
         # --- 2×3 grid of overlay group-boxes ---
         self._fx_effect_rows: dict = {}  # key → (checkbox, slider, pct_label)
         self._fx_post_rows: dict = {}    # key → (checkbox, slider, pct_label)
+        self._fx_pp_overlay_btns: dict = {}  # overlay_type → QPushButton
         self._fx_group_widgets: dict = {}  # overlay_type → QGroupBox
         self._fx_scroll = scroll
 
@@ -386,7 +387,7 @@ class EffectsMixin:
         outer_lay.setContentsMargins(8, 8, 8, 8)
 
         desc = QLabel(
-            "Screen-space effects applied on top of all overlays. "
+            "Screen-space effects applied on top of overlay windows. "
             "Requires OpenGL. Disabled automatically in Low Performance Mode."
         )
         desc.setWordWrap(True)
@@ -400,6 +401,49 @@ class EffectsMixin:
             cell = self._build_fx_post_cell(key, label, default_intensity)
             post_grid.addWidget(cell, row, col)
         outer_lay.addLayout(post_grid)
+
+        # --- Per-overlay toggle buttons ---
+        apply_lbl = QLabel("Apply Post-Processing to:")
+        apply_lbl.setStyleSheet("color: #CCC; font-size: 8pt; font-weight: bold;")
+        outer_lay.addWidget(apply_lbl)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(4)
+        _OVERLAY_TOGGLES = [
+            ("pp_overlay_main",      "🖥️ Main",      True),
+            ("pp_overlay_toast",     "🏆 Toast",     True),
+            ("pp_overlay_challenge", "⚡ Challenge", False),
+            ("pp_overlay_timer",     "⏱️ Timer",     False),
+            ("pp_overlay_heat",      "🌡️ Heat",      False),
+            ("pp_overlay_flip",      "🔢 Flip",      False),
+        ]
+        _style_on = (
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00;"
+            " border: 2px solid #FF7F00; padding: 2px 6px; border-radius: 3px;"
+            " font-size: 8pt; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000; }"
+        )
+        _style_off = (
+            "QPushButton { background-color: #1a1a1a; color: #555;"
+            " border: 1px solid #333; padding: 2px 6px; border-radius: 3px;"
+            " font-size: 8pt; }"
+            "QPushButton:hover { background-color: #2a2a2a; color: #888; }"
+        )
+        for cfg_key, btn_label, _default in _OVERLAY_TOGGLES:
+            active = bool(self.cfg.OVERLAY.get(cfg_key, _default))
+            btn = QPushButton(btn_label)
+            btn.setCheckable(True)
+            btn.setChecked(active)
+            btn.setFixedHeight(26)
+            btn.setStyleSheet(_style_on if active else _style_off)
+            btn.toggled.connect(
+                lambda checked, k=cfg_key, b=btn, son=_style_on, soff=_style_off:
+                    self._fx_save_pp_overlay_toggle(k, checked, b, son, soff)
+            )
+            btn_row.addWidget(btn)
+            self._fx_pp_overlay_btns[cfg_key] = btn
+        btn_row.addStretch(1)
+        outer_lay.addLayout(btn_row)
         return grp
 
     def _build_fx_post_cell(self, key: str, label: str, default_intensity: int) -> QWidget:
@@ -468,6 +512,11 @@ class EffectsMixin:
         self.cfg.save()
         self._fx_apply_low_perf_state(enabled)
 
+    def _fx_save_pp_overlay_toggle(self, key: str, checked: bool, btn, style_on: str, style_off: str):
+        self.cfg.OVERLAY[key] = checked
+        self.cfg.save()
+        btn.setStyleSheet(style_on if checked else style_off)
+
     # ------------------------------------------------------------------
     # Bulk actions
     # ------------------------------------------------------------------
@@ -489,6 +538,8 @@ class EffectsMixin:
         self._fx_apply_row_enabled(self._fx_post_rows, not low_perf)
         self._fx_btn_enable.setEnabled(not low_perf)
         self._fx_btn_disable.setEnabled(not low_perf)
+        for btn in getattr(self, '_fx_pp_overlay_btns', {}).values():
+            btn.setEnabled(not low_perf)
 
     def _fx_apply_row_enabled(self, rows: dict, enabled: bool):
         """Enable or disable all controls in a row dict (key → (chk, slider, pct_lbl))."""
