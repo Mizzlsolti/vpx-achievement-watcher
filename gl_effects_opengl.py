@@ -252,6 +252,8 @@ class EffectsWidget(QWidget):
     def set_accent(self, color: QColor):
         """Set the target accent color; the glow will smoothly lerp to it."""
         self._target_accent = QColor(color)
+        if not self._tick_timer.isActive():
+            self._tick_timer.start()
 
     def paintEvent(self, event):
         W, H = self.width(), self.height()

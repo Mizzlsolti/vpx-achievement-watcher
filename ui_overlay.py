@@ -222,8 +222,8 @@ class OverlayNavArrows(QWidget):
                 wobble = 0
             else:
                 amp = self._breathing_pulse.get_amp()
-                alpha = 60 + int(195 * amp)
-                scale = 0.85 + 0.35 * amp
+                alpha = 120 + int(135 * amp)
+                scale = 0.88 + 0.25 * amp
                 wobble = 2.0 * self._breathing_pulse.get_sin()
             base_h = 18
             ah = int(base_h * scale)
@@ -1316,6 +1316,13 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         except Exception:
             pass
 
+        # In preview/demo mode the combined dict carries synthetic achievement counts
+        # so the progress bar is always rendered even without real ROM data.
+        if total_achs == 0 and "_demo_total_achs" in (self._current_combined or {}):
+            total_achs = int(self._current_combined["_demo_total_achs"])
+            unlocked_total = int(self._current_combined.get("_demo_unlocked", 0))
+            pct = round((unlocked_total / total_achs) * 100, 1) if total_achs > 0 else 0.0
+
         # Animated progress bar: update target and start timer if changed
         new_pct_target = pct if total_achs > 0 else 0.0
         if abs(new_pct_target - getattr(self, '_progress_pct_target', -1)) > 0.05:
@@ -1658,9 +1665,28 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         between old and new snapshots.
         """
         if not self._anim_ok("fx_main_page_transition"):
+            # Even without a full page slide, still show the glitch-frame flash
+            # if that effect is enabled so it works independently of page transitions.
+            if self._anim_ok("fx_main_glitch_frame"):
+                QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 50)
+                _gf_img = self._snapshot_current()
+                if _gf_img and not _gf_img.isNull():
+                    _gf_lbl = QLabel(self)
+                    _gf_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    _gf_lbl.setStyleSheet("background:transparent;")
+                    _gf_lbl.setGeometry(0, 0, self.width(), self.height())
+                    _gf_lbl.setPixmap(QPixmap.fromImage(_gf_img))
+                    self._draw_glitch_frame(_gf_img, _gf_lbl)
+                    _gf_lbl.show()
+                    _gf_lbl.raise_()
+                    new_content_callback()
+                    QTimer.singleShot(300, _gf_lbl.deleteLater)
+                    return
             new_content_callback()
             return
 
+        # Ensure overlay content is fully rendered before taking the initial snapshot.
+        QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 50)
         old_img = self._snapshot_current()
         if old_img is None or old_img.isNull():
             new_content_callback()
