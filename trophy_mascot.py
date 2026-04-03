@@ -2315,12 +2315,51 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         elif skin == "rubber":
             c0, c1, c2, c3, c4 = "#555555", "#333333", "#222222", "#111111", "#000000"
             pen_color = "#444444"
-        elif skin in ("soccer", "basketball", "baseball", "tennis", "bowling",
-                      "beach", "camo", "pixel", "galaxy", "disco", "moon",
-                      "planet", "skull", "eyeball", "8ball"):
-            # These skins use default chrome but get surface decoration via _draw_skin_accessory
-            c0, c1, c2, c3, c4 = "#FFFFFF", "#E8E8F0", "#A0A8B8", "#606880", "#303040"
-            pen_color = "#404050"
+        elif skin == "soccer":
+            c0, c1, c2, c3, c4 = "#FFFFFF", "#F8F8F8", "#EBEBEB", "#D0D0D0", "#B0B0B0"
+            pen_color = "#888888"
+        elif skin == "basketball":
+            c0, c1, c2, c3, c4 = "#FF9944", "#FF6600", "#CC4400", "#882200", "#441100"
+            pen_color = "#662200"
+        elif skin == "baseball":
+            c0, c1, c2, c3, c4 = "#FFFEF0", "#F5F0DC", "#E8DCC8", "#C8B090", "#907060"
+            pen_color = "#806050"
+        elif skin == "tennis":
+            c0, c1, c2, c3, c4 = "#FFFF88", "#CCDD00", "#AACC00", "#669900", "#446600"
+            pen_color = "#557700"
+        elif skin == "bowling":
+            c0, c1, c2, c3, c4 = "#6080C0", "#304090", "#182060", "#0C1040", "#060818"
+            pen_color = "#101828"
+        elif skin == "beach":
+            c0, c1, c2, c3, c4 = "#FFFFFF", "#FFFFC0", "#FFE880", "#EEC860", "#CCA040"
+            pen_color = "#AA8030"
+        elif skin == "camo":
+            c0, c1, c2, c3, c4 = "#8B9B5B", "#6B7B3B", "#4B5B2B", "#2B3B1B", "#1B2B0B"
+            pen_color = "#384820"
+        elif skin == "pixel":
+            c0, c1, c2, c3, c4 = "#FF80FF", "#CC00CC", "#880088", "#440044", "#220022"
+            pen_color = "#660066"
+        elif skin == "galaxy":
+            c0, c1, c2, c3, c4 = "#8040C0", "#4820A0", "#281070", "#180840", "#0C0420"
+            pen_color = "#301060"
+        elif skin == "disco":
+            c0, c1, c2, c3, c4 = "#FFFFFF", "#F8F8FF", "#D8D8F8", "#B0B0D8", "#6868A0"
+            pen_color = "#8080B0"
+        elif skin == "moon":
+            c0, c1, c2, c3, c4 = "#C0C0C0", "#909090", "#606060", "#363636", "#1C1C1C"
+            pen_color = "#404040"
+        elif skin == "planet":
+            c0, c1, c2, c3, c4 = "#F0E080", "#D4A840", "#B08020", "#785010", "#3C2808"
+            pen_color = "#604018"
+        elif skin == "skull":
+            c0, c1, c2, c3, c4 = "#484848", "#282828", "#181818", "#0C0C0C", "#040404"
+            pen_color = "#303030"
+        elif skin == "eyeball":
+            c0, c1, c2, c3, c4 = "#FFFFFF", "#FAFAFA", "#F0F0F0", "#E0E0E0", "#C8C8C8"
+            pen_color = "#B0B0B0"
+        elif skin == "8ball":
+            c0, c1, c2, c3, c4 = "#404040", "#202020", "#101010", "#080808", "#020202"
+            pen_color = "#303030"
         else:
             c0, c1, c2, c3, c4 = "#FFFFFF", "#E8E8F0", "#A0A8B8", "#606880", "#303040"
             pen_color = "#404050"
@@ -2504,14 +2543,11 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.restore()
 
         elif skin == "basketball":
-            # Orange tint and seam lines — face area excluded via clip
+            # Seam lines — face area excluded via clip
             safe = self._steely_safe_clip(cx, cy)
             p.save()
             p.setClipPath(safe)
-            p.setBrush(QColor(200, 80, 0, 60))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
-            p.setPen(QPen(QColor(80, 30, 0, 160), 2))
+            p.setPen(QPen(QColor(60, 20, 0, 220), 3))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawLine(cx, cy - radius, cx, cy + radius)
             p.drawArc(cx - radius, cy - radius // 2, radius * 2, radius, 0, 180 * 16)
@@ -2532,14 +2568,11 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.restore()
 
         elif skin == "tennis":
-            # Yellow-green tint + white seam curves — face area excluded via clip
+            # White seam curves — face area excluded via clip
             safe = self._steely_safe_clip(cx, cy)
             p.save()
             p.setClipPath(safe)
-            p.setBrush(QColor(100, 160, 0, 50))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
-            p.setPen(QPen(QColor("#FFFFFF"), 2))
+            p.setPen(QPen(QColor("#FFFFFF"), 3))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawArc(cx - radius, cy - radius, radius * 2, radius * 2,
                       45 * 16, 90 * 16)
@@ -2620,7 +2653,7 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             # Skull shifted to lower half of ball so it clears Steely's face
             skull_cy = cy + int(radius * 0.18)
             sr = int(radius * 0.35)
-            p.setBrush(QColor(255, 255, 255, 80))
+            p.setBrush(QColor(255, 255, 255, 200))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(cx - sr, skull_cy - sr, sr * 2, sr * 2)
             p.setBrush(QColor("#111111"))
@@ -2682,14 +2715,12 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.restore()
 
         elif skin == "galaxy":
-            # Purple tint + star dots — face area excluded via clip
+            # Star dots — face area excluded via clip
             safe = self._steely_safe_clip(cx, cy)
             p.save()
             p.setClipPath(safe)
-            p.setBrush(QColor(80, 0, 120, 80))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
             p.setBrush(QColor("#FFFFFF"))
+            p.setPen(Qt.PenStyle.NoPen)
             for i in range(8):
                 a2 = math.radians(i * 45 + 22)
                 sx3 = cx + int(math.cos(a2) * radius * 0.6)
