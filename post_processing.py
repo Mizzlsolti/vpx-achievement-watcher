@@ -93,7 +93,7 @@ class PostBloom:
         self._draw_qpainter(painter, rect)
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
-        alpha_base = int(self._intensity * 120)
+        alpha_base = int(self._intensity * 160)
         pulse = math.sin(self._time_ms * 0.002) * 0.3 + 0.7
         layers = max(2, int(self._intensity * 5))
         old_mode = painter.compositionMode()
@@ -101,7 +101,7 @@ class PostBloom:
         for i in range(layers):
             expand = (i + 1) * int(self._intensity * 12)
             alpha = max(0, int(alpha_base * pulse * (1.0 - i / layers)))
-            color = QColor(180, 140, 255, alpha)
+            color = QColor(255, 220, 180, alpha)
             painter.setBrush(QBrush(color))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(
@@ -122,8 +122,8 @@ class PostBloom:
         glDisable(GL_DEPTH_TEST)
 
         pulse = math.sin(self._time_ms * 0.002) * 0.3 + 0.7
-        alpha = float(self._intensity * 0.25 * pulse)
-        glColor4f(0.7, 0.55, 1.0, alpha)
+        alpha = float(self._intensity * 0.35 * pulse)
+        glColor4f(1.0, 0.86, 0.7, alpha)
 
         layers = max(2, int(self._intensity * 4))
         for i in range(layers):
@@ -163,6 +163,7 @@ class PostMotionBlur:
         self._active = False
         self._vx = 1.0
         self._vy = 0.0
+        self._time_ms = 0.0
 
     def set_intensity(self, intensity: float):
         self._intensity = _clamp(intensity, 0.0, 1.0)
@@ -173,10 +174,17 @@ class PostMotionBlur:
         self._vy = vy
 
     def start(self):
+        self._time_ms = 0.0
         self._active = True
 
     def tick(self, dt_ms: float):
-        pass  # Stateless — redraws based on current velocity each frame
+        if not self._active:
+            return
+        self._time_ms += dt_ms
+        # Slowly rotate the blur direction so it sweeps around over time
+        angle = self._time_ms * 0.001
+        self._vx = math.cos(angle)
+        self._vy = math.sin(angle)
 
     def is_active(self) -> bool:
         return self._active
@@ -197,13 +205,13 @@ class PostMotionBlur:
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
         steps = max(3, int(self._intensity * 5))
-        step_dist = self._intensity * 10
+        step_dist = self._intensity * 25
         old_mode = painter.compositionMode()
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         for i in range(steps, 0, -1):
             offset_x = int(-self._vx * step_dist * i / steps)
             offset_y = int(-self._vy * step_dist * i / steps)
-            alpha = int(self._intensity * 90 * (1.0 - i / (steps + 1)))
+            alpha = int(self._intensity * 140 * (1.0 - i / (steps + 1)))
             color = QColor(200, 200, 255, alpha)
             painter.setBrush(QBrush(color))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -222,11 +230,11 @@ class PostMotionBlur:
         glDisable(GL_DEPTH_TEST)
 
         steps = max(3, int(self._intensity * 5))
-        step_dist = self._intensity * 10
+        step_dist = self._intensity * 25
         for i in range(steps, 0, -1):
             ox = -self._vx * step_dist * i / steps
             oy = -self._vy * step_dist * i / steps
-            alpha = float(self._intensity * 0.35 * (1.0 - i / (steps + 1)))
+            alpha = float(self._intensity * 0.55 * (1.0 - i / (steps + 1)))
             glColor4f(0.8, 0.8, 1.0, alpha)
             glBegin(GL_TRIANGLE_FAN)
             glVertex2f(ox, oy)
@@ -284,8 +292,9 @@ class PostChromaticAberration:
         self._draw_qpainter(painter, rect)
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
-        offset = max(1, int(self._intensity * 6))
-        alpha = int(self._intensity * 100)
+        jitter = math.sin(self._time_ms * 0.007) * self._intensity * 4
+        offset = max(1, int(self._intensity * 12 + jitter))
+        alpha = int(self._intensity * 130)
         old_mode = painter.compositionMode()
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Screen)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -311,8 +320,9 @@ class PostChromaticAberration:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
 
-        offset = self._intensity * 6.0
-        alpha = float(self._intensity * 0.4)
+        jitter = math.sin(self._time_ms * 0.007) * self._intensity * 4
+        offset = self._intensity * 12.0 + jitter
+        alpha = float(self._intensity * 0.55)
 
         # Red quad – shifted left
         glColor4f(1.0, 0.0, 0.0, alpha)
@@ -575,10 +585,10 @@ class PostScanlines:
         return max(2, int(8 - self._intensity * 6))
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
-        alpha = int(self._intensity * 90)
+        alpha = int(self._intensity * 200)
         spacing = self._line_spacing()
         pen = QPen(QColor(0, 0, 0, alpha))
-        pen.setWidth(1)
+        pen.setWidth(2)
         painter.setPen(pen)
         x0, y0 = rect.x(), rect.y()
         x1 = rect.x() + rect.width()
@@ -598,9 +608,9 @@ class PostScanlines:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
-        glLineWidth(1.0)
+        glLineWidth(1.5)
 
-        alpha = float(self._intensity * 0.35)
+        alpha = float(self._intensity * 0.8)
         spacing = self._line_spacing()
         glColor4f(0.0, 0.0, 0.0, alpha)
         glBegin(GL_LINES)

@@ -233,7 +233,7 @@ class EffectsMixin:
             )
             btn_row.addWidget(b)
         self._fx_btn_preview_all = QPushButton("▶ Preview All")
-        self._fx_btn_preview_all.setToolTip("Open all overlay windows simultaneously to preview all effects")
+        self._fx_btn_preview_all.setToolTip("Open all overlay windows (including Main Overlay) simultaneously to preview all effects")
         self._fx_btn_preview_all.clicked.connect(self._preview_all_overlays)
         self._fx_btn_preview_all.setStyleSheet(
             "QPushButton { background-color: #1a1a1a; color: #00E5FF; border: 1px solid #00E5FF;"
@@ -509,7 +509,7 @@ class EffectsMixin:
 
     def _preview_all_overlays(self):
         """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
-        for overlay_type in ("toast", "challenge", "timer", "heat", "flip"):
+        for overlay_type in ("main", "toast", "challenge", "timer", "heat", "flip"):
             self._open_demo_overlay(overlay_type, duration_ms=6000)
 
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
