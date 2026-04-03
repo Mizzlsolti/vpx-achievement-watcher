@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Optional
 
 from PyQt6.QtCore import (
-    QPoint, QRect, QSize, Qt, QTimer,
+    QPoint, QRect, QRectF, QSize, Qt, QTimer,
 )
 from PyQt6.QtGui import (
     QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen,
@@ -1516,6 +1516,39 @@ class _TrophieDrawWidget(QWidget):
             path.quadTo(mouth_cx, mouth_y + mouth_h // 2, mouth_cx + mouth_w // 3, mouth_y)
             p.drawPath(path)
 
+    def _cup_safe_clip(self, cx: int, cy: int) -> QPainterPath:
+        """Return the cup trapezoid path minus the face exclusion zone.
+
+        Used by clothing skins so decorations don't paint over the face.
+        """
+        tw = self._tw
+        th = self._th
+        cup_w = int(tw * 0.62)
+        cup_h = int(th * 0.52)
+        cup_x = cx - cup_w // 2
+        cup_y = cy - int(th * 0.36)
+        top_extra = int(cup_w * 0.1)
+        eye_y = cup_y + cup_h // 2 - 4
+        eye_r = max(4, int(tw * 0.09))
+        mouth_y = eye_y + eye_r + 6
+        mouth_h = int(tw * 0.14)
+        mouth_w = int(tw * 0.28)
+        fm = eye_r + 4
+        cup_path = QPainterPath()
+        cup_path.moveTo(float(cup_x - top_extra), float(cup_y))
+        cup_path.lineTo(float(cup_x + cup_w + top_extra), float(cup_y))
+        cup_path.lineTo(float(cup_x + cup_w), float(cup_y + cup_h))
+        cup_path.lineTo(float(cup_x), float(cup_y + cup_h))
+        cup_path.closeSubpath()
+        face_path = QPainterPath()
+        face_path.addRect(QRectF(
+            cx - mouth_w // 2 - fm,
+            eye_y - eye_r - fm,
+            mouth_w + fm * 2,
+            mouth_y + mouth_h + fm - (eye_y - eye_r - fm),
+        ))
+        return cup_path.subtracted(face_path)
+
     def _draw_skin_accessory(self, p: QPainter, cx: int, cy: int) -> None:
         """Draw the skin-specific accessory on top of the trophy."""
         skin = getattr(self, "_skin", "classic")
@@ -1859,6 +1892,216 @@ class _TrophieDrawWidget(QWidget):
             p.drawText(mx - mr, my - mr, mr * 2, mr * 2,
                        Qt.AlignmentFlag.AlignCenter, "1")
 
+        elif skin == "suit":
+            # Tuxedo: black jacket sides + white shirt front + red bow tie
+            cup_w_s = int(tw * 0.62)
+            cup_h_s = int(th * 0.52)
+            cup_x_s = cx - cup_w_s // 2
+            top_ex = int(cup_w_s * 0.1)
+            shirt_hw = max(5, int(cup_w_s * 0.18))
+            p.save()
+            p.setClipPath(self._cup_safe_clip(cx, cy))
+            p.setBrush(QColor("#1A1A1A"))
+            p.setPen(Qt.PenStyle.NoPen)
+            # Left jacket panel
+            p.drawRect(cup_x_s - top_ex, cup_y_top,
+                       cx - shirt_hw - (cup_x_s - top_ex), cup_h_s)
+            # Right jacket panel
+            p.drawRect(cx + shirt_hw, cup_y_top,
+                       cup_x_s + cup_w_s + top_ex - cx - shirt_hw, cup_h_s)
+            # White shirt front
+            p.setBrush(QColor("#F5F5F5"))
+            p.drawRect(cx - shirt_hw, cup_y_top, shirt_hw * 2, cup_h_s)
+            # Shirt buttons
+            p.setBrush(QColor("#999999"))
+            for bi in range(3):
+                btn_y = cup_y_top + cup_h_s * (bi + 1) // 4
+                p.drawEllipse(cx - 2, btn_y - 2, 4, 4)
+            p.restore()
+            # Bow tie at collar top (above face zone)
+            bt_y = cup_y_top + max(3, int(cup_h_s * 0.05))
+            bt_w = max(5, int(tw * 0.09))
+            bt_h = max(3, int(th * 0.04))
+            bow_l = QPainterPath()
+            bow_l.moveTo(float(cx - bt_w), float(bt_y - bt_h))
+            bow_l.lineTo(float(cx), float(bt_y))
+            bow_l.lineTo(float(cx - bt_w), float(bt_y + bt_h))
+            bow_l.closeSubpath()
+            p.fillPath(bow_l, QColor("#CC0000"))
+            bow_r = QPainterPath()
+            bow_r.moveTo(float(cx + bt_w), float(bt_y - bt_h))
+            bow_r.lineTo(float(cx), float(bt_y))
+            bow_r.lineTo(float(cx + bt_w), float(bt_y + bt_h))
+            bow_r.closeSubpath()
+            p.fillPath(bow_r, QColor("#CC0000"))
+            p.setBrush(QColor("#990000"))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(cx - 3, bt_y - 3, 6, 6)
+
+        elif skin == "hoodie":
+            # Grey hoodie with raised hood above cup and kangaroo pocket
+            cup_w_h = int(tw * 0.62)
+            cup_h_h = int(th * 0.52)
+            cup_x_h = cx - cup_w_h // 2
+            top_ex = int(cup_w_h * 0.1)
+            hood_color = QColor("#4A4A4A")
+            # Hood raised above the cup top (always above the face)
+            hood_w = int(tw * 0.52)
+            hood_h = int(th * 0.16)
+            p.setBrush(hood_color)
+            p.setPen(QPen(QColor("#333333"), 1))
+            p.drawRoundedRect(cx - hood_w // 2, cup_y_top - hood_h,
+                              hood_w, hood_h + 4, hood_w // 3, hood_w // 3)
+            # Hoodie body over cup (clipped to avoid face)
+            p.save()
+            p.setClipPath(self._cup_safe_clip(cx, cy))
+            p.setBrush(hood_color)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawRect(cup_x_h - top_ex, cup_y_top, cup_w_h + top_ex * 2, cup_h_h)
+            # Kangaroo pocket at bottom of hoodie body
+            pkt_w = int(cup_w_h * 0.42)
+            pkt_h = int(cup_h_h * 0.18)
+            pkt_y = cup_y_top + cup_h_h - pkt_h - int(cup_h_h * 0.05)
+            p.setBrush(QColor("#3A3A3A"))
+            p.setPen(QPen(QColor("#555555"), 1))
+            p.drawRoundedRect(cx - pkt_w // 2, pkt_y, pkt_w, pkt_h, 3, 3)
+            p.restore()
+            # Drawstrings
+            str_y = cup_y_top + int(cup_h_h * 0.12)
+            p.setPen(QPen(QColor("#BBBBBB"), 1))
+            p.drawLine(cx - 5, str_y, cx - 8, str_y + int(cup_h_h * 0.18))
+            p.drawLine(cx + 5, str_y, cx + 8, str_y + int(cup_h_h * 0.18))
+            # Aglets
+            p.setBrush(QColor("#CCCCCC"))
+            p.setPen(Qt.PenStyle.NoPen)
+            aglet_y = str_y + int(cup_h_h * 0.18)
+            p.drawEllipse(cx - 10, aglet_y - 2, 4, 4)
+            p.drawEllipse(cx + 6, aglet_y - 2, 4, 4)
+
+        elif skin == "superhero":
+            # Red cape strips on cup sides + gold star emblem at collar
+            cup_w_sp = int(tw * 0.62)
+            cup_h_sp = int(th * 0.52)
+            cup_x_sp = cx - cup_w_sp // 2
+            top_ex = int(cup_w_sp * 0.1)
+            cape_strip_w = max(5, int(cup_w_sp * 0.20))
+            # Left cape strip (outer edge of cup)
+            p.setBrush(QColor("#CC0000"))
+            p.setPen(Qt.PenStyle.NoPen)
+            cap_l = QPainterPath()
+            cap_l.moveTo(float(cup_x_sp - top_ex), float(cup_y_top))
+            cap_l.lineTo(float(cup_x_sp - top_ex + cape_strip_w), float(cup_y_top))
+            cap_l.lineTo(float(cup_x_sp), float(cup_y_top + cup_h_sp))
+            cap_l.lineTo(float(cup_x_sp - top_ex), float(cup_y_top + cup_h_sp))
+            cap_l.closeSubpath()
+            p.fillPath(cap_l, QColor("#CC0000"))
+            # Right cape strip
+            cap_r = QPainterPath()
+            cap_r.moveTo(float(cup_x_sp + cup_w_sp + top_ex - cape_strip_w), float(cup_y_top))
+            cap_r.lineTo(float(cup_x_sp + cup_w_sp + top_ex), float(cup_y_top))
+            cap_r.lineTo(float(cup_x_sp + cup_w_sp + top_ex), float(cup_y_top + cup_h_sp))
+            cap_r.lineTo(float(cup_x_sp + cup_w_sp), float(cup_y_top + cup_h_sp))
+            cap_r.closeSubpath()
+            p.fillPath(cap_r, QColor("#CC0000"))
+            # Gold star emblem at collar (top of cup — always above face zone)
+            emb_cx = cx
+            emb_cy = cup_y_top + max(4, int(cup_h_sp * 0.07))
+            emb_r = max(4, int(tw * 0.09))
+            star_path = QPainterPath()
+            for k in range(5):
+                oa = math.radians(-90 + k * 72)
+                ia = math.radians(-90 + k * 72 + 36)
+                op = (emb_cx + math.cos(oa) * emb_r, emb_cy + math.sin(oa) * emb_r)
+                ip = (emb_cx + math.cos(ia) * emb_r * 0.4, emb_cy + math.sin(ia) * emb_r * 0.4)
+                if k == 0:
+                    star_path.moveTo(float(op[0]), float(op[1]))
+                else:
+                    star_path.lineTo(float(op[0]), float(op[1]))
+                star_path.lineTo(float(ip[0]), float(ip[1]))
+            star_path.closeSubpath()
+            p.fillPath(star_path, QColor("#FFD700"))
+            p.strokePath(star_path, QPen(QColor("#CC8800"), 1))
+
+        elif skin == "armor":
+            # Silver armor plates on cup sides + shoulder pauldrons + gorget
+            cup_w_a = int(tw * 0.62)
+            cup_h_a = int(th * 0.52)
+            cup_x_a = cx - cup_w_a // 2
+            top_ex = int(cup_w_a * 0.1)
+            # Shoulder pauldrons outside the cup (over handles area)
+            pld_w = int(tw * 0.14)
+            pld_h = int(th * 0.16)
+            pld_y = cup_y_top + int(cup_h_a * 0.05)
+            for hx_off in (cup_x_a - top_ex - pld_w - 2,
+                           cup_x_a + cup_w_a + top_ex + 2):
+                p.setBrush(QColor("#8888AA"))
+                p.setPen(QPen(QColor("#555566"), 1))
+                p.drawRoundedRect(hx_off, pld_y, pld_w, pld_h, 3, 3)
+                p.setPen(QPen(QColor("#666677"), 1))
+                for lv in range(3):
+                    ly = pld_y + lv * pld_h // 3
+                    p.drawLine(hx_off + 2, ly, hx_off + pld_w - 2, ly)
+            # Armor side plates on cup (clipped)
+            plate_w = max(5, int(cup_w_a * 0.22))
+            p.save()
+            p.setClipPath(self._cup_safe_clip(cx, cy))
+            p.setBrush(QColor("#7777AA"))
+            p.setPen(QPen(QColor("#555577"), 1))
+            p.drawRoundedRect(cup_x_a - top_ex, cup_y_top, plate_w, cup_h_a, 2, 2)
+            p.drawRoundedRect(cup_x_a + cup_w_a + top_ex - plate_w, cup_y_top, plate_w, cup_h_a, 2, 2)
+            p.setPen(QPen(QColor("#444455"), 1))
+            for seg in range(1, 4):
+                seg_y = cup_y_top + seg * cup_h_a // 4
+                p.drawLine(cup_x_a - top_ex, seg_y, cup_x_a - top_ex + plate_w, seg_y)
+                r_s = cup_x_a + cup_w_a + top_ex - plate_w
+                p.drawLine(r_s, seg_y, r_s + plate_w, seg_y)
+            p.restore()
+            # Gorget (neck guard) at top of cup — above face zone
+            gorg_w = int(cup_w_a * 0.55)
+            gorg_h = max(4, int(cup_h_a * 0.07))
+            p.setBrush(QColor("#8888AA"))
+            p.setPen(QPen(QColor("#555566"), 1))
+            p.drawRoundedRect(cx - gorg_w // 2, cup_y_top - gorg_h // 2, gorg_w, gorg_h, 2, 2)
+
+        elif skin == "lab_coat":
+            # White lab coat panels on cup sides + collar + pocket
+            cup_w_l = int(tw * 0.62)
+            cup_h_l = int(th * 0.52)
+            cup_x_l = cx - cup_w_l // 2
+            top_ex = int(cup_w_l * 0.1)
+            collar_hw = max(5, int(cup_w_l * 0.18))
+            p.save()
+            p.setClipPath(self._cup_safe_clip(cx, cy))
+            p.setBrush(QColor("#EEEEEE"))
+            p.setPen(QPen(QColor("#CCCCCC"), 1))
+            # Left coat panel
+            p.drawRect(cup_x_l - top_ex, cup_y_top,
+                       cx - collar_hw - (cup_x_l - top_ex), cup_h_l)
+            # Right coat panel
+            p.drawRect(cx + collar_hw, cup_y_top,
+                       cup_x_l + cup_w_l + top_ex - cx - collar_hw, cup_h_l)
+            # Breast pocket on right side
+            pkt_w = max(4, int(cup_w_l * 0.16))
+            pkt_h = int(cup_h_l * 0.18)
+            pkt_x = cx + collar_hw + max(2, int((cup_w_l // 2 - collar_hw) * 0.25))
+            pkt_y = cup_y_top + int(cup_h_l * 0.55)
+            p.setBrush(QColor("#DDDDDD"))
+            p.setPen(QPen(QColor("#BBBBBB"), 1))
+            p.drawRect(pkt_x, pkt_y, pkt_w, pkt_h)
+            # Pen in pocket
+            p.setBrush(QColor("#2244AA"))
+            p.setPen(Qt.PenStyle.NoPen)
+            pen_x = pkt_x + pkt_w // 4
+            p.drawRect(pen_x, pkt_y - int(pkt_h * 0.3), max(2, pkt_w // 6), int(pkt_h * 0.45))
+            p.restore()
+            # Collar lapels at top of cup (above face zone)
+            lap_w = max(5, int(cup_w_l * 0.20))
+            lap_h = max(4, int(cup_h_l * 0.12))
+            p.setBrush(QColor("#EEEEEE"))
+            p.setPen(QPen(QColor("#CCCCCC"), 1))
+            p.drawRect(cup_x_l - top_ex, cup_y_top, lap_w, lap_h)
+            p.drawRect(cup_x_l + cup_w_l + top_ex - lap_w, cup_y_top, lap_w, lap_h)
+
         p.restore()
 
 
@@ -2085,6 +2328,32 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         p.fillPath(right_mst, QColor("#1A1A1A"))
         p.drawPath(right_mst)
 
+    def _steely_safe_clip(self, cx: int, cy: int) -> QPainterPath:
+        """Return the ball circle path minus the face exclusion zone.
+
+        Used by surface overlay skins so they don't paint over Steely's
+        eyes and mustache.
+        """
+        tw = self._tw
+        th = self._th
+        radius = int(min(tw, th) * 0.38)
+        eye_y = cy - radius // 5
+        eye_r = max(4, int(tw * 0.08))
+        mst_w = int(tw * 0.34)
+        mst_h = int(tw * 0.12)
+        mst_y = eye_y + eye_r + 3
+        fm = eye_r + 4
+        ball = QPainterPath()
+        ball.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+        face = QPainterPath()
+        face.addRect(QRectF(
+            cx - mst_w // 2 - fm,
+            eye_y - eye_r - fm,
+            mst_w + fm * 2,
+            mst_y + mst_h + fm - (eye_y - eye_r - fm),
+        ))
+        return ball.subtracted(face)
+
     def _draw_skin_accessory(self, p: QPainter, cx: int, cy: int) -> None:
         """Draw Steely skin-specific surface decorations."""
         skin = getattr(self, "_skin", "classic")
@@ -2095,23 +2364,33 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         tw = self._tw
         th = self._th
         radius = int(min(tw, th) * 0.38)
+        # Face zone coordinates — shared by multiple skins for exclusion logic
+        eye_y = cy - radius // 5
+        eye_r = max(4, int(tw * 0.08))
+        mst_w = int(tw * 0.34)
+        mst_h = int(tw * 0.12)
+        mst_y = eye_y + eye_r + 3
 
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         if skin == "8ball":
-            # White circle with "8"
-            cr = int(radius * 0.45)
+            # White circle with "8" — shifted to lower half so it doesn't cover the eyes
+            cr = int(radius * 0.38)
+            cy_8 = cy + int(radius * 0.18)
             p.setBrush(QColor("#FFFFFF"))
             p.setPen(Qt.PenStyle.NoPen)
-            p.drawEllipse(cx - cr, cy - cr, cr * 2, cr * 2)
+            p.drawEllipse(cx - cr, cy_8 - cr, cr * 2, cr * 2)
             p.setPen(QPen(QColor("#111111"), 1))
             p.setFont(QFont("Arial", max(6, cr - 2), QFont.Weight.Bold))
-            p.drawText(cx - cr, cy - cr, cr * 2, cr * 2,
+            p.drawText(cx - cr, cy_8 - cr, cr * 2, cr * 2,
                        Qt.AlignmentFlag.AlignCenter, "8")
 
         elif skin == "soccer":
-            # Pentagon pattern
+            # Pentagon patches — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor("#111111"))
             p.setPen(Qt.PenStyle.NoPen)
             for angle_deg in [0, 72, 144, 216, 288]:
@@ -2120,9 +2399,13 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 py2 = cy + int(math.sin(a) * radius * 0.5)
                 pr = int(radius * 0.22)
                 p.drawEllipse(px2 - pr, py2 - pr, pr * 2, pr * 2)
+            p.restore()
 
         elif skin == "basketball":
-            # Orange tint and lines
+            # Orange tint and seam lines — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor(200, 80, 0, 60))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
@@ -2131,18 +2414,26 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.drawLine(cx, cy - radius, cx, cy + radius)
             p.drawArc(cx - radius, cy - radius // 2, radius * 2, radius, 0, 180 * 16)
             p.drawArc(cx - radius, cy - radius // 2, radius * 2, radius, 180 * 16, 180 * 16)
+            p.restore()
 
         elif skin == "baseball":
-            # Red stitching
+            # Red stitching — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setPen(QPen(QColor("#CC0000"), 2))
             p.setBrush(Qt.BrushStyle.NoBrush)
             for x_off in [-radius // 4, radius // 4]:
                 p.drawArc(cx + x_off - radius // 3, cy - radius // 2,
                            radius * 2 // 3, radius,
                            30 * 16, 120 * 16)
+            p.restore()
 
         elif skin == "tennis":
-            # Yellow-green with white curve
+            # Yellow-green tint + white seam curves — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor(100, 160, 0, 50))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
@@ -2152,9 +2443,13 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                       45 * 16, 90 * 16)
             p.drawArc(cx - radius, cy - radius, radius * 2, radius * 2,
                       225 * 16, 90 * 16)
+            p.restore()
 
         elif skin == "bowling":
-            # Three finger holes
+            # Three finger holes — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor("#333333"))
             p.setPen(Qt.PenStyle.NoPen)
             hr = max(3, int(radius * 0.15))
@@ -2162,23 +2457,28 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                              (cx - int(radius * 0.25), cy + int(radius * 0.1)),
                              (cx + int(radius * 0.25), cy + int(radius * 0.1))]:
                 p.drawEllipse(hx2 - hr, hy2 - hr, hr * 2, hr * 2)
+            p.restore()
 
         elif skin == "eyeball":
-            # Big iris
-            iris_r = int(radius * 0.55)
+            # Big iris centred in the lower half of the ball so it clears the eyes
+            iris_cy = cy + int(radius * 0.20)
+            iris_r = int(radius * 0.50)
             p.setBrush(QColor("#44AAFF"))
             p.setPen(QPen(QColor("#2277CC"), 1))
-            p.drawEllipse(cx - iris_r, cy - iris_r, iris_r * 2, iris_r * 2)
+            p.drawEllipse(cx - iris_r, iris_cy - iris_r, iris_r * 2, iris_r * 2)
             p.setBrush(QColor("#111111"))
             p.setPen(Qt.PenStyle.NoPen)
             pr = int(iris_r * 0.55)
-            p.drawEllipse(cx - pr, cy - pr, pr * 2, pr * 2)
+            p.drawEllipse(cx - pr, iris_cy - pr, pr * 2, pr * 2)
             p.setBrush(QColor("#FFFFFF"))
             shine_r = max(2, pr // 3)
-            p.drawEllipse(cx - pr // 3, cy - pr // 3, shine_r, shine_r)
+            p.drawEllipse(cx - pr // 3, iris_cy - pr // 3, shine_r, shine_r)
 
         elif skin == "disco":
-            # Tiled mirror squares
+            # Tiled mirror squares — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             sq = max(4, int(radius * 0.18))
             colors = [QColor("#FF88FF"), QColor("#88FFFF"), QColor("#FFFF88"),
                       QColor("#FF8888"), QColor("#88FF88")]
@@ -2193,9 +2493,10 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                         p.setPen(Qt.PenStyle.NoPen)
                         p.drawRect(sx2, sy2, sq, sq)
                         ci += 1
+            p.restore()
 
         elif skin == "planet":
-            # Saturn-like ring
+            # Saturn-like ring around the ball — doesn't cover the face
             p.setPen(QPen(QColor("#DAA520"), 2))
             p.setBrush(Qt.BrushStyle.NoBrush)
             ring_rx = int(radius * 1.4)
@@ -2203,41 +2504,52 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.drawEllipse(cx - ring_rx, cy - ring_ry, ring_rx * 2, ring_ry * 2)
 
         elif skin == "moon":
-            # Crescent shadow
+            # Crescent shadow — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor(30, 30, 60, 160))
             p.setPen(Qt.PenStyle.NoPen)
             off = int(radius * 0.35)
             p.drawEllipse(cx + off - radius, cy - radius, radius * 2, radius * 2)
+            p.restore()
 
         elif skin == "skull":
-            # Skull pattern overlay
+            # Skull shifted to lower half of ball so it clears Steely's face
+            skull_cy = cy + int(radius * 0.18)
+            sr = int(radius * 0.35)
             p.setBrush(QColor(255, 255, 255, 80))
             p.setPen(Qt.PenStyle.NoPen)
-            sr = int(radius * 0.35)
-            p.drawEllipse(cx - sr, cy - sr, sr * 2, sr * 2)
+            p.drawEllipse(cx - sr, skull_cy - sr, sr * 2, sr * 2)
             p.setBrush(QColor("#111111"))
             eye_off = int(sr * 0.38)
             er = max(2, int(sr * 0.25))
-            p.drawEllipse(cx - eye_off - er, cy - er, er * 2, er * 2)
-            p.drawEllipse(cx + eye_off - er, cy - er, er * 2, er * 2)
+            p.drawEllipse(cx - eye_off - er, skull_cy - er, er * 2, er * 2)
+            p.drawEllipse(cx + eye_off - er, skull_cy - er, er * 2, er * 2)
             p.setPen(QPen(QColor("#111111"), 1))
             for i in range(4):
                 tx2 = cx - int(sr * 0.4) + i * int(sr * 0.28)
-                p.drawLine(tx2, cy + int(sr * 0.35), tx2, cy + int(sr * 0.6))
+                p.drawLine(tx2, skull_cy + int(sr * 0.35), tx2, skull_cy + int(sr * 0.6))
 
         elif skin == "beach":
-            # Colored stripes
+            # Colored vertical stripes — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             colors_b = [QColor("#FF4444"), QColor("#FFFF44"), QColor("#4444FF")]
             stripe_w = int(radius * 0.35)
             for i, col in enumerate(colors_b):
                 x2 = cx - stripe_w * len(colors_b) // 2 + i * stripe_w
                 p.setBrush(col)
                 p.setPen(Qt.PenStyle.NoPen)
-                # Clip to circle approximation
                 p.drawRect(x2, cy - radius, stripe_w, radius * 2)
+            p.restore()
 
         elif skin == "camo":
-            # Camo blobs
+            # Camo blobs — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             camo_colors = [QColor(60, 80, 40, 160), QColor(40, 60, 20, 140),
                            QColor(80, 70, 30, 120)]
             p.setPen(Qt.PenStyle.NoPen)
@@ -2247,9 +2559,13 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 br = int(radius * 0.22)
                 p.setBrush(camo_colors[i % len(camo_colors)])
                 p.drawEllipse(bx2 - br, by2 - br, br * 2, br * 2)
+            p.restore()
 
         elif skin == "pixel":
-            # Pixel grid pattern
+            # Pixel grid — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             pix = max(4, int(radius * 0.22))
             colors_px = [QColor("#FF00FF"), QColor("#00FFFF"), QColor("#FFFF00")]
             p.setPen(Qt.PenStyle.NoPen)
@@ -2261,9 +2577,13 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                     if dist < radius * 0.8:
                         p.setBrush(colors_px[(row + col) % len(colors_px)])
                         p.drawRect(px2, py2, pix - 1, pix - 1)
+            p.restore()
 
         elif skin == "galaxy":
-            # Star field and purple tint
+            # Purple tint + star dots — face area excluded via clip
+            safe = self._steely_safe_clip(cx, cy)
+            p.save()
+            p.setClipPath(safe)
             p.setBrush(QColor(80, 0, 120, 80))
             p.setPen(Qt.PenStyle.NoPen)
             p.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
@@ -2273,6 +2593,150 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 sx3 = cx + int(math.cos(a2) * radius * 0.6)
                 sy3 = cy + int(math.sin(a2) * radius * 0.6)
                 p.drawEllipse(sx3 - 2, sy3 - 2, 4, 4)
+            p.restore()
+
+        # ── Clothing / wearable skins ─────────────────────────────────────────
+        elif skin == "scarf":
+            # Knitted scarf wrapped below the mustache
+            scarf_top = mst_y + mst_h + 6
+            scarf_colors = [QColor("#CC3300"), QColor("#FF6600"), QColor("#FFCC00"),
+                            QColor("#CC3300"), QColor("#FF6600")]
+            band_h = max(3, int(radius * 0.13))
+            p.setPen(Qt.PenStyle.NoPen)
+            for i, col in enumerate(scarf_colors):
+                by2 = scarf_top + i * band_h
+                mid_y2 = by2 + band_h // 2
+                dy2 = abs(mid_y2 - cy)
+                if dy2 >= radius:
+                    break
+                hw2 = int(math.sqrt(max(0, radius * radius - dy2 * dy2)))
+                p.setBrush(col)
+                p.drawRect(cx - hw2, by2, hw2 * 2, band_h)
+            # Dangling scarf tail on the right
+            tail_start_y = scarf_top + band_h
+            tail_x = cx + int(radius * 0.60)
+            if abs(tail_start_y - cy) < radius:
+                tail_w = max(4, int(radius * 0.18))
+                tail_h = int(radius * 0.50)
+                p.setBrush(QColor("#CC3300"))
+                p.drawRect(tail_x, tail_start_y, tail_w, tail_h)
+                # Tassel fringe
+                p.setBrush(QColor("#FFD700"))
+                for ti in range(3):
+                    tx3 = tail_x + ti * max(1, tail_w // 3)
+                    p.drawRect(tx3, tail_start_y + tail_h,
+                               max(2, tail_w // 3 - 1), int(radius * 0.10))
+
+        elif skin == "bow_tie":
+            # Small bow tie just below the mustache
+            bt_cx = cx
+            bt_cy = mst_y + mst_h + max(6, int(radius * 0.14))
+            bt_w = max(7, int(tw * 0.14))
+            bt_h = max(3, int(tw * 0.07))
+            bow_l = QPainterPath()
+            bow_l.moveTo(float(bt_cx - bt_w), float(bt_cy - bt_h))
+            bow_l.lineTo(float(bt_cx), float(bt_cy))
+            bow_l.lineTo(float(bt_cx - bt_w), float(bt_cy + bt_h))
+            bow_l.closeSubpath()
+            p.fillPath(bow_l, QColor("#CC0044"))
+            p.strokePath(bow_l, QPen(QColor("#880033"), 1))
+            bow_r = QPainterPath()
+            bow_r.moveTo(float(bt_cx + bt_w), float(bt_cy - bt_h))
+            bow_r.lineTo(float(bt_cx), float(bt_cy))
+            bow_r.lineTo(float(bt_cx + bt_w), float(bt_cy + bt_h))
+            bow_r.closeSubpath()
+            p.fillPath(bow_r, QColor("#CC0044"))
+            p.strokePath(bow_r, QPen(QColor("#880033"), 1))
+            # Center knot
+            p.setBrush(QColor("#990033"))
+            p.setPen(Qt.PenStyle.NoPen)
+            knot_r = max(2, bt_h // 2)
+            p.drawEllipse(bt_cx - knot_r, bt_cy - knot_r, knot_r * 2, knot_r * 2)
+
+        elif skin == "bandana":
+            # Red bandana capping the very top of the ball (above face zone)
+            ban_h = int(radius * 0.30)
+            ban_bot = cy - radius + ban_h
+            # Clip to the top cap of the ball
+            ban_path = QPainterPath()
+            ban_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+            cut_path = QPainterPath()
+            cut_path.addRect(QRectF(float(cx - radius - 2), float(ban_bot),
+                                    float(radius * 2 + 4), float(radius * 2)))
+            top_cap = ban_path.subtracted(cut_path)
+            p.setBrush(QColor("#CC2200"))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawPath(top_cap)
+            # White polka dots on bandana
+            p.setBrush(QColor(255, 255, 255, 140))
+            dr = radius - ban_h // 2
+            for angle_deg in [200, 240, 270, 300, 340]:
+                a3 = math.radians(angle_deg)
+                dx3 = cx + int(math.cos(a3) * dr * 0.55)
+                dy3 = cy + int(math.sin(a3) * dr * 0.65)
+                if dy3 <= ban_bot:
+                    p.drawEllipse(dx3 - 2, dy3 - 2, 4, 4)
+            # Knot at upper-left with short tails
+            kx = cx - int(radius * 0.62)
+            ky = cy - int(radius * 0.78)
+            p.setBrush(QColor("#991100"))
+            p.setPen(QPen(QColor("#661100"), 1))
+            p.drawEllipse(kx - 5, ky - 4, 10, 8)
+            p.setPen(QPen(QColor("#CC2200"), 2))
+            p.drawLine(kx, ky - 4, kx - 7, ky - 11)
+            p.drawLine(kx, ky + 4, kx - 9, ky + 9)
+
+        elif skin == "monocle":
+            # Gold monocle ring on the right eye with a chain hanging down.
+            # Intentionally overlaps that eye — the glass is part of the look.
+            r_eye_x = cx + int(tw * 0.12)
+            mono_r = eye_r + 4
+            # Subtle glass tint
+            p.setBrush(QColor(200, 230, 255, 50))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(r_eye_x - mono_r + 2, eye_y - mono_r + 2,
+                          mono_r * 2 - 4, mono_r * 2 - 4)
+            # Gold frame
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor("#DAA520"), 2))
+            p.drawEllipse(r_eye_x - mono_r, eye_y - mono_r, mono_r * 2, mono_r * 2)
+            # Chain from bottom-right of monocle to lower-right of ball
+            chain_x1 = r_eye_x + int(mono_r * 0.7)
+            chain_y1 = eye_y + int(mono_r * 0.7)
+            chain_x2 = cx + int(radius * 0.60)
+            chain_y2 = cy + int(radius * 0.45)
+            p.setPen(QPen(QColor("#DAA520"), 1, Qt.PenStyle.DotLine))
+            p.drawLine(chain_x1, chain_y1, chain_x2, chain_y2)
+
+        elif skin == "headphones":
+            # Headphones arching over the top with ear cups on the sides
+            arc_r = int(radius * 1.05)
+            band_w = max(3, int(radius * 0.10))
+            # Headband arc (upper semicircle)
+            p.setPen(QPen(QColor("#2A2A2A"), band_w))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawArc(cx - arc_r, cy - arc_r, arc_r * 2, arc_r * 2,
+                      10 * 16, 160 * 16)
+            # Left ear cup
+            ec_r = max(5, int(radius * 0.26))
+            lec_x = cx - arc_r
+            lec_y = cy - int(radius * 0.08)
+            p.setBrush(QColor("#1A1A1A"))
+            p.setPen(QPen(QColor("#333333"), 1))
+            p.drawEllipse(lec_x - ec_r, lec_y - ec_r, ec_r * 2, ec_r * 2)
+            p.setBrush(QColor("#444444"))
+            p.setPen(Qt.PenStyle.NoPen)
+            pad_r = max(3, int(ec_r * 0.65))
+            p.drawEllipse(lec_x - pad_r, lec_y - pad_r, pad_r * 2, pad_r * 2)
+            # Right ear cup
+            rec_x = cx + arc_r
+            rec_y = lec_y
+            p.setBrush(QColor("#1A1A1A"))
+            p.setPen(QPen(QColor("#333333"), 1))
+            p.drawEllipse(rec_x - ec_r, rec_y - ec_r, ec_r * 2, ec_r * 2)
+            p.setBrush(QColor("#444444"))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.drawEllipse(rec_x - pad_r, rec_y - pad_r, pad_r * 2, pad_r * 2)
 
         p.restore()
 
