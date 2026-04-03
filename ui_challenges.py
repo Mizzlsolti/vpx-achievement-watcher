@@ -612,26 +612,44 @@ class ChallengesMixin:
         return os.path.join(self.cfg.BASE, "session_stats", "challenges", "history", f"{sanitize_filename(rom)}.json")
 
     def _open_flip_difficulty_overlay(self):
+        def _do_open():
+            # Hide challenge select after slide-out completes
+            try:
+                ovw = getattr(self, "_challenge_select", None)
+                if ovw:
+                    ovw.hide()
+            except Exception:
+                pass
+            try:
+                if getattr(self, "_flip_diff_select", None):
+                    try:
+                        self._flip_diff_select.close()
+                        self._flip_diff_select.deleteLater()
+                    except Exception:
+                        pass
+                self._flip_diff_select = FlipDifficultyOverlay(self, selected_idx=int(self._ch_flip_diff_idx),
+                                                               options=list(self._flip_diff_options))
+                self._flip_diff_select.show()
+                self._flip_diff_select.raise_()
+                self._ch_pick_flip_diff = True
+            except Exception:
+                self._flip_diff_select = None
+                self._ch_pick_flip_diff = False
+
         try:
-            if getattr(self, "_challenge_select", None):
+            ovw = getattr(self, "_challenge_select", None)
+            if ovw:
                 try:
-                    self._challenge_select.hide()
+                    ovw.start_slide_out(callback=_do_open)
+                    return
                 except Exception:
-                    pass
-            if getattr(self, "_flip_diff_select", None):
-                try:
-                    self._flip_diff_select.close()
-                    self._flip_diff_select.deleteLater()
-                except Exception:
-                    pass
-            self._flip_diff_select = FlipDifficultyOverlay(self, selected_idx=int(self._ch_flip_diff_idx),
-                                                           options=list(self._flip_diff_options))
-            self._flip_diff_select.show()
-            self._flip_diff_select.raise_()
-            self._ch_pick_flip_diff = True
+                    try:
+                        ovw.hide()
+                    except Exception:
+                        pass
         except Exception:
-            self._flip_diff_select = None
-            self._ch_pick_flip_diff = False
+            pass
+        _do_open()
 
     def _close_flip_difficulty_overlay(self):
         try:

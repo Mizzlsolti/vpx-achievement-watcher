@@ -217,6 +217,8 @@ DEFAULT_OVERLAY.setdefault("trophie_gui_enabled", True)
 DEFAULT_OVERLAY.setdefault("trophie_overlay_enabled", True)
 DEFAULT_OVERLAY.setdefault("trophie_overlay_x", -1)
 DEFAULT_OVERLAY.setdefault("trophie_overlay_y", -1)
+DEFAULT_OVERLAY.setdefault("trophie_overlay_portrait", False)
+DEFAULT_OVERLAY.setdefault("trophie_overlay_rotate_ccw", False)
 
 # Post-Processing
 DEFAULT_OVERLAY.setdefault("fx_post_bloom", False)
@@ -339,6 +341,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
     "trophie_gui_enabled", "trophie_overlay_enabled",
     "trophie_overlay_x", "trophie_overlay_y",
+    "trophie_overlay_portrait", "trophie_overlay_rotate_ccw",
 
     # Post-Processing effect toggles and intensities
     "fx_post_bloom", "fx_post_bloom_intensity",

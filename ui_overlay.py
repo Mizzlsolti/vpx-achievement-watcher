@@ -2198,14 +2198,16 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
                        int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter), title)
 
             p.setPen(hi_color); p.setFont(f_body)
-            p.drawText(QRect(0, pad + fm_title.height() + vgap, content_w, fm_body.height()),
+            body_rect = QRect(0, pad + fm_title.height() + vgap, content_w, fm_body.height())
+            p.drawText(body_rect,
                        int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter), sub)
 
             # Foreground effects (over text)
             if self._is_fx_enabled("fx_flip_impact_pulse"):
                 self._fx_impact.draw(p, draw_rect)
             if self._is_fx_enabled("fx_flip_number_cascade"):
-                self._fx_cascade.draw(p, draw_rect)
+                # Draw cascade over the counter number text area, not the full widget
+                self._fx_cascade.draw(p, body_rect)
             if self._is_fx_enabled("fx_flip_milestone_burst"):
                 self._fx_milestone.draw(p, draw_rect)
             if self._is_fx_enabled("fx_flip_electric_spark"):
@@ -4381,6 +4383,9 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._carousel = CarouselSlide(duration=180.0)
+        self._exit_slide = CarouselSlide(duration=180.0)
+        self._exit_callback = None
+        self._exiting = False
         self._electric_arc = ElectricArc(intensity=self._get_fx_intensity("fx_challenge_electric_arc"))
         self._hover_shimmer = HoverShimmer(intensity=self._get_fx_intensity("fx_challenge_hover_shimmer"))
         self._plasma_noise = PlasmaNoise(intensity=self._get_fx_intensity("fx_challenge_plasma_noise"))
@@ -4465,10 +4470,31 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self._render_and_place()
 
     def _on_slide_tick(self):
-        self._carousel.tick(16.0)
-        if not self._carousel.is_active():
-            self._slide_timer.stop()
-        self._render_and_place()
+        if self._exiting:
+            self._exit_slide.tick(16.0)
+            self._render_and_place()
+            if not self._exit_slide.is_active():
+                self._slide_timer.stop()
+                cb = self._exit_callback
+                self._exit_callback = None
+                if cb:
+                    cb()
+        else:
+            self._carousel.tick(16.0)
+            if not self._carousel.is_active():
+                self._slide_timer.stop()
+            self._render_and_place()
+
+    def start_slide_out(self, callback=None):
+        """Trigger a slide-out animation then call callback when done."""
+        if self._is_fx_enabled("fx_challenge_carousel"):
+            self._exit_callback = callback
+            self._exiting = True
+            self._exit_slide.start(direction=1)
+            self._slide_timer.start()
+        else:
+            if callback:
+                callback()
 
     def set_selected(self, idx: int):
         new_idx = int(idx) % 4
@@ -4696,6 +4722,18 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             try: p.end()
             except Exception: pass
 
+        # Exit slide: shift content to the left (sliding out)
+        if getattr(self, '_exiting', False) and self._exit_slide.is_active():
+            eased = self._exit_slide.get_eased_t()
+            x_shift = int(eased * w)
+            shifted = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+            shifted.fill(Qt.GlobalColor.transparent)
+            sp = QPainter(shifted)
+            sp.setOpacity(1.0 - eased)
+            sp.drawImage(-x_shift, 0, img)
+            sp.end()
+            img = shifted
+
         try:
             portrait = bool(ov.get("ch_ov_portrait", ov.get("portrait_mode", True)))
             if portrait:
@@ -4753,12 +4791,16 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
 
         self._breathing_pulse = BreathingPulse(speed=0.08)
         self._snap = SnapScale(duration=160.0, scale_amount=0.07)
+        self._entry_slide = CarouselSlide(duration=180.0)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(50)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._snap_timer = QTimer(self)
         self._snap_timer.setInterval(16)
         self._snap_timer.timeout.connect(self._on_snap_tick)
+        self._entry_timer = QTimer(self)
+        self._entry_timer.setInterval(16)
+        self._entry_timer.timeout.connect(self._on_entry_tick)
         self._pulse_timer.start()  # always run; live fx checks in _compose_image
 
         self.setWindowFlags(
@@ -4771,6 +4813,10 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._pix = None
         self._render_and_place()
+        # Start entry slide-in from the right when fx is enabled
+        if self._is_fx_enabled("fx_challenge_carousel"):
+            self._entry_slide.start(direction=1)
+            self._entry_timer.start()
         self.show()
         self.raise_()
         try:
@@ -4795,6 +4841,11 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
                 self._snap_timer.stop()
         except Exception:
             pass
+        try:
+            if getattr(self, "_entry_timer", None):
+                self._entry_timer.stop()
+        except Exception:
+            pass
         super().closeEvent(e)
 
     def _on_pulse_tick(self):
@@ -4805,6 +4856,12 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         self._snap.tick(16.0)
         if not self._snap.is_active():
             self._snap_timer.stop()
+        self._render_and_place()
+
+    def _on_entry_tick(self):
+        self._entry_slide.tick(16.0)
+        if not self._entry_slide.is_active():
+            self._entry_timer.stop()
         self._render_and_place()
 
     def set_selected(self, idx: int):
@@ -4969,6 +5026,18 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         finally:
             try: p.end()
             except Exception: pass
+
+        # Entry slide: shift content in from the right (sliding in)
+        if self._is_fx_enabled("fx_challenge_carousel") and self._entry_slide.is_active():
+            eased = self._entry_slide.get_eased_t()
+            x_shift = int((1.0 - eased) * w)
+            shifted = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
+            shifted.fill(Qt.GlobalColor.transparent)
+            sp = QPainter(shifted)
+            sp.setOpacity(eased)
+            sp.drawImage(x_shift, 0, img)
+            sp.end()
+            img = shifted
 
         try:
             portrait = bool(ov.get("ch_ov_portrait", ov.get("portrait_mode", True)))
