@@ -172,18 +172,6 @@ class SystemMixin:
         if self.cfg.CLOUD_ENABLED:
             self._lock_player_identity_fields(True)
 
-        # --- 🏆 Mascot settings moved ---
-        lbl_mascot_moved = QLabel(
-            "💡 Mascot settings (Trophie &amp; Steely) have moved to "
-            "<b>🎨 Appearance → 🏆 Mascots</b>"
-        )
-        lbl_mascot_moved.setWordWrap(True)
-        lbl_mascot_moved.setTextFormat(Qt.TextFormat.RichText)
-        lbl_mascot_moved.setStyleSheet(
-            "color: #888; font-size: 9pt; font-style: italic; padding: 6px 4px;"
-        )
-        layout.addWidget(lbl_mascot_moved)
-
         # --- 🐛 Feedback & Bug Reports ---
         grp_feedback = QGroupBox("🐛 Feedback & Bug Reports")
         lay_feedback = QVBoxLayout(grp_feedback)

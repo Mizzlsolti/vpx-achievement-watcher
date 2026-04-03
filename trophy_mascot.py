@@ -371,7 +371,6 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("cloud_id",      "Your Player ID is your identity. Write it down somewhere safe!"),
         ("cloud_sync",    "Cloud Sync runs automatically in the background — always protected!"),
         ("cloud_leader",  "Check the online leaderboard to see how you rank globally!"),
-        ("cloud_share",   "Share your Player ID with friends and compare achievement counts!"),
         ("cloud_compete", "Compete with players worldwide — pinball skill is a global language!"),
         ("cloud_safe",    "Your pinball legacy is safe in the cloud — every flip, every unlock!"),
         ("cloud_rank",    "Climb the global rankings one achievement at a time — every unlock counts!"),
