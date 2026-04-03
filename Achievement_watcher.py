@@ -1531,6 +1531,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.showNormal()
         self.activateWindow()
         self.raise_()
+        if getattr(self, "_trophie_gui", None):
+            QTimer.singleShot(400, self._trophie_gui.re_greet)
 
     def showEvent(self, event):
         super().showEvent(event)
