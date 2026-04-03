@@ -1620,7 +1620,7 @@ class GUITrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment_topleft("Hey! I am Trophie! Welcome back!", HAPPY)
+        self._show_comment("Hey! I am Trophie! Welcome back!", HAPPY)
 
     def on_tab_changed(self, idx: int) -> None:
         try:
@@ -1825,20 +1825,6 @@ class GUITrophie(QWidget):
         if self._memory:
             self._memory.seen_tips.add(key)
         self._show_comment(text, state)
-
-    def _show_comment_topleft(self, text: str, state: str = TALKING) -> None:
-        """Show comment with bubble positioned at top-left of central widget."""
-        if self._is_silenced():
-            return
-        self._dismiss_bubble()
-        self._draw.set_state(state)
-        bubble = _SpeechBubble(self._central, text, self._memory or _TrophieMemory.__new__(_TrophieMemory))
-        self._current_bubble = bubble
-        try:
-            bubble.move(8, 8)
-        except Exception:
-            self._position_bubble(bubble)
-        bubble.show()
 
     def _position_bubble(self, bubble: _SpeechBubble) -> None:
         try:
@@ -2430,26 +2416,21 @@ class OverlayTrophie(QWidget):
         try:
             bw = bubble.width()
             bh = bubble.height()
-            ov = self._cfg.OVERLAY or {}
-            portrait = bool(ov.get("trophie_overlay_portrait", False))
             screen_geom = QApplication.primaryScreen().geometry()
-            if portrait:
-                # In portrait mode, position bubble at top-left of screen
-                abs_x = screen_geom.x() + 8
-                abs_y = screen_geom.y() + 8
-            else:
-                origin = self.mapToGlobal(QPoint(0, 0))
-                abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
-                abs_y = origin.y() - bh - 4
-                # Clamp to screen
-                if abs_x < screen_geom.x():
-                    abs_x = screen_geom.x()
-                if abs_y < screen_geom.y():
-                    abs_y = origin.y() + self._TROPHY_H + 4  # flip below
-                if abs_x + bw > screen_geom.right():
-                    abs_x = screen_geom.right() - bw
-                if abs_y + bh > screen_geom.bottom():
-                    abs_y = screen_geom.bottom() - bh
+            origin = self.mapToGlobal(QPoint(0, 0))
+            w = self.width()   # already accounts for portrait swap
+            h = self.height()  # already accounts for portrait swap
+            abs_x = origin.x() + w // 2 - bw // 2
+            abs_y = origin.y() - bh - 4
+            # Clamp to screen
+            if abs_x < screen_geom.x():
+                abs_x = screen_geom.x()
+            if abs_y < screen_geom.y():
+                abs_y = origin.y() + h + 4  # flip below
+            if abs_x + bw > screen_geom.right():
+                abs_x = screen_geom.right() - bw
+            if abs_y + bh > screen_geom.bottom():
+                abs_y = screen_geom.bottom() - bh
             bubble.move(abs_x, abs_y)
         except Exception:
             pass
