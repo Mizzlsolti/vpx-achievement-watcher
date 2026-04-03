@@ -1329,7 +1329,7 @@ class _TrophieDrawWidget(QWidget):
         total_offset = bob + jump
 
         cx = self._tw // 2
-        cy_base = self._th // 2
+        cy_base = self._th // 2 + int(self._th * 0.15)
 
         # ── Tilt / rotation angle (degrees) ──────────────────────────────────
         if self._state == TALKING:
@@ -3232,10 +3232,11 @@ class GUITrophie(QWidget):
             bw = bubble.width()
             bh = bubble.height()
             # Place bubble just above the trophy cup top (not the widget top).
-            # The cup top is approximately at widget-y + (trophy_h/2 - trophy_h*0.36).
-            cup_top = self._TROPHY_H // 2 - int(self._TROPHY_H * 0.36)
+            # cy_base is shifted down by 15% to give accessories headroom, so the
+            # cup top is at widget-y + (trophy_h/2 + trophy_h*0.15 - trophy_h*0.36).
+            cup_top = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.15) - int(self._TROPHY_H * 0.36)
             bx = max(0, self.x() + self._TROPHY_W // 2 - bw // 2)
-            by_raw = self.y() + cup_top - bh - 2
+            by_raw = self.y() + cup_top - bh - 7
             if by_raw < 0:
                 by = self.y() + self._TROPHY_H + 4  # flip below
             else:
@@ -3870,7 +3871,7 @@ class OverlayTrophie(QWidget):
             if not portrait:
                 # Landscape: bubble centered above ball top
                 abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
-                abs_y = origin.y() + ball_top - bh - 2
+                abs_y = origin.y() + ball_top - bh - 7
                 # If no room above, flip below the ball
                 if abs_y < screen_geom.y():
                     abs_y = origin.y() + self._TROPHY_H + 4

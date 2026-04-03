@@ -4847,6 +4847,11 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self.move(x, y)
         self._pix = QPixmap.fromImage(img)
         self.update()
+        if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
+            self._pp_widget.setGeometry(0, 0, W, H)
+            if not self._pp_widget.isVisible():
+                self._pp_widget.show()
+            self._pp_widget.raise_()
 
     def paintEvent(self, _evt):
         if hasattr(self, "_pix") and self._pix:
