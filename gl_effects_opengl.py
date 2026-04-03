@@ -2874,7 +2874,7 @@ class LavaGlowEdge:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for i in range(layers, 0, -1):
-            a = alpha * i // layers
+            a = alpha // i
             pen = QPen(QColor(r, g, b, _clamp(a, 0, 255)), i * 3)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)

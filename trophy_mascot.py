@@ -1305,6 +1305,8 @@ class GUITrophie(QWidget):
         self._greeted = True
         self._draw.set_state(HAPPY)
         self._show_comment("Hey! I am Trophie! Welcome back!", HAPPY)
+
+    def on_tab_changed(self, idx: int) -> None:
         try:
             # self._central is the QTabWidget (centralWidget)
             tab_name = self._central.tabText(idx).lower()
