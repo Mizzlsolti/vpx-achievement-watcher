@@ -1620,7 +1620,7 @@ class GUITrophie(QWidget):
             return
         self._greeted = True
         self._draw.set_state(HAPPY)
-        self._show_comment_topleft("Hey! I am Trophie! Welcome back!", HAPPY)
+        self._show_comment("Hey! I am Trophie! Welcome back!", HAPPY)
 
     def on_tab_changed(self, idx: int) -> None:
         try:
@@ -2179,7 +2179,7 @@ class OverlayTrophie(QWidget):
             self._show_comment_key("ov_ch_10s", "10 SECONDS! GIVE IT EVERYTHING!", SURPRISED)
 
     def on_challenge_stop(self) -> None:
-        pass  # Session end will handle the result
+        self._draw.set_state(IDLE)
 
     def on_challenge_won(self, margin_pct: float = 50.0) -> None:
         self._last_game_ts = time.time()

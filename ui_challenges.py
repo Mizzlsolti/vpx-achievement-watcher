@@ -506,6 +506,12 @@ class ChallengesMixin:
                     pass
                 try:
                     self._challenge_timer = ChallengeCountdownOverlay(self, play_sec)
+                    try:
+                        if getattr(self, "_trophie_overlay", None):
+                            _ov = self._trophie_overlay
+                            self._challenge_timer._tick_callback = lambda ms: _ov.on_challenge_timer_tick(ms)
+                    except Exception:
+                        pass
                 except Exception:
                     self._challenge_timer = None
 
