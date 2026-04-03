@@ -509,7 +509,7 @@ class EffectsMixin:
 
     def _preview_all_overlays(self):
         """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
-        for overlay_type in ("toast", "challenge", "timer", "heat", "flip"):
+        for overlay_type in ("main", "toast", "challenge", "timer", "heat", "flip"):
             self._open_demo_overlay(overlay_type, duration_ms=6000)
 
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
