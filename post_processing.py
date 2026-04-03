@@ -93,7 +93,7 @@ class PostBloom:
         self._draw_qpainter(painter, rect)
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
-        alpha_base = int(self._intensity * 60)
+        alpha_base = int(self._intensity * 120)
         pulse = math.sin(self._time_ms * 0.002) * 0.3 + 0.7
         layers = max(2, int(self._intensity * 5))
         old_mode = painter.compositionMode()
@@ -203,7 +203,7 @@ class PostMotionBlur:
         for i in range(steps, 0, -1):
             offset_x = int(-self._vx * step_dist * i / steps)
             offset_y = int(-self._vy * step_dist * i / steps)
-            alpha = int(self._intensity * 40 * (1.0 - i / (steps + 1)))
+            alpha = int(self._intensity * 90 * (1.0 - i / (steps + 1)))
             color = QColor(200, 200, 255, alpha)
             painter.setBrush(QBrush(color))
             painter.setPen(Qt.PenStyle.NoPen)
@@ -226,7 +226,7 @@ class PostMotionBlur:
         for i in range(steps, 0, -1):
             ox = -self._vx * step_dist * i / steps
             oy = -self._vy * step_dist * i / steps
-            alpha = float(self._intensity * 0.15 * (1.0 - i / (steps + 1)))
+            alpha = float(self._intensity * 0.35 * (1.0 - i / (steps + 1)))
             glColor4f(0.8, 0.8, 1.0, alpha)
             glBegin(GL_TRIANGLE_FAN)
             glVertex2f(ox, oy)
@@ -285,7 +285,7 @@ class PostChromaticAberration:
 
     def _draw_qpainter(self, painter: QPainter, rect: QRect):
         offset = max(1, int(self._intensity * 6))
-        alpha = int(self._intensity * 50)
+        alpha = int(self._intensity * 100)
         old_mode = painter.compositionMode()
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Screen)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -312,7 +312,7 @@ class PostChromaticAberration:
         glDisable(GL_DEPTH_TEST)
 
         offset = self._intensity * 6.0
-        alpha = float(self._intensity * 0.2)
+        alpha = float(self._intensity * 0.4)
 
         # Red quad – shifted left
         glColor4f(1.0, 0.0, 0.0, alpha)

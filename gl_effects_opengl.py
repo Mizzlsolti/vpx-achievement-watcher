@@ -546,6 +546,8 @@ class NeonRingExpansion:
 
     def draw(self, painter: QPainter, cx: int, cy: int, color: QColor):
         """Draw all rings centered at (cx, cy) using *color*."""
+        if not self._active:
+            return
         for ring in self._rings:
             r = int(ring['r'])
             alp = int(max(0, min(255, ring['alpha'])))
@@ -2948,7 +2950,7 @@ class NumberThrob:
         if not self._active:
             return 1.0
         pulse = 0.5 + 0.5 * math.sin(self._t * 6.0)
-        return 1.0 + 0.12 * pulse * self.intensity
+        return 1.0 + 0.25 * pulse * self.intensity
 
     def draw(self, painter: QPainter, rect: QRect):
         pass  # Effect applied externally via .scale property
