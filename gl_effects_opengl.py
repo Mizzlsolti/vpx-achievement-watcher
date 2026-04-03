@@ -2600,13 +2600,14 @@ class FlameParticles:
         self._active = True
 
     def _spawn(self, rect: QRect):
+        eff = self.intensity ** 0.7
         return {
             "x": random.uniform(rect.left(), rect.right()),
             "y": float(rect.bottom()),
-            "vx": random.uniform(-12, 12) * self.intensity,
-            "vy": random.uniform(-60, -30) * self.intensity,
+            "vx": random.uniform(-18, 18) * eff,
+            "vy": random.uniform(-90, -45) * eff,
             "life": 1.0,
-            "size": random.uniform(6, 16) * self.intensity,
+            "size": random.uniform(8, 22) * eff,
         }
 
     def tick(self, dt_ms: float):
@@ -2615,7 +2616,8 @@ class FlameParticles:
         dt_s = dt_ms / 1000.0
         self._t += dt_s
         self._spawn_acc += dt_ms
-        spawn_interval = max(30, int(80 / max(0.1, self.intensity)))
+        eff = self.intensity ** 0.7
+        spawn_interval = max(20, int(60 / max(0.1, eff)))
         for p in self._particles:
             p["x"] += p["vx"] * dt_s
             p["y"] += p["vy"] * dt_s
@@ -2640,12 +2642,13 @@ class FlameParticles:
             self._do_spawn = False
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        eff = self.intensity ** 0.7
         for p in self._particles:
             life = p["life"]
             r = _clamp(int(255), 0, 255)
-            g = _clamp(int(100 * life), 0, 255)
+            g = _clamp(int(140 * life), 0, 255)
             b = 0
-            alpha = _clamp(int(200 * life * self.intensity), 0, 255)
+            alpha = _clamp(int(240 * life * eff), 0, 255)
             painter.setBrush(QBrush(QColor(r, g, b, alpha)))
             painter.setPen(Qt.PenStyle.NoPen)
             sz = int(p["size"] * life)
@@ -2659,12 +2662,13 @@ class FlameParticles:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        glPointSize(5.0)
+        glPointSize(6.0)
+        eff = self.intensity ** 0.7
         glBegin(GL_POINTS)
         for p in self._particles:
             life = p["life"]
-            g = _clamp(100 * life / 255.0, 0.0, 1.0)
-            alpha = _clamp(200 * life * self.intensity / 255.0, 0.0, 1.0)
+            g = _clamp(140 * life / 255.0, 0.0, 1.0)
+            alpha = _clamp(240 * life * eff / 255.0, 0.0, 1.0)
             glColor4f(1.0, g, 0.0, alpha)
             glVertex2f(float(p["x"]), float(p["y"]))
         glEnd()
@@ -2701,18 +2705,19 @@ class HeatShimmer:
                 return
             except Exception:
                 pass
-        alpha = _clamp(int(80 * self.intensity), 0, 120)
+        eff = self.intensity ** 0.7
+        alpha = _clamp(int(150 * eff), 0, 200)
         W, H = rect.width(), rect.height()
         painter.save()
         pen = QPen(QColor(255, 180, 60, alpha), 1)
         painter.setPen(pen)
-        num_lines = max(3, int(10 * self.intensity))
+        num_lines = max(4, int(18 * eff))
         for i in range(num_lines):
             y_base = rect.top() + int((i + 0.5) * H / num_lines)
             prev = None
             for x in range(rect.left(), rect.right(), 3):
                 phase = (x / max(1, W)) * 3 * math.pi + self._t * 5 + i * 1.2
-                y_off = int(math.sin(phase) * 8 * self.intensity)
+                y_off = int(math.sin(phase) * 14 * eff)
                 pt = (x, y_base + y_off)
                 if prev:
                     painter.drawLine(prev[0], prev[1], pt[0], pt[1])
@@ -2726,9 +2731,10 @@ class HeatShimmer:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        alpha = _clamp(80 * self.intensity / 255.0, 0.0, 1.0)
+        eff = self.intensity ** 0.7
+        alpha = _clamp(150 * eff / 255.0, 0.0, 1.0)
         W, H = rect.width(), rect.height()
-        num_lines = max(3, int(10 * self.intensity))
+        num_lines = max(4, int(18 * eff))
         glLineWidth(1.0)
         for i in range(num_lines):
             y_base = rect.top() + (i + 0.5) * H / num_lines
@@ -2737,7 +2743,7 @@ class HeatShimmer:
             x = rect.left()
             while x < rect.right():
                 phase = (x / max(1, W)) * 3 * math.pi + self._t * 5 + i * 1.2
-                y_off = math.sin(phase) * 8 * self.intensity
+                y_off = math.sin(phase) * 14 * eff
                 glVertex2f(float(x), float(y_base + y_off))
                 x += 3
             glEnd()
@@ -2773,7 +2779,8 @@ class SmokeWisps:
             p["life"] -= dt_s * 0.8
             p["size"] *= 1.01
         self._particles = [p for p in self._particles if p["life"] > 0]
-        spawn_interval = max(80, int(200 / max(0.1, self.intensity)))
+        eff = self.intensity ** 0.7
+        spawn_interval = max(50, int(150 / max(0.1, eff)))
         self._do_spawn = self._spawn_acc >= spawn_interval
         if self._do_spawn:
             self._spawn_acc = 0
@@ -2787,22 +2794,23 @@ class SmokeWisps:
                 return
             except Exception:
                 pass
+        eff = self.intensity ** 0.7
         if getattr(self, "_do_spawn", False):
             side = random.choice([rect.left() + 5, rect.right() - 5])
             self._particles.append({
                 "x": float(side),
                 "y": float(rect.bottom() - 5),
-                "vx": random.uniform(-5, 5),
-                "vy": random.uniform(-20, -10) * self.intensity,
+                "vx": random.uniform(-6, 6),
+                "vy": random.uniform(-28, -14) * eff,
                 "life": 1.0,
-                "size": random.uniform(10, 22) * self.intensity,
+                "size": random.uniform(14, 30) * eff,
             })
             self._do_spawn = False
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for p in self._particles:
-            alpha = _clamp(int(160 * p["life"] * self.intensity), 0, 200)
-            painter.setBrush(QBrush(QColor(180, 180, 180, alpha)))
+            alpha = _clamp(int(220 * p["life"] * eff), 0, 220)
+            painter.setBrush(QBrush(QColor(200, 200, 200, alpha)))
             painter.setPen(Qt.PenStyle.NoPen)
             sz = int(p["size"])
             painter.drawEllipse(int(p["x"]) - sz // 2, int(p["y"]) - sz // 2, sz, sz)
@@ -2815,11 +2823,12 @@ class SmokeWisps:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glDisable(GL_DEPTH_TEST)
-        glPointSize(8.0)
+        glPointSize(10.0)
+        eff = self.intensity ** 0.7
         glBegin(GL_POINTS)
         for p in self._particles:
-            alpha = _clamp(160 * p["life"] * self.intensity / 255.0, 0.0, 1.0)
-            glColor4f(0.71, 0.71, 0.71, alpha)
+            alpha = _clamp(220 * p["life"] * eff / 255.0, 0.0, 1.0)
+            glColor4f(0.78, 0.78, 0.78, alpha)
             glVertex2f(float(p["x"]), float(p["y"]))
         glEnd()
 
@@ -2854,18 +2863,19 @@ class LavaGlowEdge:
                 return
             except Exception:
                 pass
+        eff = self.intensity ** 0.7
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
-        alpha = _clamp(int((120 + 135 * amp) * self.intensity), 0, 255)
+        alpha = _clamp(int((160 + 95 * amp) * eff), 0, 255)
         r = _clamp(int(255), 0, 255)
         g = _clamp(int(60 + 80 * amp), 0, 255)
         b = 0
         color = QColor(r, g, b, alpha)
-        layers = max(2, int(5 * self.intensity))
+        layers = max(3, int(8 * eff))
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         for i in range(layers, 0, -1):
-            a = alpha // i
-            pen = QPen(QColor(r, g, b, _clamp(a, 0, 255)), i * 2)
+            a = alpha * i // layers
+            pen = QPen(QColor(r, g, b, _clamp(a, 0, 255)), i * 3)
             painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(
@@ -2879,13 +2889,14 @@ class LavaGlowEdge:
         return self._active
 
     def _draw_gl(self, rect: QRect):
+        eff = self.intensity ** 0.7
         amp = 0.5 + 0.5 * math.sin(self._t * 3.0)
-        alpha = _clamp((120 + 135 * amp) * self.intensity / 255.0, 0.0, 1.0)
+        alpha = _clamp((160 + 95 * amp) * eff / 255.0, 0.0, 1.0)
         g_val = (60 + 80 * amp) / 255.0
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glDisable(GL_DEPTH_TEST)
-        glLineWidth(4.0)
+        glLineWidth(6.0)
         x = float(rect.left())
         y = float(rect.top())
         w = float(rect.width())
