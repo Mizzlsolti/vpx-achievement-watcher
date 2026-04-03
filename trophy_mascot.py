@@ -936,8 +936,13 @@ class _SpeechBubble(QWidget):
         self._auto_timer.start(self._AUTO_DISMISS_MS)
 
         self._fading_out = False
+        self._ptr_offset = -1
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.show()
+
+    def set_pointer_offset(self, offset: int) -> None:
+        self._ptr_offset = offset
+        self.update()
 
     def _on_fade(self) -> None:
         step = 16.0 / self._FADE_MS
@@ -1006,7 +1011,8 @@ class _SpeechBubble(QWidget):
 
         # Pointer triangle (pointing down, centered)
         tri = QPainterPath()
-        cx = w // 2
+        cx = self._ptr_offset if self._ptr_offset >= 0 else w // 2
+        cx = max(self._RADIUS + 8, min(w - self._RADIUS - 8, cx))
         tri.moveTo(cx - 8, h)
         tri.lineTo(cx + 8, h)
         tri.lineTo(cx, h + self._PTR_H)
@@ -1051,7 +1057,8 @@ class _SpeechBubble(QWidget):
         ip.drawPath(path)
 
         tri = QPainterPath()
-        cx = uw // 2
+        cx = self._ptr_offset if self._ptr_offset >= 0 else uw // 2
+        cx = max(self._RADIUS + 8, min(uw - self._RADIUS - 8, cx))
         tri.moveTo(cx - 8, bh_content)
         tri.lineTo(cx + 8, bh_content)
         tri.lineTo(cx, bh_content + self._PTR_H)
@@ -3152,6 +3159,8 @@ class GUITrophie(QWidget):
             # Clamp to central widget
             if bx + bw > self._central.width():
                 bx = self._central.width() - bw - 4
+            mascot_cx = self.x() + self._TROPHY_W // 2
+            bubble.set_pointer_offset(mascot_cx - bx)
             bubble.move(bx, by)
         except Exception:
             pass
@@ -3781,23 +3790,53 @@ class OverlayTrophie(QWidget):
                 # If no room above, flip below the ball
                 if abs_y < screen_geom.y():
                     abs_y = origin.y() + self._TROPHY_H + 4
+                # Clamp to screen
+                if abs_x < screen_geom.x():
+                    abs_x = screen_geom.x()
+                if abs_y < screen_geom.y():
+                    abs_y = screen_geom.y()
+                if abs_x + bw > screen_geom.right():
+                    abs_x = screen_geom.right() - bw
+                if abs_y + bh > screen_geom.bottom():
+                    abs_y = screen_geom.bottom() - bh
+                mascot_cx = origin.x() + self._TROPHY_W // 2
+                bubble.set_pointer_offset(mascot_cx - abs_x)
             else:
                 # Portrait: widget is _TROPHY_H wide × _TROPHY_W tall.
-                # Place bubble above the widget, centered horizontally.
-                abs_x = origin.x() + self.width() // 2 - bw // 2
-                abs_y = origin.y() - bh - 4
-                # If no room above, flip below
+                # Place bubble to the left or right of the mascot.
+                # rotation=90 (CW)  → pointer points LEFT  → bubble to the RIGHT
+                # rotation=-90 (CCW) → pointer points RIGHT → bubble to the LEFT
+                ccw = bool(ov.get("trophie_overlay_rotate_ccw", False))
+                mascot_center_y = origin.y() + self.height() // 2
+                if not ccw:
+                    # rotation=90: bubble to the right of mascot
+                    abs_x = origin.x() + self.width() + 4
+                    if abs_x + bw > screen_geom.right():
+                        abs_x = origin.x() - bw - 4  # flip to left
+                else:
+                    # rotation=-90: bubble to the left of mascot
+                    abs_x = origin.x() - bw - 4
+                    if abs_x < screen_geom.x():
+                        abs_x = origin.x() + self.width() + 4  # flip to right
+                # Center bubble vertically with mascot
+                abs_y = mascot_center_y - bh // 2
+                # Clamp to screen
+                if abs_x < screen_geom.x():
+                    abs_x = screen_geom.x()
                 if abs_y < screen_geom.y():
-                    abs_y = origin.y() + self.height() + 4
-            # Clamp to screen
-            if abs_x < screen_geom.x():
-                abs_x = screen_geom.x()
-            if abs_y < screen_geom.y():
-                abs_y = screen_geom.y()
-            if abs_x + bw > screen_geom.right():
-                abs_x = screen_geom.right() - bw
-            if abs_y + bh > screen_geom.bottom():
-                abs_y = screen_geom.bottom() - bh
+                    abs_y = screen_geom.y()
+                if abs_x + bw > screen_geom.right():
+                    abs_x = screen_geom.right() - bw
+                if abs_y + bh > screen_geom.bottom():
+                    abs_y = screen_geom.bottom() - bh
+                # Map mascot Y distance to unrotated X (pointer offset).
+                # rotation=90:  pointer Y in rotated widget == cx (unrotated X)
+                # rotation=-90: pointer Y in rotated widget == bh - cx
+                ptr_y = mascot_center_y - abs_y
+                if not ccw:
+                    bubble.set_pointer_offset(ptr_y)
+                else:
+                    bubble.set_pointer_offset(bh - ptr_y)
             bubble.move(abs_x, abs_y)
         except Exception:
             pass
