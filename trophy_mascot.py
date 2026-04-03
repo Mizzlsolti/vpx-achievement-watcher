@@ -3174,6 +3174,11 @@ class OverlayTrophie(QWidget):
     _TROPHY_W = 80
     _TROPHY_H = 90
     _MARGIN = 20
+    # Extra padding added around the logical drawing area on every side so that
+    # passive animations (orbit, vibrate, bounce, zigzag, spin, wobble, squash)
+    # and skin accessories (headphones, planet ring, scarf, flame, bow tie) are
+    # never clipped by the widget boundary.
+    _DRAW_PAD = 25
 
     _ROM_START_POLL_INTERVAL_MS = 250   # ms between VPX-visible checks on rom start
     _ROM_START_POLL_MAX_TRIES   = 60    # 60 × 250 ms ≈ 15 s fallback timeout
@@ -3204,9 +3209,11 @@ class OverlayTrophie(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.setFixedSize(self._TROPHY_W, self._TROPHY_H)
+        self.setFixedSize(self._TROPHY_W + 2 * self._DRAW_PAD, self._TROPHY_H + 2 * self._DRAW_PAD)
 
-        self._draw = _PinballDrawWidget(self, self._TROPHY_W, self._TROPHY_H)
+        # Draw widget — sized to _TROPHY_W/H + 2*_DRAW_PAD on every side so
+        # animations and skin accessories are not clipped at the widget boundary.
+        self._draw = _PinballDrawWidget(self, self._TROPHY_W, self._TROPHY_H, pad=self._DRAW_PAD)
         self._draw.move(0, 0)
         self._draw.set_skin(cfg.OVERLAY.get("trophie_overlay_skin", "classic"))
 
@@ -3295,12 +3302,13 @@ class OverlayTrophie(QWidget):
         """Apply portrait/landscape mode based on current config."""
         ov = self._cfg.OVERLAY or {}
         portrait = bool(ov.get("trophie_overlay_portrait", False))
+        pad = self._DRAW_PAD
         if portrait:
-            # Swap dimensions for portrait (rotated 90°)
-            self.setFixedSize(self._TROPHY_H, self._TROPHY_W)
+            # Swap dimensions for portrait (rotated 90°); keep pad on each side
+            self.setFixedSize(self._TROPHY_H + 2 * pad, self._TROPHY_W + 2 * pad)
             self._draw.setVisible(False)
         else:
-            self.setFixedSize(self._TROPHY_W, self._TROPHY_H)
+            self.setFixedSize(self._TROPHY_W + 2 * pad, self._TROPHY_H + 2 * pad)
             self._draw.setVisible(True)
         self.update()
 
@@ -3311,7 +3319,8 @@ class OverlayTrophie(QWidget):
             super().paintEvent(event)
             return
         # Portrait mode: render _draw widget to offscreen image, rotate, then paint
-        img = QImage(self._TROPHY_W, self._TROPHY_H, QImage.Format.Format_ARGB32_Premultiplied)
+        pad = self._DRAW_PAD
+        img = QImage(self._TROPHY_W + 2 * pad, self._TROPHY_H + 2 * pad, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
         render_painter = QPainter(img)
         try:
@@ -3761,15 +3770,16 @@ class OverlayTrophie(QWidget):
             ov = self._cfg.OVERLAY or {}
             portrait = bool(ov.get("trophie_overlay_portrait", False))
             # Ball top offset in landscape widget coordinates:
-            # ball center is at (tw/2, th/2), radius ≈ min(tw,th)*0.38
-            ball_top = self._TROPHY_H // 2 - int(min(self._TROPHY_W, self._TROPHY_H) * 0.38)
+            # ball center is at (pad+tw/2, pad+th/2), radius ≈ min(tw,th)*0.38
+            pad = self._DRAW_PAD
+            ball_top = pad + self._TROPHY_H // 2 - int(min(self._TROPHY_W, self._TROPHY_H) * 0.38)
             if not portrait:
                 # Landscape: bubble centered above ball top
-                abs_x = origin.x() + self._TROPHY_W // 2 - bw // 2
+                abs_x = origin.x() + pad + self._TROPHY_W // 2 - bw // 2
                 abs_y = origin.y() + ball_top - bh - 7
                 # If no room above, flip below the ball
                 if abs_y < screen_geom.y():
-                    abs_y = origin.y() + self._TROPHY_H + 4
+                    abs_y = origin.y() + pad + self._TROPHY_H + 4
                 # Clamp to screen
                 if abs_x < screen_geom.x():
                     abs_x = screen_geom.x()
@@ -3779,7 +3789,7 @@ class OverlayTrophie(QWidget):
                     abs_x = screen_geom.right() - bw
                 if abs_y + bh > screen_geom.bottom():
                     abs_y = screen_geom.bottom() - bh
-                mascot_cx = origin.x() + self._TROPHY_W // 2
+                mascot_cx = origin.x() + pad + self._TROPHY_W // 2
                 bubble.set_pointer_offset(mascot_cx - abs_x)
             else:
                 # Portrait: widget is _TROPHY_H wide × _TROPHY_W tall.
@@ -3872,8 +3882,10 @@ class OverlayTrophie(QWidget):
             pass
         # Default: bottom-left of primary screen
         try:
+            pad = self._DRAW_PAD
             screen = QApplication.primaryScreen().geometry()
-            self.move(self._MARGIN, screen.height() - self._TROPHY_H - self._MARGIN)
+            self.move(max(0, self._MARGIN - pad),
+                      max(0, screen.height() - (self._TROPHY_H + 2 * pad) - self._MARGIN))
         except Exception:
             self.move(self._MARGIN, 600)
 
@@ -3892,12 +3904,13 @@ class OverlayTrophie(QWidget):
     def _show_action_toast(self, global_pos: QPoint) -> None:
         toast = _ActionToast(None)
         # Centre the toast above the mascot widget
-        tx = self.x() + self._TROPHY_W // 2 - toast.width() // 2
+        pad = self._DRAW_PAD
+        tx = self.x() + pad + self._TROPHY_W // 2 - toast.width() // 2
         ty = self.y() - toast.height() - 4
         try:
             screen = QApplication.primaryScreen().geometry()
             if ty < screen.y():
-                ty = self.y() + self._TROPHY_H + 4
+                ty = self.y() + pad + self._TROPHY_H + 4
             tx = max(screen.x(), min(tx, screen.x() + screen.width()  - toast.width()))
             ty = max(screen.y(), min(ty, screen.y() + screen.height() - toast.height()))
         except Exception:
@@ -3912,14 +3925,17 @@ class OverlayTrophie(QWidget):
         try:
             screen = QApplication.primaryScreen().geometry()
             sw, sh = screen.width(), screen.height()
+            pad = self._DRAW_PAD
+            ww = self._TROPHY_W + 2 * pad
+            wh = self._TROPHY_H + 2 * pad
             m = self._MARGIN
             positions = {
-                "bl": (m, sh - self._TROPHY_H - m),
-                "br": (sw - self._TROPHY_W - m, sh - self._TROPHY_H - m),
-                "tl": (m, m),
-                "tr": (sw - self._TROPHY_W - m, m),
+                "bl": (max(0, m - pad), sh - wh - m),
+                "br": (sw - ww - m, sh - wh - m),
+                "tl": (max(0, m - pad), max(0, m - pad)),
+                "tr": (sw - ww - m, max(0, m - pad)),
             }
-            self.move(*positions.get(corner, (m, sh - self._TROPHY_H - m)))
+            self.move(*positions.get(corner, (max(0, m - pad), sh - wh - m)))
             self._save_position()
         except Exception:
             pass
