@@ -222,8 +222,8 @@ class OverlayNavArrows(QWidget):
                 wobble = 0
             else:
                 amp = self._breathing_pulse.get_amp()
-                alpha = 110 + int(120 * amp)
-                scale = 0.9 + 0.2 * amp
+                alpha = 60 + int(195 * amp)
+                scale = 0.85 + 0.35 * amp
                 wobble = 2.0 * self._breathing_pulse.get_sin()
             base_h = 18
             ah = int(base_h * scale)
@@ -2205,9 +2205,6 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
             # Foreground effects (over text)
             if self._is_fx_enabled("fx_flip_impact_pulse"):
                 self._fx_impact.draw(p, draw_rect)
-            if self._is_fx_enabled("fx_flip_number_cascade"):
-                # Draw cascade over the counter number text area, not the full widget
-                self._fx_cascade.draw(p, body_rect)
             if self._is_fx_enabled("fx_flip_milestone_burst"):
                 self._fx_milestone.draw(p, draw_rect)
             if self._is_fx_enabled("fx_flip_electric_spark"):
@@ -2262,8 +2259,6 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
             # Trigger one-shot effects on count change
             if self._is_fx_enabled("fx_flip_impact_pulse"):
                 self._fx_impact.trigger()
-            if self._is_fx_enabled("fx_flip_number_cascade"):
-                self._fx_cascade.trigger()
             if self._is_fx_enabled("fx_flip_electric_spark"):
                 self._fx_spark.trigger()
             # Counter spin (inline)
@@ -4309,9 +4304,10 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(_theme_bg_qcolor(self.parent_gui.cfg, 245))
         p.drawRoundedRect(0, 0, w, h, 16, 16)
-        _draw_glow_border(p, 0, 0, w, h, radius=16,
-                          color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
-                          low_perf=bool(ov.get("low_performance_mode", False)))
+        if self._is_fx_enabled("fx_timer_glow_border") and not bool(ov.get("low_performance_mode", False)):
+            _draw_glow_border(p, 0, 0, w, h, radius=16,
+                              color=QColor(get_theme_color(self.parent_gui.cfg, "border")),
+                              low_perf=False)
         draw_rect = QRect(0, 0, w, h)
         # Background effects (drawn behind text)
         if self._is_fx_enabled("fx_timer_radial_pulse"):
@@ -5119,6 +5115,7 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         self._pulse_timer.setInterval(40)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)
         self._pulse_timer.start()
+        self._anim_t = 0.0
         self._render_and_place()
         self.show()
         self.raise_()
@@ -5134,6 +5131,7 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         _start_topmost_timer(self)
 
     def _on_pulse_tick(self):
+        self._anim_t += 0.04
         self._heat_pulse.tick(40.0)
         self._critical_pulse.tick(40.0)
         self._fx_flame.tick(40.0)
@@ -5228,7 +5226,21 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             fill_h = int(bar_h * self._heat / 100)
             if fill_h > 0:
                 fill_y = by + bar_h - fill_h
-                p.setBrush(self._bar_color(self._heat))
+                if self._is_fx_enabled("fx_heat_gradient_anim"):
+                    # Animated gradient: green→yellow→orange→red based on heat
+                    # with a phase offset to create shimmer motion
+                    grad = QLinearGradient(float(bx), float(fill_y + fill_h),
+                                           float(bx), float(fill_y))
+                    phase = (math.sin(self._anim_t * 2.0) * 0.08)
+                    heat_frac = self._heat / 100.0
+                    # Color stops: green at bottom, heat-dependent color at top
+                    grad.setColorAt(max(0.0, 0.0 + phase),  QColor(0,  200, 0))
+                    grad.setColorAt(max(0.0, min(1.0, 0.35 + phase)), QColor(200, 200, 0))
+                    grad.setColorAt(max(0.0, min(1.0, 0.65 + phase)), QColor(255, 120, 0))
+                    grad.setColorAt(min(1.0, 1.0 + phase),  QColor(220,  30, 0))
+                    p.setBrush(QBrush(grad))
+                else:
+                    p.setBrush(self._bar_color(self._heat))
                 p.drawRoundedRect(bx, fill_y, bar_w, fill_h, 6, 6)
 
             # label
@@ -5529,13 +5541,21 @@ class ChallengeStartCountdown(_OverlayFxMixin, QWidget):
                 opacity = max(0.0, 1.0 - eased)
                 p.setOpacity(opacity)
             else:
-                # Numbers scale 2.0 → 1.0
+                # Numbers scale 2.0 → 1.0 and spin 360° → 0°
                 scale = 2.0 - eased
                 p.setOpacity(1.0)
 
             font_size = int(80 * scale)
             font = QFont("Segoe UI", max(12, font_size), QFont.Weight.Bold)
             p.setFont(font)
+
+            if fx_enabled and not is_go:
+                # Spin animation: rotate from 360° → 0° as eased goes 0→1
+                angle = 360.0 * (1.0 - eased)
+                p.save()
+                p.translate(W / 2, H / 2)
+                p.rotate(angle)
+                p.translate(-W / 2, -H / 2)
 
             if fx_enabled:
                 # Glow effect
@@ -5551,6 +5571,9 @@ class ChallengeStartCountdown(_OverlayFxMixin, QWidget):
             p.setPen(QPen(color))
             p.drawText(QRect(0, 0, W, H),
                        Qt.AlignmentFlag.AlignCenter, label)
+
+            if fx_enabled and not is_go:
+                p.restore()
         finally:
             try:
                 p.end()

@@ -217,7 +217,7 @@ class EffectsMixin:
         # --- Post-Processing section ---
         layout.addWidget(self._build_fx_post_group())
 
-        # --- Bottom buttons: Enable All / Disable All ---
+        # --- Bottom buttons: Enable All / Disable All / Preview All ---
         btn_row = QHBoxLayout()
         self._fx_btn_enable = QPushButton("Enable All")
         self._fx_btn_enable.setToolTip("Enable all 60 individual effects")
@@ -232,6 +232,15 @@ class EffectsMixin:
                 "QPushButton:hover { background-color: #FF7F00; color: #000; }"
             )
             btn_row.addWidget(b)
+        self._fx_btn_preview_all = QPushButton("▶ Preview All")
+        self._fx_btn_preview_all.setToolTip("Open all overlay windows simultaneously to preview all effects")
+        self._fx_btn_preview_all.clicked.connect(self._preview_all_overlays)
+        self._fx_btn_preview_all.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #00E5FF; border: 1px solid #00E5FF;"
+            " padding: 4px 14px; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #00E5FF; color: #000; }"
+        )
+        btn_row.addWidget(self._fx_btn_preview_all)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -498,6 +507,11 @@ class EffectsMixin:
         """▶ Preview — open overlay in demo mode, all currently enabled effects (6 s)."""
         self._open_demo_overlay(overlay_type, duration_ms=6000)
 
+    def _preview_all_overlays(self):
+        """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
+        for overlay_type in ("toast", "challenge", "timer", "heat", "flip"):
+            self._open_demo_overlay(overlay_type, duration_ms=6000)
+
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
         """Open an overlay in demo mode with simulated triggers."""
         # Lazy import avoids module-level circular dependency
@@ -519,7 +533,7 @@ class EffectsMixin:
 
         try:
             if overlay_type == "toast":
-                win = AchToastWindow(self, "🏆 Preview Effect", "demo", seconds=5)
+                win = AchToastWindow(self, "🏆 Preview Effect", "__levelup__", seconds=5)
 
             elif overlay_type == "challenge":
                 win = ChallengeSelectOverlay(self, selected_idx=0)
