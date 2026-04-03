@@ -36,7 +36,7 @@ from gl_effects_opengl import (
     # Heat Barometer effects
     FlameParticles, HeatShimmer, SmokeWisps, LavaGlowEdge, NumberThrob, MeltdownShake,
     # Flip Counter effects
-    FlipImpactPulse, NumberCascade, MilestoneBurst, ElectricSpark,
+    FlipImpactPulse, MilestoneBurst, ElectricSpark,
     GoalProximityGlow, CompletionFirework,
 )
 
@@ -154,7 +154,7 @@ class OverlayNavArrows(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._breathing_pulse = BreathingPulse(speed=0.13)
+        self._breathing_pulse = BreathingPulse(speed=0.08)
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(80)
         self._pulse_timer.timeout.connect(self._on_tick)
@@ -224,8 +224,8 @@ class OverlayNavArrows(QWidget):
                 amp = self._breathing_pulse.get_amp()
                 alpha = 120 + int(135 * amp)
                 scale = 0.88 + 0.25 * amp
-                wobble = 2.0 * self._breathing_pulse.get_sin()
-            base_h = 18
+                wobble = 5.0 * self._breathing_pulse.get_sin()
+            base_h = 28
             ah = int(base_h * scale)
             aw = max(6, int(ah * 0.6))
             cy = draw_h // 2
@@ -236,6 +236,18 @@ class OverlayNavArrows(QWidget):
             except Exception:
                 arrow_color = QColor("#00E5FF")
             arrow_color.setAlpha(alpha)
+            # Glow/shadow behind the arrow for better visibility
+            if not low_perf:
+                glow_color = QColor(arrow_color)
+                glow_color.setAlpha(max(0, alpha // 3))
+                for glow_r in (ah // 2 + 6, ah // 2 + 3):
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(glow_color)
+                    p.drawPolygon([
+                        QPoint(right_cx + aw // 2 + glow_r // 3, cy),
+                        QPoint(right_cx - aw // 2 - glow_r // 3, cy - ah // 2 - glow_r // 3),
+                        QPoint(right_cx - aw // 2 - glow_r // 3, cy + ah // 2 + glow_r // 3),
+                    ])
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(arrow_color)
             # Right-pointing arrow
@@ -331,7 +343,7 @@ class PostProcessingWidget(QWidget):
 
     def _pp_intensity(self, key: str) -> float:
         ov = self._cfg_ov()
-        return max(0.0, min(1.0, float(ov.get(key + "_intensity", 50)) / 100.0))
+        return max(0.0, min(1.0, float(ov.get(key + "_intensity", 70)) / 100.0))
 
     def _any_pp_enabled(self) -> bool:
         ov = self._cfg_ov()
@@ -2072,7 +2084,6 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
 
         # --- Flip Counter effects ---
         self._fx_impact = FlipImpactPulse(intensity=self._get_fx_intensity("fx_flip_impact_pulse"))
-        self._fx_cascade = NumberCascade(intensity=self._get_fx_intensity("fx_flip_number_cascade"))
         self._fx_milestone = MilestoneBurst(intensity=self._get_fx_intensity("fx_flip_milestone_burst"))
         self._fx_spark = ElectricSpark(intensity=self._get_fx_intensity("fx_flip_electric_spark"))
         self._fx_goal_glow = GoalProximityGlow(intensity=self._get_fx_intensity("fx_flip_goal_glow"))
@@ -2107,7 +2118,6 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
     def _on_anim_tick(self):
         self._breathing_pulse.tick(50.0)
         self._fx_impact.tick(50.0)
-        self._fx_cascade.tick(50.0)
         self._fx_milestone.tick(50.0)
         self._fx_spark.tick(50.0)
         self._fx_goal_glow.tick(50.0)
@@ -5137,6 +5147,10 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             self._fx_lava.start()
         if self._is_fx_enabled("fx_heat_number_throb"):
             self._fx_throb.start()
+        if self._is_fx_enabled("fx_heat_warning_pulse"):
+            self._heat_pulse.start()
+        if self._is_fx_enabled("fx_heat_critical_pulse"):
+            self._critical_pulse.start()
         self._pulse_timer = QTimer(self)
         self._pulse_timer.setInterval(40)
         self._pulse_timer.timeout.connect(self._on_pulse_tick)

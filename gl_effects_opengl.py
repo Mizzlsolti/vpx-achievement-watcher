@@ -951,7 +951,7 @@ class HeatPulse:
 
     def tick(self, dt_ms: float = 40.0):
         """Advance pulse phase."""
-        self._t = (self._t + 0.1) % 1.0
+        self._t = (self._t + 0.04) % 1.0
 
     def draw(self, painter: QPainter, x: int, y: int, w: int, h: int,
              heat: int, low_perf: bool = False):
@@ -959,6 +959,11 @@ class HeatPulse:
 
         In low-performance mode a static red border is drawn only at critical
         heat (>85 %) to match the original behaviour.
+
+        Visual style is determined by this instance's threshold value so that
+        a warning pulse (threshold=65, orange) and a critical pulse
+        (threshold=85, red) remain visually distinct even when both are
+        active at the same time.
         """
         if heat < self._threshold:
             return
@@ -971,16 +976,18 @@ class HeatPulse:
                 painter.drawRoundedRect(x, y, w, h, 10, 10)
             return
         amp = 0.5 + 0.5 * math.sin(2 * math.pi * self._t)
-        if heat > 85:
-            pulse_alpha = int(180 + 60 * amp)
-            pulse_width = 2 + int(2 * amp)
+        if self._threshold >= 85:
+            # Critical pulse: bright red, strongly visible pulsation
+            pulse_alpha = int(200 + 55 * amp)
+            pulse_width = 4 + int(3 * amp)
             pulse_color = QColor(self._critical_color.red(),
                                  self._critical_color.green(),
                                  self._critical_color.blue(),
                                  min(255, pulse_alpha))
         else:
-            pulse_alpha = int(120 + 40 * amp)
-            pulse_width = 2
+            # Warning pulse: orange, clearly visible pulsation
+            pulse_alpha = int(160 + 95 * amp)
+            pulse_width = 3 + int(2 * amp)
             pulse_color = QColor(self._warning_color.red(),
                                  self._warning_color.green(),
                                  self._warning_color.blue(),
