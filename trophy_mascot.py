@@ -2307,8 +2307,8 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             c0, c1, c2, c3, c4 = "#FFFACD", "#FFD700", "#DAA520", "#B8860B", "#705000"
             pen_color = "#8B6914"
         elif skin == "chrome":
-            c0, c1, c2, c3, c4 = "#FFFFFF", "#F0F0FF", "#C8C8D8", "#8888A0", "#404050"
-            pen_color = "#606070"
+            c0, c1, c2, c3, c4 = "#FFFFFF", "#F0F8FF", "#88AACC", "#204870", "#071828"
+            pen_color = "#305880"
         elif skin == "fireball":
             c0, c1, c2, c3, c4 = "#FFFF80", "#FF8800", "#CC3300", "#880000", "#330000"
             pen_color = "#660000"
@@ -2370,6 +2370,18 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             c0, c1, c2, c3, c4 = "#FFFFFF", "#E8E8F0", "#A0A8B8", "#606880", "#303040"
             pen_color = "#404050"
 
+        # ── Planet skin: draw ring back-half before ball so it appears behind ────
+        if skin == "planet":
+            ring_rx = int(radius * 1.4)
+            ring_ry = int(radius * 0.35)
+            p.save()
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setPen(QPen(QColor("#DAA520"), 3))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            # Upper semicircle (0° → 180° CCW) appears behind the ball
+            p.drawArc(cx - ring_rx, cy - ring_ry, ring_rx * 2, ring_ry * 2, 0, 180 * 16)
+            p.restore()
+
         grad = QRadialGradient(float(cx - radius // 4), float(cy - radius // 3), float(radius * 1.4))
         grad.setColorAt(0.0,  QColor(c0))
         grad.setColorAt(0.15, QColor(c1))
@@ -2400,6 +2412,24 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         hl2_grad.setColorAt(1.0, QColor(180, 200, 255, 0))
         p.setBrush(hl2_grad)
         p.drawEllipse(hl2_x - hl2_r, hl2_y - hl2_r, hl2_r * 2, hl2_r * 2)
+
+        # ── Soccer ball patches (drawn before face so face renders on top) ──────
+        if skin == "soccer":
+            ball_path = QPainterPath()
+            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+            p.save()
+            p.setClipPath(ball_path)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setBrush(QColor("#111111"))
+            p.setPen(Qt.PenStyle.NoPen)
+            patch_r = int(radius * 0.18)
+            dist = int(radius * 0.62)
+            for angle_deg in [0, 72, 144, 216, 288]:
+                a = math.radians(angle_deg)
+                px2 = cx + int(math.cos(a) * dist)
+                py2 = cy + int(math.sin(a) * dist)
+                p.drawEllipse(px2 - patch_r, py2 - patch_r, patch_r * 2, patch_r * 2)
+            p.restore()
 
         # ── Eyes ─────────────────────────────────────────────────────────────
         eye_y = cy - radius // 5
@@ -2534,18 +2564,21 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                        Qt.AlignmentFlag.AlignCenter, "8")
 
         elif skin == "soccer":
-            # Pentagon patches — face area excluded via clip
-            safe = self._steely_safe_clip(cx, cy)
+            # Outer ring patches — ball circle clip, no face exclusion
+            # (inner ring patches were drawn before the face in _draw_trophy_pinball)
+            ball_clip = QPainterPath()
+            ball_clip.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
             p.save()
-            p.setClipPath(safe)
+            p.setClipPath(ball_clip)
             p.setBrush(QColor("#111111"))
             p.setPen(Qt.PenStyle.NoPen)
-            for angle_deg in [0, 72, 144, 216, 288]:
+            outer_r = int(radius * 0.15)
+            dist_out = int(radius * 0.80)
+            for angle_deg in [36, 108, 180, 252, 324]:
                 a = math.radians(angle_deg)
-                px2 = cx + int(math.cos(a) * radius * 0.5)
-                py2 = cy + int(math.sin(a) * radius * 0.5)
-                pr = int(radius * 0.22)
-                p.drawEllipse(px2 - pr, py2 - pr, pr * 2, pr * 2)
+                px2 = cx + int(math.cos(a) * dist_out)
+                py2 = cy + int(math.sin(a) * dist_out)
+                p.drawEllipse(px2 - outer_r, py2 - outer_r, outer_r * 2, outer_r * 2)
             p.restore()
 
         elif skin == "basketball":
@@ -2561,16 +2594,33 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.restore()
 
         elif skin == "baseball":
-            # Red stitching — face area excluded via clip
-            safe = self._steely_safe_clip(cx, cy)
+            # Prominent C-curve seam stitching — clipped to ball circle, no face exclusion
+            ball_path = QPainterPath()
+            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
             p.save()
-            p.setClipPath(safe)
-            p.setPen(QPen(QColor("#CC0000"), 2))
+            p.setClipPath(ball_path)
+            seam_pen = QPen(QColor("#CC2200"), max(3, radius // 13),
+                            Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+            p.setPen(seam_pen)
             p.setBrush(Qt.BrushStyle.NoBrush)
-            for x_off in [-radius // 4, radius // 4]:
-                p.drawArc(cx + x_off - radius // 3, cy - radius // 2,
-                           radius * 2 // 3, radius,
-                           30 * 16, 120 * 16)
+            # Left C-curve seam (concave right)
+            left_seam = QPainterPath()
+            left_seam.moveTo(cx - int(radius * 0.15), cy - int(radius * 0.68))
+            left_seam.cubicTo(
+                cx - int(radius * 0.78), cy - int(radius * 0.22),
+                cx - int(radius * 0.78), cy + int(radius * 0.22),
+                cx - int(radius * 0.15), cy + int(radius * 0.68),
+            )
+            p.drawPath(left_seam)
+            # Right C-curve seam (concave left, mirror of left)
+            right_seam = QPainterPath()
+            right_seam.moveTo(cx + int(radius * 0.15), cy - int(radius * 0.68))
+            right_seam.cubicTo(
+                cx + int(radius * 0.78), cy - int(radius * 0.22),
+                cx + int(radius * 0.78), cy + int(radius * 0.22),
+                cx + int(radius * 0.15), cy + int(radius * 0.68),
+            )
+            p.drawPath(right_seam)
             p.restore()
 
         elif skin == "tennis":
@@ -2637,22 +2687,26 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             p.restore()
 
         elif skin == "planet":
-            # Saturn-like ring around the ball — doesn't cover the face
-            p.setPen(QPen(QColor("#DAA520"), 2))
-            p.setBrush(Qt.BrushStyle.NoBrush)
+            # Front half of Saturn ring — lower arc drawn in front of ball
             ring_rx = int(radius * 1.4)
             ring_ry = int(radius * 0.35)
-            p.drawEllipse(cx - ring_rx, cy - ring_ry, ring_rx * 2, ring_ry * 2)
+            p.setPen(QPen(QColor("#DAA520"), 3))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            # Lower semicircle (180° → 360° CCW) appears in front of the ball
+            p.drawArc(cx - ring_rx, cy - ring_ry, ring_rx * 2, ring_ry * 2, 180 * 16, 180 * 16)
 
         elif skin == "moon":
-            # Crescent shadow — face area excluded via clip
-            safe = self._steely_safe_clip(cx, cy)
+            # Smooth crescent via path subtraction — no rectangular face-clip artifacts
+            off = int(radius * 0.35)
+            ball_path = QPainterPath()
+            ball_path.addEllipse(QRectF(cx - radius, cy - radius, radius * 2, radius * 2))
+            inner_path = QPainterPath()
+            inner_path.addEllipse(QRectF(cx + off - radius, cy - radius, radius * 2, radius * 2))
+            crescent = ball_path.subtracted(inner_path)
             p.save()
-            p.setClipPath(safe)
             p.setBrush(QColor(30, 30, 60, 160))
             p.setPen(Qt.PenStyle.NoPen)
-            off = int(radius * 0.35)
-            p.drawEllipse(cx + off - radius, cy - radius, radius * 2, radius * 2)
+            p.drawPath(crescent)
             p.restore()
 
         elif skin == "skull":
