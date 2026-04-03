@@ -618,6 +618,32 @@ class EffectsMixin:
                     except Exception:
                         pass
 
+                    # Show nav arrows immediately so the pulsing animation is
+                    # visible throughout the first half of the demo.
+                    try:
+                        win._nav_arrows.setGeometry(0, 0, win.width(), win.height())
+                        win._nav_arrows.show()
+                        win._nav_arrows.raise_()
+                    except Exception:
+                        pass
+
+                    # Helper: animate the progress bar to a specific target percentage.
+                    # (triggers Progress Bar Fill + Shine/Sweep each call)
+                    def _demo_progress_step(target_pct: float):
+                        if not win or win.isHidden():
+                            return
+                        try:
+                            win._progress_pct_current = max(0.0, getattr(win, "_progress_pct_target", 0.0))
+                            win._progress_pct_target = target_pct
+                            if hasattr(win, "_progress_bar_timer"):
+                                win._progress_bar_timer.start()
+                            win._trigger_shine()
+                        except Exception:
+                            pass
+
+                    # 1s: progress 0 → 20%
+                    _add_shot(1000, lambda: _demo_progress_step(20.0))
+
                     # 2s: simulate page transition
                     # (triggers Page Slide+Fade, Glitch Frame, Accent Color Lerp)
                     _add_shot(2000, lambda: (
@@ -627,6 +653,9 @@ class EffectsMixin:
                         if win and not win.isHidden() else None
                     ))
 
+                    # 2.5s: progress 20 → 50%
+                    _add_shot(2500, lambda: _demo_progress_step(50.0))
+
                     # 3s: simulate score change +500
                     # (triggers Score Counter Spin, Value Highlight Flash)
                     _add_shot(3000, lambda: (
@@ -634,21 +663,28 @@ class EffectsMixin:
                         if win and not win.isHidden() else None
                     ))
 
-                    # 4s: simulate progress change +20%
-                    # (triggers Progress Bar Fill, Shine/Sweep)
-                    def _demo_progress():
-                        if not win or win.isHidden():
-                            return
-                        try:
-                            old_target = max(0.0, getattr(win, "_progress_pct_target", 0.0))
-                            win._progress_pct_current = old_target
-                            win._progress_pct_target = min(100.0, old_target + 20.0)
-                            if hasattr(win, "_progress_bar_timer"):
-                                win._progress_bar_timer.start()
-                            win._trigger_shine()
-                        except Exception:
-                            pass
-                    _add_shot(4000, _demo_progress)
+                    # 3s: hide nav arrows after ~3s of visible pulsing
+                    _add_shot(3000, lambda: (
+                        win._nav_arrows.hide()
+                        if win and not win.isHidden() else None
+                    ))
+
+                    # 4s: progress 50 → 80%
+                    _add_shot(4000, lambda: _demo_progress_step(80.0))
+
+                    # 4.5s: second page transition (direction='right')
+                    # Triggers Glitch Frame + Accent Color Lerp a second time so
+                    # both effects are clearly demonstrated during the preview.
+                    _add_shot(4500, lambda: (
+                        win.transition_to(
+                            lambda: win.set_combined(_demo_p1, "Demo — Page 1"),
+                            direction='right',
+                        )
+                        if win and not win.isHidden() else None
+                    ))
+
+                    # 5s: progress 80 → 100%
+                    _add_shot(5000, lambda: _demo_progress_step(100.0))
 
                     # Auto-hide (not close) at duration_ms
                     def _hide_overlay():

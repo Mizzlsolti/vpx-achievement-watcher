@@ -1691,8 +1691,11 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             self._transition_label.setStyleSheet("background:transparent;")
         W, H = self.width(), self.height()
         self._transition_label.setGeometry(0, 0, W, H)
-        # Show old content as the starting frame — no blank flash, no glitch stripes.
+        # Show old content as the starting frame; apply a brief glitch-strip
+        # distortion on the first displayed frame when the effect is enabled.
         self._transition_label.setPixmap(QPixmap.fromImage(old_img))
+        if self._anim_ok("fx_main_glitch_frame"):
+            self._draw_glitch_frame(old_img, self._transition_label)
         self._transition_label.show()
         self._transition_label.raise_()
 

@@ -284,7 +284,9 @@ class EffectsWidget(QWidget):
             if draw_glow:
                 amp_scaled = amp * glow_intensity  # scale breathing amplitude by intensity
                 alpha_base = int((120 + 135 * amp_scaled) * glow_intensity)
-                layers = max(1, int((2 + 2 * amp_scaled) * glow_intensity))
+                # Quadratic layer count: makes 100% noticeably thicker than 80%
+                # Range: ~1 layer at 0% intensity, ~3 at 80%, ~6 at 100% (glow_intensity²)
+                layers = max(1, int((2 + 4 * amp_scaled) * glow_intensity * glow_intensity + 0.5))
                 glow_color = QColor(ac.red(), ac.green(), ac.blue(), max(0, min(255, alpha_base)))
                 draw_glow_border(p, 0, 0, W, H, radius=18, color=glow_color, layers=layers)
             if draw_particles:
@@ -293,9 +295,11 @@ class EffectsWidget(QWidget):
                 p.setPen(Qt.PenStyle.NoPen)
                 for pt in self._particles[:particle_count]:
                     alpha = int(pt['alpha'] * particles_intensity)
-                    c = QColor(ac.red(), ac.green(), ac.blue(), alpha)
+                    c = QColor(ac.red(), ac.green(), ac.blue(), max(0, min(255, alpha)))
                     p.setBrush(c)
-                    sz = int(pt['size'])
+                    # Quadratic size scaling: 100% gives significantly larger particles than 80%
+                    # Factor range: ~0.3× at 0% intensity, ~1.4× at 80%, 2.0× at 100% (intensity²)
+                    sz = max(1, int(pt['size'] * (0.3 + 1.7 * particles_intensity * particles_intensity)))
                     p.drawEllipse(int(pt['x']) - sz // 2, int(pt['y']) - sz // 2, sz, sz)
         finally:
             try:
