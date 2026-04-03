@@ -98,35 +98,53 @@ _ZANK_OVERLAY_LINES: dict[str, str] = {
 _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
     # (key, text)
     "tab_dashboard": [
-        ("dash_notif",  "Check the notification feed — it shows everything that happened last game!"),
-        ("dash_restart","You can restart the watcher engine here if something seems stuck."),
+        ("dash_notif",    "Check the notification feed — it shows everything that happened last game!"),
+        ("dash_restart",  "You can restart the watcher engine here if something seems stuck."),
+        ("dash_sessions", "Your session history shows your best gaming streaks — watch them grow!"),
+        ("dash_stats",    "The dashboard tracks your all-time trophy count. Keep it climbing!"),
+        ("dash_export",   "Tip: you can scroll the notification feed to see older events too!"),
     ],
     "tab_effects": [
-        ("eff_lowperf",  "Too many effects active? Enable Low Performance Mode to save CPU!"),
+        ("eff_lowperf",   "Too many effects active? Enable Low Performance Mode to save CPU!"),
         ("eff_bloom_scan","Bloom + Scanlines together = perfect arcade look!"),
-        ("eff_opengl",   "Post-Processing effects require OpenGL to look their best!"),
-        ("eff_grain",    "Film Grain + Scanlines = retro CRT monitor feeling!"),
+        ("eff_opengl",    "Post-Processing effects require OpenGL to look their best!"),
+        ("eff_grain",     "Film Grain + Scanlines = retro CRT monitor feeling!"),
+        ("eff_particle",  "Particle effects add that extra pop to every unlock — try them!"),
     ],
     "tab_appearance": [
-        ("app_synthwave","Try the Synthwave theme — it looks amazing with Bloom enabled!"),
-        ("app_place",    "You can position each overlay independently — try the Place buttons!"),
-        ("app_portrait", "Portrait mode rotates the overlay for cabinet screens!"),
+        ("app_synthwave", "Try the Synthwave theme — it looks amazing with Bloom enabled!"),
+        ("app_place",     "You can position each overlay independently — try the Place buttons!"),
+        ("app_portrait",  "Portrait mode rotates the overlay for cabinet screens!"),
+        ("app_font",      "Bigger font sizes work great on a real arcade cabinet — try it!"),
+        ("app_color",     "Customize the overlay accent colour to match your room's lighting!"),
     ],
     "tab_controls": [
-        ("ctrl_joy",     "You can bind a joystick button instead of keyboard to toggle the overlay!"),
-        ("ctrl_hotkey",  None),  # dynamic tip — built at runtime
+        ("ctrl_joy",      "You can bind a joystick button instead of keyboard to toggle the overlay!"),
+        ("ctrl_hotkey",   None),  # dynamic tip — built at runtime
+        ("ctrl_overlay",  "The overlay toggle key works even while VPX is running — very handy!"),
+        ("ctrl_remap",    "Changed your button layout? Re-bind your overlay toggle here!"),
+        ("ctrl_gamepad",  "Gamepad users: almost any button can be assigned as the overlay toggle!"),
     ],
     "tab_progress": [
-        ("prog_tab",     "The Progress tab shows how close you are to every achievement!"),
-        ("prog_click",   "Click any achievement to see its unlock rules!"),
+        ("prog_tab",      "The Progress tab shows how close you are to every achievement!"),
+        ("prog_click",    "Click any achievement to see its unlock rules!"),
+        ("prog_filter",   "Filter achievements by status to focus only on what is still locked!"),
+        ("prog_percent",  "Completion percentage is tracked per table — can you reach 100%?"),
+        ("prog_sort",     "Sort your achievements by unlock date to relive your greatest moments!"),
     ],
     "tab_cloud": [
-        ("cloud_backup", "Back up your achievements to the cloud — do not lose your progress!"),
-        ("cloud_id",     "Your Player ID is your identity. Write it down somewhere safe!"),
+        ("cloud_backup",  "Back up your achievements to the cloud — do not lose your progress!"),
+        ("cloud_id",      "Your Player ID is your identity. Write it down somewhere safe!"),
+        ("cloud_sync",    "Cloud Sync runs automatically in the background — always protected!"),
+        ("cloud_leader",  "Check the online leaderboard to see how you rank globally!"),
+        ("cloud_share",   "Share your Player ID with friends and compare achievement counts!"),
     ],
     "tab_system": [
-        ("sys_nvram",    "Use Force Cache NVRAM Maps if a new table is not being tracked!"),
-        ("sys_name",     "You can change your display name here — it shows on the cloud leaderboard!"),
+        ("sys_nvram",     "Use Force Cache NVRAM Maps if a new table is not being tracked!"),
+        ("sys_name",      "You can change your display name here — it shows on the cloud leaderboard!"),
+        ("sys_logs",      "Check the system log if something is not tracking correctly!"),
+        ("sys_paths",     "Verify your NVRAM and ROM paths here if tables are not being detected!"),
+        ("sys_update",    "Keep VPX Achievement Watcher updated for the latest table support!"),
     ],
 }
 
@@ -611,7 +629,7 @@ class _TrophieDrawWidget(QWidget):
         self._state = IDLE
         self._bob_t = 0.0          # time for sine bob (radians)
         self._bob_y = 0.0          # current vertical offset from bob
-        self._scale = 1.0          # for grow/shrink animations
+        self._scale = 1.0          # for grow/shrink animations (dismiss)
         self._opacity_val = 1.0    # for fade-out
 
         # Blink state
@@ -642,6 +660,12 @@ class _TrophieDrawWidget(QWidget):
         # Dismiss animation
         self._dismiss_cb = None
 
+        # Extended animations
+        self._tilt_t = 0.0          # wobble/tilt phase for TALKING state
+        self._wiggle_t = 0.0        # rapid horizontal wiggle phase for SURPRISED
+        self._squash_t = 0.0        # squash-and-stretch phase (post-jump landing)
+        self._squash_active = False  # True while squash/stretch is playing
+
     def _schedule_blink(self) -> None:
         delay_ms = random.randint(3000, 6000)
         self._blink_timer.start(delay_ms)
@@ -669,13 +693,38 @@ class _TrophieDrawWidget(QWidget):
                 if self._dismiss_cb:
                     self._dismiss_cb()
                 return
-        elif self._state in (HAPPY, SURPRISED):
+        else:
+            # Not dismissing — run all motion physics.
+            # Jump physics (runs for any jumping state)
             if self._jumping:
                 self._jump_offset += self._jump_vel * dt * 60
                 self._jump_vel += 0.5  # gravity
                 if self._jump_offset >= 0.0:
                     self._jump_offset = 0.0
                     self._jumping = False
+                    # Trigger squash-and-stretch on landing
+                    self._squash_active = True
+                    self._squash_t = 0.0
+
+            # Squash-and-stretch countdown
+            if self._squash_active:
+                self._squash_t += dt * 5.0
+                if self._squash_t >= 1.0:
+                    self._squash_t = 0.0
+                    self._squash_active = False
+
+            # Wobble/tilt phase for TALKING
+            if self._state == TALKING:
+                self._tilt_t += dt * 3.0
+            else:
+                self._tilt_t = 0.0
+
+            # Rapid horizontal wiggle for SURPRISED
+            if self._state == SURPRISED:
+                self._wiggle_t += dt * 8.0
+            else:
+                self._wiggle_t = 0.0
+
         self.update()
 
     def set_state(self, state: str) -> None:
@@ -691,6 +740,11 @@ class _TrophieDrawWidget(QWidget):
         if state == DISMISSING:
             self._scale = 1.0
             self._opacity_val = 1.0
+        # Reset secondary animations on state change for clean transitions
+        if state != TALKING:
+            self._tilt_t = 0.0
+        if state != SURPRISED:
+            self._wiggle_t = 0.0
 
     def start_dismiss(self, callback=None) -> None:
         self._dismiss_cb = callback
@@ -706,16 +760,53 @@ class _TrophieDrawWidget(QWidget):
         total_offset = bob + jump
 
         cx = self._tw // 2
-        cy = self._th // 2 + int(total_offset)
+        cy_base = self._th // 2
+
+        # ── Tilt / rotation angle (degrees) ──────────────────────────────────
+        if self._state == TALKING:
+            # Gentle side-to-side wobble while speaking
+            angle = math.sin(self._tilt_t) * 8.0
+        elif self._state == SAD:
+            # Slight downward droop
+            angle = -5.0
+        elif self._state == SLEEPY:
+            # Slow exaggerated sway
+            angle = math.sin(self._bob_t * 0.25) * 12.0
+        else:
+            angle = 0.0
+
+        # ── Horizontal wiggle offset (SURPRISED) ─────────────────────────────
+        wiggle_x = math.sin(self._wiggle_t) * 4.0 if self._state == SURPRISED else 0.0
+
+        # ── Scale components ──────────────────────────────────────────────────
+        if self._squash_active:
+            # Squash-and-stretch on jump landing: briefly squash then snap back
+            sq = math.sin(self._squash_t * math.pi)
+            sx = 1.0 + sq * 0.25   # momentarily wider
+            sy = 1.0 - sq * 0.20   # momentarily shorter
+        elif self._state == IDLE:
+            # Subtle breathe / pulse while idle
+            s = 1.0 + math.sin(self._bob_t * 0.7) * 0.025
+            sx = s
+            sy = s
+        else:
+            sx = 1.0
+            sy = 1.0
+
+        # Apply dismiss shrink on top of any other scale
+        sx *= self._scale
+        sy *= self._scale
 
         p.save()
-        # Scale around center for dismiss shrink
-        if self._scale != 1.0:
-            p.translate(cx, cy)
-            p.scale(self._scale, self._scale)
-            p.translate(-cx, -cy)
-
-        self._draw_trophy(p, cx, cy)
+        # Translate origin to the draw center (incorporating vertical bob/jump
+        # and horizontal wiggle), then apply rotation and scale around that
+        # center before drawing.
+        p.translate(cx + wiggle_x, cy_base + int(total_offset))
+        if angle != 0.0:
+            p.rotate(angle)
+        if sx != 1.0 or sy != 1.0:
+            p.scale(sx, sy)
+        self._draw_trophy(p, 0, 0)
         p.restore()
         p.end()
 
