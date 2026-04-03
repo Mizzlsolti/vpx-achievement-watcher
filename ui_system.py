@@ -445,6 +445,11 @@ class SystemMixin:
                 "✅ Cloud Sync enabled!",
                 "Your player profile has been saved and Cloud Sync is now active.",
             )
+            try:
+                if getattr(self, "_trophie_gui", None):
+                    self._trophie_gui.on_cloud_enabled()
+            except Exception:
+                pass
             return
 
         # Validation failed — uncheck the checkbox and keep cloud disabled

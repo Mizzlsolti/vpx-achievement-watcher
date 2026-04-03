@@ -489,6 +489,11 @@ class AppearanceMixin(EffectsMixin):
         self._style(getattr(self, "btn_quit", None), "QPushButton { background-color:#8a2525; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._style(getattr(self, "btn_restart", None), "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._update_theme_preview(theme_id)
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_theme_changed()
+        except Exception:
+            pass
 
     def _on_theme_combo_changed(self, _index: int):
         theme_id = self.cmb_theme.currentData()

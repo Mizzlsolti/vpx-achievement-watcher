@@ -4221,6 +4221,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         super().__init__(parent)
         self.parent_gui = parent
         self._left = max(1, int(total_seconds))
+        self._tick_callback = None
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(1000)
@@ -4269,6 +4270,11 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
 
     def _tick(self):
         self._left -= 1
+        try:
+            if self._tick_callback is not None:
+                self._tick_callback(self._left * 1000)
+        except Exception:
+            pass
         if self._left <= 0:
             self._left = 0
             if _sound_mod is not None:

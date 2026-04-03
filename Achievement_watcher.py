@@ -118,6 +118,9 @@ class Bridge(QObject):
     ach_toast_show = pyqtSignal(str, str, int)
     challenge_timer_start = pyqtSignal(int)
     challenge_timer_stop = pyqtSignal()
+    challenge_timer_tick = pyqtSignal(int)
+    challenge_won = pyqtSignal(float)
+    challenge_lost = pyqtSignal(int, float)
     challenge_warmup_show = pyqtSignal(int, str)
     challenge_info_show = pyqtSignal(str, int, str)
     challenge_speak = pyqtSignal(str)
@@ -337,6 +340,15 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             )
             self.bridge.challenge_timer_stop.connect(
                 lambda *a: self._trophie_overlay.on_challenge_stop()
+            )
+            self.bridge.challenge_timer_tick.connect(
+                lambda ms: self._trophie_overlay.on_challenge_timer_tick(ms)
+            )
+            self.bridge.challenge_won.connect(
+                lambda margin: self._trophie_overlay.on_challenge_won(margin)
+            )
+            self.bridge.challenge_lost.connect(
+                lambda attempts, margin: self._trophie_overlay.on_challenge_lost(attempts, margin)
             )
 
             if self.cfg.OVERLAY.get("trophie_gui_enabled", True):

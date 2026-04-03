@@ -4963,6 +4963,9 @@ class Watcher:
                 try:
                     self.bridge.challenge_info_show.emit("Challenge Aborted!", 3, "#FF3B30")
                 except Exception: pass
+                try:
+                    self.bridge.challenge_lost.emit(1, 0.0)  # attempts=1 (not tracked), margin_pct=0.0 (no goal score)
+                except Exception: pass
 
         # 2. DELAY NUR BEI ERFOLG (Verhindert langes Warten beim manuellen Abbruch)
         if is_challenge and not ch_aborted:
@@ -4972,6 +4975,9 @@ class Watcher:
                     time.sleep(max(0.0, delay_ms / 1000.0))
             except Exception:
                 pass
+            try:
+                self.bridge.challenge_won.emit(0.0)  # margin_pct=0.0 (no goal score to compute actual margin)
+            except Exception: pass
 
         try:
             end_ts = time.time()

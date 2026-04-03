@@ -498,8 +498,15 @@ class EffectsMixin:
     # ------------------------------------------------------------------
 
     def _fx_save_checkbox(self, key: str, state: int):
-        self.cfg.OVERLAY[key] = bool(Qt.CheckState(state) == Qt.CheckState.Checked)
+        enabled = bool(Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY[key] = enabled
         self.cfg.save()
+        if enabled and key.startswith("fx_post_"):
+            try:
+                if getattr(self, "_trophie_gui", None):
+                    self._trophie_gui.on_postproc_enabled()
+            except Exception:
+                pass
 
     def _fx_save_slider(self, key: str, value: int, pct_lbl: QLabel):
         pct_lbl.setText(f"{value}%")
@@ -511,6 +518,12 @@ class EffectsMixin:
         self.cfg.OVERLAY["low_performance_mode"] = enabled
         self.cfg.save()
         self._fx_apply_low_perf_state(enabled)
+        if enabled:
+            try:
+                if getattr(self, "_trophie_gui", None):
+                    self._trophie_gui.on_low_perf_enabled()
+            except Exception:
+                pass
 
     def _fx_save_pp_overlay_toggle(self, key: str, checked: bool, btn, style_on: str, style_off: str):
         self.cfg.OVERLAY[key] = checked
