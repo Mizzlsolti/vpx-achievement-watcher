@@ -17,6 +17,8 @@ import time
 from datetime import datetime
 from typing import Optional
 
+import trophy_animations
+
 from PyQt6.QtCore import (
     QPoint, QRect, QRectF, QSize, Qt, QTimer,
 )
@@ -1106,7 +1108,11 @@ class _TrophieDrawWidget(QWidget):
     }
 
     # Passive animation modes — cycle through these to keep the trophy lively
-    _PASSIVE_MODES = ["float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce", "eye_roll", "stretch", "nod", "sparkle", "yawn"]
+    _PASSIVE_MODES = [
+        "float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce",
+        "eye_roll", "stretch", "nod", "sparkle", "yawn",
+        "dance", "wave", "snore", "shiver", "celebrate", "peek", "dizzy",
+    ]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
     _PASSIVE_MODE_OFFSET_MS = 5000  # max extra random offset so two instances desynchronize
@@ -1163,6 +1169,10 @@ class _TrophieDrawWidget(QWidget):
         self._eye_roll_phase: float = 0.0  # for eye_roll passive mode
         self._yawn_amount: float = 0.0     # 0.0=closed, 1.0=full yawn
 
+        # Particle lists for trophy_animations passive modes
+        self._snore_particles: list = []       # for snore mode and SLEEPY state
+        self._confetti_particles: list = []    # for celebrate mode
+
         # Subclass-settable passive offsets (used for Steely-specific modes)
         self._passive_extra_x: float = 0.0
         self._passive_extra_y: float = 0.0
@@ -1216,6 +1226,8 @@ class _TrophieDrawWidget(QWidget):
         self._passive_extra_x = 0.0
         self._passive_extra_y = 0.0
         self._passive_angle = 0.0
+        self._snore_particles = []
+        self._confetti_particles = []
         # Restore normal pupil position only when leaving eye_roll mode
         if current == "eye_roll":
             dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
@@ -1285,6 +1297,26 @@ class _TrophieDrawWidget(QWidget):
                     self._yawn_amount = max(0.0, 1.0 - (self._passive_t - 1.5) / 1.0)
             else:
                 self._yawn_amount = max(0.0, self._yawn_amount - dt * 2.0)
+
+            # New passive animations — delegate to trophy_animations
+            if self._state == IDLE:
+                _mode = self._passive_mode
+                if _mode == "dance":
+                    trophy_animations.tick_dance(self)
+                elif _mode == "wave":
+                    trophy_animations.tick_wave(self)
+                elif _mode == "snore":
+                    trophy_animations.tick_snore(self)
+                elif _mode == "shiver":
+                    trophy_animations.tick_shiver(self)
+                elif _mode == "celebrate":
+                    trophy_animations.tick_celebrate(self)
+                elif _mode == "peek":
+                    trophy_animations.tick_peek(self)
+                elif _mode == "dizzy":
+                    trophy_animations.tick_dizzy(self)
+            elif self._state == SLEEPY:
+                trophy_animations.tick_snore(self)
 
         self.update()
 
@@ -1407,6 +1439,16 @@ class _TrophieDrawWidget(QWidget):
         # ── Shimmer/shine sweep overlay ───────────────────────────────────────
         if self._state == IDLE and self._passive_mode == "shimmer":
             self._draw_shimmer(p)
+
+        # ── New passive animation overlays (trophy_animations) ────────────────
+        if self._state == IDLE and self._passive_mode == "wave":
+            trophy_animations.draw_wave(p, self)
+        if self._passive_mode == "snore" or self._state == SLEEPY:
+            trophy_animations.draw_snore(p, self)
+        if self._state == IDLE and self._passive_mode == "celebrate":
+            trophy_animations.draw_celebrate(p, self)
+        if self._state == IDLE and self._passive_mode == "dizzy":
+            trophy_animations.draw_dizzy(p, self)
 
         p.end()
 
