@@ -1113,11 +1113,12 @@ class _TrophieDrawWidget(QWidget):
     # Yawn threshold: above this value the mouth is drawn wide open (surprised shape)
     _YAWN_FULL_OPEN_THRESHOLD = 0.7
 
-    def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int) -> None:
+    def __init__(self, parent: QWidget, trophy_w: int, trophy_h: int, pad: int = 0) -> None:
         super().__init__(parent)
         self._tw = trophy_w
         self._th = trophy_h
-        self.setFixedSize(trophy_w, trophy_h)
+        self._pad = pad
+        self.setFixedSize(trophy_w + 2 * pad, trophy_h + 2 * pad)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         # Skin
@@ -1328,8 +1329,8 @@ class _TrophieDrawWidget(QWidget):
         jump = self._jump_offset if self._jumping else 0.0
         total_offset = bob + jump
 
-        cx = self._tw // 2
-        cy_base = self._th // 2 + int(self._th * 0.20)
+        cx = self._tw // 2 + self._pad
+        cy_base = self._th // 2 + int(self._th * 0.20) + self._pad
 
         # ── Tilt / rotation angle (degrees) ──────────────────────────────────
         if self._state == TALKING:
@@ -1419,10 +1420,12 @@ class _TrophieDrawWidget(QWidget):
             return
         tw = self._tw
         th = self._th
-        # Map sweep_pos 0→1 to x position across the widget
-        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20
+        pad = self._pad
+        # Map sweep_pos 0→1 to x position across the visual trophy area
+        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20 + pad
         sweep_w = max(12, int(tw * 0.25))
-        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(th))
+        widget_h = th + 2 * pad
+        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(widget_h))
         grad.setColorAt(0.0, QColor(255, 220, 80, 0))
         grad.setColorAt(0.3, QColor(255, 220, 80, 80))
         grad.setColorAt(0.5, QColor(255, 240, 120, 120))
@@ -1432,7 +1435,7 @@ class _TrophieDrawWidget(QWidget):
         p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(grad)
-        p.drawRect(sweep_x, 0, sweep_w, th)
+        p.drawRect(sweep_x, 0, sweep_w, widget_h)
         p.restore()
 
     def _draw_sparkles(self, p: QPainter, cx: int, cy: int) -> None:
@@ -2135,9 +2138,11 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             return
         tw = self._tw
         th = self._th
-        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20
+        pad = self._pad
+        sweep_x = int((sweep_pos - 0.2) * (tw + 40)) - 20 + pad
         sweep_w = max(12, int(tw * 0.25))
-        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(th))
+        widget_h = th + 2 * pad
+        grad = QLinearGradient(float(sweep_x), 0.0, float(sweep_x + sweep_w), float(widget_h))
         grad.setColorAt(0.0, QColor(220, 220, 240, 0))
         grad.setColorAt(0.3, QColor(220, 220, 240, 70))
         grad.setColorAt(0.5, QColor(240, 240, 255, 110))
@@ -2147,7 +2152,7 @@ class _PinballDrawWidget(_TrophieDrawWidget):
         p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(grad)
-        p.drawRect(sweep_x, 0, sweep_w, th)
+        p.drawRect(sweep_x, 0, sweep_w, widget_h)
         p.restore()
 
     def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
@@ -2783,6 +2788,10 @@ class GUITrophie(QWidget):
     _TROPHY_W = 60
     _TROPHY_H = 70
     _MARGIN = 8
+    # Extra padding added around the logical drawing area on every side so that
+    # animations (bounce, jump, wobble, squash) and tall skin accessories (hats,
+    # rainbow arc) are never clipped by the widget boundary.
+    _DRAW_PAD = 25
 
     _TROPHIE_GREETINGS = [
         "Hey! I am Trophie! Welcome back!",
@@ -2807,12 +2816,13 @@ class GUITrophie(QWidget):
         self._current_tab = ""
         self._greeted = False
 
-        # Draw widget
-        self._draw = _TrophieDrawWidget(self, self._TROPHY_W, self._TROPHY_H)
+        # Draw widget — sized to _TROPHY_W/H + 2*_DRAW_PAD on every side so
+        # animations and accessories are not clipped at the widget boundary.
+        self._draw = _TrophieDrawWidget(self, self._TROPHY_W, self._TROPHY_H, pad=self._DRAW_PAD)
         self._draw.move(0, 0)
         self._draw.set_skin(cfg.OVERLAY.get("trophie_gui_skin", "classic"))
 
-        self.setFixedSize(self._TROPHY_W, self._TROPHY_H)
+        self.setFixedSize(self._TROPHY_W + 2 * self._DRAW_PAD, self._TROPHY_H + 2 * self._DRAW_PAD)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.raise_()
 
@@ -3069,22 +3079,29 @@ class GUITrophie(QWidget):
 
     def _position_bubble(self, bubble: _SpeechBubble) -> None:
         try:
+            pad = self._DRAW_PAD
             bw = bubble.width()
             bh = bubble.height()
-            # Place bubble just above the trophy cup top (not the widget top).
-            # cy_base is shifted down by 20% to give accessories headroom, so the
-            # cup top is at widget-y + (trophy_h/2 + trophy_h*0.20 - trophy_h*0.36).
-            cup_top = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.20) - int(self._TROPHY_H * 0.36)
-            bx = max(0, self.x() + self._TROPHY_W // 2 - bw // 2)
-            by_raw = self.y() + cup_top - bh - 7
+            # The drawing centre within the (padded) widget:
+            draw_cx = self._TROPHY_W // 2 + pad
+            draw_cy_base = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.20) + pad
+            # Cup top (widget-relative) and absolute visual positions
+            cup_top_in_widget = draw_cy_base - int(self._TROPHY_H * 0.36)
+            mascot_cx = self.x() + draw_cx
+            cup_top_abs = self.y() + cup_top_in_widget
+            base_bottom_abs = self.y() + draw_cy_base + int(self._TROPHY_H * 0.44)
+            # Place bubble above the cup; flip below if not enough room
+            bx = max(0, mascot_cx - bw // 2)
+            by_raw = cup_top_abs - bh - 7
             if by_raw < 0:
-                by = self.y() + self._TROPHY_H + 4  # flip below
+                by = base_bottom_abs + 4  # flip below visual base
             else:
                 by = by_raw
-            # Clamp to central widget
+            # Clamp to central widget bounds
             if bx + bw > self._central.width():
                 bx = self._central.width() - bw - 4
-            mascot_cx = self.x() + self._TROPHY_W // 2
+            if by + bh > self._central.height():
+                by = self._central.height() - bh - 4
             bubble.set_pointer_offset(mascot_cx - bx)
             bubble.move(bx, by)
         except Exception:
@@ -3120,11 +3137,15 @@ class GUITrophie(QWidget):
 
     def _show_action_toast(self, global_pos: QPoint) -> None:
         toast = _ActionToast(self._central)
-        # Position above the trophie, centred horizontally
-        cx = self.x() + self._TROPHY_W // 2
-        ty = self.y() - toast.height() - 4
+        # Position above the trophie visual area, centred horizontally
+        pad = self._DRAW_PAD
+        draw_cx = self._TROPHY_W // 2 + pad
+        draw_cy_base = self._TROPHY_H // 2 + int(self._TROPHY_H * 0.20) + pad
+        cup_top_abs = self.y() + draw_cy_base - int(self._TROPHY_H * 0.36)
+        cx = self.x() + draw_cx
+        ty = cup_top_abs - toast.height() - 4
         if ty < 0:
-            ty = self.y() + self._TROPHY_H + 4
+            ty = self.y() + draw_cy_base + int(self._TROPHY_H * 0.44) + 4
         toast.popup(self._central.mapToGlobal(QPoint(cx - toast.width() // 2, ty)))
 
     def _silence_10m(self) -> None:
@@ -3132,8 +3153,14 @@ class GUITrophie(QWidget):
         self._dismiss_bubble()
 
     def update_position(self, parent_size: QSize) -> None:
-        x = self._MARGIN
-        y = parent_size.height() - self._TROPHY_H - self._MARGIN
+        pad = self._DRAW_PAD
+        widget_h = self._TROPHY_H + 2 * pad
+        # Keep the widget's left edge at or to the right of the parent's left edge.
+        # The visual trophy content (cx=55) remains visible even at x=0.
+        x = max(0, self._MARGIN - pad)
+        # Keep the widget bottom at _MARGIN pixels above the parent bottom so the
+        # bottom padding absorbs downward animation without the widget overflowing.
+        y = max(0, parent_size.height() - widget_h - self._MARGIN)
         self.move(x, y)
         self.raise_()
 
