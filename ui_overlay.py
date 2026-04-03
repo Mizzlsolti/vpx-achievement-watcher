@@ -3991,7 +3991,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.resize(400, 120)
         # --- Timer effects (instantiated before first render) ---
-        self._fx_scale_glow = CountdownScaleGlow(intensity=self._get_fx_intensity("fx_timer_number_spin"))
+        self._fx_scale_glow = CountdownScaleGlow(intensity=self._get_fx_intensity("fx_timer_321go"))
         self._fx_radial_pulse = RadialPulseBackground(intensity=self._get_fx_intensity("fx_timer_radial_pulse"))
         self._fx_urgency_shake = UrgencyShake(intensity=self._get_fx_intensity("fx_timer_urgency_shake"))
         self._fx_warp = TimeWarpDistortion(intensity=self._get_fx_intensity("fx_timer_warp_distortion"))
@@ -4040,7 +4040,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
                 self._fx_explosion.start()
             QTimer.singleShot(2000, self.close)
             return
-        if self._is_fx_enabled("fx_timer_number_spin"):
+        if self._is_fx_enabled("fx_timer_321go"):
             self._fx_scale_glow.trigger()
         if self._is_fx_enabled("fx_timer_pulse_ring"):
             self._fx_pulse_ring.trigger()
@@ -4123,7 +4123,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         # Background effects (drawn behind text)
         if self._is_fx_enabled("fx_timer_radial_pulse"):
             self._fx_radial_pulse.draw(p, draw_rect)
-        if self._is_fx_enabled("fx_timer_number_spin"):
+        if self._is_fx_enabled("fx_timer_321go"):
             self._fx_scale_glow.draw(p, draw_rect)
         if self._is_fx_enabled("fx_timer_warp_distortion"):
             self._fx_warp.draw(p, draw_rect)
