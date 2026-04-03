@@ -2578,7 +2578,11 @@ class GUITrophie(QWidget):
             # The cup top is approximately at widget-y + (trophy_h/2 - trophy_h*0.36).
             cup_top = self._TROPHY_H // 2 - int(self._TROPHY_H * 0.36)
             bx = max(0, self.x() + self._TROPHY_W // 2 - bw // 2)
-            by = max(0, self.y() + cup_top - bh - 2)
+            by_raw = self.y() + cup_top - bh - 2
+            if by_raw < 0:
+                by = self.y() + self._TROPHY_H + 4  # flip below
+            else:
+                by = by_raw
             # Clamp to central widget
             if bx + bw > self._central.width():
                 bx = self._central.width() - bw - 4
@@ -3203,18 +3207,12 @@ class OverlayTrophie(QWidget):
                     abs_y = origin.y() + self._TROPHY_H + 4
             else:
                 # Portrait: widget is _TROPHY_H wide × _TROPHY_W tall.
-                # After CW rotation the ball "head" moves to the left edge;
-                # after CCW rotation it moves to the right edge.
-                ccw = bool(ov.get("trophie_overlay_rotate_ccw", False))
-                mid_y = origin.y() + self.height() // 2
-                if ccw:
-                    # CCW: head is on the right — place bubble to the right
-                    abs_x = origin.x() + self.width() + 4
-                    abs_y = mid_y - bh // 2
-                else:
-                    # CW: head is on the left — place bubble to the left
-                    abs_x = origin.x() - bw - 4
-                    abs_y = mid_y - bh // 2
+                # Place bubble above the widget, centered horizontally.
+                abs_x = origin.x() + self.width() // 2 - bw // 2
+                abs_y = origin.y() - bh - 4
+                # If no room above, flip below
+                if abs_y < screen_geom.y():
+                    abs_y = origin.y() + self.height() + 4
             # Clamp to screen
             if abs_x < screen_geom.x():
                 abs_x = screen_geom.x()
