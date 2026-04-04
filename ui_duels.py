@@ -221,7 +221,7 @@ class DuelInviteOverlay(QWidget):
             super().keyPressEvent(event)
 
 
-
+class DuelsMixin:
     """Mixin that provides the Score Duels tab and all related UI methods.
 
     Expects the host class to provide:
