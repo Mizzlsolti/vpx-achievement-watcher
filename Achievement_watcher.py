@@ -74,6 +74,7 @@ from ui_challenges import ChallengesMixin
 from ui_progress import ProgressMixin
 from ui_dashboard import DashboardMixin
 from ui_overlay_pages import OverlayPagesMixin
+from ui_duels import DuelsMixin
 
 from ui_vps import (
     VpsPickerDialog, VpsAchievementInfoDialog, CloudProgressVpsInfoDialog,
@@ -140,6 +141,10 @@ class Bridge(QObject):
     close_secondary_overlays = pyqtSignal()
     session_ended = pyqtSignal(str)  # (rom)
     session_started = pyqtSignal(str, str)  # (rom, table_name)
+    duel_received = pyqtSignal(str, str, str)    # (opponent_name, table_name, duel_id)
+    duel_accepted = pyqtSignal(str)              # (duel_id)
+    duel_result = pyqtSignal(str, str, int, int) # (duel_id, result, your_score, their_score)
+    duel_expired = pyqtSignal(str)               # (duel_id)
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
@@ -165,7 +170,7 @@ def _parse_version(v_str):
 
 
 class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, AppearanceMixin, ChallengesMixin, ProgressMixin,
-                 DashboardMixin, OverlayPagesMixin):
+                 DashboardMixin, OverlayPagesMixin, DuelsMixin):
     CURRENT_VERSION = WATCHER_VERSION
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
     _NOTIF_COOLDOWN_HOURS = 24              # dedup window for highscore_beaten per ROM
@@ -213,6 +218,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
+        self.bridge.duel_received.connect(self._on_duel_invitation_received)
+        self.bridge.duel_result.connect(self._on_duel_result)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -226,7 +233,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self._build_tab_appearance()
         self._build_tab_controls()
         self._build_tab_stats()
-        self._build_tab_progress()        
+        self._build_tab_progress()
+        self._build_tab_duels()
         self._build_tab_available_maps()   
         self._build_tab_cloud() 
         self._build_tab_system()
@@ -529,6 +537,20 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• Click an achievement link to see more details.<br>"
             "• Use <b>🔄 Refresh</b> to reload the list."
         ),
+        "duels": (
+            "<b>⚔️ Score Duels</b><br><br>"
+            "Challenge other players to asynchronous high-score battles!<br><br>"
+            "• <b>Start New Duel</b>: Search for a player by ID and select a table to challenge them.<br>"
+            "• <b>Incoming Invitations</b>: When someone challenges you, an alert appears at the top "
+            "of the tab. You have 15 seconds to accept or decline.<br>"
+            "• <b>Active Duels</b>: Shows all pending and in-progress duels with status indicators.<br>"
+            "• <b>Duel History</b>: Browse your completed duels with results and scores.<br><br>"
+            "<b>Rules:</b><br>"
+            "• VPX must NOT be running when accepting a duel invitation.<br>"
+            "• Both players play the same table; highest score wins.<br>"
+            "• Duels expire if not accepted or completed within the time limit.<br>"
+            "• Cloud Sync must be enabled for duels to work."
+        ),
         "appearance_overlay": (
             "<b>🖼 Overlay</b><br><br>"
             "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
@@ -627,7 +649,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "<b>🕹️ Controls</b><br><br>"
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Challenge Action / Start</b>: Bind a key or button to start or trigger a challenge action.<br>"
+            "• <b>Challenge / Duel Action</b>: Bind a key or button to start or trigger a challenge or duel action.<br>"
             "• <b>Challenge Left / Right</b>: Bind keys or buttons for left/right challenge navigation.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
@@ -933,7 +955,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Challenge Action / Start:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge / Duel Action:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
         lay_inputs.addWidget(QLabel("<b>Challenge Left:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
         lay_inputs.addWidget(QLabel("<b>Challenge Right:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)

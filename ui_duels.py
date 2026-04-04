@@ -1,0 +1,582 @@
+"""Score-Duels-tab mixin: Score Duels tab, alert bar, active duels table,
+start new duel, history table, and all duel event handlers."""
+from __future__ import annotations
+
+import time
+from datetime import datetime
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
+    QLineEdit, QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
+    QHeaderView, QFrame,
+)
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot
+
+from duel_engine import DuelEngine, DuelStatus
+
+
+class DuelsMixin:
+    """Mixin that provides the Score Duels tab and all related UI methods.
+
+    Expects the host class to provide:
+        self.cfg            – AppConfig instance
+        self.watcher        – Watcher instance
+        self.main_tabs      – QTabWidget (main tab bar)
+        self._add_tab_help_button(layout, key)  – adds the Help button to a tab layout
+    """
+
+    # ==========================================
+    # TAB: SCORE DUELS
+    # ==========================================
+
+    def _build_tab_duels(self):
+        """Build the '⚔️ Score Duels' tab and wire up all timers."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Instantiate the duel engine.
+        self._duel_engine = DuelEngine(self.cfg)
+
+        # ── a) Incoming Invitation Alert Bar ────────────────────────────────
+        self._duel_alert_frame = QFrame()
+        self._duel_alert_frame.setStyleSheet(
+            "QFrame { background-color:#3a1a00; border:2px solid #FF7F00;"
+            " border-radius:8px; padding:6px; }"
+        )
+        alert_layout = QVBoxLayout(self._duel_alert_frame)
+        alert_layout.setContentsMargins(10, 6, 10, 6)
+        alert_layout.setSpacing(4)
+
+        self._duel_alert_label = QLabel("")
+        self._duel_alert_label.setStyleSheet(
+            "color:#FF7F00; font-size:11pt; font-weight:bold;"
+        )
+        self._duel_alert_label.setWordWrap(True)
+        alert_layout.addWidget(self._duel_alert_label)
+
+        alert_btn_row = QHBoxLayout()
+        self._btn_duel_accept = QPushButton("✅ Accept")
+        self._btn_duel_accept.setStyleSheet(
+            "QPushButton { background-color:#006400; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 18px; }"
+            "QPushButton:hover { background-color:#008000; }"
+        )
+        self._btn_duel_accept.clicked.connect(self._on_duel_accept)
+
+        self._btn_duel_decline = QPushButton("❌ Decline")
+        self._btn_duel_decline.setStyleSheet(
+            "QPushButton { background-color:#8B0000; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 18px; }"
+            "QPushButton:hover { background-color:#AA0000; }"
+        )
+        self._btn_duel_decline.clicked.connect(self._on_duel_decline)
+
+        self._lbl_duel_countdown = QLabel("")
+        self._lbl_duel_countdown.setStyleSheet(
+            "color:#FFAA00; font-size:10pt; font-weight:bold; margin-left:12px;"
+        )
+
+        alert_btn_row.addWidget(self._btn_duel_accept)
+        alert_btn_row.addWidget(self._btn_duel_decline)
+        alert_btn_row.addWidget(self._lbl_duel_countdown)
+        alert_btn_row.addStretch(1)
+        alert_layout.addLayout(alert_btn_row)
+
+        layout.addWidget(self._duel_alert_frame)
+        self._duel_alert_frame.setVisible(False)
+
+        # Countdown timer for incoming invitation (15 seconds).
+        self._duel_accept_timer = QTimer(self)
+        self._duel_accept_timer.setInterval(1000)
+        self._duel_accept_timer.timeout.connect(self._on_duel_invitation_timeout)
+        self._duel_accept_countdown = 0
+        self._pending_invitation_duel_id: str = ""
+
+        # ── b) Start New Duel ────────────────────────────────────────────────
+        grp_new = QGroupBox("⚔️ Start New Duel")
+        lay_new = QVBoxLayout(grp_new)
+
+        row_search = QHBoxLayout()
+        row_search.addWidget(QLabel("Opponent Player ID:"))
+        self._txt_duel_search = QLineEdit()
+        self._txt_duel_search.setPlaceholderText("Search player by ID...")
+        self._txt_duel_search.setMaxLength(64)
+        row_search.addWidget(self._txt_duel_search)
+
+        self._btn_duel_search = QPushButton("🔍 Search")
+        self._btn_duel_search.setStyleSheet(
+            "QPushButton { background-color:#005c99; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 14px; }"
+            "QPushButton:hover { background-color:#0070bb; }"
+        )
+        self._btn_duel_search.clicked.connect(self._on_duel_search_player)
+        row_search.addWidget(self._btn_duel_search)
+        lay_new.addLayout(row_search)
+
+        row_table = QHBoxLayout()
+        row_table.addWidget(QLabel("Table:"))
+        self._cmb_duel_table = QComboBox()
+        self._cmb_duel_table.setMinimumWidth(250)
+        self._cmb_duel_table.setPlaceholderText("Select a table...")
+        row_table.addWidget(self._cmb_duel_table, 1)
+
+        self._btn_duel_start = QPushButton("⚔️ Start Duel")
+        self._btn_duel_start.setStyleSheet(
+            "QPushButton { background-color:#FF7F00; color:#000000; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 18px; }"
+            "QPushButton:hover { background-color:#FFA040; }"
+        )
+        self._btn_duel_start.clicked.connect(self._on_duel_start_clicked)
+        row_table.addWidget(self._btn_duel_start)
+        lay_new.addLayout(row_table)
+
+        self._lbl_duel_status = QLabel("")
+        self._lbl_duel_status.setStyleSheet("color:#00E5FF; font-style:italic;")
+        lay_new.addWidget(self._lbl_duel_status)
+
+        layout.addWidget(grp_new)
+
+        # ── c) Active Duels ──────────────────────────────────────────────────
+        grp_active = QGroupBox("🔵 Active Duels")
+        lay_active = QVBoxLayout(grp_active)
+
+        self._tbl_active_duels = QTableWidget(0, 5)
+        self._tbl_active_duels.setHorizontalHeaderLabels(
+            ["Opponent", "Table", "Status", "Time Remaining", "Actions"]
+        )
+        self._tbl_active_duels.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self._tbl_active_duels.horizontalHeader().setSectionResizeMode(
+            4, QHeaderView.ResizeMode.ResizeToContents
+        )
+        self._tbl_active_duels.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tbl_active_duels.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._tbl_active_duels.setAlternatingRowColors(True)
+        self._tbl_active_duels.setStyleSheet(
+            "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
+            "QTableWidget::item:alternate { background:#1a1a1a; }"
+            "QTableWidget::item:selected { background:#1a3a1a; }"
+            "QHeaderView::section { background:#222; color:#FF7F00; font-weight:bold;"
+            " border:1px solid #333; padding:4px; }"
+        )
+        self._tbl_active_duels.setMinimumHeight(120)
+        lay_active.addWidget(self._tbl_active_duels)
+
+        btn_row_active = QHBoxLayout()
+        btn_refresh_active = QPushButton("🔄 Refresh")
+        btn_refresh_active.setStyleSheet(
+            "QPushButton { background-color:#00E5FF; color:#000000; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 14px; }"
+        )
+        btn_refresh_active.clicked.connect(self._refresh_active_duels)
+        btn_row_active.addWidget(btn_refresh_active)
+        btn_row_active.addStretch(1)
+        lay_active.addLayout(btn_row_active)
+        layout.addWidget(grp_active)
+
+        # ── d) Duel History ──────────────────────────────────────────────────
+        grp_history = QGroupBox("📜 Duel History")
+        lay_history = QVBoxLayout(grp_history)
+
+        self._tbl_duel_history = QTableWidget(0, 6)
+        self._tbl_duel_history.setHorizontalHeaderLabels(
+            ["Opponent", "Table", "Result", "Your Score", "Their Score", "Date"]
+        )
+        self._tbl_duel_history.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self._tbl_duel_history.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tbl_duel_history.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._tbl_duel_history.setAlternatingRowColors(True)
+        self._tbl_duel_history.setStyleSheet(
+            "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
+            "QTableWidget::item:alternate { background:#1a1a1a; }"
+            "QTableWidget::item:selected { background:#1a3a3a; }"
+            "QHeaderView::section { background:#222; color:#FF7F00; font-weight:bold;"
+            " border:1px solid #333; padding:4px; }"
+        )
+        self._tbl_duel_history.setMinimumHeight(120)
+        lay_history.addWidget(self._tbl_duel_history)
+
+        btn_row_hist = QHBoxLayout()
+        btn_refresh_hist = QPushButton("🔄 Refresh History")
+        btn_refresh_hist.setStyleSheet(
+            "QPushButton { background-color:#00E5FF; color:#000000; font-weight:bold;"
+            " border:none; border-radius:5px; padding:6px 14px; }"
+        )
+        btn_refresh_hist.clicked.connect(self._refresh_duel_history)
+        btn_row_hist.addWidget(btn_refresh_hist)
+        btn_row_hist.addStretch(1)
+        lay_history.addLayout(btn_row_hist)
+        layout.addWidget(grp_history)
+
+        # ── e) Bottom ────────────────────────────────────────────────────────
+        layout.addStretch(1)
+        self._add_tab_help_button(layout, "duels")
+        self.main_tabs.addTab(tab, "⚔️ Score Duels")
+
+        # ── Populate table dropdown from maps cache ──────────────────────────
+        self._populate_duel_table_combo()
+
+        # ── Polling timers ───────────────────────────────────────────────────
+        # Poll for incoming invitations every 30 seconds (cloud only).
+        self._duel_poll_timer = QTimer(self)
+        self._duel_poll_timer.setInterval(30_000)
+        self._duel_poll_timer.timeout.connect(self._poll_duel_invitations)
+        if getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._duel_poll_timer.start()
+
+        # Check duel expiry every 60 seconds.
+        self._duel_expiry_timer = QTimer(self)
+        self._duel_expiry_timer.setInterval(60_000)
+        self._duel_expiry_timer.timeout.connect(self._check_duel_expiry)
+        self._duel_expiry_timer.start()
+
+        # Initial populate.
+        self._refresh_active_duels()
+        self._refresh_duel_history()
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _populate_duel_table_combo(self) -> None:
+        """Populate the table selection dropdown from the available maps cache.
+
+        Filters the cache to entries that have an NVRAM map, sorts them
+        alphabetically by display name, and adds them to the combo box.
+        Falls back to a placeholder entry when no tables are available
+        (e.g. before the map list has been loaded).
+        """
+        self._cmb_duel_table.clear()
+        cache = getattr(self, "_all_maps_cache", None) or []
+        entries = sorted(
+            (e for e in cache if isinstance(e, dict) and e.get("has_map")),
+            key=lambda e: e.get("name", e.get("rom", "")).lower(),
+        )
+        for entry in entries:
+            display = entry.get("name") or entry.get("rom", "")
+            rom = entry.get("rom", "")
+            self._cmb_duel_table.addItem(display, rom)
+        if not entries:
+            self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
+
+    # ── Slot: search player ───────────────────────────────────────────────────
+
+    def _on_duel_search_player(self) -> None:
+        """Validate the entered player ID against the cloud player list."""
+        pid = self._txt_duel_search.text().strip()
+        if not pid:
+            self._lbl_duel_status.setText("⚠️ Please enter a player ID.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        if pid == my_id:
+            self._lbl_duel_status.setText("⚠️ You cannot challenge yourself.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        self._lbl_duel_status.setText("🔍 Searching…")
+        self._lbl_duel_status.setStyleSheet("color:#00E5FF; font-style:italic;")
+
+        import threading
+        def _search():
+            from cloud_sync import CloudSync
+            ids = CloudSync.fetch_player_ids(self.cfg) or []
+            found = pid in ids
+            from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
+            QMetaObject.invokeMethod(
+                self, "_on_duel_search_result",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, found),
+                Q_ARG(str, pid),
+            )
+        threading.Thread(target=_search, daemon=True).start()
+
+    @pyqtSlot(bool, str)
+    def _on_duel_search_result(self, found: bool, pid: str) -> None:
+        """Called on the GUI thread with the player-search result."""
+        if found:
+            self._lbl_duel_status.setText(f"✅ Player '{pid}' found.")
+            self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
+        else:
+            self._lbl_duel_status.setText(f"❌ Player '{pid}' not found.")
+            self._lbl_duel_status.setStyleSheet("color:#CC4444; font-style:italic;")
+
+    # ── Slot: start duel ─────────────────────────────────────────────────────
+
+    def _on_duel_start_clicked(self) -> None:
+        """Send a duel invitation to the selected opponent for the chosen table.
+
+        Validates that an opponent player ID and a valid table ROM have been
+        selected, that Cloud Sync is enabled, and then delegates to
+        DuelEngine.send_invitation().  Updates the status label with success
+        or failure feedback and refreshes the Active Duels table on success.
+        """
+        opponent_id = self._txt_duel_search.text().strip()
+        if not opponent_id:
+            self._lbl_duel_status.setText("⚠️ Enter an opponent player ID first.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        idx = self._cmb_duel_table.currentIndex()
+        table_rom = self._cmb_duel_table.itemData(idx) or ""
+        table_name = self._cmb_duel_table.currentText()
+        if not table_rom:
+            self._lbl_duel_status.setText("⚠️ Select a valid table first.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+
+        duel = self._duel_engine.send_invitation(opponent_id, table_rom, table_name)
+        if duel:
+            self._lbl_duel_status.setText(
+                f"✅ Invitation sent to '{opponent_id}' for '{table_name}'!"
+            )
+            self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
+            self._refresh_active_duels()
+        else:
+            self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync and player ID.")
+            self._lbl_duel_status.setStyleSheet("color:#CC4444; font-style:italic;")
+
+    # ── Slot: accept / decline invitation ────────────────────────────────────
+
+    def _on_duel_accept(self) -> None:
+        """Accept the currently displayed incoming duel invitation.
+
+        Stops the 15-second countdown timer, hides the alert bar, delegates
+        to DuelEngine.accept_duel(), and refreshes the Active Duels table.
+        """
+        duel_id = self._pending_invitation_duel_id
+        self._duel_accept_timer.stop()
+        self._duel_alert_frame.setVisible(False)
+        if duel_id:
+            self._duel_engine.accept_duel(duel_id)
+            self._refresh_active_duels()
+
+    def _on_duel_decline(self) -> None:
+        """Decline the currently displayed incoming duel invitation.
+
+        Stops the 15-second countdown timer, hides the alert bar, delegates
+        to DuelEngine.decline_duel(), and refreshes the Active Duels table.
+        """
+        duel_id = self._pending_invitation_duel_id
+        self._duel_accept_timer.stop()
+        self._duel_alert_frame.setVisible(False)
+        if duel_id:
+            self._duel_engine.decline_duel(duel_id)
+            self._refresh_active_duels()
+
+    # ── Slot: incoming invitation ─────────────────────────────────────────────
+
+    @pyqtSlot(str, str, str)
+    def _on_duel_invitation_received(self, opponent: str, table_name: str, duel_id: str) -> None:
+        """Show the alert bar when an invitation arrives.
+
+        Parameters
+        ----------
+        opponent : str
+            Display name of the challenger.
+        table_name : str
+            Name of the table being challenged on.
+        duel_id : str
+            Unique ID of the incoming duel.
+        """
+        self._pending_invitation_duel_id = duel_id
+        self._duel_alert_label.setText(
+            f"⚔️ You have been challenged to a Score Duel by {opponent} "
+            f"(Table: {table_name}). Accept?"
+        )
+        self._duel_accept_countdown = 15
+        self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
+        self._duel_alert_frame.setVisible(True)
+        self._duel_accept_timer.start()
+
+        # Switch to the Score Duels tab so the user notices the alert.
+        for i in range(self.main_tabs.count()):
+            if self.main_tabs.tabText(i) == "⚔️ Score Duels":
+                self.main_tabs.setCurrentIndex(i)
+                break
+
+    # ── Slot: countdown tick ──────────────────────────────────────────────────
+
+    def _on_duel_invitation_timeout(self) -> None:
+        """Called every second during the 15-second accept window.
+        Auto-declines when the counter reaches zero.
+        """
+        self._duel_accept_countdown -= 1
+        if self._duel_accept_countdown <= 0:
+            self._duel_accept_timer.stop()
+            self._duel_alert_frame.setVisible(False)
+            if self._pending_invitation_duel_id:
+                self._duel_engine.decline_duel(self._pending_invitation_duel_id)
+                self._pending_invitation_duel_id = ""
+            self._refresh_active_duels()
+        else:
+            self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
+
+    # ── Slot: duel result ─────────────────────────────────────────────────────
+
+    def _on_duel_result(self, duel_id: str, result: str, your_score: int, their_score: int) -> None:
+        """Handle a completed duel result update from the bridge.
+
+        Parameters
+        ----------
+        duel_id : str
+            The duel that was completed.
+        result : str
+            'won', 'lost', or 'expired'.
+        your_score : int
+            Your final score.
+        their_score : int
+            Opponent's final score.
+        """
+        self._refresh_active_duels()
+        self._refresh_duel_history()
+
+    # ── Polling: invitation poll ───────────────────────────────────────────────
+
+    def _poll_duel_invitations(self) -> None:
+        """Poll the cloud for new incoming duel invitations in a background thread.
+
+        Runs DuelEngine.receive_invitations() off the GUI thread so the UI
+        stays responsive.  For each newly discovered invitation, triggers
+        _on_duel_invitation_received() via QMetaObject.invokeMethod() on the
+        GUI thread and refreshes the Active Duels table.  This method is
+        called periodically by self._duel_poll_timer every 30 seconds when
+        Cloud Sync is enabled.
+        """
+        import threading
+        def _poll():
+            new_duels = self._duel_engine.receive_invitations()
+            if new_duels:
+                from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
+                for duel in new_duels:
+                    QMetaObject.invokeMethod(
+                        self, "_on_duel_invitation_received",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, duel.challenger_name or duel.challenger),
+                        Q_ARG(str, duel.table_name or duel.table_rom),
+                        Q_ARG(str, duel.duel_id),
+                    )
+                QMetaObject.invokeMethod(
+                    self, "_refresh_active_duels",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+        threading.Thread(target=_poll, daemon=True).start()
+
+    # ── Polling: expiry check ──────────────────────────────────────────────────
+
+    def _check_duel_expiry(self) -> None:
+        """Check for expired duels via the engine and refresh both tables.
+
+        Delegates to DuelEngine.check_expiry() which moves any overdue
+        PENDING duels to history with DuelStatus.EXPIRED.  If any duels
+        were expired, both the Active Duels and Duel History tables are
+        refreshed.  Called every 60 seconds by self._duel_expiry_timer.
+        """
+        expired = self._duel_engine.check_expiry()
+        if expired:
+            self._refresh_active_duels()
+            self._refresh_duel_history()
+
+    # ── Refresh: active duels table ────────────────────────────────────────────
+
+    @pyqtSlot()
+    def _refresh_active_duels(self) -> None:
+        """Reload the Active Duels table from the engine."""
+        duels = self._duel_engine.get_active_duels()
+        tbl = self._tbl_active_duels
+        tbl.setRowCount(0)
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        now = time.time()
+        for duel in duels:
+            row = tbl.rowCount()
+            tbl.insertRow(row)
+
+            # Opponent name column.
+            is_challenger = (duel.challenger == my_id)
+            opp_name = duel.opponent_name or duel.opponent if is_challenger else duel.challenger_name or duel.challenger
+            tbl.setItem(row, 0, QTableWidgetItem(opp_name))
+
+            # Table name column.
+            tbl.setItem(row, 1, QTableWidgetItem(duel.table_name or duel.table_rom))
+
+            # Status with colored indicator.
+            status_map = {
+                DuelStatus.PENDING:  "🟡 Pending",
+                DuelStatus.ACCEPTED: "🟢 Accepted",
+                DuelStatus.ACTIVE:   "🔵 In Progress",
+            }
+            status_text = status_map.get(duel.status, duel.status.capitalize())
+            tbl.setItem(row, 2, QTableWidgetItem(status_text))
+
+            # Time remaining column.
+            if duel.status == DuelStatus.PENDING and duel.expires_at > 0:
+                remaining = max(0, duel.expires_at - now)
+                mins = int(remaining // 60)
+                secs = int(remaining % 60)
+                tbl.setItem(row, 3, QTableWidgetItem(f"{mins}m {secs:02d}s"))
+            else:
+                tbl.setItem(row, 3, QTableWidgetItem("—"))
+
+            # Actions column placeholder.
+            tbl.setItem(row, 4, QTableWidgetItem(""))
+
+    # ── Refresh: history table ─────────────────────────────────────────────────
+
+    def _refresh_duel_history(self) -> None:
+        """Reload the Duel History table from the engine.
+
+        Fetches the completed-duel list (newest first) from DuelEngine and
+        repopulates self._tbl_duel_history.  Each row shows opponent name,
+        table name, result with color coding (green for wins, red for losses,
+        gray for expired/declined), local player score, opponent score, and
+        the completion date formatted as YYYY-MM-DD HH:MM.
+        """
+        history = self._duel_engine.get_duel_history()
+        tbl = self._tbl_duel_history
+        tbl.setRowCount(0)
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        for duel in history:
+            row = tbl.rowCount()
+            tbl.insertRow(row)
+
+            # Opponent name.
+            is_challenger = (duel.challenger == my_id)
+            opp_name = duel.opponent_name or duel.opponent if is_challenger else duel.challenger_name or duel.challenger
+            tbl.setItem(row, 0, QTableWidgetItem(opp_name))
+
+            # Table name.
+            tbl.setItem(row, 1, QTableWidgetItem(duel.table_name or duel.table_rom))
+
+            # Result with icon and color.
+            result_map = {
+                DuelStatus.WON:      ("🏆 Won",     "#00AA00"),
+                DuelStatus.LOST:     ("💀 Lost",    "#AA0000"),
+                DuelStatus.EXPIRED:  ("⏰ Expired", "#666666"),
+                DuelStatus.DECLINED: ("❌ Declined","#666666"),
+            }
+            result_text, result_color = result_map.get(duel.status, (duel.status.capitalize(), "#AAAAAA"))
+            result_item = QTableWidgetItem(result_text)
+            result_item.setForeground(__import__("PyQt6.QtGui", fromlist=["QColor"]).QColor(result_color))
+            tbl.setItem(row, 2, result_item)
+
+            # Your score.
+            my_score = duel.challenger_score if is_challenger else duel.opponent_score
+            tbl.setItem(row, 3, QTableWidgetItem(f"{my_score:,}"))
+
+            # Their score.
+            their_score = duel.opponent_score if is_challenger else duel.challenger_score
+            tbl.setItem(row, 4, QTableWidgetItem(f"{their_score:,}"))
+
+            # Date.
+            if duel.completed_at:
+                dt = datetime.fromtimestamp(duel.completed_at).strftime("%Y-%m-%d %H:%M")
+            else:
+                dt = "—"
+            tbl.setItem(row, 5, QTableWidgetItem(dt))
