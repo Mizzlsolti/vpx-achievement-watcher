@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QCompleter, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
 from config import p_aweditor
 from duel_engine import DuelEngine, DuelStatus
@@ -478,6 +478,7 @@ class DuelsMixin:
         on first launch before the map list has been loaded.
         """
         self._cmb_duel_table.clear()
+        self._cmb_duel_table.addItem("— Select Table —", "")
         cache = getattr(self, "_all_maps_cache", None) or []
         entries = sorted(
             (e for e in cache if isinstance(e, dict) and e.get("has_map") and e.get("is_local")),
@@ -487,7 +488,7 @@ class DuelsMixin:
             title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
             clean_title = _strip_version_from_name(title)
-            display = f"{clean_title} ({rom})" if clean_title != rom else clean_title
+            display = clean_title
             self._cmb_duel_table.addItem(display, rom)
         if not entries:
             # Fallback: use vps_id_mapping.json (always present if the user has
@@ -503,7 +504,7 @@ class DuelsMixin:
                 for rom in fallback_entries:
                     title = romnames.get(rom) or rom
                     clean_title = _strip_version_from_name(title)
-                    display = f"{clean_title} ({rom})" if clean_title != rom else clean_title
+                    display = clean_title
                     self._cmb_duel_table.addItem(display, rom)
             else:
                 self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
@@ -517,13 +518,60 @@ class DuelsMixin:
                     if fname.endswith(".custom.json"):
                         table_key = fname[:-len(".custom.json")]
                         clean_name = _strip_version_from_name(table_key)
-                        display = f"{clean_name} (CAT)"
+                        display = clean_name
                         if table_key not in existing_data:
                             self._cmb_duel_table.addItem(display, table_key)
         except Exception:
             pass
 
+        # Build autocomplete suggestions: both display names and ROM names.
+        suggestions: list[str] = []
+        seen: set[str] = set()
+        for i in range(self._cmb_duel_table.count()):
+            display = self._cmb_duel_table.itemText(i)
+            rom = self._cmb_duel_table.itemData(i) or ""
+            if display and display not in seen:
+                seen.add(display)
+                suggestions.append(display)
+            if rom and rom not in seen:
+                seen.add(rom)
+                suggestions.append(rom)
+
+        if not hasattr(self, '_duel_table_completer_model'):
+            self._duel_table_completer_model = QStringListModel(suggestions, self)
+        else:
+            self._duel_table_completer_model.setStringList(suggestions)
+        self._duel_table_completer.setModel(self._duel_table_completer_model)
+
+        # Connect completer activation to select correct combo entry.
+        try:
+            self._duel_table_completer.activated.disconnect()
+        except Exception:
+            pass
+        self._duel_table_completer.activated.connect(self._on_duel_table_completer_activated)
+
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
+
+    def _on_duel_table_completer_activated(self, text: str) -> None:
+        """When autocomplete selects something, find the matching combo entry.
+
+        Supports both table name and ROM name matching.
+        """
+        cmb = self._cmb_duel_table
+        # First try exact display text match.
+        idx = cmb.findText(text, Qt.MatchFlag.MatchExactly)
+        if idx >= 0:
+            cmb.setCurrentIndex(idx)
+            return
+        # Then try matching by ROM (itemData).
+        for i in range(cmb.count()):
+            if (cmb.itemData(i) or "").lower() == text.lower():
+                cmb.setCurrentIndex(i)
+                return
+        # Fallback: partial match on display text.
+        idx = cmb.findText(text, Qt.MatchFlag.MatchContains)
+        if idx >= 0:
+            cmb.setCurrentIndex(idx)
 
     def _fetch_duel_opponents(self) -> None:
         """Fetch all player names from the cloud and populate the opponent combo box.
