@@ -355,11 +355,11 @@ class DuelEngine:
 
         if isinstance(cloud_data, dict):
             if is_challenger:
-                opp_raw = cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED)
-                duel.opponent_score = int(opp_raw) if int(opp_raw) != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+                opp_val = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
+                duel.opponent_score = opp_val if opp_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
             else:
-                chall_raw = cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED)
-                duel.challenger_score = int(chall_raw) if int(chall_raw) != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+                chall_val = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
+                duel.challenger_score = chall_val if chall_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
 
         # Only determine winner if both scores have been submitted.
         both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED

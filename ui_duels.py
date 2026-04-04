@@ -897,7 +897,6 @@ class DuelsMixin:
                         self._trophie_overlay.on_duel_declined()
                 except Exception:
                     pass
-                self._pending_invitation_duel_id = ""
                 return
         except Exception:
             pass
@@ -919,14 +918,12 @@ class DuelsMixin:
                     "#CC2200",
                     seconds=6,
                 )
-                self._pending_invitation_duel_id = ""
                 return
         except Exception:
             pass
 
         self._duel_engine.accept_duel(duel_id)
         self._refresh_active_duels()
-        self._pending_invitation_duel_id = ""
         # Trigger mascot accepted reactions.
         try:
             if getattr(self, "_trophie_gui", None):
