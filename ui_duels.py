@@ -487,7 +487,7 @@ class DuelsMixin:
 
         # ── e) Bottom ────────────────────────────────────────────────────────
         layout.addStretch(1)
-        self._add_tab_help_button(layout, "duels")
+        self._add_tab_duels_bottom_buttons(layout)
         self.main_tabs.addTab(tab, "⚔️ Score Duels")
         self._duels_tab_index = self.main_tabs.count() - 1
 
@@ -520,6 +520,67 @@ class DuelsMixin:
         self._refresh_duel_history()
 
     # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _add_tab_duels_bottom_buttons(self, layout) -> None:
+        """Add the Duel Rules and Help buttons anchored to the bottom-right."""
+        row = QHBoxLayout()
+        row.addStretch(1)
+
+        btn_rules = QPushButton("📜 Duel Rules")
+        btn_rules.setToolTip("Show the Score Duel rules")
+        btn_rules.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00;"
+            " border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0 10px; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
+        )
+        btn_rules.setFixedHeight(28)
+        btn_rules.clicked.connect(self._show_duel_rules)
+        row.addWidget(btn_rules)
+
+        btn_help = QPushButton("❓")
+        btn_help.setFixedSize(28, 28)
+        btn_help.setToolTip("Show help for this tab")
+        btn_help.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
+        )
+        btn_help.clicked.connect(lambda: self._show_tab_help("duels"))
+        row.addWidget(btn_help)
+        layout.addLayout(row)
+
+    def _show_duel_rules(self) -> None:
+        """Show the Score Duel rules dialog."""
+        from PyQt6.QtWidgets import QMessageBox
+        rules = (
+            "📜 Score Duel Rules\n\n"
+            "⚔️ OVERVIEW\n"
+            "Score Duels are asynchronous high-score battles. Challenge any\n"
+            "cloud-connected player to compete on the same table.\n\n"
+            "👥 OPPONENTS\n"
+            "• Cloud Sync must be enabled for both players\n"
+            "• Only players with a valid Player Name appear\n"
+            "• Players using the default name \"Player\" are hidden\n\n"
+            "🎰 TABLE SELECTION\n"
+            "• Tables must have an NVRAM map AND be locally installed\n"
+            "• Only approved custom tables (CAT Registry) are included\n\n"
+            "🔗 MATCHING\n"
+            "• Both players must have the same ROM name for the table\n"
+            "• If the opponent does not have the table installed, the duel is automatically declined\n\n"
+            "⏳ INVITATIONS\n"
+            "• You have 15 seconds to accept or decline\n"
+            "• VPX must NOT be running when accepting\n"
+            "• Unanswered invitations expire automatically\n\n"
+            "🏆 SCORING\n"
+            "• Both players play the table independently\n"
+            "• Scores are submitted and compared via the cloud\n"
+            "• Highest score wins the duel"
+        )
+        box = QMessageBox(self)
+        box.setWindowTitle("📜 Score Duel Rules")
+        box.setText(rules)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.exec()
 
     def _populate_duel_table_combo(self) -> None:
         """Populate the table selection dropdown from the available maps cache.
@@ -568,14 +629,17 @@ class DuelsMixin:
             else:
                 self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
 
-        # Add CAT tables from AWEditor (.custom.json files).
+        # Add CAT tables from AWEditor (.custom.json files) — only approved entries.
         try:
+            from cat_registry import lookup_by_table_key
             aw_dir = p_aweditor(self.cfg)
             if os.path.isdir(aw_dir):
                 existing_data = [self._cmb_duel_table.itemData(i) for i in range(self._cmb_duel_table.count())]
                 for fname in sorted(os.listdir(aw_dir)):
                     if fname.endswith(".custom.json"):
                         table_key = fname[:-len(".custom.json")]
+                        if lookup_by_table_key(table_key) is None:
+                            continue  # Not approved → skip
                         clean_name = _strip_version_from_name(table_key)
                         display = clean_name
                         if table_key not in existing_data:
@@ -820,14 +884,11 @@ class DuelsMixin:
             if w and (w.game_active or w._vp_player_visible()):
                 self._duel_engine.decline_duel(duel_id)
                 self._refresh_active_duels()
-                try:
-                    self._get_mini_overlay().show_info(
-                        "Cannot accept duel while VPX is running.",
-                        seconds=5,
-                        color_hex="#CC5500",
-                    )
-                except Exception:
-                    pass
+                self._duel_notify(
+                    "Cannot accept duel while VPX is running.",
+                    "#CC5500",
+                    seconds=5,
+                )
                 try:
                     if getattr(self, "_trophie_gui", None):
                         self._trophie_gui.on_duel_declined()
@@ -851,14 +912,11 @@ class DuelsMixin:
                 tname = duel.table_name or duel.table_rom
                 self._duel_engine.decline_duel(duel_id)
                 self._refresh_active_duels()
-                try:
-                    self._get_mini_overlay().show_info(
-                        f"Duel cancelled \u2013 Table \u2018{tname}\u2019 is not available.",
-                        seconds=6,
-                        color_hex="#CC2200",
-                    )
-                except Exception:
-                    pass
+                self._duel_notify(
+                    f"❌ Duel cancelled – Table '{tname}' is not available.",
+                    "#CC2200",
+                    seconds=6,
+                )
                 return
         except Exception:
             pass
@@ -934,13 +992,19 @@ class DuelsMixin:
                         self._duel_engine.decline_duel(did)
                         self._refresh_active_duels()
                         try:
-                            self._get_mini_overlay().show_info(
-                                f"Duel cancelled \u2013 Table \u2018{tname}\u2019 is not available.",
-                                seconds=6,
-                                color_hex="#CC2200",
-                            )
+                            w = getattr(self, "watcher", None)
+                            vpx_running = w and (w.game_active or w._vp_player_visible())
                         except Exception:
-                            pass
+                            vpx_running = False
+                        if not vpx_running:
+                            try:
+                                self._get_mini_overlay().show_info(
+                                    f"Duel cancelled \u2013 Table \u2018{tname}\u2019 is not available.",
+                                    seconds=6,
+                                    color_hex="#CC2200",
+                                )
+                            except Exception:
+                                pass
                         return
                 except Exception:
                     pass
@@ -1039,15 +1103,15 @@ class DuelsMixin:
         """
         try:
             if result == "won":
-                msg = f"🏆 DUEL WON!\nYou: {your_score:,} vs Opponent: {their_score:,}"
+                msg = f"🏆 DUEL WON! You: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#00CC44"
             elif result == "lost":
-                msg = f"💀 DUEL LOST.\nYou: {your_score:,} vs Opponent: {their_score:,}"
+                msg = f"💀 DUEL LOST. You: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#CC2200"
             else:
                 msg = "⏰ Duel expired \u2014 no response received."
                 color = "#888888"
-            self._get_mini_overlay().show_info(msg, seconds=8, color_hex=color)
+            self._duel_notify(msg, color, seconds=8)
         except Exception:
             pass
 
@@ -1063,6 +1127,25 @@ class DuelsMixin:
             from ui_overlay import MiniInfoOverlay  # deferred import
             self._mini_overlay = MiniInfoOverlay(self)
         return self._mini_overlay
+
+    def _duel_notify(self, msg: str, color_hex: str, seconds: int = 6) -> None:
+        """Show a duel notification — in-tab label if GUI visible, MiniOverlay if systray, nothing if VPX running."""
+        try:
+            w = getattr(self, "watcher", None)
+            if w and (w.game_active or w._vp_player_visible()):
+                return  # VPX is running → no notification
+        except Exception:
+            pass
+
+        gui_visible = self.isVisible() and not self.isMinimized()
+        if gui_visible:
+            self._lbl_duel_status.setText(msg)
+            self._lbl_duel_status.setStyleSheet(f"color:{color_hex}; font-style:italic;")
+        else:
+            try:
+                self._get_mini_overlay().show_info(msg, seconds=seconds, color_hex=color_hex)
+            except Exception:
+                pass
 
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
@@ -1111,14 +1194,11 @@ class DuelsMixin:
             self._refresh_active_duels()
             self._refresh_duel_history()
             for duel in expired:
-                try:
-                    self._get_mini_overlay().show_info(
-                        "⏰ Duel expired \u2014 no response received.",
-                        seconds=6,
-                        color_hex="#888888",
-                    )
-                except Exception:
-                    pass
+                self._duel_notify(
+                    "⏰ Duel expired \u2014 no response received.",
+                    "#888888",
+                    seconds=6,
+                )
 
     # ── Refresh: active duels table ────────────────────────────────────────────
 
@@ -1187,8 +1267,43 @@ class DuelsMixin:
             opp_name = duel.opponent_name or duel.opponent if is_challenger else duel.challenger_name or duel.challenger
             tbl.setItem(row, 0, QTableWidgetItem(opp_name))
 
-            # Table name.
-            tbl.setItem(row, 1, QTableWidgetItem(duel.table_name or duel.table_rom))
+            # Table name with optional ℹ️ info badge.
+            table_display = duel.table_name or duel.table_rom
+            try:
+                from ui_vps import _load_vps_mapping, CloudProgressVpsInfoDialog
+                vps_mapping = _load_vps_mapping(self.cfg)
+                vps_id = vps_mapping.get(duel.table_rom, "")
+            except Exception:
+                vps_id = ""
+            if vps_id:
+                cell_w = QWidget()
+                cell_w.setStyleSheet("background: transparent;")
+                cell_lay = QHBoxLayout(cell_w)
+                cell_lay.setContentsMargins(2, 0, 2, 0)
+                cell_lay.setSpacing(4)
+                lbl_table = QLabel(table_display)
+                lbl_table.setStyleSheet("color:#DDD;")
+                cell_lay.addWidget(lbl_table)
+                btn_info = QPushButton("ℹ️")
+                btn_info.setFixedSize(22, 22)
+                btn_info.setFlat(True)
+                btn_info.setToolTip(f"Table: {table_display}")
+                btn_info.setStyleSheet(
+                    "QPushButton { background: transparent; border: none;"
+                    " font-size: 13px; padding: 0; }"
+                    "QPushButton:hover { background: #1a2a2a; border-radius: 4px; }"
+                )
+                _vps_id = vps_id
+                _cfg = self.cfg
+                btn_info.clicked.connect(
+                    lambda _checked=False, vid=_vps_id, tname=table_display:
+                        CloudProgressVpsInfoDialog(_cfg, vid, table_name=tname, parent=self).exec()
+                )
+                cell_lay.addWidget(btn_info)
+                cell_lay.addStretch(1)
+                tbl.setCellWidget(row, 1, cell_w)
+            else:
+                tbl.setItem(row, 1, QTableWidgetItem(table_display))
 
             # Result with icon and color.
             result_map = {
