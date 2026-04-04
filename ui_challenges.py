@@ -694,15 +694,9 @@ class ChallengesMixin:
             except Exception:
                 pass
             # If the in-tab duel alert bar is visible, click the focused button.
+            # (alert bar removed — this block is kept as no-op for compatibility)
             try:
-                alert = getattr(self, "_duel_alert_frame", None)
-                if alert is not None and alert.isVisible():
-                    focus = int(getattr(self, "_duel_alert_focus", 0))
-                    if focus == 0:
-                        self._on_duel_accept()
-                    else:
-                        self._on_duel_decline()
-                    return
+                pass
             except Exception:
                 pass
             try:
@@ -813,15 +807,7 @@ class ChallengesMixin:
                 return
         except Exception:
             pass
-        # If the in-tab duel alert bar is visible, toggle focus between Accept/Decline.
-        try:
-            alert = getattr(self, "_duel_alert_frame", None)
-            if alert is not None and alert.isVisible():
-                self._duel_alert_focus = 0 if getattr(self, "_duel_alert_focus", 0) != 0 else 1
-                self._apply_duel_alert_focus_styles()
-                return
-        except Exception:
-            pass
+        # Alert bar removed — skip duel alert frame focus toggle
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
@@ -888,15 +874,7 @@ class ChallengesMixin:
                 return
         except Exception:
             pass
-        # If the in-tab duel alert bar is visible, toggle focus between Accept/Decline.
-        try:
-            alert = getattr(self, "_duel_alert_frame", None)
-            if alert is not None and alert.isVisible():
-                self._duel_alert_focus = 0 if getattr(self, "_duel_alert_focus", 0) != 0 else 1
-                self._apply_duel_alert_focus_styles()
-                return
-        except Exception:
-            pass
+        # Alert bar removed — skip duel alert frame focus toggle
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
