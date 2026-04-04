@@ -240,7 +240,13 @@ class DuelsMixin:
     # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _populate_duel_table_combo(self) -> None:
-        """Populate the table dropdown from the available maps cache."""
+        """Populate the table selection dropdown from the available maps cache.
+
+        Filters the cache to entries that have an NVRAM map, sorts them
+        alphabetically by display name, and adds them to the combo box.
+        Falls back to a placeholder entry when no tables are available
+        (e.g. before the map list has been loaded).
+        """
         self._cmb_duel_table.clear()
         cache = getattr(self, "_all_maps_cache", None) or []
         entries = sorted(
@@ -302,7 +308,13 @@ class DuelsMixin:
     # ── Slot: start duel ─────────────────────────────────────────────────────
 
     def _on_duel_start_clicked(self) -> None:
-        """Send a duel invitation to the selected opponent for the chosen table."""
+        """Send a duel invitation to the selected opponent for the chosen table.
+
+        Validates that an opponent player ID and a valid table ROM have been
+        selected, that Cloud Sync is enabled, and then delegates to
+        DuelEngine.send_invitation().  Updates the status label with success
+        or failure feedback and refreshes the Active Duels table on success.
+        """
         opponent_id = self._txt_duel_search.text().strip()
         if not opponent_id:
             self._lbl_duel_status.setText("⚠️ Enter an opponent player ID first.")
@@ -334,7 +346,11 @@ class DuelsMixin:
     # ── Slot: accept / decline invitation ────────────────────────────────────
 
     def _on_duel_accept(self) -> None:
-        """Accept the currently displayed incoming duel invitation."""
+        """Accept the currently displayed incoming duel invitation.
+
+        Stops the 15-second countdown timer, hides the alert bar, delegates
+        to DuelEngine.accept_duel(), and refreshes the Active Duels table.
+        """
         duel_id = self._pending_invitation_duel_id
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
@@ -343,7 +359,11 @@ class DuelsMixin:
             self._refresh_active_duels()
 
     def _on_duel_decline(self) -> None:
-        """Decline the currently displayed incoming duel invitation."""
+        """Decline the currently displayed incoming duel invitation.
+
+        Stops the 15-second countdown timer, hides the alert bar, delegates
+        to DuelEngine.decline_duel(), and refreshes the Active Duels table.
+        """
         duel_id = self._pending_invitation_duel_id
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
@@ -421,7 +441,15 @@ class DuelsMixin:
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
     def _poll_duel_invitations(self) -> None:
-        """Poll the cloud for new incoming duel invitations."""
+        """Poll the cloud for new incoming duel invitations in a background thread.
+
+        Runs DuelEngine.receive_invitations() off the GUI thread so the UI
+        stays responsive.  For each newly discovered invitation, triggers
+        _on_duel_invitation_received() via QMetaObject.invokeMethod() on the
+        GUI thread and refreshes the Active Duels table.  This method is
+        called periodically by self._duel_poll_timer every 30 seconds when
+        Cloud Sync is enabled.
+        """
         import threading
         def _poll():
             new_duels = self._duel_engine.receive_invitations()
@@ -444,7 +472,13 @@ class DuelsMixin:
     # ── Polling: expiry check ──────────────────────────────────────────────────
 
     def _check_duel_expiry(self) -> None:
-        """Check for expired duels and refresh the tables."""
+        """Check for expired duels via the engine and refresh both tables.
+
+        Delegates to DuelEngine.check_expiry() which moves any overdue
+        PENDING duels to history with DuelStatus.EXPIRED.  If any duels
+        were expired, both the Active Duels and Duel History tables are
+        refreshed.  Called every 60 seconds by self._duel_expiry_timer.
+        """
         expired = self._duel_engine.check_expiry()
         if expired:
             self._refresh_active_duels()
@@ -496,7 +530,14 @@ class DuelsMixin:
     # ── Refresh: history table ─────────────────────────────────────────────────
 
     def _refresh_duel_history(self) -> None:
-        """Reload the Duel History table from the engine."""
+        """Reload the Duel History table from the engine.
+
+        Fetches the completed-duel list (newest first) from DuelEngine and
+        repopulates self._tbl_duel_history.  Each row shows opponent name,
+        table name, result with color coding (green for wins, red for losses,
+        gray for expired/declined), local player score, opponent score, and
+        the completion date formatted as YYYY-MM-DD HH:MM.
+        """
         history = self._duel_engine.get_duel_history()
         tbl = self._tbl_duel_history
         tbl.setRowCount(0)
