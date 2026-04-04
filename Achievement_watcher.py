@@ -596,7 +596,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         "duels": (
             "<b>⚔️ Score Duels</b><br><br>"
             "Challenge other players to asynchronous high-score battles!<br><br>"
-            "• <b>Start New Duel</b>: Search for a player by ID and select a table to challenge them.<br>"
+            "• <b>Start New Duel</b>: Search for a player by Name and select a table to challenge them.<br>"
             "• <b>Incoming Invitations</b>: When someone challenges you, an alert bar appears at the top "
             "of this tab (if the GUI is open). If the GUI is minimized to the system tray, a floating "
             "notification overlay pops up instead.<br>"
