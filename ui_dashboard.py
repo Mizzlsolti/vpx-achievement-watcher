@@ -393,12 +393,12 @@ class DashboardMixin:
 
         # Tab indices (order matches addTab calls in __init__:
         #   0=Dashboard, 1=Player, 2=Appearance, 3=Controls, 4=Records&Stats,
-        #   5=Progress, 6=Available Maps, 7=Cloud, 8=System)
+        #   5=Progress, 6=Score Duels, 7=Available Maps, 8=Cloud, 9=System)
         # Only tabs used as notification action_tab destinations are listed here.
         _TAB_MAP = {
-            "cloud": 7,
-            "system": 8,
-            "available_maps": 6,
+            "cloud": 8,
+            "system": 9,
+            "available_maps": 7,
         }
 
         if not display:
@@ -503,7 +503,7 @@ class DashboardMixin:
         # ── system_maintenance → System tab + Maintenance sub-tab ────────────
         if action_tab == "system_maintenance":
             try:
-                self.main_tabs.setCurrentIndex(8)  # System tab
+                self.main_tabs.setCurrentIndex(9)  # System tab
             except Exception:
                 pass
             try:
@@ -529,7 +529,7 @@ class DashboardMixin:
         # ── leaderboard_rank → Cloud tab + auto-fetch ROM ────────────────────
         if notif_type == "leaderboard_rank" and action_tab == "cloud":
             try:
-                self.main_tabs.setCurrentIndex(7)  # Cloud tab
+                self.main_tabs.setCurrentIndex(8)  # Cloud tab
             except Exception:
                 pass
             try:
@@ -544,7 +544,7 @@ class DashboardMixin:
         # ── available_maps → switch tab + highlight missing ROMs ─────────────
         if action_tab == "available_maps":
             try:
-                self.main_tabs.setCurrentIndex(6)  # Available Maps tab
+                self.main_tabs.setCurrentIndex(7)  # Available Maps tab
             except Exception:
                 pass
             try:
@@ -557,9 +557,9 @@ class DashboardMixin:
 
         # ── generic tab switch ────────────────────────────────────────────────
         _TAB_MAP = {
-            "cloud": 7,
-            "system": 8,
-            "available_maps": 6,
+            "cloud": 8,
+            "system": 9,
+            "available_maps": 7,
         }
         if action_tab and action_tab in _TAB_MAP:
             try:
