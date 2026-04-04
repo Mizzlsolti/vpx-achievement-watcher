@@ -293,7 +293,7 @@ _RETURN_30D: list[str] = [
     "30 days! You have been missed. Welcome home, champion!",
 ]
 _HEAVY_SESSION_DAY: list[str] = [
-    "That is your {count}th game today! You are in the zone!",
+    "Game number {count} today! You are in the zone!",
     "{count} sessions in one day?! You are absolutely dedicated!",
 ]
 _REPEATED_STARTS: list[str] = [
@@ -686,7 +686,7 @@ class MascotMemorySystem:
         # -- Best session check -------------------------------------------
         if self._mem and self._mem.session_durations:
             all_durations = self._mem.session_durations
-            if duration_min > 0 and len(all_durations) > 1 and duration_min >= max(all_durations):
+            if duration_min > 0 and len(all_durations) > 1 and duration_min > max(all_durations):
                 return _pick(_COMPARE_BEST_SESSION, dur=int(duration_min))
 
         # -- Achievement streak comment -----------------------------------
@@ -894,7 +894,7 @@ class MascotMemorySystem:
         """Return a comment when a rival has recent activity."""
         if point_diff > 0:
             return _pick(_SOCIAL_RIVAL, rival=rival_name, diff=point_diff)
-        return random.choice(_SOCIAL_RIVAL).format(rival=rival_name, diff="?")
+        return _pick(_SOCIAL_RIVAL, rival=rival_name, diff="?")
 
     # ── 7. Seasonal / Anniversary ──────────────────────────────────────────────
 
