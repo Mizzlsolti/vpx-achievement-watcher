@@ -1743,9 +1743,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             conn = sqlite3.connect(db_path)
             try:
                 cursor = conn.execute(
-                    "SELECT romname, VPSID FROM Games"
-                    " WHERE VPSID IS NOT NULL AND VPSID != ''"
-                    " AND romname IS NOT NULL AND romname != ''"
+                    "SELECT ROM, CUSTOM3 FROM Games"
+                    " WHERE CUSTOM3 IS NOT NULL AND CUSTOM3 != ''"
+                    " AND ROM IS NOT NULL AND ROM != ''"
                 )
                 rows = cursor.fetchall()
             except sqlite3.OperationalError as exc:
