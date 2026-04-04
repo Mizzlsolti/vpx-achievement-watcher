@@ -1091,6 +1091,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         btn_auto.clicked.connect(self._on_vps_auto_match_all)
         row.addWidget(btn_auto)
 
+        btn_popper = QPushButton("📥 Import from Popper")
+        btn_popper.setStyleSheet(
+            "QPushButton { background-color:#1A0A00; color:#FFAA44; font-weight:bold;"
+            " border:1px solid #BB6600; border-radius:5px; padding:7px 16px; }"
+            "QPushButton:hover { background-color:#2A1400; border-color:#FFAA44; }"
+        )
+        btn_popper.setToolTip("Import VPS-IDs from PinUP Popper (PUPDatabase.db)")
+        btn_popper.clicked.connect(self._on_import_from_popper)
+        row.addWidget(btn_popper)
+
         lay.addLayout(row)
 
         # Legend bar
@@ -1545,6 +1555,264 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         tablefile_line = f"\n  → of which {matched_tablefile_id} matched to exact tableFile version" if matched_tablefile_id else ""
         QMessageBox.information(self, "Auto-Match Complete",
                                 f"Auto-match finished.\n{matched} table(s) matched{match_detail}.{tablefile_line}\n\n⚠️ Please review the assignments manually to ensure correctness.")
+
+    # ------------------------------------------------------------------
+    # PinUP Popper VPS-ID Import
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _popper_db_candidates(base: str) -> list:
+        """Return ordered list of candidate PUPDatabase.db paths to probe."""
+        return [
+            os.path.normpath(os.path.join(base, "..", "PinUPSystem", "PUPDatabase.db")),
+            r"C:\vPinball\PinUPSystem\PUPDatabase.db",
+            r"C:\PinUPSystem\PUPDatabase.db",
+            r"D:\vPinball\PinUPSystem\PUPDatabase.db",
+            r"D:\PinUPSystem\PUPDatabase.db",
+        ]
+
+    @staticmethod
+    def _is_valid_popper_db(p: str) -> bool:
+        """Return True if *p* is an accessible SQLite file with a Games table."""
+        import sqlite3
+        if not os.path.isfile(p):
+            return False
+        try:
+            con = sqlite3.connect(p)
+            con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Games'")
+            con.close()
+            return True
+        except Exception:
+            return False
+
+    def _find_popper_db(self, cancel_event: threading.Event | None = None) -> str | None:
+        """
+        Locate PUPDatabase.db using three phases:
+          1. Cached path from config
+          2. Known common install locations
+          3. Shallow scan (first 3 directory levels) of all drive letters
+        Returns the found path, or None if not found.
+        cancel_event: optional threading.Event; scan stops early when set.
+        """
+        # Phase 1 — cached path
+        cached = getattr(self.cfg, "POPPER_DB_PATH", "").strip()
+        if cached and self._is_valid_popper_db(cached):
+            return cached
+
+        # Phase 2 — known paths
+        base = getattr(self.cfg, "BASE", "")
+        for p in self._popper_db_candidates(base):
+            if self._is_valid_popper_db(p):
+                return p
+
+        # Phase 3 — shallow scan (up to 3 levels deep on each drive)
+        drives: list[str] = []
+        for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            root = f"{letter}:\\"
+            if os.path.isdir(root):
+                drives.append(root)
+
+        TARGET = "PUPDatabase.db"
+        MAX_DEPTH = 3
+
+        for drive in drives:
+            for dirpath, dirnames, filenames in os.walk(drive):
+                if cancel_event and cancel_event.is_set():
+                    return None
+                depth = dirpath.replace(drive, "").count(os.sep)
+                if depth >= MAX_DEPTH:
+                    dirnames.clear()
+                    continue
+                if TARGET in filenames:
+                    candidate = os.path.join(dirpath, TARGET)
+                    if self._is_valid_popper_db(candidate):
+                        return candidate
+
+        return None
+
+    def _on_import_from_popper(self):
+        """Handler for the '📥 Import from Popper' button."""
+        import sqlite3
+
+        # ----------------------------------------------------------------
+        # Phase 1+2: try fast discovery (no UI blocking)
+        # ----------------------------------------------------------------
+        db_path: str | None = None
+
+        cached = getattr(self.cfg, "POPPER_DB_PATH", "").strip()
+        if cached and os.path.isfile(cached):
+            db_path = cached
+        else:
+            base = getattr(self.cfg, "BASE", "")
+            for p in self._popper_db_candidates(base):
+                if os.path.isfile(p):
+                    db_path = p
+                    break
+
+        if db_path is None:
+            # Phase 3 — shallow scan in background with progress indicator
+            cancel_event = threading.Event()
+            found_path: list[str] = []
+
+            def _do_scan():
+                result = self._find_popper_db(cancel_event=cancel_event)
+                if result and not cancel_event.is_set():
+                    found_path.append(result)
+
+            scan_thread = threading.Thread(target=_do_scan, daemon=True)
+            scan_thread.start()
+
+            progress = QProgressDialog("Searching for PUPDatabase.db…", "Cancel", 0, 0, self)
+            progress.setWindowTitle("📥 Import from Popper")
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setValue(0)
+            progress.show()
+
+            while scan_thread.is_alive():
+                QApplication.processEvents()
+                if progress.wasCanceled():
+                    cancel_event.set()
+                    progress.close()
+                    scan_thread.join(timeout=2)
+                    return
+                scan_thread.join(timeout=0.1)
+
+            progress.close()
+            db_path = found_path[0] if found_path else None
+
+        if db_path is None:
+            # Fallback — manual path entry
+            dlg = QDialog(self)
+            dlg.setWindowTitle("📥 Import from Popper — Enter Path")
+            dlg.setMinimumWidth(500)
+            dlg_layout = QVBoxLayout(dlg)
+            lbl = QLabel("PUPDatabase.db not found. Enter path manually:")
+            lbl.setStyleSheet("color:#FFAA44;")
+            dlg_layout.addWidget(lbl)
+            path_edit = QLineEdit()
+            path_edit.setPlaceholderText(r"e.g. C:\vPinball\PinUPSystem\PUPDatabase.db")
+            path_edit.setStyleSheet(
+                "QLineEdit { background:#1A1A1A; color:#EEE; border:1px solid #BB6600;"
+                " border-radius:4px; padding:4px 8px; }"
+            )
+            dlg_layout.addWidget(path_edit)
+            btn_row = QHBoxLayout()
+            btn_ok = QPushButton("Import")
+            btn_ok.setStyleSheet(
+                "QPushButton { background-color:#1A0A00; color:#FFAA44; font-weight:bold;"
+                " border:1px solid #BB6600; border-radius:4px; padding:5px 14px; }"
+            )
+            btn_cancel = QPushButton("Cancel")
+            btn_cancel.setStyleSheet(
+                "QPushButton { background-color:#222; color:#AAA; border:1px solid #555;"
+                " border-radius:4px; padding:5px 14px; }"
+            )
+            btn_row.addStretch(1)
+            btn_row.addWidget(btn_ok)
+            btn_row.addWidget(btn_cancel)
+            dlg_layout.addLayout(btn_row)
+            btn_ok.clicked.connect(dlg.accept)
+            btn_cancel.clicked.connect(dlg.reject)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            db_path = path_edit.text().strip()
+            if not db_path:
+                return
+            if not os.path.isfile(db_path):
+                QMessageBox.warning(self, "Import from Popper",
+                                    f"File not found:\n{db_path}")
+                return
+
+        # ----------------------------------------------------------------
+        # Cache the discovered path
+        # ----------------------------------------------------------------
+        self.cfg.POPPER_DB_PATH = db_path
+        self.cfg.save()
+
+        # ----------------------------------------------------------------
+        # Load existing mapping
+        # ----------------------------------------------------------------
+        mapping: dict = _load_vps_mapping(self.cfg)
+
+        # ----------------------------------------------------------------
+        # Run import
+        # ----------------------------------------------------------------
+        try:
+            conn = sqlite3.connect(db_path)
+            try:
+                cursor = conn.execute(
+                    "SELECT romname, VPSID FROM Games"
+                    " WHERE VPSID IS NOT NULL AND VPSID != ''"
+                    " AND romname IS NOT NULL AND romname != ''"
+                )
+                rows = cursor.fetchall()
+            except sqlite3.OperationalError as exc:
+                conn.close()
+                err = str(exc).lower()
+                if "no such table" in err or "no such column" in err:
+                    QMessageBox.warning(
+                        self, "Import from Popper",
+                        "No VPS-ID data found in this database.\n"
+                        "Make sure your Popper version supports VPS-IDs."
+                    )
+                else:
+                    QMessageBox.warning(
+                        self, "Import from Popper",
+                        f"Could not read from PUPDatabase.db.\n{exc}\n\n"
+                        "If Popper is running, try closing it first."
+                    )
+                return
+            conn.close()
+        except sqlite3.OperationalError as exc:
+            QMessageBox.warning(
+                self, "Import from Popper",
+                f"Could not open PUPDatabase.db.\n{exc}\n\n"
+                "The file may be corrupted, locked, or currently in use by Popper."
+            )
+            return
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Import from Popper",
+                f"Unexpected error opening PUPDatabase.db:\n{exc}"
+            )
+            return
+
+        imported = 0
+        skipped = 0
+        for row in rows:
+            try:
+                rom = str(row[0]).strip().lower()
+                vps_id = str(row[1]).strip()
+                if not rom or not vps_id:
+                    continue
+                if mapping.get(rom):
+                    skipped += 1
+                else:
+                    mapping[rom] = vps_id
+                    imported += 1
+            except Exception:
+                continue
+
+        # ----------------------------------------------------------------
+        # Persist and refresh
+        # ----------------------------------------------------------------
+        _save_vps_mapping(self.cfg, mapping)
+        self._cloud_upload_vps_mapping()
+
+        for entry in self._all_maps_cache:
+            rom = entry.get("rom", "").lower()
+            if rom in mapping and mapping[rom]:
+                entry["vps_id"] = mapping[rom]
+
+        self._filter_available_maps()
+
+        QMessageBox.information(
+            self, "Import Complete",
+            f"Import complete.\n"
+            f"{imported} VPS-ID(s) imported from PinUP Popper.\n"
+            f"{skipped} already mapped (skipped)."
+        )
 
     def _init_tooltips_main(self):
         def _set_tip(attr: str, tip: str):
