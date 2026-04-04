@@ -498,7 +498,7 @@ class CloudStatsMixin:
 
         for i, row in enumerate(data):
             rank = i + 1
-            name = row.get("name", "Unknown")
+            name = _html.escape(str(row.get("name", "Unknown")))
             ts = row.get("ts", "")[:10]
             medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
 
