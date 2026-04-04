@@ -1158,6 +1158,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                     self._filter_available_maps()
                     self._update_map_search_completer()
                     self._update_cloud_rom_completer()
+                    if hasattr(self, '_cmb_duel_table'):
+                        self._populate_duel_table_combo()
         except Exception:
             pass
 
@@ -1205,6 +1207,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             self._filter_available_maps()
             self._update_map_search_completer()
             self._update_cloud_rom_completer()
+            if hasattr(self, '_cmb_duel_table'):
+                self._populate_duel_table_combo()
             # Notify about ROMs missing a VPS-ID
             try:
                 missing_roms = [
