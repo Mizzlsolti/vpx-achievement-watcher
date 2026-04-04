@@ -339,7 +339,8 @@ class DuelsMixin:
         self._cmb_duel_table.lineEdit().setPlaceholderText("Type to filter tables...")
         self._cmb_duel_table.setMaxVisibleItems(20)
 
-        self._duel_table_completer = QCompleter(self._cmb_duel_table.model(), self)
+        self._duel_table_completer_model = QStringListModel([], self)
+        self._duel_table_completer = QCompleter(self._duel_table_completer_model, self)
         self._duel_table_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._duel_table_completer.setFilterMode(Qt.MatchFlag.MatchContains)
         self._cmb_duel_table.setCompleter(self._duel_table_completer)
@@ -552,11 +553,7 @@ class DuelsMixin:
 
         suggestions.sort(key=str.lower)
 
-        if not hasattr(self, '_duel_table_completer_model'):
-            self._duel_table_completer_model = QStringListModel(suggestions, self)
-        else:
-            self._duel_table_completer_model.setStringList(suggestions)
-        self._duel_table_completer.setModel(self._duel_table_completer_model)
+        self._duel_table_completer_model.setStringList(suggestions)
 
         # Connect completer activation to select correct combo entry.
         try:
