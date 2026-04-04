@@ -311,6 +311,10 @@ class DuelEngine:
         self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} declined.")
+        try:
+            sound.play("duel_declined")
+        except Exception:
+            pass
         return True
 
     def submit_result(self, duel_id: str, score: int) -> Optional[str]:

@@ -218,7 +218,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
-        self.bridge.duel_received.connect(self._on_duel_invitation_received)
+        self.bridge.session_ended.connect(self._on_session_ended_duels)
         self.bridge.duel_result.connect(self._on_duel_result)
         
         self._prefetch_blink_timer = QTimer(self)
@@ -414,6 +414,11 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                     trophie_gui.on_duel_expired()
                 if trophie_ov:
                     trophie_ov.on_duel_expired()
+            elif result == "declined":
+                if trophie_gui:
+                    trophie_gui.on_duel_declined()
+                if trophie_ov:
+                    trophie_ov.on_duel_declined()
         except Exception:
             pass
 
@@ -1668,6 +1673,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 self.hide()
                 event.ignore()
                 return
+        except Exception:
+            pass
+        # Stop duel timers to prevent background activity after close.
+        try:
+            if getattr(self, "_duel_poll_timer", None):
+                self._duel_poll_timer.stop()
+            if getattr(self, "_duel_expiry_timer", None):
+                self._duel_expiry_timer.stop()
+            if getattr(self, "_duel_accept_timer", None):
+                self._duel_accept_timer.stop()
         except Exception:
             pass
         try:
