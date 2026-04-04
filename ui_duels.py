@@ -119,6 +119,9 @@ class DuelInviteOverlay(QWidget):
         )
         self._btn_decline.clicked.connect(self._on_decline_clicked)
 
+        # Focus tracking: 0 = Accept focused, 1 = Decline focused
+        self._focused = 0
+
         self._lbl_cd = QLabel(f"⏳ {self._countdown}s")
         self._lbl_cd.setStyleSheet(
             "color:#FFAA00; font-size:10pt; font-weight:bold; background:transparent;"
@@ -215,6 +218,49 @@ class DuelInviteOverlay(QWidget):
             return
         self._auto_decline()
 
+    # ── hotkey-driven focus ───────────────────────────────────────────────
+
+    @staticmethod
+    def _focused_btn_style(bg: str, hover_bg: str, focused: bool) -> str:
+        """Return a QPushButton stylesheet with or without focus border."""
+        border = "border:2px solid #FFFF00;" if focused else "border:none;"
+        return (
+            f"QPushButton {{ background-color:{bg}; color:#FFFFFF; font-weight:bold;"
+            f" {border} border-radius:5px; padding:7px 18px; font-size:9pt; }}"
+            f"QPushButton:hover {{ background-color:{hover_bg}; }}"
+        )
+
+    def _apply_focus_styles(self) -> None:
+        """Visually highlight the currently focused button."""
+        accept_focused = self._focused == 0
+        self._btn_accept.setStyleSheet(
+            self._focused_btn_style("#006400", "#008000", accept_focused)
+        )
+        self._btn_decline.setStyleSheet(
+            self._focused_btn_style("#8B0000", "#AA0000", not accept_focused)
+        )
+
+    def is_accept_focused(self) -> bool:
+        """Return ``True`` when the Accept button is currently focused."""
+        return self._focused == 0
+
+    def focus_accept(self) -> None:
+        """Switch keyboard focus to the Accept button."""
+        self._focused = 0
+        self._apply_focus_styles()
+
+    def focus_decline(self) -> None:
+        """Switch keyboard focus to the Decline button."""
+        self._focused = 1
+        self._apply_focus_styles()
+
+    def confirm_focused(self) -> None:
+        """Click whichever button is currently focused."""
+        if self._focused == 0:
+            self._on_accept_clicked()
+        else:
+            self._on_decline_clicked()
+
     def keyPressEvent(self, event) -> None:  # noqa: N802
         key = event.key()
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -301,6 +347,8 @@ class DuelsMixin:
         self._duel_accept_timer.timeout.connect(self._on_duel_invitation_timeout)
         self._duel_accept_countdown = 0
         self._pending_invitation_duel_id: str = ""
+        # Focus tracking for hotkey navigation: 0 = Accept focused, 1 = Decline focused
+        self._duel_alert_focus: int = 0
 
         # ── b) Start New Duel ────────────────────────────────────────────────
         grp_new = QGroupBox("⚔️ Start New Duel")
@@ -723,6 +771,35 @@ class DuelsMixin:
 
     # ── Slot: accept / decline invitation ────────────────────────────────────
 
+    def _update_duels_tab_badge(self, count: int) -> None:
+        """Update the Duels tab text to show a badge counter when ``count > 0``."""
+        base = "⚔️ Score Duels"
+        text = f"{base} ({count})" if count > 0 else base
+        try:
+            for i in range(self.main_tabs.count()):
+                tab_text = self.main_tabs.tabText(i)
+                if tab_text == base or (tab_text.startswith(base + " (") and tab_text.endswith(")")):
+                    self.main_tabs.setTabText(i, text)
+                    break
+        except Exception:
+            pass
+
+    def _apply_duel_alert_focus_styles(self) -> None:
+        """Visually highlight the currently focused button in the in-tab alert bar."""
+        accept_focused = self._duel_alert_focus == 0
+        border_on  = "border:2px solid #FFFF00;"
+        border_off = "border:none;"
+        self._btn_duel_accept.setStyleSheet(
+            f"QPushButton {{ background-color:#006400; color:#FFFFFF; font-weight:bold;"
+            f" {border_on if accept_focused else border_off} border-radius:5px; padding:6px 18px; }}"
+            "QPushButton:hover { background-color:#008000; }"
+        )
+        self._btn_duel_decline.setStyleSheet(
+            f"QPushButton {{ background-color:#8B0000; color:#FFFFFF; font-weight:bold;"
+            f" {border_off if accept_focused else border_on} border-radius:5px; padding:6px 18px; }}"
+            "QPushButton:hover { background-color:#AA0000; }"
+        )
+
     def _on_duel_accept(self) -> None:
         """Accept the currently displayed incoming duel invitation.
 
@@ -733,6 +810,7 @@ class DuelsMixin:
         duel_id = self._pending_invitation_duel_id
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
+        self._update_duels_tab_badge(0)
         if not duel_id:
             return
 
@@ -797,6 +875,7 @@ class DuelsMixin:
         duel_id = self._pending_invitation_duel_id
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
+        self._update_duels_tab_badge(0)
         if duel_id:
             self._duel_engine.decline_duel(duel_id)
             self._refresh_active_duels()
@@ -891,12 +970,15 @@ class DuelsMixin:
             )
             self._duel_accept_countdown = 15
             self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
+            self._duel_alert_focus = 0
             self._duel_alert_frame.setVisible(True)
             self._duel_accept_timer.start()
+            self._update_duels_tab_badge(1)
 
             # Switch to the Score Duels tab so the user notices the alert.
             for i in range(self.main_tabs.count()):
-                if self.main_tabs.tabText(i) == "⚔️ Score Duels":
+                tab_text = self.main_tabs.tabText(i)
+                if tab_text == "⚔️ Score Duels" or (tab_text.startswith("⚔️ Score Duels (") and tab_text.endswith(")")):
                     self.main_tabs.setCurrentIndex(i)
                     break
 
@@ -910,6 +992,7 @@ class DuelsMixin:
         if self._duel_accept_countdown <= 0:
             self._duel_accept_timer.stop()
             self._duel_alert_frame.setVisible(False)
+            self._update_duels_tab_badge(0)
             if self._pending_invitation_duel_id:
                 self._duel_engine.decline_duel(self._pending_invitation_duel_id)
                 self._pending_invitation_duel_id = ""
