@@ -537,6 +537,21 @@ class DuelsMixin:
                 seen.add(rom)
                 suggestions.append(rom)
 
+        # Also add all known ROM names and table titles from ROMNAMES for broader autocomplete.
+        try:
+            romnames = getattr(getattr(self, "watcher", None), "ROMNAMES", {}) or {}
+            for rom_key, table_title in romnames.items():
+                if rom_key and rom_key not in seen:
+                    seen.add(rom_key)
+                    suggestions.append(rom_key)
+                if table_title and table_title not in seen:
+                    seen.add(table_title)
+                    suggestions.append(table_title)
+        except Exception:
+            pass
+
+        suggestions.sort(key=str.lower)
+
         if not hasattr(self, '_duel_table_completer_model'):
             self._duel_table_completer_model = QStringListModel(suggestions, self)
         else:
@@ -568,6 +583,17 @@ class DuelsMixin:
             if (cmb.itemData(i) or "").lower() == text.lower():
                 cmb.setCurrentIndex(i)
                 return
+        # Try reverse lookup via ROMNAMES (table title → ROM).
+        try:
+            romnames = getattr(getattr(self, "watcher", None), "ROMNAMES", {}) or {}
+            for rk, rv in romnames.items():
+                if rv and rv.lower() == text.lower():
+                    for i in range(cmb.count()):
+                        if (cmb.itemData(i) or "").lower() == rk.lower():
+                            cmb.setCurrentIndex(i)
+                            return
+        except Exception:
+            pass
         # Fallback: partial match on display text.
         idx = cmb.findText(text, Qt.MatchFlag.MatchContains)
         if idx >= 0:
