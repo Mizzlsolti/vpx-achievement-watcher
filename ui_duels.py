@@ -31,7 +31,7 @@ class DuelInviteOverlay(QWidget):
 
     Appears when the main GUI is minimized or hidden to the system tray.
     Shows the challenger name and table, and provides Accept/Decline buttons
-    with a visible 15-second countdown.  Auto-declines on timeout.
+    with a visible 60-second countdown.  Auto-declines on timeout.
 
     Parameters
     ----------
@@ -68,7 +68,7 @@ class DuelInviteOverlay(QWidget):
         self._duel_id    = duel_id
         self._on_accept  = on_accept
         self._on_decline = on_decline
-        self._countdown  = 15
+        self._countdown  = 60
         self._closed     = False
 
         self.setWindowTitle("⚔️ Score Duel Invitation")
@@ -342,7 +342,7 @@ class DuelsMixin:
         layout.addWidget(self._duel_alert_frame)
         self._duel_alert_frame.setVisible(False)
 
-        # Countdown timer for incoming invitation (15 seconds).
+        # Countdown timer for incoming invitation (60 seconds).
         self._duel_accept_timer = QTimer(self)
         self._duel_accept_timer.setInterval(1000)
         self._duel_accept_timer.timeout.connect(self._on_duel_invitation_timeout)
@@ -569,7 +569,7 @@ class DuelsMixin:
             "• Both players must have the same ROM name for the table\n"
             "• If the opponent does not have the table installed, the duel is automatically declined\n\n"
             "⏳ INVITATIONS\n"
-            "• You have 15 seconds to accept or decline\n"
+            "• You have 60 seconds to accept or decline\n"
             "• VPX must NOT be running when accepting\n"
             "• Unanswered invitations expire automatically\n\n"
             "🏆 SCORING\n"
@@ -882,7 +882,7 @@ class DuelsMixin:
         """Accept the currently displayed incoming duel invitation.
 
         Checks VPX running state and table availability before accepting.
-        Stops the 15-second countdown timer, hides the alert bar, and either
+        Stops the 60-second countdown timer, hides the alert bar, and either
         declines with an error message or delegates to DuelEngine.accept_duel().
         """
         duel_id = self._pending_invitation_duel_id
@@ -950,7 +950,7 @@ class DuelsMixin:
     def _on_duel_decline(self) -> None:
         """Decline the currently displayed incoming duel invitation.
 
-        Stops the 15-second countdown timer, hides the alert bar, delegates
+        Stops the 60-second countdown timer, hides the alert bar, delegates
         to DuelEngine.decline_duel(), and refreshes the Active Duels table.
         """
         duel_id = self._pending_invitation_duel_id
@@ -1074,7 +1074,7 @@ class DuelsMixin:
                 f"⚔️ You have been challenged to a Score Duel by {opponent} "
                 f"(Table: {table_name}). Accept?"
             )
-            self._duel_accept_countdown = 15
+            self._duel_accept_countdown = 60
             self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
             self._duel_alert_focus = 0
             self._apply_duel_alert_focus_styles()
@@ -1092,7 +1092,7 @@ class DuelsMixin:
     # ── Slot: countdown tick ──────────────────────────────────────────────────
 
     def _on_duel_invitation_timeout(self) -> None:
-        """Called every second during the 15-second accept window.
+        """Called every second during the 60-second accept window.
         Auto-declines when the counter reaches zero.
         """
         self._duel_accept_countdown -= 1
@@ -1198,15 +1198,18 @@ class DuelsMixin:
         Runs DuelEngine.receive_invitations() off the GUI thread so the UI
         stays responsive.  For each newly discovered invitation, triggers
         _on_duel_invitation_received() via QMetaObject.invokeMethod() on the
-        GUI thread and refreshes the Active Duels table.  This method is
+        GUI thread and refreshes the Active Duels table.  Also calls
+        sync_active_duel_states() to detect when the challenger's pending duel
+        has been accepted or declined by the opponent.  This method is
         called periodically by self._duel_poll_timer every 30 seconds when
         Cloud Sync is enabled.
         """
         import threading
         def _poll():
             new_duels = self._duel_engine.receive_invitations()
+            changed_duels = self._duel_engine.sync_active_duel_states()
+            from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
             if new_duels:
-                from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
                 for duel in new_duels:
                     QMetaObject.invokeMethod(
                         self, "_on_duel_invitation_received",
@@ -1219,6 +1222,43 @@ class DuelsMixin:
                     self, "_refresh_active_duels",
                     Qt.ConnectionType.QueuedConnection,
                 )
+            if changed_duels:
+                from duel_engine import DuelStatus
+                QMetaObject.invokeMethod(
+                    self, "_refresh_active_duels",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+                has_history_change = any(
+                    d.status in (DuelStatus.DECLINED, DuelStatus.EXPIRED, DuelStatus.CANCELLED)
+                    for d in changed_duels
+                )
+                if has_history_change:
+                    QMetaObject.invokeMethod(
+                        self, "_refresh_duel_history",
+                        Qt.ConnectionType.QueuedConnection,
+                    )
+                for duel in changed_duels:
+                    if duel.status == DuelStatus.ACCEPTED:
+                        msg = f"✅ '{duel.opponent_name or 'Opponent'}' accepted your duel on {duel.table_name or duel.table_rom}!"
+                        color = "#00E500"
+                    elif duel.status == DuelStatus.DECLINED:
+                        msg = f"❌ '{duel.opponent_name or 'Opponent'}' declined your duel on {duel.table_name or duel.table_rom}."
+                        color = "#CC0000"
+                    elif duel.status == DuelStatus.EXPIRED:
+                        msg = f"⏰ Your duel invitation on {duel.table_name or duel.table_rom} expired (not accepted)."
+                        color = "#888888"
+                    elif duel.status == DuelStatus.CANCELLED:
+                        msg = f"🚫 Your duel on {duel.table_name or duel.table_rom} was cancelled."
+                        color = "#888888"
+                    else:
+                        continue
+                    QMetaObject.invokeMethod(
+                        self, "_duel_notify",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, msg),
+                        Q_ARG(str, color),
+                        Q_ARG(int, 8),
+                    )
         threading.Thread(target=_poll, daemon=True).start()
 
     # ── Polling: expiry check ──────────────────────────────────────────────────

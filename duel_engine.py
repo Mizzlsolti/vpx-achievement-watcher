@@ -230,7 +230,7 @@ class DuelEngine:
         self._active.append(duel)
         self._save_active()
         self._upload_duel(duel)
-        log(self._cfg, f"[DUEL] Invitation sent: {duel.duel_id} → {opponent_id} ({table_rom})")
+        log(self._cfg, f"[DUEL] Invitation sent: {duel.duel_id} → '{opponent_name or 'opponent'}' ({table_rom})")
         return duel
 
     def receive_invitations(self) -> List[Duel]:
@@ -469,6 +469,63 @@ class DuelEngine:
             self._save_history()
 
         return expired
+
+    def sync_active_duel_states(self) -> List[Duel]:
+        """Sync cloud state for pending duels where this player is the challenger.
+
+        Fetches the cloud record for each locally-PENDING duel where the local
+        player is the challenger and updates the local state if the opponent has
+        accepted, declined, expired, or cancelled.
+
+        Returns a list of Duel objects whose status changed during this call.
+        """
+        my_id = self._my_player_id()
+        if not my_id or not self._cfg.CLOUD_ENABLED:
+            return []
+
+        changed: List[Duel] = []
+        to_remove: List[Duel] = []
+
+        for duel in list(self._active):
+            if duel.challenger != my_id or duel.status != DuelStatus.PENDING:
+                continue
+
+            try:
+                cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
+            except Exception as exc:
+                log(self._cfg, f"[DUEL] sync_active_duel_states fetch error for {duel.duel_id}: {exc}", "WARN")
+                continue
+
+            if not isinstance(cloud_data, dict):
+                continue
+
+            cloud_status = cloud_data.get("status")
+            if cloud_status == duel.status:
+                continue
+
+            if cloud_status == DuelStatus.ACCEPTED:
+                duel.status = DuelStatus.ACCEPTED
+                duel.accepted_at = float(cloud_data.get("accepted_at", time.time()))
+                self._save_active()
+                log(self._cfg, f"[DUEL] Duel {duel.duel_id} accepted by '{duel.opponent_name or 'opponent'}'.")
+                changed.append(duel)
+
+            elif cloud_status in (DuelStatus.DECLINED, DuelStatus.EXPIRED, DuelStatus.CANCELLED):
+                duel.status = cloud_status
+                duel.completed_at = float(cloud_data.get("completed_at", time.time()))
+                to_remove.append(duel)
+                self._history.append(duel)
+                changed.append(duel)
+                log(self._cfg, f"[DUEL] Duel {duel.duel_id} {cloud_status} by '{duel.opponent_name or 'opponent'}'.")
+
+        if to_remove:
+            for d in to_remove:
+                if d in self._active:
+                    self._active.remove(d)
+            self._save_active()
+            self._save_history()
+
+        return changed
 
     def get_active_duels(self) -> List[Duel]:
         """Return a copy of the current active/pending duels list."""
