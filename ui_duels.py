@@ -3,13 +3,14 @@ start new duel, history table, and all duel event handlers."""
 from __future__ import annotations
 
 import random
+import threading
 import time
 from datetime import datetime
 
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
-    QLineEdit, QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
+    QComboBox, QCompleter, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot
@@ -302,22 +303,28 @@ class DuelsMixin:
         grp_new = QGroupBox("⚔️ Start New Duel")
         lay_new = QVBoxLayout(grp_new)
 
-        row_search = QHBoxLayout()
-        row_search.addWidget(QLabel("Opponent Player ID:"))
-        self._txt_duel_search = QLineEdit()
-        self._txt_duel_search.setPlaceholderText("Search player by ID...")
-        self._txt_duel_search.setMaxLength(64)
-        row_search.addWidget(self._txt_duel_search)
+        row_opponent = QHBoxLayout()
+        row_opponent.addWidget(QLabel("Opponent:"))
+        self._cmb_duel_opponent = QComboBox()
+        self._cmb_duel_opponent.setEditable(True)
+        self._cmb_duel_opponent.setMinimumWidth(220)
+        self._cmb_duel_opponent.addItem("Loading players…", "")
+        self._cmb_duel_opponent.lineEdit().setPlaceholderText("Type to filter players…")
+        self._duel_opponent_completer = QCompleter(self._cmb_duel_opponent.model(), self)
+        self._duel_opponent_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._duel_opponent_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._cmb_duel_opponent.setCompleter(self._duel_opponent_completer)
+        row_opponent.addWidget(self._cmb_duel_opponent, 1)
 
-        self._btn_duel_search = QPushButton("🔍 Search")
-        self._btn_duel_search.setStyleSheet(
+        self._btn_duel_refresh_players = QPushButton("🔄 Refresh Players")
+        self._btn_duel_refresh_players.setStyleSheet(
             "QPushButton { background-color:#005c99; color:#FFFFFF; font-weight:bold;"
             " border:none; border-radius:5px; padding:6px 14px; }"
             "QPushButton:hover { background-color:#0070bb; }"
         )
-        self._btn_duel_search.clicked.connect(self._on_duel_search_player)
-        row_search.addWidget(self._btn_duel_search)
-        lay_new.addLayout(row_search)
+        self._btn_duel_refresh_players.clicked.connect(self._fetch_duel_opponents)
+        row_opponent.addWidget(self._btn_duel_refresh_players)
+        lay_new.addLayout(row_opponent)
 
         row_table = QHBoxLayout()
         row_table.addWidget(QLabel("Table:"))
@@ -425,6 +432,10 @@ class DuelsMixin:
         # ── Populate table dropdown from maps cache ──────────────────────────
         self._populate_duel_table_combo()
 
+        # ── Fetch opponent players from cloud in background ──────────────────
+        if getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._fetch_duel_opponents()
+
         # ── Polling timers ───────────────────────────────────────────────────
         # Poll for incoming invitations every 30 seconds (cloud only).
         self._duel_poll_timer = QTimer(self)
@@ -448,82 +459,102 @@ class DuelsMixin:
     def _populate_duel_table_combo(self) -> None:
         """Populate the table selection dropdown from the available maps cache.
 
-        Filters the cache to entries that have an NVRAM map, sorts them
-        alphabetically by display name, and adds them to the combo box.
-        Falls back to a placeholder entry when no tables are available
-        (e.g. before the map list has been loaded).
+        Filters the cache to entries that have an NVRAM map AND are locally
+        installed, sorts them alphabetically by title, and adds them to the
+        combo box.  Falls back to a placeholder entry when no tables are
+        available (e.g. before the map list has been loaded).
         """
         self._cmb_duel_table.clear()
         cache = getattr(self, "_all_maps_cache", None) or []
         entries = sorted(
-            (e for e in cache if isinstance(e, dict) and e.get("has_map")),
-            key=lambda e: e.get("name", e.get("rom", "")).lower(),
+            (e for e in cache if isinstance(e, dict) and e.get("has_map") and e.get("is_local")),
+            key=lambda e: e.get("title", e.get("rom", "")).lower(),
         )
         for entry in entries:
-            display = entry.get("name") or entry.get("rom", "")
+            title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
+            display = f"{title} ({rom})" if title != rom else title
             self._cmb_duel_table.addItem(display, rom)
         if not entries:
             self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
 
-    # ── Slot: search player ───────────────────────────────────────────────────
+    # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
-    def _on_duel_search_player(self) -> None:
-        """Validate the entered player ID against the cloud player list."""
-        pid = self._txt_duel_search.text().strip()
-        if not pid:
-            self._lbl_duel_status.setText("⚠️ Please enter a player ID.")
-            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
-            return
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
-        if pid == my_id:
-            self._lbl_duel_status.setText("⚠️ You cannot challenge yourself.")
-            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
-            return
+    def _fetch_duel_opponents(self) -> None:
+        """Fetch all player names from the cloud and populate the opponent combo box.
+
+        Runs in a background thread to avoid blocking the UI.  Shows a
+        "Loading players…" placeholder while fetching.
+        """
         if not getattr(self.cfg, "CLOUD_ENABLED", False):
-            self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
-            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            self._cmb_duel_opponent.clear()
+            self._cmb_duel_opponent.addItem("(Cloud Sync disabled)", "")
             return
-        self._lbl_duel_status.setText("🔍 Searching…")
-        self._lbl_duel_status.setStyleSheet("color:#00E5FF; font-style:italic;")
+        self._cmb_duel_opponent.clear()
+        self._cmb_duel_opponent.addItem("Loading players…", "")
+        self._btn_duel_refresh_players.setEnabled(False)
 
-        import threading
-        def _search():
+        def _load():
             from cloud_sync import CloudSync
-            ids = CloudSync.fetch_player_ids(self.cfg) or []
-            found = pid in ids
+            try:
+                player_ids = CloudSync.fetch_player_ids(self.cfg) or []
+                my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+                other_ids = [pid for pid in player_ids if pid != my_id]
+                name_nodes = [f"players/{pid}/achievements/name" for pid in other_ids]
+                names_map: dict[str, str] = {}
+                if name_nodes:
+                    results = CloudSync.fetch_parallel(self.cfg, name_nodes) or {}
+                    for pid in other_ids:
+                        node = f"players/{pid}/achievements/name"
+                        raw = results.get(node)
+                        if isinstance(raw, str):
+                            names_map[pid] = raw
+                        elif isinstance(raw, dict):
+                            names_map[pid] = raw.get("name", "")
+                        else:
+                            names_map[pid] = ""
+                players = []
+                for pid in other_ids:
+                    name = names_map.get(pid, "").strip()
+                    if name and name != "Player":
+                        players.append((name, pid))
+                players.sort(key=lambda x: x[0].lower())
+            except Exception:
+                players = []
             from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
             QMetaObject.invokeMethod(
-                self, "_on_duel_search_result",
+                self, "_on_duel_players_loaded",
                 Qt.ConnectionType.QueuedConnection,
-                Q_ARG(bool, found),
-                Q_ARG(str, pid),
+                Q_ARG(object, players),
             )
-        threading.Thread(target=_search, daemon=True).start()
 
-    @pyqtSlot(bool, str)
-    def _on_duel_search_result(self, found: bool, pid: str) -> None:
-        """Called on the GUI thread with the player-search result."""
-        if found:
-            self._lbl_duel_status.setText(f"✅ Player '{pid}' found.")
-            self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
-        else:
-            self._lbl_duel_status.setText(f"❌ Player '{pid}' not found.")
-            self._lbl_duel_status.setStyleSheet("color:#CC4444; font-style:italic;")
+        threading.Thread(target=_load, daemon=True).start()
+
+    @pyqtSlot(object)
+    def _on_duel_players_loaded(self, players) -> None:
+        """Populate the opponent combo box with the fetched player list."""
+        self._btn_duel_refresh_players.setEnabled(True)
+        self._cmb_duel_opponent.clear()
+        if not players:
+            self._cmb_duel_opponent.addItem("(No players found)", "")
+            return
+        for display_name, player_id in players:
+            self._cmb_duel_opponent.addItem(display_name, player_id)
 
     # ── Slot: start duel ─────────────────────────────────────────────────────
 
     def _on_duel_start_clicked(self) -> None:
         """Send a duel invitation to the selected opponent for the chosen table.
 
-        Validates that an opponent player ID and a valid table ROM have been
-        selected, that Cloud Sync is enabled, and then delegates to
+        Validates that an opponent has been selected and a valid table ROM has
+        been chosen, that Cloud Sync is enabled, and then delegates to
         DuelEngine.send_invitation().  Updates the status label with success
         or failure feedback and refreshes the Active Duels table on success.
         """
-        opponent_id = self._txt_duel_search.text().strip()
+        opponent_id = self._cmb_duel_opponent.currentData() or ""
+        opponent_name = self._cmb_duel_opponent.currentText().strip()
         if not opponent_id:
-            self._lbl_duel_status.setText("⚠️ Enter an opponent player ID first.")
+            self._lbl_duel_status.setText("⚠️ Select an opponent first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
         idx = self._cmb_duel_table.currentIndex()
@@ -538,15 +569,16 @@ class DuelsMixin:
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
 
-        duel = self._duel_engine.send_invitation(opponent_id, table_rom, table_name)
+        duel = self._duel_engine.send_invitation(opponent_id, table_rom, table_name,
+                                                  opponent_name=opponent_name)
         if duel:
             self._lbl_duel_status.setText(
-                f"✅ Invitation sent to '{opponent_id}' for '{table_name}'!"
+                f"✅ Invitation sent to '{opponent_name or opponent_id}' for '{table_name}'!"
             )
             self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
             self._refresh_active_duels()
         else:
-            self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync and player ID.")
+            self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync.")
             self._lbl_duel_status.setStyleSheet("color:#CC4444; font-style:italic;")
 
     # ── Slot: accept / decline invitation ────────────────────────────────────

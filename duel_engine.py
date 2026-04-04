@@ -164,7 +164,8 @@ class DuelEngine:
 
     # ── Public API ───────────────────────────────────────────────────────────
 
-    def send_invitation(self, opponent_id: str, table_rom: str, table_name: str = "") -> Optional[Duel]:
+    def send_invitation(self, opponent_id: str, table_rom: str, table_name: str = "",
+                        opponent_name: str = "") -> Optional[Duel]:
         """Create a new duel invitation and upload it to the cloud.
 
         Parameters
@@ -175,6 +176,8 @@ class DuelEngine:
             The ROM name of the table to play.
         table_name : str, optional
             Human-readable display name for the table.
+        opponent_name : str, optional
+            Display name of the opponent player.
 
         Returns
         -------
@@ -195,7 +198,7 @@ class DuelEngine:
             challenger=my_id,
             challenger_name=self._my_player_name(),
             opponent=opponent_id,
-            opponent_name="",
+            opponent_name=opponent_name,
             table_rom=table_rom.lower().strip(),
             table_name=table_name or table_rom,
             status=DuelStatus.PENDING,
