@@ -3679,6 +3679,12 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         # Post-processing widget (drawn on top of toast content)
         self._pp_widget = PostProcessingWidget(self, overlay_type="toast")
 
+        # Hide before first render to prevent a single-frame flash at the wrong
+        # position: on frame 0 slide_offset is at its maximum value and burst_margin
+        # may be non-zero, which shifts the window far from its intended position.
+        # The slide animation fades opacity 0→1 naturally; when slide motion is
+        # disabled, _render_and_place sets opacity=1.0 on the first render.
+        self.setWindowOpacity(0)
         self._render_and_place()
         self._timer.start()
         self.raise_()
@@ -4042,11 +4048,15 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 # the X axis; direction depends on the rotation direction.
                 ccw = bool(ov.get("ach_toast_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
                 if ccw:
-                    # CCW (-90°): logical bottom = right side → slide in from right
-                    x_win = x - burst_margin + slide_offset
-                else:
-                    # CW (+90°): logical bottom = left side → slide in from left
+                    # CCW (-90°): rotating down→left, so logical bottom maps to the
+                    # LEFT side of the screen → slide in from the left (start offset
+                    # to the left, decrease toward 0).
                     x_win = x - burst_margin - slide_offset
+                else:
+                    # CW (+90°): rotating down→right, so logical bottom maps to the
+                    # RIGHT side of the screen → slide in from the right (start offset
+                    # to the right, decrease toward 0).
+                    x_win = x - burst_margin + slide_offset
                 y_win = y - burst_margin
             else:
                 # Landscape: slide along Y axis (bottom-to-top) as before.
@@ -4208,6 +4218,18 @@ class AchToastManager(QObject):
             self._sound_played = False
             self._levelup_sound_played = False
             return
+
+        # Immediately hide and close any lingering previous window so it is never
+        # visible at the same time as the incoming toast (the old window may still
+        # be on-screen waiting for its QTimer.singleShot close callback).
+        old = self._active_window
+        self._active_window = None
+        if old is not None:
+            try:
+                old.hide()
+                old.close()
+            except Exception:
+                pass
 
         self._active = True
         title, rom, seconds = self._queue.pop(0)
