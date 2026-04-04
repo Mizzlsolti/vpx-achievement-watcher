@@ -2,6 +2,7 @@
 start new duel, history table, and all duel event handlers."""
 from __future__ import annotations
 
+import os
 import random
 import threading
 import time
@@ -15,7 +16,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 
+from config import p_aweditor
 from duel_engine import DuelEngine, DuelStatus
+from watcher_core import _strip_version_from_name
 
 
 # ---------------------------------------------------------------------------
@@ -326,11 +329,20 @@ class DuelsMixin:
         row_opponent.addWidget(self._btn_duel_refresh_players)
         lay_new.addLayout(row_opponent)
 
+        self._cmb_duel_opponent.setMaxVisibleItems(20)
+
         row_table = QHBoxLayout()
         row_table.addWidget(QLabel("Table:"))
         self._cmb_duel_table = QComboBox()
+        self._cmb_duel_table.setEditable(True)
         self._cmb_duel_table.setMinimumWidth(250)
-        self._cmb_duel_table.setPlaceholderText("Select a table...")
+        self._cmb_duel_table.lineEdit().setPlaceholderText("Type to filter tables...")
+        self._cmb_duel_table.setMaxVisibleItems(20)
+
+        self._duel_table_completer = QCompleter(self._cmb_duel_table.model(), self)
+        self._duel_table_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._duel_table_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._cmb_duel_table.setCompleter(self._duel_table_completer)
         row_table.addWidget(self._cmb_duel_table, 1)
 
         self._btn_duel_start = QPushButton("⚔️ Start Duel")
@@ -474,7 +486,8 @@ class DuelsMixin:
         for entry in entries:
             title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
-            display = f"{title} ({rom})" if title != rom else title
+            clean_title = _strip_version_from_name(title)
+            display = f"{clean_title} ({rom})" if clean_title != rom else clean_title
             self._cmb_duel_table.addItem(display, rom)
         if not entries:
             # Fallback: use vps_id_mapping.json (always present if the user has
@@ -489,10 +502,26 @@ class DuelsMixin:
                 fallback_entries = sorted(mapping.keys(), key=lambda r: (romnames.get(r) or r).lower())
                 for rom in fallback_entries:
                     title = romnames.get(rom) or rom
-                    display = f"{title} ({rom})" if title != rom else title
+                    clean_title = _strip_version_from_name(title)
+                    display = f"{clean_title} ({rom})" if clean_title != rom else clean_title
                     self._cmb_duel_table.addItem(display, rom)
             else:
                 self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
+
+        # Add CAT tables from AWEditor (.custom.json files).
+        try:
+            aw_dir = p_aweditor(self.cfg)
+            if os.path.isdir(aw_dir):
+                existing_data = [self._cmb_duel_table.itemData(i) for i in range(self._cmb_duel_table.count())]
+                for fname in sorted(os.listdir(aw_dir)):
+                    if fname.endswith(".custom.json"):
+                        table_key = fname[:-len(".custom.json")]
+                        clean_name = _strip_version_from_name(table_key)
+                        display = f"{clean_name} (CAT)"
+                        if table_key not in existing_data:
+                            self._cmb_duel_table.addItem(display, table_key)
+        except Exception:
+            pass
 
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
