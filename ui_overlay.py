@@ -4013,11 +4013,6 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             ) else 0
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
-            # In portrait mode the image is rotated 90°: EW = landscape EH, EH = landscape EW.
-            # When burst_margin > 0 the expanded image is built in landscape then rotated, so
-            # the content dimensions for screen-edge calculations must be restored by swapping.
-            if portrait and burst_margin > 0:
-                W, H = H, W
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
             screen = QApplication.primaryScreen()
             geo = screen.availableGeometry() if screen else QRect(0, 0, 1280, 720)
