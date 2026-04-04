@@ -50,6 +50,11 @@ SOUND_EVENTS = [
     ("level_up",           "⬆️ Level Up"),
     ("countdown_tick",     "🕐 Countdown Tick"),
     ("countdown_final",    "🔔 Countdown Final"),
+    ("duel_received",      "⚔️ Duel Received"),
+    ("duel_accepted",      "🤝 Duel Accepted"),
+    ("duel_won",           "🏆 Duel Won"),
+    ("duel_lost",          "💀 Duel Lost"),
+    ("duel_expired",       "⏰ Duel Expired"),
 ]
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
@@ -218,6 +223,28 @@ def _build_zaptron(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _concat(_square(1108, 0.07, SR), _square(1319, 0.12, SR))
         return _envelope(s, 0.001, 0.015, 0.78, 0.1, SR)
+    elif event == "duel_received":
+        s = _concat(
+            _square(330, 0.04, SR), _silence(0.02, SR),
+            _square(440, 0.04, SR), _silence(0.02, SR),
+            _square(554, 0.04, SR), _silence(0.04, SR),
+            _square(330, 0.04, SR), _silence(0.02, SR),
+            _square(440, 0.04, SR), _silence(0.02, SR),
+            _square(659, 0.08, SR),
+        )
+        return _envelope(s, 0.002, 0.02, 0.72, 0.1, SR)
+    elif event == "duel_accepted":
+        s = _concat(*[_square(f, 0.055, SR) for f in [440, 554, 659, 880]])
+        return _envelope(s, 0.002, 0.018, 0.7, 0.1, SR)
+    elif event == "duel_won":
+        s = _concat(*[_square(f, 0.06, SR) for f in [523, 659, 784, 1046, 1319, 1568]])
+        return _envelope(s, 0.002, 0.015, 0.82, 0.15, SR)
+    elif event == "duel_lost":
+        s = _concat(*[_square(f, 0.08, SR) for f in [554, 440, 370, 294, 220]])
+        return _envelope(s, 0.002, 0.025, 0.5, 0.15, SR)
+    elif event == "duel_expired":
+        s = _concat(_square(440, 0.06, SR), _silence(0.04, SR), _square(330, 0.12, SR))
+        return _envelope(s, 0.002, 0.02, 0.45, 0.15, SR)
 
 
 # Iron Basilisk – heavy low square + noise, slow, bassy, deep
@@ -255,6 +282,34 @@ def _build_iron_basilisk(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _mix(_sweep(120, 55, 0.15, SR), _noise(0.15, SR))
         return _envelope([x * 0.55 for x in s], 0.003, 0.05, 0.6, 0.12, SR)
+    elif event == "duel_received":
+        hit1 = _mix(_square(55, 0.08, SR), _noise(0.08, SR))
+        hit1 = [s * 0.45 for s in hit1]
+        hit2 = _mix(_square(65, 0.08, SR), _noise(0.08, SR))
+        hit2 = [s * 0.45 for s in hit2]
+        sting = _envelope(_square(110, 0.32, SR), 0.02, 0.07, 0.62, 0.26, SR)
+        return _concat(
+            _envelope(hit1, 0.002, 0.03, 0.5, 0.07, SR),
+            _silence(0.04, SR),
+            _envelope(hit2, 0.002, 0.03, 0.5, 0.07, SR),
+            _silence(0.05, SR),
+            sting,
+        )
+    elif event == "duel_accepted":
+        s = _concat(*[_envelope(_square(f, 0.1, SR), 0.01, 0.04, 0.6, 0.1, SR)
+                      for f in [73, 88, 110, 138]])
+        return s
+    elif event == "duel_won":
+        s = _concat(*[_envelope(_mix(_square(f, 0.1, SR), _noise(0.1, SR)),
+                                0.01, 0.04, 0.62, 0.12, SR)
+                      for f in [55, 73, 88, 110, 138, 165, 220]])
+        return s
+    elif event == "duel_lost":
+        s = _mix(_sweep(220, 40, 0.42, SR), _noise(0.42, SR))
+        return _envelope([x * 0.5 for x in s], 0.005, 0.07, 0.42, 0.35, SR)
+    elif event == "duel_expired":
+        s = _mix(_square(80, 0.12, SR), _noise(0.12, SR))
+        return _envelope([x * 0.35 for x in s], 0.005, 0.04, 0.38, 0.14, SR)
 
 
 # Voodoo Swamp – low crackle + tremolo sine, murky, atmospheric
@@ -291,6 +346,33 @@ def _build_voodoo_swamp(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _mix(_sweep(150, 500, 0.14, SR), _tremolo(_sine(330, 0.18, SR), 5, 0.45, SR))
         return _envelope(s, 0.01, 0.06, 0.62, 0.2, SR)
+    elif event == "duel_received":
+        alert = _mix(_sweep(80, 330, 0.18, SR), _crackle(0.18, SR))
+        sting1 = _tremolo(_sine(330, 0.14, SR), 5, 0.5, SR)
+        sting2 = _tremolo(_sine(440, 0.18, SR), 5, 0.5, SR)
+        return _concat(
+            _envelope(alert, 0.01, 0.06, 0.48, 0.15, SR),
+            _silence(0.04, SR),
+            _envelope(sting1, 0.02, 0.07, 0.52, 0.18, SR),
+            _envelope(sting2, 0.02, 0.07, 0.58, 0.22, SR),
+        )
+    elif event == "duel_accepted":
+        s = _mix(_sweep(150, 440, 0.18, SR), _crackle(0.18, SR))
+        tone = _envelope(_tremolo(_sine(440, 0.2, SR), 4, 0.45, SR), 0.02, 0.07, 0.55, 0.22, SR)
+        return _concat(_envelope(s, 0.01, 0.06, 0.5, 0.15, SR), _silence(0.03, SR), tone)
+    elif event == "duel_won":
+        s = _mix(
+            _sweep(200, 660, 0.28, SR),
+            _tremolo(_sine(440, 0.28, SR), 3, 0.4, SR),
+            _crackle(0.28, SR),
+        )
+        return _envelope(s, 0.02, 0.1, 0.62, 0.28, SR)
+    elif event == "duel_lost":
+        s = _mix(_sweep(330, 55, 0.42, SR), _crackle(0.42, SR))
+        return _envelope(s, 0.005, 0.07, 0.4, 0.35, SR)
+    elif event == "duel_expired":
+        s = _mix(_tremolo(_sine(220, 0.2, SR), 3, 0.5, SR), _crackle(0.2, SR))
+        return _envelope(s, 0.01, 0.06, 0.35, 0.2, SR)
 
 
 # Pixel Ghost – square + ring mod, retro ghostly, mid-range
@@ -320,6 +402,28 @@ def _build_pixel_ghost(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _ring(_concat(_square(740, 0.08, SR), _square(932, 0.14, SR)), 200, SR)
         return _envelope(s, 0.002, 0.03, 0.72, 0.12, SR)
+    elif event == "duel_received":
+        s = _ring(_concat(
+            _square(220, 0.05, SR), _silence(0.02, SR),
+            _square(294, 0.05, SR), _silence(0.02, SR),
+            _square(370, 0.05, SR), _silence(0.04, SR),
+            _square(220, 0.05, SR), _silence(0.02, SR),
+            _square(294, 0.05, SR), _silence(0.02, SR),
+            _square(440, 0.1, SR),
+        ), 130, SR)
+        return _envelope(s, 0.005, 0.03, 0.68, 0.12, SR)
+    elif event == "duel_accepted":
+        s = _ring(_concat(*[_square(f, 0.065, SR) for f in [294, 370, 440, 554]]), 150, SR)
+        return _envelope(s, 0.005, 0.025, 0.68, 0.12, SR)
+    elif event == "duel_won":
+        s = _ring(_concat(*[_square(f, 0.065, SR) for f in [294, 370, 440, 554, 659, 880, 1108]]), 180, SR)
+        return _envelope(s, 0.005, 0.025, 0.75, 0.15, SR)
+    elif event == "duel_lost":
+        s = _ring(_concat(*[_square(f, 0.08, SR) for f in [440, 370, 311, 247, 185]]), 100, SR)
+        return _envelope(s, 0.003, 0.03, 0.52, 0.18, SR)
+    elif event == "duel_expired":
+        s = _ring(_concat(_square(370, 0.07, SR), _silence(0.04, SR), _square(247, 0.14, SR)), 110, SR)
+        return _envelope(s, 0.003, 0.025, 0.42, 0.18, SR)
 
 
 # Solar Drift – smooth pure sine + slow sweeps, gentle fade-in, ethereal
@@ -351,6 +455,25 @@ def _build_solar_drift(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _concat(_sweep(440, 1320, 0.14, SR), _sine(1320, 0.22, SR))
         return _envelope(s, 0.04, 0.08, 0.72, 0.25, SR)
+    elif event == "duel_received":
+        s = _concat(
+            _sweep(300, 600, 0.14, SR), _sine(600, 0.06, SR),
+            _silence(0.04, SR),
+            _sweep(300, 880, 0.16, SR), _sine(880, 0.22, SR),
+        )
+        return _envelope(s, 0.06, 0.12, 0.65, 0.3, SR)
+    elif event == "duel_accepted":
+        s = _concat(_sweep(392, 784, 0.16, SR), _sine(784, 0.24, SR))
+        return _envelope(s, 0.05, 0.1, 0.62, 0.26, SR)
+    elif event == "duel_won":
+        s = _concat(_sweep(440, 1320, 0.22, SR), _sine(1320, 0.35, SR))
+        return _envelope(s, 0.06, 0.12, 0.72, 0.32, SR)
+    elif event == "duel_lost":
+        s = _concat(_sine(660, 0.14, SR), _sweep(660, 180, 0.38, SR))
+        return _envelope(s, 0.04, 0.1, 0.45, 0.32, SR)
+    elif event == "duel_expired":
+        s = _concat(_sine(440, 0.1, SR), _sweep(440, 220, 0.22, SR))
+        return _envelope(s, 0.04, 0.08, 0.38, 0.28, SR)
 
 
 # Roko's Lair – deep low sine, very long sustain, ominous dungeon
@@ -385,6 +508,30 @@ def _build_rokos_lair(event: str) -> List[float]:
         s = _mix(
             _envelope(_sine(80, 0.35, SR), 0.04, 0.1, 0.55, 0.3, SR),
             _envelope(_sine(320, 0.28, SR), 0.03, 0.09, 0.62, 0.25, SR),
+        )
+        return s
+    elif event == "duel_received":
+        pulse1 = _envelope(_sine(80, 0.12, SR), 0.005, 0.04, 0.5, 0.1, SR)
+        pulse2 = _envelope(_sine(80, 0.12, SR), 0.005, 0.04, 0.5, 0.1, SR)
+        sting = _envelope(_sine(320, 0.4, SR), 0.04, 0.12, 0.58, 0.32, SR)
+        return _concat(pulse1, _silence(0.05, SR), pulse2, _silence(0.06, SR), sting)
+    elif event == "duel_accepted":
+        s = _mix(
+            _envelope(_sine(80, 0.4, SR), 0.04, 0.1, 0.45, 0.32, SR),
+            _envelope(_sine(480, 0.32, SR), 0.03, 0.09, 0.58, 0.28, SR),
+        )
+        return s
+    elif event == "duel_won":
+        layers = [_envelope(_sine(f, 0.55, SR), 0.05, 0.12, 0.55, 0.4, SR)
+                  for f in [80, 160, 480, 640]]
+        return _mix(*layers)
+    elif event == "duel_lost":
+        s = _concat(_sine(160, 0.14, SR), _sweep(160, 40, 0.5, SR))
+        return _envelope(s, 0.04, 0.12, 0.42, 0.4, SR)
+    elif event == "duel_expired":
+        s = _mix(
+            _envelope(_sine(80, 0.35, SR), 0.04, 0.1, 0.38, 0.3, SR),
+            _envelope(_sine(160, 0.28, SR), 0.03, 0.08, 0.35, 0.25, SR),
         )
         return s
 
@@ -438,6 +585,49 @@ def _build_thunderclap_rex(event: str) -> List[float]:
         boom = _mix(_sweep(300, 80, 0.18, SR), _noise(0.18, SR))
         return _concat(_envelope([x * 0.55 for x in s], 0.001, 0.02, 0.55, 0.05, SR),
                        _envelope([x * 0.55 for x in boom], 0.003, 0.06, 0.55, 0.15, SR))
+    elif event == "duel_received":
+        crack1 = _mix(_noise(0.05, SR), _sweep(500, 150, 0.05, SR))
+        crack1 = [x * 0.6 for x in crack1]
+        crack2 = _mix(_noise(0.05, SR), _sweep(600, 200, 0.05, SR))
+        crack2 = [x * 0.6 for x in crack2]
+        boom = _mix(_sweep(300, 1200, 0.22, SR), _noise(0.22, SR))
+        boom = [x * 0.5 for x in boom]
+        return _concat(
+            _envelope(crack1, 0.001, 0.02, 0.5, 0.04, SR),
+            _silence(0.04, SR),
+            _envelope(crack2, 0.001, 0.02, 0.5, 0.04, SR),
+            _silence(0.04, SR),
+            _envelope(boom, 0.003, 0.06, 0.6, 0.2, SR),
+        )
+    elif event == "duel_accepted":
+        s = _concat(
+            _envelope(_mix(_noise(0.06, SR), _sweep(400, 1000, 0.06, SR)),
+                      0.001, 0.02, 0.55, 0.05, SR),
+            _envelope(_mix(_sweep(200, 1000, 0.18, SR), _noise(0.18, SR)),
+                      0.003, 0.05, 0.58, 0.16, SR),
+        )
+        return s
+    elif event == "duel_won":
+        beats = _concat(*[
+            _concat(_envelope(_mix(_noise(0.05, SR), _sweep(200 + i * 100, 80, 0.05, SR)),
+                              0.001, 0.02, 0.52, 0.04, SR), _silence(0.03, SR))
+            for i in range(3)
+        ])
+        finale = _envelope(_mix(_sweep(200, 1800, 0.28, SR), _noise(0.28, SR)),
+                           0.003, 0.06, 0.65, 0.25, SR)
+        return _concat(beats, finale)
+    elif event == "duel_lost":
+        s = _mix(_sweep(1000, 40, 0.42, SR), _noise(0.42, SR))
+        return _envelope([x * 0.55 for x in s], 0.003, 0.07, 0.42, 0.35, SR)
+    elif event == "duel_expired":
+        crack = _mix(_noise(0.06, SR), _sweep(500, 200, 0.06, SR))
+        crack = [x * 0.45 for x in crack]
+        tail = _mix(_sweep(200, 80, 0.18, SR), _noise(0.18, SR))
+        tail = [x * 0.35 for x in tail]
+        return _concat(
+            _envelope(crack, 0.001, 0.02, 0.45, 0.05, SR),
+            _envelope(tail, 0.003, 0.05, 0.35, 0.18, SR),
+        )
 
 
 # Frostbite Hollow – very high frequency tremolo sine, crystalline pings
@@ -481,6 +671,41 @@ def _build_frostbite_hollow(event: str) -> List[float]:
             _envelope(_tremolo(_sine(f, 0.08, SR), 8, 0.3, SR), 0.003, 0.025, 0.68, 0.1, SR)
             for f in [1568, 1760, 2093]
         ])
+        return s
+    elif event == "duel_received":
+        pings1 = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.09, SR), 8, 0.3, SR), 0.004, 0.028, 0.62, 0.1, SR)
+            for f in [1319, 1568, 1760]
+        ])
+        pings2 = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.09, SR), 8, 0.3, SR), 0.004, 0.028, 0.68, 0.12, SR)
+            for f in [1047, 1319, 1568, 2093]
+        ])
+        return _concat(pings1, _silence(0.03, SR), pings2)
+    elif event == "duel_accepted":
+        pings = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.1, SR), 7, 0.3, SR), 0.004, 0.03, 0.65, 0.1, SR)
+            for f in [1175, 1568, 1760, 2093]
+        ])
+        return pings
+    elif event == "duel_won":
+        pings = _concat(*[
+            _envelope(_tremolo(_sine(f, 0.085, SR), 9, 0.28, SR), 0.004, 0.025, 0.72, 0.12, SR)
+            for f in [784, 988, 1175, 1319, 1568, 1760, 2093, 2637]
+        ])
+        return pings
+    elif event == "duel_lost":
+        s = _concat(
+            _envelope(_tremolo(_sine(2093, 0.1, SR), 7, 0.4, SR), 0.005, 0.03, 0.62, 0.1, SR),
+            _envelope(_tremolo(_sweep(2093, 500, 0.35, SR), 6, 0.38, SR), 0.01, 0.06, 0.45, 0.3, SR),
+        )
+        return s
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_tremolo(_sine(1760, 0.07, SR), 8, 0.3, SR), 0.003, 0.025, 0.5, 0.07, SR),
+            _silence(0.04, SR),
+            _envelope(_tremolo(_sine(1047, 0.16, SR), 7, 0.32, SR), 0.005, 0.04, 0.38, 0.18, SR),
+        )
         return s
 
 
@@ -534,6 +759,48 @@ def _build_ratchet_circus(event: str) -> List[float]:
             for f in [659, 784, 988]
         ])
         return mech
+    elif event == "duel_received":
+        ratchet = _concat(*[
+            _concat(_envelope(_mix(_noise(0.025, SR), _square(f, 0.025, SR)),
+                              0.001, 0.008, 0.5, 0.02, SR), _silence(0.015, SR))
+            for f in [330, 440, 554]
+        ])
+        fanfare = _concat(
+            _envelope(_mix(_square(523, 0.05, SR), _noise(0.05, SR)), 0.001, 0.015, 0.55, 0.04, SR),
+            _silence(0.02, SR),
+            _envelope(_mix(_square(659, 0.05, SR), _noise(0.05, SR)), 0.001, 0.015, 0.58, 0.04, SR),
+            _silence(0.02, SR),
+            _envelope(_mix(_square(880, 0.12, SR), _noise(0.12, SR)), 0.002, 0.03, 0.65, 0.1, SR),
+        )
+        return _concat(ratchet, _silence(0.02, SR), fanfare)
+    elif event == "duel_accepted":
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.025, SR), _square(f, 0.025, SR)),
+                              0.001, 0.008, 0.52, 0.02, SR), _silence(0.012, SR))
+            for f in [440, 554, 659, 880]
+        ])
+        return mech
+    elif event == "duel_won":
+        mech = _concat(*[
+            _concat(_envelope(_mix(_noise(0.022, SR), _square(f, 0.022, SR)),
+                              0.001, 0.008, 0.55, 0.018, SR), _silence(0.01, SR))
+            for f in [392, 494, 587, 784, 988, 1175, 1319, 1568]
+        ])
+        return mech
+    elif event == "duel_lost":
+        wind_down = _concat(*[
+            _envelope(_mix(_noise(0.04, SR), _square(f, 0.04, SR)),
+                      0.001, 0.015, 0.5, 0.035, SR)
+            for f in [554, 494, 440, 370, 294, 220]
+        ])
+        return wind_down
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_mix(_noise(0.03, SR), _square(440, 0.03, SR)), 0.001, 0.01, 0.45, 0.025, SR),
+            _silence(0.04, SR),
+            _envelope(_mix(_noise(0.04, SR), _square(330, 0.04, SR)), 0.001, 0.015, 0.38, 0.04, SR),
+        )
+        return s
 
 
 # Lucky Stardust – fast bright high sine arpeggios, glittery, sparkly
@@ -566,6 +833,31 @@ def _build_lucky_stardust(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _concat(*[_envelope(_sine(f, 0.045, SR), 0.002, 0.015, 0.72, 0.045, SR)
                       for f in [1568, 1760, 2093]])
+        return s
+    elif event == "duel_received":
+        arp1 = _concat(*[_envelope(_sine(f, 0.045, SR), 0.002, 0.015, 0.68, 0.045, SR)
+                         for f in [784, 988, 1175, 1568]])
+        arp2 = _concat(*[_envelope(_sine(f, 0.042, SR), 0.002, 0.013, 0.72, 0.042, SR)
+                         for f in [784, 988, 1319, 1760, 2093]])
+        return _concat(arp1, _silence(0.03, SR), arp2)
+    elif event == "duel_accepted":
+        s = _concat(*[_envelope(_sine(f, 0.05, SR), 0.002, 0.015, 0.7, 0.05, SR)
+                      for f in [988, 1175, 1568, 2093]])
+        return s
+    elif event == "duel_won":
+        s = _concat(*[_envelope(_sine(f, 0.04, SR), 0.002, 0.012, 0.75, 0.04, SR)
+                      for f in [784, 988, 1175, 1319, 1568, 1760, 2093, 2793, 3136]])
+        return s
+    elif event == "duel_lost":
+        s = _concat(*[_envelope(_sine(f, 0.06, SR), 0.003, 0.02, 0.55, 0.06, SR)
+                      for f in [1568, 1319, 1047, 784, 523]])
+        return s
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_sine(1175, 0.06, SR), 0.002, 0.018, 0.52, 0.06, SR),
+            _silence(0.04, SR),
+            _envelope(_sine(784, 0.14, SR), 0.003, 0.025, 0.38, 0.14, SR),
+        )
         return s
 
 
@@ -620,6 +912,38 @@ def _build_boneshaker(event: str) -> List[float]:
         boom = _envelope(_mix(_noise(0.1, SR), _square(110, 0.1, SR)),
                          0.001, 0.03, 0.55, 0.09, SR)
         return _concat(rattle, boom)
+    elif event == "duel_received":
+        rattle = _concat(*[
+            _concat(_envelope(_noise(0.03, SR), 0.001, 0.01, 0.5, 0.025, SR), _silence(0.02, SR))
+            for _ in range(3)
+        ])
+        bone = _concat(*[_envelope(_mix(_noise(0.04, SR), _square(f, 0.04, SR)),
+                                   0.001, 0.015, 0.58, 0.04, SR)
+                         for f in [147, 196, 247, 294, 370]])
+        return _concat(rattle, _silence(0.02, SR), bone)
+    elif event == "duel_accepted":
+        s = _concat(*[_envelope(_mix(_noise(0.035, SR), _square(f, 0.035, SR)),
+                                0.001, 0.012, 0.55, 0.03, SR)
+                      for f in [196, 247, 294, 370]])
+        return s
+    elif event == "duel_won":
+        s = _concat(*[_envelope(_mix(_noise(0.035, SR), _square(f, 0.035, SR)),
+                                0.001, 0.012, 0.58, 0.03, SR)
+                      for f in [147, 196, 247, 294, 370, 440, 554]])
+        return s
+    elif event == "duel_lost":
+        s = _concat(*[_envelope(_mix(_noise(0.05, SR), _square(f, 0.05, SR)),
+                                0.001, 0.018, 0.48, 0.045, SR)
+                      for f in [370, 294, 247, 196, 147, 110]])
+        return s
+    elif event == "duel_expired":
+        rattle = _concat(*[
+            _concat(_envelope(_noise(0.02, SR), 0.001, 0.007, 0.42, 0.018, SR), _silence(0.015, SR))
+            for _ in range(2)
+        ])
+        tail = _envelope(_mix(_noise(0.07, SR), _square(147, 0.07, SR)),
+                         0.001, 0.02, 0.38, 0.07, SR)
+        return _concat(rattle, tail)
 
 
 # Vex Machina – ring mod + metallic sweeps, steampunk gears
@@ -664,6 +988,41 @@ def _build_vex_machina(event: str) -> List[float]:
             _mix(_ring(_sine(1400, 0.2, SR), 350, SR), _sine(700, 0.2, SR)),
         )
         return _envelope(s, 0.004, 0.04, 0.72, 0.18, SR)
+    elif event == "duel_received":
+        gears = _concat(*[
+            _ring(_sine(200 + i * 80, 0.065, SR), 100 + i * 40, SR)
+            for i in range(3)
+        ])
+        flare1 = _ring(_sweep(200, 800, 0.1, SR), 200, SR)
+        flare2 = _ring(_sweep(300, 1400, 0.18, SR), 260, SR)
+        return _envelope(
+            _concat(gears, _silence(0.04, SR), flare1, _silence(0.03, SR), flare2),
+            0.005, 0.04, 0.68, 0.2, SR,
+        )
+    elif event == "duel_accepted":
+        s = _concat(
+            _ring(_sweep(300, 1000, 0.12, SR), 200, SR),
+            _mix(_ring(_sine(1000, 0.18, SR), 280, SR), _sine(500, 0.18, SR)),
+        )
+        return _envelope(s, 0.005, 0.04, 0.65, 0.18, SR)
+    elif event == "duel_won":
+        s = _mix(
+            _ring(_sweep(300, 1800, 0.25, SR), 240, SR),
+            _ring(_sine(900, 0.25, SR), 320, SR),
+        )
+        return _envelope(_concat(s, _ring(_sine(1800, 0.2, SR), 420, SR)),
+                         0.008, 0.05, 0.74, 0.22, SR)
+    elif event == "duel_lost":
+        s = _mix(_ring(_sweep(800, 60, 0.35, SR), 160, SR),
+                 _ring(_noise(0.35, SR), 90, SR))
+        return _envelope([x * 0.52 for x in s], 0.004, 0.05, 0.42, 0.3, SR)
+    elif event == "duel_expired":
+        s = _concat(
+            _ring(_sine(600, 0.07, SR), 200, SR),
+            _silence(0.04, SR),
+            _ring(_sweep(600, 200, 0.2, SR), 140, SR),
+        )
+        return _envelope(s, 0.004, 0.04, 0.4, 0.22, SR)
 
 
 # Stormfront Jake – wide dramatic sweeps + noise gusts, stormy western
@@ -710,6 +1069,38 @@ def _build_stormfront_jake(event: str) -> List[float]:
     elif event == "countdown_final":
         s = _mix(_sweep(200, 1400, 0.14, SR), [x * 0.3 for x in _noise(0.14, SR)])
         return _envelope(s, 0.01, 0.06, 0.7, 0.18, SR)
+    elif event == "duel_received":
+        gust1 = [s * 0.28 for s in _noise(0.1, SR)]
+        gust2 = [s * 0.28 for s in _noise(0.1, SR)]
+        s = _concat(
+            _envelope(gust1, 0.04, 0.07, 0.3, 0.08, SR),
+            _silence(0.03, SR),
+            _envelope(gust2, 0.04, 0.07, 0.32, 0.08, SR),
+            _silence(0.04, SR),
+            _envelope(_mix(_sweep(150, 1200, 0.28, SR), [x * 0.25 for x in _noise(0.28, SR)]),
+                      0.01, 0.07, 0.68, 0.24, SR),
+        )
+        return s
+    elif event == "duel_accepted":
+        wind = [s * 0.28 for s in _noise(0.14, SR)]
+        s = _concat(
+            _envelope(wind, 0.04, 0.08, 0.3, 0.1, SR),
+            _silence(0.03, SR),
+            _envelope(_sweep(200, 1000, 0.22, SR), 0.01, 0.06, 0.62, 0.2, SR),
+        )
+        return s
+    elif event == "duel_won":
+        s = _mix(
+            _sweep(300, 1800, 0.28, SR),
+            [x * 0.28 for x in _noise(0.28, SR)],
+        )
+        return _envelope(s, 0.01, 0.07, 0.68, 0.25, SR)
+    elif event == "duel_lost":
+        s = _mix(_sweep(1400, 80, 0.42, SR), [x * 0.38 for x in _noise(0.42, SR)])
+        return _envelope(s, 0.01, 0.07, 0.42, 0.35, SR)
+    elif event == "duel_expired":
+        s = _mix(_sweep(500, 150, 0.22, SR), [x * 0.2 for x in _noise(0.22, SR)])
+        return _envelope(s, 0.01, 0.06, 0.38, 0.22, SR)
 
 
 # Nebula Drift – very long, slow tremolo/vibrato sine waves, deep ambient space
@@ -756,6 +1147,42 @@ def _build_nebula_drift(event: str) -> List[float]:
         s = _mix(
             _envelope(_tremolo(_sine(220, 0.4, SR), 1.5, 0.5, SR), 0.05, 0.1, 0.55, 0.32, SR),
             _envelope(_vibrato(_sine(880, 0.32, SR), 2, 7, SR), 0.03, 0.08, 0.65, 0.28, SR),
+        )
+        return s
+    elif event == "duel_received":
+        low = _tremolo(_sine(130, 0.35, SR), 1.2, 0.5, SR)
+        mid = _tremolo(_sine(260, 0.32, SR), 1.8, 0.45, SR)
+        call = _vibrato(_sine(880, 0.22, SR), 2, 7, SR)
+        call2 = _vibrato(_sine(1320, 0.2, SR), 2.2, 6, SR)
+        return _mix(
+            _envelope(low, 0.07, 0.12, 0.48, 0.28, SR),
+            _envelope(mid, 0.06, 0.1, 0.45, 0.26, SR),
+            _envelope(_concat(call, call2), 0.04, 0.1, 0.6, 0.25, SR),
+        )
+    elif event == "duel_accepted":
+        low = _tremolo(_sine(130, 0.35, SR), 1.5, 0.48, SR)
+        rise = _sweep(220, 700, 0.28, SR)
+        return _mix(
+            _envelope(low, 0.06, 0.12, 0.45, 0.28, SR),
+            _envelope(rise, 0.04, 0.1, 0.55, 0.25, SR),
+        )
+    elif event == "duel_won":
+        s = _mix(
+            _envelope(_tremolo(_sine(110, 0.55, SR), 1.5, 0.5, SR), 0.07, 0.14, 0.55, 0.42, SR),
+            _envelope(_vibrato(_sine(660, 0.45, SR), 2.5, 6, SR), 0.05, 0.12, 0.68, 0.36, SR),
+            _envelope(_vibrato(_sine(1320, 0.35, SR), 3, 5, SR), 0.04, 0.1, 0.6, 0.28, SR),
+        )
+        return s
+    elif event == "duel_lost":
+        s = _mix(
+            _tremolo(_sweep(440, 55, 0.55, SR), 1.2, 0.55, SR),
+            _envelope(_sine(220, 0.5, SR), 0.05, 0.12, 0.4, 0.42, SR),
+        )
+        return _envelope(s, 0.06, 0.12, 0.4, 0.42, SR)
+    elif event == "duel_expired":
+        s = _mix(
+            _envelope(_tremolo(_sine(220, 0.38, SR), 1.2, 0.45, SR), 0.05, 0.1, 0.38, 0.32, SR),
+            _envelope(_vibrato(_sine(440, 0.3, SR), 2, 6, SR), 0.04, 0.08, 0.35, 0.28, SR),
         )
         return s
 
@@ -808,6 +1235,46 @@ def _build_gideons_clock(event: str) -> List[float]:
             for f in [880, 1047, 1319]
         ])
         return chime
+    elif event == "duel_received":
+        alarm = _concat(*[
+            _concat(_envelope(_square(784, 0.04, SR), 0.001, 0.014, 0.6, 0.035, SR),
+                    _silence(0.04, SR))
+            for _ in range(3)
+        ])
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.05, SR), 0.001, 0.018, 0.68, 0.055, SR),
+                    _silence(0.025, SR))
+            for f in [523, 659, 784, 988]
+        ])
+        return _concat(alarm, _silence(0.03, SR), chime)
+    elif event == "duel_accepted":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.05, SR), 0.001, 0.018, 0.65, 0.055, SR),
+                    _silence(0.025, SR))
+            for f in [659, 784, 880, 1047]
+        ])
+        return chime
+    elif event == "duel_won":
+        chime = _concat(*[
+            _concat(_envelope(_square(f, 0.05, SR), 0.001, 0.018, 0.72, 0.055, SR),
+                    _silence(0.022, SR))
+            for f in [523, 659, 784, 880, 988, 1175, 1319, 1568]
+        ])
+        return chime
+    elif event == "duel_lost":
+        s = _concat(*[
+            _concat(_envelope(_square(f, 0.06, SR), 0.001, 0.022, 0.52, 0.06, SR),
+                    _silence(0.038, SR))
+            for f in [659, 587, 523, 466, 392, 330]
+        ])
+        return s
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_square(523, 0.06, SR), 0.001, 0.022, 0.52, 0.06, SR),
+            _silence(0.05, SR),
+            _envelope(_square(392, 0.14, SR), 0.001, 0.03, 0.4, 0.14, SR),
+        )
+        return s
 
 
 # Sapphire Specter – soft vibrato sine, high harmonic shimmer, spectral beauty
@@ -857,6 +1324,45 @@ def _build_sapphire_specter(event: str) -> List[float]:
                       0.006, 0.03, 0.68, 0.1, SR)
             for f in [880, 1108, 1319]
         ])
+        return s
+    elif event == "duel_received":
+        call = _concat(*[
+            _envelope(_vibrato(_sine(f, 0.1, SR), 3, 4, SR), 0.01, 0.04, 0.6, 0.12, SR)
+            for f in [494, 659, 784]
+        ])
+        call2 = _concat(*[
+            _envelope(_vibrato(_mix(_sine(f, 0.1, SR), _sine(f * 2, 0.1, SR)), 3.5, 5, SR),
+                      0.01, 0.04, 0.65, 0.12, SR)
+            for f in [494, 659, 784, 988]
+        ])
+        return _concat(call, _silence(0.04, SR), call2)
+    elif event == "duel_accepted":
+        s = _concat(*[
+            _envelope(_vibrato(_mix(_sine(f, 0.1, SR), _sine(f * 2, 0.1, SR)), 3.5, 4, SR),
+                      0.01, 0.04, 0.62, 0.12, SR)
+            for f in [659, 784, 988, 1175]
+        ])
+        return s
+    elif event == "duel_won":
+        s = _concat(*[
+            _envelope(_vibrato(_mix(_sine(f, 0.09, SR), _sine(f * 2, 0.09, SR)), 4, 4, SR),
+                      0.008, 0.035, 0.7, 0.1, SR)
+            for f in [523, 659, 784, 988, 1175, 1319, 1568, 1975]
+        ])
+        return s
+    elif event == "duel_lost":
+        s = _concat(*[
+            _envelope(_vibrato(_sine(f, 0.12, SR), 3, 5, SR), 0.01, 0.04, 0.48, 0.12, SR)
+            for f in [988, 784, 659, 523, 415, 330]
+        ])
+        return s
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_vibrato(_mix(_sine(784, 0.08, SR), _sine(1568, 0.08, SR)), 4, 4, SR),
+                      0.008, 0.03, 0.48, 0.1, SR),
+            _silence(0.04, SR),
+            _envelope(_vibrato(_sine(494, 0.18, SR), 3, 4, SR), 0.01, 0.05, 0.35, 0.18, SR),
+        )
         return s
 
 
@@ -908,6 +1414,44 @@ def _build_molten_core(event: str) -> List[float]:
             _sweep(100, 700, 0.28, SR),
         )
         return _envelope(s, 0.04, 0.1, 0.58, 0.3, SR)
+    elif event == "duel_received":
+        rumble1 = _tremolo(_mix(_sine(55, 0.22, SR), _sine(110, 0.22, SR)), 2.5, 0.55, SR)
+        rumble2 = _tremolo(_mix(_sine(55, 0.22, SR), _sine(110, 0.22, SR)), 2.5, 0.55, SR)
+        rise = _sweep(80, 700, 0.28, SR)
+        return _concat(
+            _envelope(rumble1, 0.05, 0.1, 0.45, 0.2, SR),
+            _silence(0.04, SR),
+            _envelope(rumble2, 0.05, 0.1, 0.45, 0.2, SR),
+            _silence(0.04, SR),
+            _envelope(rise, 0.02, 0.08, 0.65, 0.25, SR),
+        )
+    elif event == "duel_accepted":
+        rumble = _tremolo(_sine(60, 0.3, SR), 2, 0.5, SR)
+        slam = _mix(_sweep(100, 500, 0.2, SR), [x * 0.28 for x in _noise(0.2, SR)])
+        return _concat(
+            _envelope(rumble, 0.05, 0.1, 0.42, 0.24, SR),
+            _silence(0.03, SR),
+            _envelope(slam, 0.01, 0.06, 0.6, 0.18, SR),
+        )
+    elif event == "duel_won":
+        s = _mix(
+            _tremolo(_sine(55, 0.5, SR), 2, 0.55, SR),
+            _sweep(100, 1000, 0.35, SR),
+            _envelope(_sine(400, 0.32, SR), 0.02, 0.08, 0.58, 0.26, SR),
+        )
+        return _envelope(s, 0.05, 0.12, 0.58, 0.36, SR)
+    elif event == "duel_lost":
+        s = _mix(
+            _tremolo(_sweep(350, 40, 0.5, SR), 2, 0.6, SR),
+            [x * 0.3 for x in _noise(0.5, SR)],
+        )
+        return _envelope(s, 0.04, 0.1, 0.42, 0.42, SR)
+    elif event == "duel_expired":
+        s = _mix(
+            _tremolo(_sine(55, 0.3, SR), 2, 0.5, SR),
+            _sweep(100, 50, 0.22, SR),
+        )
+        return _envelope(s, 0.04, 0.1, 0.38, 0.28, SR)
 
 
 # Zigzag Bandit – rapidly alternating high/low square notes, erratic and fun
@@ -941,6 +1485,26 @@ def _build_zigzag_bandit(event: str) -> List[float]:
         zz = _concat(*[_square(1319 if i % 2 == 0 else 659, 0.04, SR) for i in range(4)])
         s = _concat(zz, _square(2637, 0.14, SR))
         return _envelope(s, 0.001, 0.015, 0.78, 0.12, SR)
+    elif event == "duel_received":
+        zz1 = _concat(*[_square(880 if i % 2 == 0 else 330, 0.035, SR) for i in range(6)])
+        zz2 = _concat(*[_square(1046 if i % 2 == 0 else 440, 0.032, SR) for i in range(8)])
+        s = _concat(zz1, _silence(0.03, SR), zz2, _square(1760, 0.12, SR))
+        return _envelope(s, 0.002, 0.02, 0.75, 0.12, SR)
+    elif event == "duel_accepted":
+        zz = _concat(*[_square(880 if i % 2 == 0 else 440, 0.042, SR) for i in range(6)])
+        s = _concat(zz, _square(1760, 0.14, SR))
+        return _envelope(s, 0.002, 0.02, 0.7, 0.12, SR)
+    elif event == "duel_won":
+        zz = _concat(*[_square(1319 if i % 2 == 0 else 659, 0.035, SR) for i in range(12)])
+        s = _concat(zz, _square(2637, 0.18, SR))
+        return _envelope(s, 0.002, 0.018, 0.8, 0.15, SR)
+    elif event == "duel_lost":
+        zz = _concat(*[_square(440 if i % 2 == 0 else 220, 0.06, SR) for i in range(8)])
+        return _envelope(zz, 0.002, 0.022, 0.58, 0.18, SR)
+    elif event == "duel_expired":
+        s = _concat(_square(660, 0.05, SR), _square(330, 0.05, SR),
+                    _silence(0.04, SR), _square(440, 0.14, SR))
+        return _envelope(s, 0.002, 0.02, 0.42, 0.18, SR)
 
 
 # Wildcat Hollow – warm sine + mild crackle, rustic country charm
@@ -997,6 +1561,51 @@ def _build_wildcat_hollow(event: str) -> List[float]:
             for f in [659, 784, 988]
         ])
         return s
+    elif event == "duel_received":
+        call1 = _concat(*[
+            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)),
+                      0.005, 0.03, 0.6, 0.1, SR)
+            for f in [330, 440, 523]
+        ])
+        call2 = _concat(*[
+            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.5, 0.09, SR)),
+                      0.005, 0.03, 0.65, 0.1, SR)
+            for f in [330, 440, 523, 659]
+        ])
+        cr = [s * 0.1 for s in _crackle(len(call1) / SR, SR)]
+        cr = (cr + [0.0] * len(call1))[:len(call1)]
+        return _concat(_mix(call1, cr), _silence(0.03, SR), call2)
+    elif event == "duel_accepted":
+        s = _concat(*[
+            _envelope(_mix(_sine(f, 0.09, SR), _sine(f * 1.25, 0.09, SR)),
+                      0.005, 0.03, 0.62, 0.1, SR)
+            for f in [392, 523, 659, 784]
+        ])
+        return s
+    elif event == "duel_won":
+        notes = [330, 440, 523, 659, 784, 988, 1175]
+        s = _concat(*[
+            _envelope(_mix(_sine(f, 0.08, SR), _sine(f * 1.5, 0.08, SR),
+                           _sine(f * 1.25, 0.08, SR)), 0.005, 0.025, 0.68, 0.1, SR)
+            for f in notes
+        ])
+        return s
+    elif event == "duel_lost":
+        s = _concat(*[
+            _envelope(_mix(_sine(f, 0.1, SR), _sine(f * 0.5, 0.1, SR)),
+                      0.006, 0.04, 0.46, 0.12, SR)
+            for f in [392, 330, 277, 220, 165]
+        ])
+        return s
+    elif event == "duel_expired":
+        s = _concat(
+            _envelope(_mix(_sine(440, 0.08, SR), _sine(550, 0.08, SR)),
+                      0.005, 0.03, 0.48, 0.1, SR),
+            _silence(0.04, SR),
+            _envelope(_mix(_sine(330, 0.16, SR), _sine(247, 0.16, SR)),
+                      0.005, 0.04, 0.35, 0.18, SR),
+        )
+        return s
 
 
 # Crimson Flare – ring mod dramatic rises, intense cinematic build-up
@@ -1046,6 +1655,46 @@ def _build_crimson_flare(event: str) -> List[float]:
             _mix(_ring(_sine(1600, 0.22, SR), 320, SR), _sine(800, 0.22, SR)),
         )
         return _envelope(s, 0.006, 0.05, 0.74, 0.2, SR)
+    elif event == "duel_received":
+        build1 = _concat(*[
+            _ring(_sine(200 + i * 100, 0.065, SR), 80 + i * 45, SR)
+            for i in range(3)
+        ])
+        build2 = _concat(*[
+            _ring(_sine(200 + i * 100, 0.065, SR), 90 + i * 50, SR)
+            for i in range(4)
+        ])
+        flare = _ring(_sweep(400, 1600, 0.22, SR), 200, SR)
+        return _envelope(
+            _concat(build1, _silence(0.03, SR), build2, _silence(0.04, SR), flare),
+            0.008, 0.05, 0.72, 0.2, SR,
+        )
+    elif event == "duel_accepted":
+        s = _concat(
+            _ring(_sweep(250, 1000, 0.13, SR), 140, SR),
+            _mix(_ring(_sine(1000, 0.2, SR), 230, SR), _sine(500, 0.2, SR)),
+        )
+        return _envelope(s, 0.008, 0.05, 0.67, 0.2, SR)
+    elif event == "duel_won":
+        s = _mix(
+            _ring(_sweep(300, 2000, 0.26, SR), 240, SR),
+            _ring(_sine(1000, 0.26, SR), 320, SR),
+        )
+        return _envelope(_concat(s, _ring(_sine(2000, 0.22, SR), 450, SR)),
+                         0.01, 0.05, 0.76, 0.22, SR)
+    elif event == "duel_lost":
+        s = _mix(
+            _ring(_sweep(1400, 80, 0.38, SR), 170, SR),
+            _ring(_noise(0.38, SR), 90, SR),
+        )
+        return _envelope([x * 0.52 for x in s], 0.005, 0.05, 0.42, 0.32, SR)
+    elif event == "duel_expired":
+        s = _concat(
+            _ring(_sine(700, 0.07, SR), 200, SR),
+            _silence(0.04, SR),
+            _ring(_sweep(700, 220, 0.22, SR), 140, SR),
+        )
+        return _envelope(s, 0.006, 0.04, 0.4, 0.24, SR)
 
 
 # ── Pack registry ─────────────────────────────────────────────────────────────
