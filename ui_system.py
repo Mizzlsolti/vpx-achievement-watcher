@@ -103,7 +103,7 @@ class SystemMixin:
 
         self.txt_player_name = QLineEdit()
         self.txt_player_name.setText(self.cfg.OVERLAY.get("player_name", "Player"))
-        _name_rx = QRegularExpression(r"[\p{L}\d /\\!\"\u00a7$%&()\-_,.:;]*")
+        _name_rx = QRegularExpression(r"[\p{L}\d /\\!\"§$%&()\-_,.:;]*")
         self.txt_player_name.setValidator(QRegularExpressionValidator(_name_rx, self.txt_player_name))
 
         self.txt_player_id = QLineEdit()
