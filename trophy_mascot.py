@@ -539,6 +539,11 @@ _GUI_DUEL: dict[str, list[str]] = {
         "No shame in saying no. There will be other duels!",
         "Declined. The duels tab is always open for new challenges!",
     ],
+    "gui_duel_accepted": [
+        "Challenge accepted! Time to show them what you got!",
+        "The duel is ON! Go crush that score!",
+        "Accepted! May the best player win!",
+    ],
     "gui_duel_expired": [
         "That duel timed out... They were probably scared!",
         "Duel expired. Onwards to the next challenge!",
@@ -713,6 +718,11 @@ _OV_DUEL: dict[str, list[str]] = {
         "Maybe next time...",
         "No problem. The duels will keep coming!",
         "Declined. Save your energy for the right opponent!",
+    ],
+    "ov_duel_accepted": [
+        "Challenge accepted! Time to dominate!",
+        "The duel is ON! Show them your skills!",
+        "Accepted! Let the battle begin!",
     ],
     "ov_duel_expired": [
         "Too slow! That duel just expired!",
@@ -3174,6 +3184,14 @@ class GUITrophie(QWidget):
         if options:
             self._show_comment_key("gui_duel_declined", random.choice(options), IDLE)
 
+    def on_duel_accepted(self) -> None:
+        """React when a duel invitation is accepted."""
+        self._last_interaction = time.time()
+        self._draw.set_state(HAPPY)
+        options = _GUI_DUEL.get("gui_duel_accepted", [])
+        if options:
+            self._show_comment_key("gui_duel_accepted", random.choice(options), HAPPY)
+
     def on_duel_expired(self) -> None:
         """React when a duel invitation expires."""
         options = _GUI_DUEL.get("gui_duel_expired", [])
@@ -3840,6 +3858,13 @@ class OverlayTrophie(QWidget):
         options = _OV_DUEL.get("ov_duel_declined", [])
         if options:
             self._show_comment_key("ov_duel_declined", random.choice(options), IDLE)
+
+    def on_duel_accepted(self) -> None:
+        """React when a duel invitation is accepted."""
+        self._draw.set_state(HAPPY)
+        options = _OV_DUEL.get("ov_duel_accepted", [])
+        if options:
+            self._show_comment_key("ov_duel_accepted", random.choice(options), HAPPY)
 
     def on_duel_expired(self) -> None:
         """React when a duel invitation expires."""

@@ -26,12 +26,19 @@ class DuelStatus:
     ACTIVE   = "active"
     WON      = "won"
     LOST     = "lost"
+    DRAW     = "draw"
     EXPIRED  = "expired"
     DECLINED = "declined"
 
 
 # Invitation expires after 15 minutes if not accepted.
 INVITATION_TTL_SECONDS = 900
+
+# Accepted/active duels expire after 24 hours if no score is submitted.
+ACTIVE_DUEL_TTL_SECONDS = 86_400
+
+# Sentinel value indicating a score has not yet been submitted.
+SCORE_NOT_SUBMITTED = -1
 
 
 @dataclass
@@ -48,8 +55,8 @@ class Duel:
     created_at:       float # Unix timestamp of creation
     accepted_at:      float = 0.0   # Unix timestamp when accepted (0 = not yet)
     completed_at:     float = 0.0   # Unix timestamp when completed (0 = not yet)
-    challenger_score: int   = 0     # final score of challenger
-    opponent_score:   int   = 0     # final score of opponent
+    challenger_score: int   = -1    # final score of challenger (-1 = not yet submitted)
+    opponent_score:   int   = -1    # final score of opponent (-1 = not yet submitted)
     expires_at:       float = 0.0   # Unix timestamp when invitation expires
 
 
@@ -67,8 +74,8 @@ def _duel_from_dict(d: dict) -> Duel:
         created_at=float(d.get("created_at", 0)),
         accepted_at=float(d.get("accepted_at", 0)),
         completed_at=float(d.get("completed_at", 0)),
-        challenger_score=int(d.get("challenger_score", 0)),
-        opponent_score=int(d.get("opponent_score", 0)),
+        challenger_score=int(d.get("challenger_score", SCORE_NOT_SUBMITTED)),
+        opponent_score=int(d.get("opponent_score", SCORE_NOT_SUBMITTED)),
         expires_at=float(d.get("expires_at", 0)),
     )
 
@@ -160,7 +167,10 @@ class DuelEngine:
         if not self._cfg.CLOUD_ENABLED:
             return False
         node = self._cloud_node_for_duel(duel.duel_id)
-        return CloudSync.set_node(self._cfg, node, asdict(duel))
+        ok = CloudSync.set_node(self._cfg, node, asdict(duel))
+        if not ok:
+            log(self._cfg, f"[DUEL] Cloud upload failed for duel {duel.duel_id}.", "WARN")
+        return ok
 
     # ── Public API ───────────────────────────────────────────────────────────
 
@@ -191,6 +201,14 @@ class DuelEngine:
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
             return None
+
+        # Prevent duplicate invitation for the same opponent + table while one is still pending.
+        for existing in self._active:
+            if (existing.opponent == opponent_id
+                    and existing.table_rom == table_rom.lower().strip()
+                    and existing.status == DuelStatus.PENDING):
+                log(self._cfg, "[DUEL] send_invitation: duplicate – a pending duel for this opponent/table already exists.", "WARN")
+                return None
 
         now = time.time()
         duel = Duel(
@@ -293,6 +311,10 @@ class DuelEngine:
         self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} declined.")
+        try:
+            sound.play("duel_declined")
+        except Exception:
+            pass
         return True
 
     def submit_result(self, duel_id: str, score: int) -> Optional[str]:
@@ -333,16 +355,24 @@ class DuelEngine:
 
         if isinstance(cloud_data, dict):
             if is_challenger:
-                duel.opponent_score = int(cloud_data.get("opponent_score", 0))
+                opp_val = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
+                duel.opponent_score = opp_val if opp_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
             else:
-                duel.challenger_score = int(cloud_data.get("challenger_score", 0))
+                chall_val = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
+                duel.challenger_score = chall_val if chall_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
 
-        # Only determine winner if both scores are present.
-        if duel.challenger_score > 0 and duel.opponent_score > 0:
-            if is_challenger:
-                result = DuelStatus.WON if duel.challenger_score >= duel.opponent_score else DuelStatus.LOST
+        # Only determine winner if both scores have been submitted.
+        both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED
+                          and duel.opponent_score != SCORE_NOT_SUBMITTED)
+        if both_submitted:
+            # Challenger advantage on tie: challenger wins if scores are equal.
+            if duel.challenger_score > duel.opponent_score:
+                result = DuelStatus.WON if is_challenger else DuelStatus.LOST
+            elif duel.challenger_score < duel.opponent_score:
+                result = DuelStatus.LOST if is_challenger else DuelStatus.WON
             else:
-                result = DuelStatus.WON if duel.opponent_score >= duel.challenger_score else DuelStatus.LOST
+                # Tie: challenger gets the edge (home-field advantage rule).
+                result = DuelStatus.WON if is_challenger else DuelStatus.LOST
         else:
             # Score not yet available from the other side – mark ACTIVE and wait.
             duel.status = DuelStatus.ACTIVE
@@ -370,12 +400,25 @@ class DuelEngine:
     def check_expiry(self) -> List[Duel]:
         """Check all active duels for expiry and move expired ones to history.
 
+        PENDING duels expire when their ``expires_at`` timestamp passes.
+        ACCEPTED and ACTIVE duels expire after ``ACTIVE_DUEL_TTL_SECONDS``
+        (24 hours) from acceptance to prevent them from staying forever.
+
         Returns a list of duels that were expired in this call.
         """
         now = time.time()
         expired: List[Duel] = []
         for duel in list(self._active):
+            should_expire = False
             if duel.status == DuelStatus.PENDING and duel.expires_at > 0 and now > duel.expires_at:
+                should_expire = True
+            elif duel.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
+                # Accepted/active duels expire after 24 hours from acceptance.
+                ref_time = duel.accepted_at if duel.accepted_at > 0 else duel.created_at
+                if ref_time > 0 and now > ref_time + ACTIVE_DUEL_TTL_SECONDS:
+                    should_expire = True
+
+            if should_expire:
                 duel.status = DuelStatus.EXPIRED
                 duel.completed_at = now
                 self._active.remove(duel)

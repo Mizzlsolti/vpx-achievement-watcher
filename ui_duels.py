@@ -264,7 +264,7 @@ class DuelInviteOverlay(QWidget):
     def keyPressEvent(self, event) -> None:  # noqa: N802
         key = event.key()
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._on_accept_clicked()
+            self.confirm_focused()
         elif key == Qt.Key.Key_Escape:
             self._on_decline_clicked()
         else:
@@ -872,6 +872,7 @@ class DuelsMixin:
         declines with an error message or delegates to DuelEngine.accept_duel().
         """
         duel_id = self._pending_invitation_duel_id
+        self._pending_invitation_duel_id = ""
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
         self._update_duels_tab_badge(0)
@@ -923,6 +924,14 @@ class DuelsMixin:
 
         self._duel_engine.accept_duel(duel_id)
         self._refresh_active_duels()
+        # Trigger mascot accepted reactions.
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_duel_accepted()
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_duel_accepted()
+        except Exception:
+            pass
 
     def _on_duel_decline(self) -> None:
         """Decline the currently displayed incoming duel invitation.
@@ -931,6 +940,7 @@ class DuelsMixin:
         to DuelEngine.decline_duel(), and refreshes the Active Duels table.
         """
         duel_id = self._pending_invitation_duel_id
+        self._pending_invitation_duel_id = ""
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
         self._update_duels_tab_badge(0)
@@ -1010,6 +1020,13 @@ class DuelsMixin:
                     pass
                 self._duel_engine.accept_duel(did)
                 self._refresh_active_duels()
+                try:
+                    if getattr(self, "_trophie_gui", None):
+                        self._trophie_gui.on_duel_accepted()
+                    if getattr(self, "_trophie_overlay", None):
+                        self._trophie_overlay.on_duel_accepted()
+                except Exception:
+                    pass
 
             def _decline_cb(did: str) -> None:
                 self._duel_engine.decline_duel(did)
@@ -1025,6 +1042,11 @@ class DuelsMixin:
             self._duel_invite_overlay = DuelInviteOverlay(
                 self, opponent, table_name, duel_id, _accept_cb, _decline_cb
             )
+            # Clear the reference when the overlay is destroyed (WA_DeleteOnClose)
+            # to prevent RuntimeError from accessing a deleted C++ object.
+            self._duel_invite_overlay.destroyed.connect(
+                lambda: setattr(self, "_duel_invite_overlay", None)
+            )
             self._duel_invite_overlay.show()
         else:
             # GUI is visible — use the in-tab alert bar.
@@ -1035,6 +1057,7 @@ class DuelsMixin:
             self._duel_accept_countdown = 15
             self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
             self._duel_alert_focus = 0
+            self._apply_duel_alert_focus_styles()
             self._duel_alert_frame.setVisible(True)
             self._duel_accept_timer.start()
             self._update_duels_tab_badge(1)
@@ -1184,16 +1207,29 @@ class DuelsMixin:
         """Check for expired duels via the engine and refresh both tables.
 
         Delegates to DuelEngine.check_expiry() which moves any overdue
-        PENDING duels to history with DuelStatus.EXPIRED.  If any duels
-        were expired, both the Active Duels and Duel History tables are
-        refreshed and a brief expiry overlay is shown per expired duel.
+        PENDING/ACCEPTED/ACTIVE duels to history with DuelStatus.EXPIRED.
+        If any duels were expired, both the Active Duels and Duel History
+        tables are refreshed, bridge.duel_expired is emitted for mascot
+        reactions, and a brief expiry overlay is shown per expired duel.
+        Also re-checks ACTIVE duels for opponent score availability.
         Called every 60 seconds by self._duel_expiry_timer.
         """
+        # Re-check ACTIVE duels for opponent score (mitigates race condition).
+        try:
+            self._recheck_active_duel_scores()
+        except Exception:
+            pass
+
         expired = self._duel_engine.check_expiry()
         if expired:
             self._refresh_active_duels()
             self._refresh_duel_history()
             for duel in expired:
+                # Emit bridge signal so mascot dispatchers fire.
+                try:
+                    self.bridge.duel_expired.emit(duel.duel_id)
+                except Exception:
+                    pass
                 self._duel_notify(
                     "⏰ Duel expired \u2014 no response received.",
                     "#888888",
@@ -1312,16 +1348,16 @@ class DuelsMixin:
             }
             result_text, result_color = result_map.get(duel.status, (duel.status.capitalize(), "#AAAAAA"))
             result_item = QTableWidgetItem(result_text)
-            result_item.setForeground(__import__("PyQt6.QtGui", fromlist=["QColor"]).QColor(result_color))
+            result_item.setForeground(QColor(result_color))
             tbl.setItem(row, 2, result_item)
 
             # Your score.
             my_score = duel.challenger_score if is_challenger else duel.opponent_score
-            tbl.setItem(row, 3, QTableWidgetItem(f"{my_score:,}"))
+            tbl.setItem(row, 3, QTableWidgetItem(f"{my_score:,}" if my_score >= 0 else "—"))
 
             # Their score.
             their_score = duel.opponent_score if is_challenger else duel.challenger_score
-            tbl.setItem(row, 4, QTableWidgetItem(f"{their_score:,}"))
+            tbl.setItem(row, 4, QTableWidgetItem(f"{their_score:,}" if their_score >= 0 else "—"))
 
             # Date.
             if duel.completed_at:
@@ -1329,3 +1365,88 @@ class DuelsMixin:
             else:
                 dt = "—"
             tbl.setItem(row, 5, QTableWidgetItem(dt))
+
+    # ── Session-ended hook: submit duel scores ─────────────────────────────────
+
+    def _on_session_ended_duels(self, rom: str) -> None:
+        """Called when a game session ends. Submits scores for any ACCEPTED
+        duels on the finished ROM.
+
+        Looks up the latest high score from the watcher and calls
+        ``DuelEngine.submit_result()`` for each matching duel.
+        """
+        if not rom:
+            return
+        rom_lower = rom.lower().strip()
+        try:
+            active = self._duel_engine.get_active_duels()
+        except Exception:
+            return
+
+        matching = [d for d in active
+                    if d.table_rom.lower().strip() == rom_lower
+                    and d.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE)]
+        if not matching:
+            return
+
+        # Get the latest score from the watcher.
+        score = 0
+        try:
+            w = getattr(self, "watcher", None)
+            if w:
+                score = int(getattr(w, "last_session_score", 0) or 0)
+                if score <= 0:
+                    # Fallback: try current high score from NVRAM state.
+                    score = int(getattr(w, "current_highscore", 0) or 0)
+        except Exception:
+            pass
+
+        for duel in matching:
+            try:
+                result = self._duel_engine.submit_result(duel.duel_id, score)
+                if result:
+                    my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+                    is_challenger = (duel.challenger == my_id)
+                    my_score = duel.challenger_score if is_challenger else duel.opponent_score
+                    their_score = duel.opponent_score if is_challenger else duel.challenger_score
+                    try:
+                        self.bridge.duel_result.emit(duel.duel_id, result, my_score, their_score)
+                    except Exception:
+                        pass
+                    self._refresh_active_duels()
+                    self._refresh_duel_history()
+            except Exception:
+                pass
+
+    # ── Re-check ACTIVE duel scores (race condition mitigation) ────────────────
+
+    def _recheck_active_duel_scores(self) -> None:
+        """Re-check ACTIVE duels where we are waiting for the opponent's score.
+
+        Called periodically by _check_duel_expiry to mitigate the race
+        condition where both players submit at similar times and one does
+        not see the other's score on the first attempt.
+        """
+        from duel_engine import SCORE_NOT_SUBMITTED
+        try:
+            active = self._duel_engine.get_active_duels()
+        except Exception:
+            return
+
+        for duel in active:
+            if duel.status != DuelStatus.ACTIVE:
+                continue
+            my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            is_challenger = (duel.challenger == my_id)
+            my_score = duel.challenger_score if is_challenger else duel.opponent_score
+            if my_score == SCORE_NOT_SUBMITTED:
+                continue  # We haven't submitted yet; nothing to re-check.
+            result = self._duel_engine.submit_result(duel.duel_id, my_score)
+            if result:
+                opp_score = duel.opponent_score if is_challenger else duel.challenger_score
+                try:
+                    self.bridge.duel_result.emit(duel.duel_id, result, my_score, opp_score)
+                except Exception:
+                    pass
+                self._refresh_active_duels()
+                self._refresh_duel_history()

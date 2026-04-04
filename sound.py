@@ -55,6 +55,7 @@ SOUND_EVENTS = [
     ("duel_won",           "🏆 Duel Won"),
     ("duel_lost",          "💀 Duel Lost"),
     ("duel_expired",       "⏰ Duel Expired"),
+    ("duel_declined",      "❌ Duel Declined"),
 ]
 
 # ── Low-level helpers ─────────────────────────────────────────────────────────
@@ -245,6 +246,9 @@ def _build_zaptron(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _concat(_square(440, 0.06, SR), _silence(0.04, SR), _square(330, 0.12, SR))
         return _envelope(s, 0.002, 0.02, 0.45, 0.15, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Iron Basilisk – heavy low square + noise, slow, bassy, deep
@@ -310,6 +314,9 @@ def _build_iron_basilisk(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _mix(_square(80, 0.12, SR), _noise(0.12, SR))
         return _envelope([x * 0.35 for x in s], 0.005, 0.04, 0.38, 0.14, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Voodoo Swamp – low crackle + tremolo sine, murky, atmospheric
@@ -373,6 +380,9 @@ def _build_voodoo_swamp(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _mix(_tremolo(_sine(220, 0.2, SR), 3, 0.5, SR), _crackle(0.2, SR))
         return _envelope(s, 0.01, 0.06, 0.35, 0.2, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Pixel Ghost – square + ring mod, retro ghostly, mid-range
@@ -424,6 +434,9 @@ def _build_pixel_ghost(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _ring(_concat(_square(370, 0.07, SR), _silence(0.04, SR), _square(247, 0.14, SR)), 110, SR)
         return _envelope(s, 0.003, 0.025, 0.42, 0.18, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Solar Drift – smooth pure sine + slow sweeps, gentle fade-in, ethereal
@@ -474,6 +487,9 @@ def _build_solar_drift(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _concat(_sine(440, 0.1, SR), _sweep(440, 220, 0.22, SR))
         return _envelope(s, 0.04, 0.08, 0.38, 0.28, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Roko's Lair – deep low sine, very long sustain, ominous dungeon
@@ -534,6 +550,9 @@ def _build_rokos_lair(event: str) -> List[float]:
             _envelope(_sine(160, 0.28, SR), 0.03, 0.08, 0.35, 0.25, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Thunderclap Rex – noise transients + short sweeps, percussive, powerful
@@ -628,6 +647,9 @@ def _build_thunderclap_rex(event: str) -> List[float]:
             _envelope(crack, 0.001, 0.02, 0.45, 0.05, SR),
             _envelope(tail, 0.003, 0.05, 0.35, 0.18, SR),
         )
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Frostbite Hollow – very high frequency tremolo sine, crystalline pings
@@ -707,6 +729,9 @@ def _build_frostbite_hollow(event: str) -> List[float]:
             _envelope(_tremolo(_sine(1047, 0.16, SR), 7, 0.32, SR), 0.005, 0.04, 0.38, 0.18, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Ratchet Circus – mechanical staccato noise + square bursts, carnival machine
@@ -801,6 +826,9 @@ def _build_ratchet_circus(event: str) -> List[float]:
             _envelope(_mix(_noise(0.04, SR), _square(330, 0.04, SR)), 0.001, 0.015, 0.38, 0.04, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Lucky Stardust – fast bright high sine arpeggios, glittery, sparkly
@@ -859,6 +887,9 @@ def _build_lucky_stardust(event: str) -> List[float]:
             _envelope(_sine(784, 0.14, SR), 0.003, 0.025, 0.38, 0.14, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Boneshaker – short rattling noise + low square bursts, percussive skeleton
@@ -944,6 +975,9 @@ def _build_boneshaker(event: str) -> List[float]:
         tail = _envelope(_mix(_noise(0.07, SR), _square(147, 0.07, SR)),
                          0.001, 0.02, 0.38, 0.07, SR)
         return _concat(rattle, tail)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Vex Machina – ring mod + metallic sweeps, steampunk gears
@@ -1023,6 +1057,9 @@ def _build_vex_machina(event: str) -> List[float]:
             _ring(_sweep(600, 200, 0.2, SR), 140, SR),
         )
         return _envelope(s, 0.004, 0.04, 0.4, 0.22, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Stormfront Jake – wide dramatic sweeps + noise gusts, stormy western
@@ -1101,6 +1138,9 @@ def _build_stormfront_jake(event: str) -> List[float]:
     elif event == "duel_expired":
         s = _mix(_sweep(500, 150, 0.22, SR), [x * 0.2 for x in _noise(0.22, SR)])
         return _envelope(s, 0.01, 0.06, 0.38, 0.22, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Nebula Drift – very long, slow tremolo/vibrato sine waves, deep ambient space
@@ -1185,6 +1225,9 @@ def _build_nebula_drift(event: str) -> List[float]:
             _envelope(_vibrato(_sine(440, 0.3, SR), 2, 6, SR), 0.04, 0.08, 0.35, 0.28, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Gideon's Clock – precise staccato square bursts, clockwork timing
@@ -1275,6 +1318,9 @@ def _build_gideons_clock(event: str) -> List[float]:
             _envelope(_square(392, 0.14, SR), 0.001, 0.03, 0.4, 0.14, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Sapphire Specter – soft vibrato sine, high harmonic shimmer, spectral beauty
@@ -1364,6 +1410,9 @@ def _build_sapphire_specter(event: str) -> List[float]:
             _envelope(_vibrato(_sine(494, 0.18, SR), 3, 4, SR), 0.01, 0.05, 0.35, 0.18, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Molten Core – deep low rumbling sweeps, industrial, heavy
@@ -1452,6 +1501,9 @@ def _build_molten_core(event: str) -> List[float]:
             _sweep(100, 50, 0.22, SR),
         )
         return _envelope(s, 0.04, 0.1, 0.38, 0.28, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Zigzag Bandit – rapidly alternating high/low square notes, erratic and fun
@@ -1505,6 +1557,9 @@ def _build_zigzag_bandit(event: str) -> List[float]:
         s = _concat(_square(660, 0.05, SR), _square(330, 0.05, SR),
                     _silence(0.04, SR), _square(440, 0.14, SR))
         return _envelope(s, 0.002, 0.02, 0.42, 0.18, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Wildcat Hollow – warm sine + mild crackle, rustic country charm
@@ -1606,6 +1661,9 @@ def _build_wildcat_hollow(event: str) -> List[float]:
                       0.005, 0.04, 0.35, 0.18, SR),
         )
         return s
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # Crimson Flare – ring mod dramatic rises, intense cinematic build-up
@@ -1695,6 +1753,9 @@ def _build_crimson_flare(event: str) -> List[float]:
             _ring(_sweep(700, 220, 0.22, SR), 140, SR),
         )
         return _envelope(s, 0.006, 0.04, 0.4, 0.24, SR)
+    elif event == "duel_declined":
+        s = _concat(_square(370, 0.06, SR), _silence(0.03, SR), _square(277, 0.1, SR))
+        return _envelope(s, 0.002, 0.02, 0.35, 0.12, SR)
 
 
 # ── Pack registry ─────────────────────────────────────────────────────────────
