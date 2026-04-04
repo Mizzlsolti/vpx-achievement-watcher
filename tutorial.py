@@ -1,5 +1,5 @@
 """
-tutorial.py – First-Run Tutorial Wizard (14 steps)
+tutorial.py – First-Run Tutorial Wizard (16 steps)
 
 A non-modal QDialog that walks the user through every tab of the app on
 their very first launch.  It floats on top of the main window so the user
@@ -55,7 +55,7 @@ _STEPS = [
             "    If you lose it, your progress cannot be recovered.\n"
             "    Do not share it with others."
         ),
-        "tab": 8,   # System
+        "tab": 9,   # System
         "subtab": None,
     },
     {
@@ -89,7 +89,7 @@ _STEPS = [
             "Each table needs an NVRAM Map to track achievements.\n"
             "Maps are downloaded automatically from the cloud index."
         ),
-        "tab": 6,   # Available Maps
+        "tab": 7,   # Available Maps
         "subtab": None,
     },
     {
@@ -242,7 +242,29 @@ _STEPS = [
             "  • Rankings update after each sync\n\n"
             "Click \"📜 Cloud Rules\" in the Cloud tab for full details."
         ),
-        "tab": 7,   # Cloud
+        "tab": 8,   # Cloud
+        "subtab": None,
+    },
+    {
+        "title": "⚔️ Score Duels",
+        "body": (
+            "Score Duels let you challenge other players to async\n"
+            "high-score battles on any table!\n\n"
+            "How it works:\n"
+            "  1. Go to the Score Duels tab and search for a player by ID\n"
+            "  2. Select a table and send the invitation\n"
+            "  3. Both players play the same table independently\n"
+            "  4. Highest score wins!\n\n"
+            "Receiving invitations:\n"
+            "  • If the GUI is open: an alert bar appears at the top\n"
+            "    of the Score Duels tab\n"
+            "  • If minimized to tray: a floating overlay notification\n"
+            "    pops up on your desktop\n\n"
+            "  ⏳ You have 15 seconds to accept or decline.\n"
+            "  ⚠️ VPX must NOT be running to accept a duel.\n"
+            "  ☁️ Cloud Sync must be enabled for duels to work."
+        ),
+        "tab": 6,   # Score Duels
         "subtab": None,
     },
     {
@@ -339,7 +361,7 @@ QPushButton#btn_finish:hover {
 # ---------------------------------------------------------------------------
 class TutorialWizardDialog(QDialog):
     """
-    Non-modal 14-step first-run tutorial wizard.
+    Non-modal 16-step first-run tutorial wizard.
 
     Parameters
     ----------

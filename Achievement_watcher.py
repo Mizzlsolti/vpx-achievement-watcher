@@ -359,6 +359,11 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 lambda attempts, margin: self._trophie_overlay.on_challenge_lost(attempts, margin)
             )
 
+            # Duel mascot reactions
+            self.bridge.duel_received.connect(self._on_duel_received_mascot)
+            self.bridge.duel_result.connect(self._on_duel_result_mascot)
+            self.bridge.duel_expired.connect(self._on_duel_expired_mascot)
+
             if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
                 self._trophie_gui.show()
                 QTimer.singleShot(800, self._trophie_gui.greet)
@@ -373,6 +378,57 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         except Exception:
             self._trophie_gui = None
             self._trophie_overlay = None
+
+    # ── Duel mascot dispatchers ───────────────────────────────────────────────
+
+    def _on_duel_received_mascot(self, opponent: str, table_name: str, duel_id: str) -> None:
+        """Trigger mascot duel-received reactions."""
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_duel_received()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_duel_received()
+        except Exception:
+            pass
+
+    def _on_duel_result_mascot(self, duel_id: str, result: str, your_score: int, their_score: int) -> None:
+        """Trigger mascot reactions based on duel result."""
+        try:
+            trophie_gui = getattr(self, "_trophie_gui", None)
+            trophie_ov  = getattr(self, "_trophie_overlay", None)
+            if result == "won":
+                if trophie_gui:
+                    trophie_gui.on_duel_won()
+                if trophie_ov:
+                    trophie_ov.on_duel_won()
+            elif result == "lost":
+                if trophie_gui:
+                    trophie_gui.on_duel_lost()
+                if trophie_ov:
+                    trophie_ov.on_duel_lost()
+            elif result == "expired":
+                if trophie_gui:
+                    trophie_gui.on_duel_expired()
+                if trophie_ov:
+                    trophie_ov.on_duel_expired()
+        except Exception:
+            pass
+
+    def _on_duel_expired_mascot(self, duel_id: str) -> None:
+        """Trigger mascot duel-expired reactions (bridge.duel_expired signal)."""
+        try:
+            if getattr(self, "_trophie_gui", None):
+                self._trophie_gui.on_duel_expired()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_trophie_overlay", None):
+                self._trophie_overlay.on_duel_expired()
+        except Exception:
+            pass
 
     def _in_game_now(self) -> bool:
         try:
@@ -541,13 +597,15 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "<b>⚔️ Score Duels</b><br><br>"
             "Challenge other players to asynchronous high-score battles!<br><br>"
             "• <b>Start New Duel</b>: Search for a player by ID and select a table to challenge them.<br>"
-            "• <b>Incoming Invitations</b>: When someone challenges you, an alert appears at the top "
-            "of the tab. You have 15 seconds to accept or decline.<br>"
+            "• <b>Incoming Invitations</b>: When someone challenges you, an alert bar appears at the top "
+            "of this tab (if the GUI is open). If the GUI is minimized to the system tray, a floating "
+            "notification overlay pops up instead.<br>"
+            "• You have <b>15 seconds</b> to accept or decline an invitation — it auto-declines on timeout.<br>"
             "• <b>Active Duels</b>: Shows all pending and in-progress duels with status indicators.<br>"
             "• <b>Duel History</b>: Browse your completed duels with results and scores.<br><br>"
             "<b>Rules:</b><br>"
-            "• VPX must NOT be running when accepting a duel invitation.<br>"
-            "• Both players play the same table; highest score wins.<br>"
+            "• VPX must <b>NOT</b> be running when accepting a duel invitation.<br>"
+            "• Both players play the same table independently; highest score wins.<br>"
             "• Duels expire if not accepted or completed within the time limit.<br>"
             "• Cloud Sync must be enabled for duels to work."
         ),
