@@ -495,6 +495,37 @@ _GUI_ZANK: list[tuple[str, str]] = [
     ("z_gui_envy",    "Sure, Steely floats around looking fancy. I actually HELP."),
 ]
 
+_GUI_DUEL: dict[str, list[str]] = {
+    "gui_duel_received": [
+        "A challenger approaches! Check your Score Duels tab!",
+        "You have been challenged! Open the Score Duels tab to respond!",
+        "Incoming duel invitation! Will you accept the challenge?",
+        "Someone wants to duel you! 15 seconds to decide!",
+    ],
+    "gui_duel_won": [
+        "DUEL CHAMPION! You crushed that duel!",
+        "Victory in the duel! That is what I am talking about!",
+        "Duel won! The high score speaks for itself!",
+        "DUEL WINNER! Absolutely dominant performance!",
+    ],
+    "gui_duel_lost": [
+        "The table was rigged! Next time for sure...",
+        "Tough duel. Rematch incoming?",
+        "Duel lost... but you gave it everything!",
+        "They got lucky. That is all I am saying.",
+    ],
+    "gui_duel_declined": [
+        "Maybe next time...",
+        "No shame in saying no. There will be other duels!",
+        "Declined. The duels tab is always open for new challenges!",
+    ],
+    "gui_duel_expired": [
+        "That duel timed out... They were probably scared!",
+        "Duel expired. Onwards to the next challenge!",
+        "Too slow! The invite window closed.",
+    ],
+}
+
 # ---------------------------------------------------------------------------
 # Overlay Trophie comments
 # ---------------------------------------------------------------------------
@@ -638,6 +669,37 @@ _OV_ZANK: list[tuple[str, str]] = [
     ("z_ov_freedom",   "The desktop is my kingdom. Trophie is basically in a box."),
     ("z_ov_relevant",  "You can minimise the window but you cannot minimise ME!"),
 ]
+
+_OV_DUEL: dict[str, list[str]] = {
+    "ov_duel_received": [
+        "A challenger approaches! Open the app to respond!",
+        "Incoming duel invitation! Check your Score Duels tab!",
+        "Someone wants to duel you! You have 15 seconds!",
+        "DUEL ALERT! Will you answer the challenge?",
+    ],
+    "ov_duel_won": [
+        "DUEL CHAMPION! I knew you had it in you!",
+        "Victory! The high score dominates again!",
+        "DUEL WON! Nobody beats you on this table!",
+        "That is how you duel! Absolutely crushing!",
+    ],
+    "ov_duel_lost": [
+        "Next time for sure... The table was clearly rigged!",
+        "Tough loss. Challenge them to a rematch!",
+        "Duel lost... but what a battle!",
+        "They got lucky. I was watching. It was luck.",
+    ],
+    "ov_duel_declined": [
+        "Maybe next time...",
+        "No problem. The duels will keep coming!",
+        "Declined. Save your energy for the right opponent!",
+    ],
+    "ov_duel_expired": [
+        "Too slow! That duel just expired!",
+        "Duel expired. The clock waits for nobody!",
+        "That invite timed out. Watch for the next one!",
+    ],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -3062,7 +3124,43 @@ class GUITrophie(QWidget):
     def on_cloud_enabled(self) -> None:
         self._show_comment_key("evt_cloud_on", "Cloud Sync is on! Your achievements are safe now.", HAPPY)
 
-    def _fire_tab_tip(self, tab_name: str) -> None:
+    def on_duel_received(self) -> None:
+        """React when a duel invitation arrives."""
+        self._last_interaction = time.time()
+        self._draw.set_state(SURPRISED)
+        options = _GUI_DUEL.get("gui_duel_received", [])
+        if options:
+            self._show_comment_key("gui_duel_received", random.choice(options), SURPRISED)
+
+    def on_duel_won(self) -> None:
+        """React when a duel is won."""
+        self._last_interaction = time.time()
+        self._draw.set_state(HAPPY)
+        options = _GUI_DUEL.get("gui_duel_won", [])
+        if options:
+            self._show_comment_key("gui_duel_won", random.choice(options), HAPPY)
+
+    def on_duel_lost(self) -> None:
+        """React when a duel is lost."""
+        self._last_interaction = time.time()
+        self._draw.set_state(SAD)
+        options = _GUI_DUEL.get("gui_duel_lost", [])
+        if options:
+            self._show_comment_key("gui_duel_lost", random.choice(options), SAD)
+
+    def on_duel_declined(self) -> None:
+        """React when a duel invitation is declined."""
+        options = _GUI_DUEL.get("gui_duel_declined", [])
+        if options:
+            self._show_comment_key("gui_duel_declined", random.choice(options), IDLE)
+
+    def on_duel_expired(self) -> None:
+        """React when a duel invitation expires."""
+        options = _GUI_DUEL.get("gui_duel_expired", [])
+        if options:
+            self._show_comment_key("gui_duel_expired", random.choice(options), IDLE)
+
+
         tab_map = {
             "dashboard":        "tab_dashboard",
             "effects":          "tab_effects",
@@ -3690,6 +3788,41 @@ class OverlayTrophie(QWidget):
             self._show_comment_key("ov_ch_close", "So close... Try again!", SAD)
         else:
             self._show_comment_key("ov_ch_notmyfault", "NOT MY FAULT!", SAD)
+
+    def on_duel_received(self) -> None:
+        """React when a duel invitation arrives."""
+        self._draw.set_state(SURPRISED)
+        options = _OV_DUEL.get("ov_duel_received", [])
+        if options:
+            self._show_comment_key("ov_duel_received", random.choice(options), SURPRISED)
+
+    def on_duel_won(self) -> None:
+        """React when a duel is won."""
+        self._draw.set_state(HAPPY)
+        self._draw.start_event_anim("victory_lap")
+        options = _OV_DUEL.get("ov_duel_won", [])
+        if options:
+            self._show_comment_key("ov_duel_won", random.choice(options), HAPPY)
+
+    def on_duel_lost(self) -> None:
+        """React when a duel is lost."""
+        self._draw.set_state(SAD)
+        self._draw.start_event_anim("drain_fall")
+        options = _OV_DUEL.get("ov_duel_lost", [])
+        if options:
+            self._show_comment_key("ov_duel_lost", random.choice(options), SAD)
+
+    def on_duel_declined(self) -> None:
+        """React when a duel invitation is declined."""
+        options = _OV_DUEL.get("ov_duel_declined", [])
+        if options:
+            self._show_comment_key("ov_duel_declined", random.choice(options), IDLE)
+
+    def on_duel_expired(self) -> None:
+        """React when a duel invitation expires."""
+        options = _OV_DUEL.get("ov_duel_expired", [])
+        if options:
+            self._show_comment_key("ov_duel_expired", random.choice(options), IDLE)
 
     def on_heat_changed(self, heat_pct: int) -> None:
         self._last_game_ts = time.time()

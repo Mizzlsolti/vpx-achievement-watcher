@@ -2,11 +2,13 @@
 start new duel, history table, and all duel event handlers."""
 from __future__ import annotations
 
+import random
 import time
 from datetime import datetime
 
+from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QLineEdit, QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
     QHeaderView, QFrame,
 )
@@ -15,7 +17,211 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from duel_engine import DuelEngine, DuelStatus
 
 
-class DuelsMixin:
+# ---------------------------------------------------------------------------
+# Floating duel invitation overlay (shown when GUI is minimized / in systray)
+# ---------------------------------------------------------------------------
+
+class DuelInviteOverlay(QWidget):
+    """Floating always-on-top duel invitation overlay.
+
+    Appears when the main GUI is minimized or hidden to the system tray.
+    Shows the challenger name and table, and provides Accept/Decline buttons
+    with a visible 15-second countdown.  Auto-declines on timeout.
+
+    Parameters
+    ----------
+    parent_gui : MainWindow
+        The main application window (used for VPX-running check).
+    opponent : str
+        Display name of the challenging player.
+    table_name : str
+        Display name of the table being challenged on.
+    duel_id : str
+        Unique ID of the duel invitation.
+    on_accept : callable
+        Called with ``(duel_id)`` when the user accepts (after all checks pass).
+    on_decline : callable
+        Called with ``(duel_id)`` when the user declines or the timer expires.
+    """
+
+    _WIDTH  = 460
+    _HEIGHT = 185
+
+    def __init__(
+        self,
+        parent_gui,
+        opponent: str,
+        table_name: str,
+        duel_id: str,
+        on_accept,
+        on_decline,
+    ) -> None:
+        super().__init__(None)
+        self._parent_gui = parent_gui
+        self._opponent   = opponent
+        self._table_name = table_name
+        self._duel_id    = duel_id
+        self._on_accept  = on_accept
+        self._on_decline = on_decline
+        self._countdown  = 15
+        self._closed     = False
+
+        self.setWindowTitle("⚔️ Score Duel Invitation")
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self.setFixedSize(self._WIDTH, self._HEIGHT)
+
+        # ── layout ────────────────────────────────────────────────────────
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 14, 20, 14)
+        root.setSpacing(8)
+
+        lbl_title = QLabel("⚔️  Score Duel Invitation")
+        lbl_title.setStyleSheet(
+            "color:#FF7F00; font-size:12pt; font-weight:bold; background:transparent;"
+        )
+        root.addWidget(lbl_title)
+
+        self._lbl_msg = QLabel(
+            f"You have been challenged by <b>{opponent}</b><br>"
+            f"Table: <b>{table_name}</b>"
+        )
+        self._lbl_msg.setWordWrap(True)
+        self._lbl_msg.setStyleSheet(
+            "color:#EEEEEE; font-size:10pt; background:transparent;"
+        )
+        root.addWidget(self._lbl_msg)
+
+        btn_row = QHBoxLayout()
+        self._btn_accept = QPushButton("✅  Accept  [Enter]")
+        self._btn_accept.setStyleSheet(
+            "QPushButton { background-color:#006400; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 18px; font-size:9pt; }"
+            "QPushButton:hover { background-color:#008000; }"
+        )
+        self._btn_accept.clicked.connect(self._on_accept_clicked)
+
+        self._btn_decline = QPushButton("❌  Decline  [Esc]")
+        self._btn_decline.setStyleSheet(
+            "QPushButton { background-color:#8B0000; color:#FFFFFF; font-weight:bold;"
+            " border:none; border-radius:5px; padding:7px 18px; font-size:9pt; }"
+            "QPushButton:hover { background-color:#AA0000; }"
+        )
+        self._btn_decline.clicked.connect(self._on_decline_clicked)
+
+        self._lbl_cd = QLabel(f"⏳ {self._countdown}s")
+        self._lbl_cd.setStyleSheet(
+            "color:#FFAA00; font-size:10pt; font-weight:bold; background:transparent;"
+        )
+
+        btn_row.addWidget(self._btn_accept)
+        btn_row.addWidget(self._btn_decline)
+        btn_row.addStretch(1)
+        btn_row.addWidget(self._lbl_cd)
+        root.addLayout(btn_row)
+
+        # ── position on primary screen (top-right corner) ─────────────────
+        self._place_on_screen()
+
+        # ── countdown timer ───────────────────────────────────────────────
+        self._timer = QTimer(self)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start()
+
+    # ── painting ──────────────────────────────────────────────────────────
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        p.setBrush(QColor("#2a1000"))
+        p.setPen(QPen(QColor("#FF7F00"), 2))
+        p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 10, 10)
+
+    # ── helpers ───────────────────────────────────────────────────────────
+
+    def _place_on_screen(self) -> None:
+        try:
+            scr = QApplication.primaryScreen()
+            geo = scr.availableGeometry() if scr else None
+            if geo:
+                x = geo.right() - self._WIDTH - 20
+                y = geo.top() + 80
+                self.move(x, y)
+        except Exception:
+            pass
+
+    def _tick(self) -> None:
+        self._countdown -= 1
+        if self._countdown <= 0:
+            self._auto_decline()
+        else:
+            self._lbl_cd.setText(f"⏳ {self._countdown}s")
+
+    def _auto_decline(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._timer.stop()
+        try:
+            self._on_decline(self._duel_id)
+        except Exception:
+            pass
+        self.close()
+
+    def _on_accept_clicked(self) -> None:
+        if self._closed:
+            return
+        # Check VPX running — auto-decline if so.
+        try:
+            w = getattr(self._parent_gui, "watcher", None)
+            if w and (w.game_active or w._vp_player_visible()):
+                self._closed = True
+                self._timer.stop()
+                self._lbl_msg.setText(
+                    "⚠️ Cannot accept duel while VPX is running.<br>"
+                    "The invitation has been declined."
+                )
+                self._btn_accept.setEnabled(False)
+                self._btn_decline.setEnabled(False)
+                QTimer.singleShot(2500, self.close)
+                try:
+                    self._on_decline(self._duel_id)
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+        self._closed = True
+        self._timer.stop()
+        try:
+            self._on_accept(self._duel_id)
+        except Exception:
+            pass
+        self.close()
+
+    def _on_decline_clicked(self) -> None:
+        if self._closed:
+            return
+        self._auto_decline()
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._on_accept_clicked()
+        elif key == Qt.Key.Key_Escape:
+            self._on_decline_clicked()
+        else:
+            super().keyPressEvent(event)
+
+
+
     """Mixin that provides the Score Duels tab and all related UI methods.
 
     Expects the host class to provide:
@@ -348,15 +554,67 @@ class DuelsMixin:
     def _on_duel_accept(self) -> None:
         """Accept the currently displayed incoming duel invitation.
 
-        Stops the 15-second countdown timer, hides the alert bar, delegates
-        to DuelEngine.accept_duel(), and refreshes the Active Duels table.
+        Checks VPX running state and table availability before accepting.
+        Stops the 15-second countdown timer, hides the alert bar, and either
+        declines with an error message or delegates to DuelEngine.accept_duel().
         """
         duel_id = self._pending_invitation_duel_id
         self._duel_accept_timer.stop()
         self._duel_alert_frame.setVisible(False)
-        if duel_id:
-            self._duel_engine.accept_duel(duel_id)
-            self._refresh_active_duels()
+        if not duel_id:
+            return
+
+        # Check VPX running — cannot accept while VPX is active.
+        try:
+            w = getattr(self, "watcher", None)
+            if w and (w.game_active or w._vp_player_visible()):
+                self._duel_engine.decline_duel(duel_id)
+                self._refresh_active_duels()
+                try:
+                    self._get_mini_overlay().show_info(
+                        "Cannot accept duel while VPX is running.",
+                        seconds=5,
+                        color_hex="#CC5500",
+                    )
+                except Exception:
+                    pass
+                try:
+                    if getattr(self, "_trophie_gui", None):
+                        self._trophie_gui.on_duel_declined()
+                    if getattr(self, "_trophie_overlay", None):
+                        self._trophie_overlay.on_duel_declined()
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
+        # Check table availability.
+        try:
+            duel = next(
+                (d for d in self._duel_engine.get_active_duels() if d.duel_id == duel_id),
+                None,
+            )
+            if duel and not self._duel_engine.validate_table(
+                duel.table_rom, getattr(self, "_all_maps_cache", [])
+            ):
+                tname = duel.table_name or duel.table_rom
+                self._duel_engine.decline_duel(duel_id)
+                self._refresh_active_duels()
+                try:
+                    self._get_mini_overlay().show_info(
+                        f"Duel cancelled \u2013 Table \u2018{tname}\u2019 is not available.",
+                        seconds=6,
+                        color_hex="#CC2200",
+                    )
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
+        self._duel_engine.accept_duel(duel_id)
+        self._refresh_active_duels()
 
     def _on_duel_decline(self) -> None:
         """Decline the currently displayed incoming duel invitation.
@@ -370,12 +628,24 @@ class DuelsMixin:
         if duel_id:
             self._duel_engine.decline_duel(duel_id)
             self._refresh_active_duels()
+            try:
+                if getattr(self, "_trophie_gui", None):
+                    self._trophie_gui.on_duel_declined()
+                if getattr(self, "_trophie_overlay", None):
+                    self._trophie_overlay.on_duel_declined()
+            except Exception:
+                pass
 
     # ── Slot: incoming invitation ─────────────────────────────────────────────
 
     @pyqtSlot(str, str, str)
     def _on_duel_invitation_received(self, opponent: str, table_name: str, duel_id: str) -> None:
-        """Show the alert bar when an invitation arrives.
+        """Handle an incoming duel invitation.
+
+        If the main GUI is visible the in-tab alert bar is shown.  When the
+        window is minimized or hidden (e.g. to the system tray) a floating
+        :class:`DuelInviteOverlay` is used instead so the user still sees the
+        invitation.
 
         Parameters
         ----------
@@ -387,20 +657,76 @@ class DuelsMixin:
             Unique ID of the incoming duel.
         """
         self._pending_invitation_duel_id = duel_id
-        self._duel_alert_label.setText(
-            f"⚔️ You have been challenged to a Score Duel by {opponent} "
-            f"(Table: {table_name}). Accept?"
-        )
-        self._duel_accept_countdown = 15
-        self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
-        self._duel_alert_frame.setVisible(True)
-        self._duel_accept_timer.start()
 
-        # Switch to the Score Duels tab so the user notices the alert.
-        for i in range(self.main_tabs.count()):
-            if self.main_tabs.tabText(i) == "⚔️ Score Duels":
-                self.main_tabs.setCurrentIndex(i)
-                break
+        gui_hidden = not self.isVisible() or self.isMinimized()
+
+        if gui_hidden:
+            # Close any previous invite overlay before showing a new one.
+            try:
+                prev = getattr(self, "_duel_invite_overlay", None)
+                if prev is not None:
+                    prev._auto_decline()
+            except Exception:
+                pass
+
+            def _accept_cb(did: str) -> None:
+                # Table availability check is handled here; VPX check is in overlay.
+                try:
+                    duel = next(
+                        (d for d in self._duel_engine.get_active_duels() if d.duel_id == did),
+                        None,
+                    )
+                    if duel and not self._duel_engine.validate_table(
+                        duel.table_rom, getattr(self, "_all_maps_cache", [])
+                    ):
+                        tname = duel.table_name or duel.table_rom
+                        self._duel_engine.decline_duel(did)
+                        self._refresh_active_duels()
+                        try:
+                            self._get_mini_overlay().show_info(
+                                f"Duel cancelled \u2013 Table \u2018{tname}\u2019 is not available.",
+                                seconds=6,
+                                color_hex="#CC2200",
+                            )
+                        except Exception:
+                            pass
+                        return
+                except Exception:
+                    pass
+                self._duel_engine.accept_duel(did)
+                self._refresh_active_duels()
+
+            def _decline_cb(did: str) -> None:
+                self._duel_engine.decline_duel(did)
+                self._refresh_active_duels()
+                try:
+                    if getattr(self, "_trophie_gui", None):
+                        self._trophie_gui.on_duel_declined()
+                    if getattr(self, "_trophie_overlay", None):
+                        self._trophie_overlay.on_duel_declined()
+                except Exception:
+                    pass
+
+            self._duel_invite_overlay = DuelInviteOverlay(
+                self, opponent, table_name, duel_id, _accept_cb, _decline_cb
+            )
+            self._duel_invite_overlay.show()
+        else:
+            # GUI is visible — use the in-tab alert bar.
+            self._duel_alert_label.setText(
+                f"⚔️ You have been challenged to a Score Duel by {opponent} "
+                f"(Table: {table_name}). Accept?"
+            )
+            self._duel_accept_countdown = 15
+            self._lbl_duel_countdown.setText(f"⏳ {self._duel_accept_countdown}s")
+            self._duel_alert_frame.setVisible(True)
+            self._duel_accept_timer.start()
+
+            # Switch to the Score Duels tab so the user notices the alert.
+            for i in range(self.main_tabs.count()):
+                if self.main_tabs.tabText(i) == "⚔️ Score Duels":
+                    self.main_tabs.setCurrentIndex(i)
+                    break
 
     # ── Slot: countdown tick ──────────────────────────────────────────────────
 
@@ -437,6 +763,51 @@ class DuelsMixin:
         """
         self._refresh_active_duels()
         self._refresh_duel_history()
+        self._show_duel_result_overlay(result, your_score, their_score)
+
+    # ── Helper: result overlay ────────────────────────────────────────────────
+
+    def _show_duel_result_overlay(self, result: str, your_score: int, their_score: int) -> None:
+        """Display a brief result overlay after a duel completes.
+
+        Uses :class:`~ui_overlay.MiniInfoOverlay` (the System Notifications
+        widget) to show a win, loss, or expiry message with the final scores.
+
+        Parameters
+        ----------
+        result : str
+            One of ``'won'``, ``'lost'``, or ``'expired'``.
+        your_score : int
+            Local player's final score (0 for expired).
+        their_score : int
+            Opponent's final score (0 for expired).
+        """
+        try:
+            if result == "won":
+                msg = f"🏆 DUEL WON!\nYou: {your_score:,} vs Opponent: {their_score:,}"
+                color = "#00CC44"
+            elif result == "lost":
+                msg = f"💀 DUEL LOST.\nYou: {your_score:,} vs Opponent: {their_score:,}"
+                color = "#CC2200"
+            else:
+                msg = "⏰ Duel expired \u2014 no response received."
+                color = "#888888"
+            self._get_mini_overlay().show_info(msg, seconds=8, color_hex=color)
+        except Exception:
+            pass
+
+    # ── Helper: mini overlay accessor ────────────────────────────────────────
+
+    def _get_mini_overlay(self):
+        """Return the shared :class:`~ui_overlay.MiniInfoOverlay` instance.
+
+        Creates it lazily on first access so that the import is deferred and
+        circular-import issues are avoided.
+        """
+        if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
+            from ui_overlay import MiniInfoOverlay  # deferred import
+            self._mini_overlay = MiniInfoOverlay(self)
+        return self._mini_overlay
 
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
@@ -477,12 +848,22 @@ class DuelsMixin:
         Delegates to DuelEngine.check_expiry() which moves any overdue
         PENDING duels to history with DuelStatus.EXPIRED.  If any duels
         were expired, both the Active Duels and Duel History tables are
-        refreshed.  Called every 60 seconds by self._duel_expiry_timer.
+        refreshed and a brief expiry overlay is shown per expired duel.
+        Called every 60 seconds by self._duel_expiry_timer.
         """
         expired = self._duel_engine.check_expiry()
         if expired:
             self._refresh_active_duels()
             self._refresh_duel_history()
+            for duel in expired:
+                try:
+                    self._get_mini_overlay().show_info(
+                        "⏰ Duel expired \u2014 no response received.",
+                        seconds=6,
+                        color_hex="#888888",
+                    )
+                except Exception:
+                    pass
 
     # ── Refresh: active duels table ────────────────────────────────────────────
 
