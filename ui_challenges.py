@@ -231,9 +231,11 @@ class ChallengesMixin:
           Red:    Cloud Off · Local
         """
         cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
-        cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
-        if not cloud_enabled or not cloud_url:
+        if not cloud_enabled:
             return ("Cloud Off · Local", "#FF3B30")
+        cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        if not cloud_url:
+            return ("Offline · Local", "#FFA500")
         w = getattr(self, "watcher", None)
         game_active = bool(w and getattr(w, "game_active", False))
         if not game_active:

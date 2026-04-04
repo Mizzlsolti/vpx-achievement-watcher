@@ -1675,7 +1675,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 return
         except Exception:
             pass
-        # Stop duel timers to prevent background activity after close.
+        # Stop duel timers only on actual quit (not when minimizing to systray).
         try:
             if getattr(self, "_duel_poll_timer", None):
                 self._duel_poll_timer.stop()

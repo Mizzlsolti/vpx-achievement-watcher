@@ -11,7 +11,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import sound
 from config import p_session
@@ -21,14 +21,15 @@ from watcher_core import log
 
 class DuelStatus:
     """Possible states for a Score Duel."""
-    PENDING  = "pending"
-    ACCEPTED = "accepted"
-    ACTIVE   = "active"
-    WON      = "won"
-    LOST     = "lost"
-    DRAW     = "draw"
-    EXPIRED  = "expired"
-    DECLINED = "declined"
+    PENDING   = "pending"
+    ACCEPTED  = "accepted"
+    ACTIVE    = "active"
+    WON       = "won"
+    LOST      = "lost"
+    DRAW      = "draw"
+    EXPIRED   = "expired"
+    DECLINED  = "declined"
+    CANCELLED = "cancelled"
 
 
 # Invitation expires after 15 minutes if not accepted.
@@ -175,7 +176,7 @@ class DuelEngine:
     # ── Public API ───────────────────────────────────────────────────────────
 
     def send_invitation(self, opponent_id: str, table_rom: str, table_name: str = "",
-                        opponent_name: str = "") -> Optional[Duel]:
+                        opponent_name: str = "") -> Union[Duel, str]:
         """Create a new duel invitation and upload it to the cloud.
 
         Parameters
@@ -191,16 +192,19 @@ class DuelEngine:
 
         Returns
         -------
-        Duel or None
-            The newly created Duel on success, None on failure.
+        Duel
+            The newly created Duel on success.
+        str
+            An error-reason string on failure: ``"no_player_id"``,
+            ``"no_opponent"``, ``"duplicate"``, or ``"cloud_error"``.
         """
         my_id = self._my_player_id()
         if not my_id:
             log(self._cfg, "[DUEL] send_invitation: player_id not configured.", "WARN")
-            return None
+            return "no_player_id"
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
-            return None
+            return "no_opponent"
 
         # Prevent duplicate invitation for the same opponent + table while one is still pending.
         for existing in self._active:
@@ -208,7 +212,7 @@ class DuelEngine:
                     and existing.table_rom == table_rom.lower().strip()
                     and existing.status == DuelStatus.PENDING):
                 log(self._cfg, "[DUEL] send_invitation: duplicate – a pending duel for this opponent/table already exists.", "WARN")
-                return None
+                return "duplicate"
 
         now = time.time()
         duel = Duel(
@@ -315,6 +319,36 @@ class DuelEngine:
             sound.play("duel_declined")
         except Exception:
             pass
+        return True
+
+    def cancel_duel(self, duel_id: str) -> bool:
+        """Cancel a pending duel invitation that was sent by this player.
+
+        Only PENDING duels where this player is the challenger can be cancelled.
+        The duel is marked as CANCELLED, moved to history, and the updated
+        status is uploaded to the cloud.
+
+        Returns True if the duel was found and cancelled.
+        """
+        duel = self._find_active(duel_id)
+        if duel is None:
+            log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} not found.", "WARN")
+            return False
+        my_id = self._my_player_id()
+        if duel.challenger != my_id:
+            log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not the challenger.", "WARN")
+            return False
+        if duel.status != DuelStatus.PENDING:
+            log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} is not pending (status={duel.status}).", "WARN")
+            return False
+        duel.status = DuelStatus.CANCELLED
+        duel.completed_at = time.time()
+        self._active.remove(duel)
+        self._history.append(duel)
+        self._save_active()
+        self._save_history()
+        self._upload_duel(duel)
+        log(self._cfg, f"[DUEL] Duel {duel_id} cancelled by challenger.")
         return True
 
     def submit_result(self, duel_id: str, score: int) -> Optional[str]:
