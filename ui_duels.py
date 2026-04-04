@@ -461,8 +461,9 @@ class DuelsMixin:
 
         Filters the cache to entries that have an NVRAM map AND are locally
         installed, sorts them alphabetically by title, and adds them to the
-        combo box.  Falls back to a placeholder entry when no tables are
-        available (e.g. before the map list has been loaded).
+        combo box.  Falls back to vps_id_mapping.json (ROMs the user has ever
+        assigned a VPS-ID) when _all_maps_cache has no matching entries, e.g.
+        on first launch before the map list has been loaded.
         """
         self._cmb_duel_table.clear()
         cache = getattr(self, "_all_maps_cache", None) or []
@@ -476,7 +477,22 @@ class DuelsMixin:
             display = f"{title} ({rom})" if title != rom else title
             self._cmb_duel_table.addItem(display, rom)
         if not entries:
-            self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
+            # Fallback: use vps_id_mapping.json (always present if the user has
+            # ever assigned a VPS-ID to a table, even before the map list loads).
+            try:
+                from ui_vps import _load_vps_mapping
+                mapping = _load_vps_mapping(self.cfg)
+            except Exception:
+                mapping = {}
+            if mapping:
+                romnames = getattr(getattr(self, "watcher", None), "ROMNAMES", {})
+                fallback_entries = sorted(mapping.keys(), key=lambda r: (romnames.get(r) or r).lower())
+                for rom in fallback_entries:
+                    title = romnames.get(rom) or rom
+                    display = f"{title} ({rom})" if title != rom else title
+                    self._cmb_duel_table.addItem(display, rom)
+            else:
+                self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
 
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
@@ -538,8 +554,10 @@ class DuelsMixin:
         if not players:
             self._cmb_duel_opponent.addItem("(No players found)", "")
             return
+        self._cmb_duel_opponent.addItem("— Select Player —", "")
         for display_name, player_id in players:
             self._cmb_duel_opponent.addItem(display_name, player_id)
+        self._cmb_duel_opponent.setCurrentIndex(0)
 
     # ── Slot: start duel ─────────────────────────────────────────────────────
 
