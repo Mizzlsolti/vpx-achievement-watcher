@@ -4048,15 +4048,13 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 # the X axis; direction depends on the rotation direction.
                 ccw = bool(ov.get("ach_toast_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
                 if ccw:
-                    # CCW (-90°): rotating down→left, so logical bottom maps to the
-                    # LEFT side of the screen → slide in from the left (start offset
-                    # to the left, decrease toward 0).
-                    x_win = x - burst_margin - slide_offset
-                else:
-                    # CW (+90°): rotating down→right, so logical bottom maps to the
-                    # RIGHT side of the screen → slide in from the right (start offset
-                    # to the right, decrease toward 0).
+                    # CCW (-90°): logical bottom = right side of the screen
+                    # → slide in from the right (positive offset, decreases to 0).
                     x_win = x - burst_margin + slide_offset
+                else:
+                    # CW (+90°): logical bottom = left side of the screen
+                    # → slide in from the left (negative offset, increases to 0).
+                    x_win = x - burst_margin - slide_offset
                 y_win = y - burst_margin
             else:
                 # Landscape: slide along Y axis (bottom-to-top) as before.
