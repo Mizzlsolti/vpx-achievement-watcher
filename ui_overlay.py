@@ -2117,7 +2117,7 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -3586,8 +3586,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool |
-            Qt.WindowType.SubWindow
+            Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
@@ -3689,7 +3688,6 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
 
         self._render_and_place()
         self._timer.start()
-        self.show()
         self.raise_()
         _start_topmost_timer(self)
 
@@ -4048,7 +4046,10 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self.raise_()
             # Size and raise the post-processing widget above the label
             if hasattr(self, '_pp_widget') and self._pp_widget._any_pp_enabled():
-                self._pp_widget.setGeometry(0, 0, EW, EH)
+                if burst_margin > 0:
+                    self._pp_widget.setGeometry(burst_margin, burst_margin, W, H)
+                else:
+                    self._pp_widget.setGeometry(0, 0, EW, EH)
                 if not self._pp_widget.isVisible():
                     self._pp_widget.show()
                 self._pp_widget.raise_()
@@ -4057,7 +4058,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 hwnd = int(self.winId())
                 win32gui.SetWindowPos(
                     hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
                 )
             except Exception:
                 pass
@@ -4195,7 +4196,12 @@ class AchToastManager(QObject):
 
         self._active = True
         title, rom, seconds = self._queue.pop(0)
-        win = AchToastWindow(self.parent_gui, title, rom, seconds)
+        try:
+            win = AchToastWindow(self.parent_gui, title, rom, seconds)
+        except Exception:
+            self._active = False
+            QTimer.singleShot(100, self._show_next)
+            return
         win.finished.connect(self._on_finished)
         self._active_window = win
 
@@ -4261,7 +4267,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -4494,7 +4500,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -4908,7 +4914,7 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
@@ -5223,7 +5229,7 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             hwnd = int(self.winId())
             win32gui.SetWindowPos(
                 hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
-                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW
+                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_SHOWWINDOW | win32con.SWP_NOACTIVATE
             )
         except Exception:
             pass
