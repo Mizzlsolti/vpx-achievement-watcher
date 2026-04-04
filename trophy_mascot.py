@@ -1205,9 +1205,11 @@ class _TrophieDrawWidget(QWidget):
 
     # Passive animation modes — cycle through these to keep the trophy lively
     _PASSIVE_MODES = [
-        "float", "spin", "pulse", "shimmer", "wobble", "fade", "bounce",
-        "eye_roll", "stretch", "nod", "sparkle", "yawn",
-        "dance", "wave", "snore", "shiver", "celebrate", "peek", "dizzy",
+        "bumper_float", "spinner_target", "insert_light_pulse", "chrome_ball_shimmer",
+        "slingshot_wobble", "bonus_multiplier_fade", "rubber_bounce", "orbit_shot",
+        "pop_bumper_stretch", "plunger_nod", "jackpot_sparkle", "ball_lock_yawn",
+        "drop_target_dance", "flipper_wave", "trough_snore", "tilt_shiver",
+        "multiball_confetti", "ball_save_peek", "loop_dizzy",
     ]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
@@ -1325,7 +1327,7 @@ class _TrophieDrawWidget(QWidget):
         self._snore_particles = []
         self._confetti_particles = []
         # Restore normal pupil position only when leaving eye_roll mode
-        if current == "eye_roll":
+        if current in ("orbit_shot", "spinner_eye_roll"):
             dx, dy = self._EXPR_PUPIL.get(self._state, (0, 0))
             self._pupil_dx = dx
             self._pupil_dy = dy
@@ -1379,14 +1381,14 @@ class _TrophieDrawWidget(QWidget):
                 self._wiggle_t = 0.0
 
             # Eye roll passive mode
-            if self._state == IDLE and self._passive_mode == "eye_roll":
+            if self._state == IDLE and self._passive_mode in ("orbit_shot", "spinner_eye_roll"):
                 self._eye_roll_phase += dt * 1.5
                 roll_r = 3
                 self._pupil_dx = int(roll_r * math.cos(self._eye_roll_phase))
                 self._pupil_dy = int(roll_r * math.sin(self._eye_roll_phase))
 
             # Yawn passive mode
-            if self._state == IDLE and self._passive_mode == "yawn":
+            if self._state == IDLE and self._passive_mode == "ball_lock_yawn":
                 if self._passive_t < 1.5:
                     self._yawn_amount = min(1.0, self._passive_t / 1.0)
                 else:
@@ -1397,22 +1399,22 @@ class _TrophieDrawWidget(QWidget):
             # New passive animations — delegate to trophy_animations
             if self._state == IDLE:
                 _mode = self._passive_mode
-                if _mode == "dance":
-                    trophy_animations.tick_dance(self)
-                elif _mode == "wave":
-                    trophy_animations.tick_wave(self)
-                elif _mode == "snore":
-                    trophy_animations.tick_snore(self)
-                elif _mode == "shiver":
-                    trophy_animations.tick_shiver(self)
-                elif _mode == "celebrate":
-                    trophy_animations.tick_celebrate(self)
-                elif _mode == "peek":
-                    trophy_animations.tick_peek(self)
-                elif _mode == "dizzy":
-                    trophy_animations.tick_dizzy(self)
+                if _mode == "drop_target_dance":
+                    trophy_animations.tick_drop_target_dance(self)
+                elif _mode == "flipper_wave":
+                    trophy_animations.tick_flipper_wave(self)
+                elif _mode == "trough_snore":
+                    trophy_animations.tick_trough_snore(self)
+                elif _mode == "tilt_shiver":
+                    trophy_animations.tick_tilt_shiver(self)
+                elif _mode == "multiball_confetti":
+                    trophy_animations.tick_multiball_confetti(self)
+                elif _mode == "ball_save_peek":
+                    trophy_animations.tick_ball_save_peek(self)
+                elif _mode == "loop_dizzy":
+                    trophy_animations.tick_loop_dizzy(self)
             elif self._state == SLEEPY:
-                trophy_animations.tick_snore(self)
+                trophy_animations.tick_trough_snore(self)
 
         self.update()
 
@@ -1444,13 +1446,13 @@ class _TrophieDrawWidget(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Passive fade mode modulates opacity independently of dismiss fade-out
-        if self._state != DISMISSING and self._passive_mode == "fade":
+        if self._state != DISMISSING and self._passive_mode == "bonus_multiplier_fade":
             fade_opacity = 0.55 + 0.45 * (0.5 + 0.5 * math.sin(self._passive_t * 1.5))
             p.setOpacity(self._opacity_val * fade_opacity)
         else:
             p.setOpacity(self._opacity_val)
 
-        if self._state == IDLE and self._passive_mode == "bounce":
+        if self._state == IDLE and self._passive_mode in ("rubber_bounce", "rubber_ring_bounce"):
             bob = -abs(math.sin(self._bob_t * 2.0)) * 10.0
         else:
             bob = math.sin(self._bob_t) * 3.0
@@ -1470,13 +1472,13 @@ class _TrophieDrawWidget(QWidget):
         elif self._state == SLEEPY:
             # Slow exaggerated sway
             angle = math.sin(self._bob_t * 0.25) * 12.0
-        elif self._state == IDLE and self._passive_mode == "spin":
+        elif self._state == IDLE and self._passive_mode == "spinner_target":
             # Slow continuous spin in idle mode
             angle = (self._passive_t * 45.0) % 360.0
-        elif self._state == IDLE and self._passive_mode == "wobble":
+        elif self._state == IDLE and self._passive_mode in ("slingshot_wobble", "slingshot_hit"):
             # Pronounced side-to-side wobble in idle mode
             angle = math.sin(self._passive_t * 2.5) * 18.0
-        elif self._state == IDLE and self._passive_mode == "nod":
+        elif self._state == IDLE and self._passive_mode in ("plunger_nod", "plunger_pull"):
             angle = math.sin(self._passive_t * 2.5) * 10.0
         elif self._state == IDLE and self._passive_angle != 0.0:
             # Subclass-provided angle for passive modes like "roll"
@@ -1493,12 +1495,12 @@ class _TrophieDrawWidget(QWidget):
             sq = math.sin(self._squash_t * math.pi)
             sx = 1.0 + sq * 0.25   # momentarily wider
             sy = 1.0 - sq * 0.20   # momentarily shorter
-        elif self._state == IDLE and self._passive_mode == "pulse":
+        elif self._state == IDLE and self._passive_mode in ("insert_light_pulse", "kickback_pulse"):
             # Stronger breathing pulse in pulse mode
             s = 1.0 + math.sin(self._passive_t * 2.0) * 0.12
             sx = s
             sy = s
-        elif self._state == IDLE and self._passive_mode == "stretch":
+        elif self._state == IDLE and self._passive_mode == "pop_bumper_stretch":
             sx = 1.0 - abs(math.sin(self._passive_t * 1.5)) * 0.08
             sy = 1.0 + abs(math.sin(self._passive_t * 1.5)) * 0.18
         elif self._state == IDLE:
@@ -1529,22 +1531,22 @@ class _TrophieDrawWidget(QWidget):
         p.restore()
 
         # ── Sparkle overlay ───────────────────────────────────────────────────
-        if self._state == IDLE and self._passive_mode == "sparkle":
+        if self._state == IDLE and self._passive_mode in ("jackpot_sparkle", "insert_lamp_sparkle"):
             self._draw_sparkles(p, cx, int(cy_base + total_offset))
 
         # ── Shimmer/shine sweep overlay ───────────────────────────────────────
-        if self._state == IDLE and self._passive_mode == "shimmer":
+        if self._state == IDLE and self._passive_mode in ("chrome_ball_shimmer", "playfield_glass_shimmer"):
             self._draw_shimmer(p)
 
         # ── New passive animation overlays (trophy_animations) ────────────────
-        if self._state == IDLE and self._passive_mode == "wave":
-            trophy_animations.draw_wave(p, self)
-        if self._passive_mode == "snore" or self._state == SLEEPY:
-            trophy_animations.draw_snore(p, self)
-        if self._state == IDLE and self._passive_mode == "celebrate":
-            trophy_animations.draw_celebrate(p, self)
-        if self._state == IDLE and self._passive_mode == "dizzy":
-            trophy_animations.draw_dizzy(p, self)
+        if self._state == IDLE and self._passive_mode == "flipper_wave":
+            trophy_animations.draw_flipper_wave(p, self)
+        if self._passive_mode == "trough_snore" or self._state == SLEEPY:
+            trophy_animations.draw_trough_snore(p, self)
+        if self._state == IDLE and self._passive_mode == "multiball_confetti":
+            trophy_animations.draw_multiball_confetti(p, self)
+        if self._state == IDLE and self._passive_mode == "loop_dizzy":
+            trophy_animations.draw_loop_dizzy(p, self)
 
         p.end()
 
@@ -1719,7 +1721,7 @@ class _TrophieDrawWidget(QWidget):
         mouth_w = int(tw * 0.28)
         mouth_h = int(tw * 0.14)
         talk_pulse = (math.sin(self._tilt_t * 3.0) > 0) if self._state == TALKING else False
-        yawn_open = self._yawn_amount > 0.1 if self._state == IDLE and self._passive_mode == "yawn" else False
+        yawn_open = self._yawn_amount > 0.1 if self._state == IDLE and self._passive_mode == "ball_lock_yawn" else False
 
         p.setPen(QPen(QColor("#333333"), 1))
         p.setBrush(QColor("#333333"))
@@ -2224,8 +2226,9 @@ class _PinballDrawWidget(_TrophieDrawWidget):
 
     # Steely-specific passive modes — distinct from Trophie's list
     _PASSIVE_MODES = [
-        "float", "pulse", "shimmer", "wobble", "bounce", "eye_roll",
-        "roll", "vibrate", "zigzag", "orbit", "sparkle", "nod",
+        "wireform_glide", "kickback_pulse", "playfield_glass_shimmer",
+        "slingshot_hit", "rubber_ring_bounce", "spinner_eye_roll",
+        "roll", "solenoid_buzz", "lane_change", "orbit_loop", "insert_lamp_sparkle", "plunger_pull",
         "roll_out", "magnet", "bumper_hit", "spin_out", "drain",
         "multiball", "plunger_launch", "ramp_jump", "tilt_warning", "flipper_catch",
     ]
@@ -2294,19 +2297,19 @@ class _PinballDrawWidget(_TrophieDrawWidget):
                 self._passive_angle = (self._passive_angle + dt * 30.0) % 360.0
                 self._passive_extra_x = 0.0
                 self._passive_extra_y = 0.0
-            elif mode == "vibrate":
+            elif mode == "solenoid_buzz":
                 # Rapid small jitter in both X and Y
                 self._passive_extra_x = random.uniform(-3.0, 3.0)
                 self._passive_extra_y = random.uniform(-2.0, 2.0)
                 self._passive_angle = 0.0
-            elif mode == "zigzag":
+            elif mode == "lane_change":
                 # Horizontal zigzag/wave pattern
                 cycle = (self._passive_t * 0.8) % 1.0
                 self._passive_extra_x = ((cycle / 0.5) * 12.0 - 6.0) if cycle < 0.5 \
                     else (((1.0 - cycle) / 0.5) * 12.0 - 6.0)
                 self._passive_extra_y = 0.0
                 self._passive_angle = 0.0
-            elif mode == "orbit":
+            elif mode == "orbit_loop":
                 # Small elliptical orbit around the rest position
                 self._passive_extra_x = math.cos(self._passive_t * 1.2) * 8.0
                 self._passive_extra_y = math.sin(self._passive_t * 1.2) * 5.0

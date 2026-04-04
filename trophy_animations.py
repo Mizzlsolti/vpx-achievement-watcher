@@ -20,18 +20,18 @@ from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 # Tick helpers — called from _TrophieDrawWidget._tick()
 # ---------------------------------------------------------------------------
 
-def tick_dance(widget) -> None:
+def tick_drop_target_dance(widget) -> None:
     """Rhythmic sinusoidal side-to-side sway with matching tilt angle."""
     t = widget._passive_t
     widget._passive_extra_x = math.sin(t * 1.5) * 6.0
     widget._passive_angle = math.sin(t * 1.5) * 8.0
 
 
-def tick_wave(widget) -> None:
-    """Hand-wave: no body transform needed; overlay drawn by draw_wave()."""
+def tick_flipper_wave(widget) -> None:
+    """Flipper-wave: no body transform needed; overlay drawn by draw_flipper_wave()."""
 
 
-def tick_snore(widget) -> None:
+def tick_trough_snore(widget) -> None:
     """Animated 'Z' letters drifting upward; particles initialised on first call."""
     if not widget._snore_particles:
         widget._snore_particles = [
@@ -50,7 +50,7 @@ def tick_snore(widget) -> None:
             part["alpha"] = 220
 
 
-def tick_shiver(widget) -> None:
+def tick_tilt_shiver(widget) -> None:
     """Rapid high-frequency horizontal micro-jitter (±2 px)."""
     widget._passive_extra_x = random.uniform(-2.0, 2.0)
 
@@ -65,7 +65,7 @@ _CONFETTI_COLORS = [
 ]
 
 
-def tick_celebrate(widget) -> None:
+def tick_multiball_confetti(widget) -> None:
     """Confetti rain: particles initialised on first call and loop when off-screen."""
     tw = widget._tw
     th = widget._th
@@ -95,7 +95,7 @@ def tick_celebrate(widget) -> None:
             cp["x"] = random.uniform(0.0, float(tw))
 
 
-def tick_peek(widget) -> None:
+def tick_ball_save_peek(widget) -> None:
     """Single duck → hold → rise cycle using _passive_extra_y."""
     t = widget._passive_t
     peek_depth = widget._th * 0.35
@@ -109,7 +109,7 @@ def tick_peek(widget) -> None:
         widget._passive_extra_y = 0.0
 
 
-def tick_dizzy(widget) -> None:
+def tick_loop_dizzy(widget) -> None:
     """Dizzy star orbit: phase is driven by _passive_t; no extra state required."""
 
 
@@ -117,7 +117,7 @@ def tick_dizzy(widget) -> None:
 # Draw (overlay) helpers — called from _TrophieDrawWidget.paintEvent()
 # ---------------------------------------------------------------------------
 
-def draw_wave(p: QPainter, widget) -> None:
+def draw_flipper_wave(p: QPainter, widget) -> None:
     """Oscillating golden arc near the right handle of the trophy cup."""
     t = widget._passive_t
     tw = widget._tw
@@ -142,7 +142,7 @@ def draw_wave(p: QPainter, widget) -> None:
     p.restore()
 
 
-def draw_snore(p: QPainter, widget) -> None:
+def draw_trough_snore(p: QPainter, widget) -> None:
     """Draw floating 'Z' characters rising above the trophy cup."""
     particles = getattr(widget, "_snore_particles", [])
     if not particles:
@@ -164,7 +164,7 @@ def draw_snore(p: QPainter, widget) -> None:
     p.restore()
 
 
-def draw_celebrate(p: QPainter, widget) -> None:
+def draw_multiball_confetti(p: QPainter, widget) -> None:
     """Draw confetti particles raining around the trophy."""
     particles = getattr(widget, "_confetti_particles", [])
     if not particles:
@@ -181,7 +181,7 @@ def draw_celebrate(p: QPainter, widget) -> None:
     p.restore()
 
 
-def draw_dizzy(p: QPainter, widget) -> None:
+def draw_loop_dizzy(p: QPainter, widget) -> None:
     """Draw small 4-pointed stars orbiting above the trophy cup."""
     t = widget._passive_t
     tw = widget._tw
