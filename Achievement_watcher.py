@@ -605,7 +605,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• <b>Incoming Invitations</b>: When someone challenges you, an alert bar appears at the top "
             "of this tab (if the GUI is open). If the GUI is minimized to the system tray, a floating "
             "notification overlay pops up instead.<br>"
-            "• You have <b>15 seconds</b> to accept or decline an invitation — it auto-declines on timeout.<br>"
+            "• You have <b>60 seconds</b> to accept or decline an invitation — it auto-declines on timeout.<br>"
             "• <b>Active Duels</b>: Shows all pending and in-progress duels with status indicators.<br>"
             "• <b>Duel History</b>: Browse your completed duels with results and scores.<br><br>"
             "<b>Rules:</b><br>"
