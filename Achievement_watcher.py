@@ -1100,7 +1100,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             " border:1px solid #BB6600; border-radius:5px; padding:7px 16px; }"
             "QPushButton:hover { background-color:#2A1400; border-color:#FFAA44; }"
         )
-        btn_popper.setToolTip("Import VPS-IDs from PinUP Popper (PUPDatabase.db)")
+        btn_popper.setToolTip("Import VPS-IDs from PinUP Popper (PUPDatabase.db, reads CUSTOM2 & CUSTOM3)")
         btn_popper.clicked.connect(self._on_import_from_popper)
         row.addWidget(btn_popper)
 
@@ -1749,32 +1749,82 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         mapping: dict = _load_vps_mapping(self.cfg)
 
         # ----------------------------------------------------------------
+        # Build a set of all valid VPS IDs for validation
+        # ----------------------------------------------------------------
+        vpsdb_tables = _load_vpsdb(self.cfg) or []
+        valid_vps_ids: set = set()
+        for _t in vpsdb_tables:
+            tid = _t.get("id", "")
+            if tid:
+                valid_vps_ids.add(tid)
+            for _tf in _t.get("tableFiles", []):
+                tfid = _tf.get("id", "")
+                if tfid:
+                    valid_vps_ids.add(tfid)
+
+        # ----------------------------------------------------------------
         # Run import
         # ----------------------------------------------------------------
+        _query_mode = None  # "both", "c3only", "c2only"
+        rows: list = []
         try:
             conn = sqlite3.connect(db_path)
             try:
                 cursor = conn.execute(
-                    "SELECT GameFileName, GameName, CUSTOM3 FROM Games"
-                    " WHERE CUSTOM3 IS NOT NULL AND CUSTOM3 != ''"
+                    "SELECT GameFileName, GameName, CUSTOM2, CUSTOM3 FROM Games"
                 )
                 rows = cursor.fetchall()
+                _query_mode = "both"
             except sqlite3.OperationalError as exc:
-                conn.close()
                 err = str(exc).lower()
-                if "no such table" in err or "no such column" in err:
+                if "no such column" in err:
+                    # CUSTOM2 or CUSTOM3 missing — try CUSTOM3 only
+                    try:
+                        cursor = conn.execute(
+                            "SELECT GameFileName, GameName, CUSTOM3 FROM Games"
+                        )
+                        rows = cursor.fetchall()
+                        _query_mode = "c3only"
+                    except sqlite3.OperationalError:
+                        # Try CUSTOM2 only as last resort
+                        try:
+                            cursor = conn.execute(
+                                "SELECT GameFileName, GameName, CUSTOM2 FROM Games"
+                            )
+                            rows = cursor.fetchall()
+                            _query_mode = "c2only"
+                        except sqlite3.OperationalError as exc3:
+                            conn.close()
+                            err3 = str(exc3).lower()
+                            if "no such table" in err3 or "no such column" in err3:
+                                QMessageBox.warning(
+                                    self, "Import from Popper",
+                                    "No VPS-ID data found in this database.\n"
+                                    "Make sure your Popper version supports VPS-IDs."
+                                )
+                            else:
+                                QMessageBox.warning(
+                                    self, "Import from Popper",
+                                    f"Could not read from PUPDatabase.db.\n{exc3}\n\n"
+                                    "If Popper is running, try closing it first."
+                                )
+                            return
+                elif "no such table" in err:
+                    conn.close()
                     QMessageBox.warning(
                         self, "Import from Popper",
                         "No VPS-ID data found in this database.\n"
                         "Make sure your Popper version supports VPS-IDs."
                     )
+                    return
                 else:
+                    conn.close()
                     QMessageBox.warning(
                         self, "Import from Popper",
                         f"Could not read from PUPDatabase.db.\n{exc}\n\n"
                         "If Popper is running, try closing it first."
                     )
-                return
+                    return
             conn.close()
         except sqlite3.OperationalError as exc:
             QMessageBox.warning(
@@ -1815,13 +1865,43 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         matched_by_file = 0
         matched_by_name = 0
         unmatched = 0
+        from_custom3 = 0
+        from_custom2 = 0
+        invalid_id = 0
         for row in rows:
             try:
                 game_filename = str(row[0] or "").strip()
                 game_name = str(row[1] or "").strip()
-                vps_id = str(row[2] or "").strip()
+
+                # Extract CUSTOM2/CUSTOM3 based on which query succeeded
+                if _query_mode == "both":
+                    custom2 = str(row[2] or "").strip()
+                    custom3 = str(row[3] or "").strip()
+                elif _query_mode == "c3only":
+                    custom2 = ""
+                    custom3 = str(row[2] or "").strip()
+                else:  # c2only
+                    custom2 = str(row[2] or "").strip()
+                    custom3 = ""
+
+                # Priority: CUSTOM3 first, then CUSTOM2; validate against VPS-DB
+                vps_id = ""
+                id_source = ""
+                for candidate, src in [(custom3, "custom3"), (custom2, "custom2")]:
+                    if candidate and candidate in valid_vps_ids:
+                        vps_id = candidate
+                        id_source = src
+                        break
+
                 if not vps_id:
+                    if custom3 or custom2:
+                        invalid_id += 1
                     continue
+
+                if id_source == "custom3":
+                    from_custom3 += 1
+                else:
+                    from_custom2 += 1
 
                 matched_entry = None
 
@@ -1875,6 +1955,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             f"Import complete.\n"
             f"{imported} VPS-ID(s) imported from PinUP Popper.\n"
             f"{skipped} already mapped (skipped).\n\n"
+            f"From CUSTOM3: {from_custom3}\n"
+            f"From CUSTOM2: {from_custom2}\n"
+            f"Invalid/non-VPS IDs skipped: {invalid_id}\n\n"
             f"Matched by filename: {matched_by_file}\n"
             f"Matched by name: {matched_by_name}\n"
             f"No local table found: {unmatched}"
