@@ -135,7 +135,7 @@ class _OverlayFxMixin:
                 return False
             return bool(ov.get(fx_key, True))
         except Exception:
-            return True
+            return False  # fail-safe: disable effects on config error
 
     def _get_fx_intensity(self, fx_key: str) -> float:
         """Live-read the intensity (0.0–1.0) for a specific effect."""
@@ -3608,13 +3608,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             count=max(5, int(20 * self._get_fx_intensity("fx_toast_burst_particles"))),
             color=QColor(get_theme_color(self.parent_gui.cfg, "accent")),
         )
-        self._burst_timer = QTimer(self)
-        self._burst_timer.setInterval(30)
-        self._burst_timer.timeout.connect(self._burst_tick)
         # Always allocate burst margin; live fx check in _compose_image controls drawing
         self._burst_img_margin = 80
         self._burst.start()
-        self._burst_timer.start()
 
         # --- Neon ring pulse (level-up only) ---
         _neon_intensity = self._get_fx_intensity("fx_toast_neon_rings")
@@ -3623,12 +3619,8 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             delays=[0.0, 150.0, 300.0, 450.0],
             duration=max(200.0, 550.0 * _neon_intensity),
         )
-        self._ring_timer = QTimer(self)
-        self._ring_timer.setInterval(20)
-        self._ring_timer.timeout.connect(self._ring_tick)
         if is_level_up and self._is_fx_enabled("fx_toast_neon_rings"):
             self._ring.start()
-            self._ring_timer.start()
 
         # --- Energy flash for level-up ---
         self._flash = EnergyFlash(duration=300.0, start_alpha=180)
@@ -3677,11 +3669,11 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         if self._is_fx_enabled("fx_toast_shockwave"):
             self._shockwave.start()
 
-        # Combined fast animation timer (typewriter + bounce + flash)
-        self._anim_timer = QTimer(self)
-        self._anim_timer.setInterval(30)
-        self._anim_timer.timeout.connect(self._anim_tick)
-        self._anim_timer.start()
+        # Unified animation timer — advances all visual effects at 16ms and renders once
+        self._fx_timer = QTimer(self)
+        self._fx_timer.setInterval(16)
+        self._fx_timer.timeout.connect(self._fx_tick)
+        self._fx_timer.start()
 
         # Post-processing widget (drawn on top of toast content)
         self._pp_widget = PostProcessingWidget(self, overlay_type="toast")
@@ -3701,10 +3693,14 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 pass
             # Start exit animation if available and enabled, otherwise close immediately
             if not getattr(self, "_is_closing", False):
-                if self._is_fx_enabled("fx_toast_slide_motion") and not self._slide_motion.is_exit_active() and hasattr(self, "_motion_timer"):
-                    # Trigger exit animation
-                    self._slide_motion.start_exit()
-                    self._motion_timer.start()
+                if self._is_fx_enabled("fx_toast_slide_motion") and hasattr(self, "_motion_timer"):
+                    # If entry animation is still running, snap it to completion first
+                    if self._slide_motion.is_entry_active():
+                        self._slide_motion.complete_entry()
+                    if not self._slide_motion.is_exit_active():
+                        # Trigger exit animation
+                        self._slide_motion.start_exit()
+                        self._motion_timer.start()
                 else:
                     self._is_closing = True
                     try:
@@ -3723,8 +3719,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             except Exception:
                 pass
         # Stop all animation timers
-        for attr in ('_burst_timer', '_ring_timer', '_anim_timer',
-                     '_tw_cursor_timer', '_timer', '_motion_timer'):
+        for attr in ('_fx_timer', '_tw_cursor_timer', '_timer', '_motion_timer'):
             t = getattr(self, attr, None)
             if t is not None:
                 try:
@@ -3919,7 +3914,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             actual_icon_sz = icon_sz
             icon_y_offset = 0
         pm = self._icon_pixmap(actual_icon_sz)
-        iy = int((H - actual_icon_sz) / 2) + icon_y_offset
+        iy = max(0, int((H - actual_icon_sz) / 2) + icon_y_offset)
         p.drawPixmap(pad, iy, pm)
         x_text = pad + icon_sz + gap
         text_top = int((H - text_h) / 2)
@@ -4011,6 +4006,11 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             ) else 0
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
+            # In portrait mode the image is rotated 90°: EW = landscape EH, EH = landscape EW.
+            # When burst_margin > 0 the expanded image is built in landscape then rotated, so
+            # the content dimensions for screen-edge calculations must be restored by swapping.
+            if portrait and burst_margin > 0:
+                W, H = H, W
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
             screen = QApplication.primaryScreen()
             geo = screen.availableGeometry() if screen else QRect(0, 0, 1280, 720)
@@ -4035,9 +4035,14 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             else:
                 slide_offset, opacity = 0, 1.0
 
-            # Expand window for burst/ring area
-            x_win = x - burst_margin + slide_offset
-            y_win = y - burst_margin
+            # Expand window for burst/ring area; in portrait mode slide horizontally
+            # on-screen (which is the Y axis in landscape terms after rotation).
+            if portrait:
+                x_win = x - burst_margin
+                y_win = y - burst_margin + slide_offset
+            else:
+                x_win = x - burst_margin + slide_offset
+                y_win = y - burst_margin
             self.setGeometry(x_win, y_win, EW, EH)
             self._label.setGeometry(0, 0, EW, EH)
             self._label.setPixmap(QPixmap.fromImage(img))
@@ -4053,6 +4058,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                 if not self._pp_widget.isVisible():
                     self._pp_widget.show()
                 self._pp_widget.raise_()
+            elif hasattr(self, '_pp_widget') and self._pp_widget.isVisible():
+                # PP was disabled mid-toast — hide the widget
+                self._pp_widget.hide()
             try:
                 import win32gui, win32con 
                 hwnd = int(self.winId())
@@ -4084,27 +4092,23 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             self._motion_timer.stop()
         self._render_and_place()
 
-    def _burst_tick(self):
-        """Advance burst particle positions and fade out. Stops after ~700ms."""
-        self._burst.tick(30.0)
-        if not self._burst.is_active():
-            self._burst_img_margin = 0
-            self._burst_timer.stop()
-        self._render_and_place()
-
-    def _ring_tick(self):
-        """Advance neon ring expansion for level-up toasts."""
-        max_r = self.width() if self.width() > 0 else 300
-        self._ring.tick(20.0, max_r=float(max_r))
-        if not self._ring.is_active():
-            if self._ring_timer:
-                self._ring_timer.stop()
-        self._render_and_place()
-
-    def _anim_tick(self):
-        """Advance typewriter index, icon bounce, and energy flash, then re-render."""
-        dt = 30.0  # 30ms
+    def _fx_tick(self):
+        """Unified animation tick: advances all visual effects once at 16ms and re-renders."""
+        dt = 16.0
         changed = False
+
+        # Burst particles
+        if self._burst.is_active():
+            self._burst.tick(dt)
+            if not self._burst.is_active():
+                self._burst_img_margin = 0
+            changed = True
+
+        # Neon ring expansion (level-up)
+        if self._ring.is_active():
+            max_r = self.width() if self.width() > 0 else 300
+            self._ring.tick(dt, max_r=float(max_r))
+            changed = True
 
         # Typewriter (applies to title/line1)
         if self._typewriter.is_active() and self._typewriter.full_text:
@@ -4147,16 +4151,18 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         if changed:
             self._render_and_place()
 
-        # Stop anim timer when all animated effects are done
-        if (not self._typewriter.is_active() and
+        # Stop unified timer when all visual effects have completed
+        if (not self._burst.is_active() and
+                not self._ring.is_active() and
+                not self._typewriter.is_active() and
                 not self._bounce.is_active() and
                 not self._flash.is_active() and
                 not self._god_rays.is_active() and
                 not self._confetti.is_active() and
                 not self._hologram.is_active() and
                 not self._shockwave.is_active()):
-            if hasattr(self, '_anim_timer'):
-                self._anim_timer.stop()
+            if hasattr(self, '_fx_timer'):
+                self._fx_timer.stop()
 
     def _tw_cursor_blink(self):
         """Toggle cursor visibility for typewriter effect."""
@@ -4220,6 +4226,7 @@ class AchToastManager(QObject):
 
     def _on_finished(self):
         self._active_window = None
+        self._active = False
         QTimer.singleShot(250, self._show_next)
 
 class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):

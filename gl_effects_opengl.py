@@ -696,6 +696,11 @@ class SlideMotion:
         self._exit_elapsed = 0.0
         self._entry_active = False
 
+    def complete_entry(self):
+        """Force-complete the entry animation instantly (jump to final position)."""
+        self._entry_active = False
+        self._entry_elapsed = self._entry_duration
+
     def tick(self, dt_ms: float) -> bool:
         """Advance animation by *dt_ms*. Returns ``True`` while still active."""
         if self._entry_active:
