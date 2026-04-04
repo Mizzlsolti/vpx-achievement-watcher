@@ -698,7 +698,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• <b>Search</b>: Filter by table name or ROM name.<br>"
             "• <b>🎯 Local tables with nvram map</b>: Show only locally installed tables that have an NVRAM mapping.<br>"
             "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs by matching table names, authors and ROM files against the VPS database.<br>"
-            "• <b>🔄 Load List</b>: Scan your tables directory and refresh the list.<br><br>"
+            "• <b>🔄 Load List</b>: Scan your tables directory and refresh the list.<br>"
+            "• <b>📥 Import from Popper</b>: Import VPS-IDs from PinUP Popper's PUPDatabase.db. Reads the CUSTOM3 field (where VPinStudio stores VPS-IDs) and matches tables by filename and name.<br>"
+            "• <b>🗑️ Clear VPS Mapping</b>: Deletes all VPS-ID assignments (vps_id_mapping.json) and resets the Popper DB path cache. Use this to start fresh if mappings are incorrect.<br><br>"
             "<b>Columns:</b><br>"
             "• <b>Table Name</b>: Display name of the table.<br>"
             "• <b>ROM</b>: The ROM identifier used by VPinMAME.<br>"
@@ -1101,6 +1103,16 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         btn_popper.setToolTip("Import VPS-IDs from PinUP Popper (PUPDatabase.db)")
         btn_popper.clicked.connect(self._on_import_from_popper)
         row.addWidget(btn_popper)
+
+        btn_clear_vps = QPushButton("🗑️ Clear VPS Mapping")
+        btn_clear_vps.setStyleSheet(
+            "QPushButton { background-color:#1A0000; color:#FF4444; font-weight:bold;"
+            " border:1px solid #AA0000; border-radius:5px; padding:7px 16px; }"
+            "QPushButton:hover { background-color:#2A0000; border-color:#FF4444; }"
+        )
+        btn_clear_vps.setToolTip("Delete vps_id_mapping.json and clear all VPS-ID assignments")
+        btn_clear_vps.clicked.connect(self._on_clear_vps_mapping)
+        row.addWidget(btn_clear_vps)
 
         lay.addLayout(row)
 
@@ -1866,6 +1878,45 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             f"Matched by filename: {matched_by_file}\n"
             f"Matched by name: {matched_by_name}\n"
             f"No local table found: {unmatched}"
+        )
+
+    def _on_clear_vps_mapping(self):
+        """Handler for the '🗑️ Clear VPS Mapping' button."""
+        reply = QMessageBox.question(
+            self,
+            "Clear VPS Mapping",
+            "This will delete vps_id_mapping.json and clear all VPS-ID assignments.\n\n"
+            "Are you sure you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Delete the mapping file
+        mapping_path = f_vps_mapping(self.cfg)
+        if os.path.isfile(mapping_path):
+            os.remove(mapping_path)
+
+        # Clear all vps_id entries in cache
+        for entry in self._all_maps_cache:
+            entry["vps_id"] = ""
+
+        # Reset the cached Popper DB path
+        self.cfg.POPPER_DB_PATH = ""
+        self.cfg.save()
+
+        # Upload empty mapping to cloud
+        self._cloud_upload_vps_mapping()
+
+        # Refresh the table
+        self._filter_available_maps()
+
+        QMessageBox.information(
+            self,
+            "Clear VPS Mapping",
+            "VPS-ID mapping cleared successfully.\n"
+            "All VPS-ID assignments have been removed and vps_id_mapping.json has been deleted.",
         )
 
     def _init_tooltips_main(self):
