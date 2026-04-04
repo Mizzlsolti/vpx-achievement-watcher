@@ -4036,10 +4036,22 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             else:
                 slide_offset, opacity = 0, 1.0
 
-            # Slide offset is always applied to Y (bottom-to-top) in both
-            # portrait and landscape mode.
-            x_win = x - burst_margin
-            y_win = y - burst_margin + slide_offset
+            if portrait:
+                # In portrait mode the image is rotated 90°, so the logical "bottom"
+                # maps to the left or right side of the screen.  Apply slide offset to
+                # the X axis; direction depends on the rotation direction.
+                ccw = bool(ov.get("ach_toast_rotate_ccw", ov.get("portrait_rotate_ccw", True)))
+                if ccw:
+                    # CCW (-90°): logical bottom = right side → slide in from right
+                    x_win = x - burst_margin + slide_offset
+                else:
+                    # CW (+90°): logical bottom = left side → slide in from left
+                    x_win = x - burst_margin - slide_offset
+                y_win = y - burst_margin
+            else:
+                # Landscape: slide along Y axis (bottom-to-top) as before.
+                x_win = x - burst_margin
+                y_win = y - burst_margin + slide_offset
             self.setGeometry(x_win, y_win, EW, EH)
             self._label.setGeometry(0, 0, EW, EH)
             self._label.setPixmap(QPixmap.fromImage(img))
