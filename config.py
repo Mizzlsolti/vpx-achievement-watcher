@@ -250,10 +250,10 @@ _ALLOWED_OVERLAY_KEYS = [
     "pos_x", "pos_y", "use_xy", "overlay_pos_saved",
     "base_body_size", "base_title_size", "base_hint_size",
     
-    "toggle_input_source", "toggle_vk", "toggle_joy_button",
-    "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button",
-    "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button",
-    "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button",
+    "toggle_input_source", "toggle_vk", "toggle_joy_button", "toggle_mods",
+    "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button", "challenge_hotkey_mods",
+    "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button", "challenge_left_mods",
+    "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button", "challenge_right_mods",
     
     "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
     "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
