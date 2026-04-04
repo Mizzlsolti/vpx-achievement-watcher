@@ -7,6 +7,7 @@ import random
 import threading
 import time
 from datetime import datetime
+from html import escape as _html_escape
 
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
@@ -93,8 +94,8 @@ class DuelInviteOverlay(QWidget):
         root.addWidget(lbl_title)
 
         self._lbl_msg = QLabel(
-            f"You have been challenged by <b>{opponent}</b><br>"
-            f"Table: <b>{table_name}</b>"
+            f"You have been challenged by <b>{_html_escape(opponent)}</b><br>"
+            f"Table: <b>{_html_escape(table_name)}</b>"
         )
         self._lbl_msg.setWordWrap(True)
         self._lbl_msg.setStyleSheet(

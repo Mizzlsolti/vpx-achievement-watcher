@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QTextBrowser, QProgressDialog,
     QTabWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator
 from cloud_sync import CloudSync, _sanitize_firebase_keys
 from watcher_core import (
     ensure_dir, log, sanitize_filename,
@@ -102,6 +103,8 @@ class SystemMixin:
 
         self.txt_player_name = QLineEdit()
         self.txt_player_name.setText(self.cfg.OVERLAY.get("player_name", "Player"))
+        _name_rx = QRegularExpression(r"[\p{L}\d /\\!\"§$%&()\-_,.:;]*")
+        self.txt_player_name.setValidator(QRegularExpressionValidator(_name_rx, self.txt_player_name))
 
         self.txt_player_id = QLineEdit()
         self.txt_player_id.setText(self.cfg.OVERLAY.get("player_id", "0000"))
@@ -121,6 +124,13 @@ class SystemMixin:
         lbl_id_warning.setWordWrap(True)
         lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
         lay_profile.addWidget(lbl_id_warning, 1, 0, 1, 4)
+
+        lbl_name_hint = QLabel(
+            'ℹ️ Allowed characters: letters, numbers, spaces, and / \\ - _ ! " § $ % & ( ) , . ; :'
+        )
+        lbl_name_hint.setWordWrap(True)
+        lbl_name_hint.setStyleSheet("color: #888888; margin-top: 4px; font-size: 9pt; padding: 4px 8px;")
+        lay_profile.addWidget(lbl_name_hint, 2, 0, 1, 4)
 
         layout.addWidget(grp_profile)
 
