@@ -682,6 +682,27 @@ class ChallengesMixin:
             pass
 
         if not self._in_game_now():
+            # If a duel invite overlay is visible, confirm the focused button instead
+            # of showing the "not in-game" error.
+            try:
+                overlay = getattr(self, "_duel_invite_overlay", None)
+                if overlay is not None and overlay.isVisible():
+                    overlay.confirm_focused()
+                    return
+            except Exception:
+                pass
+            # If the in-tab duel alert bar is visible, click the focused button.
+            try:
+                alert = getattr(self, "_duel_alert_frame", None)
+                if alert is not None and alert.isVisible():
+                    focus = int(getattr(self, "_duel_alert_focus", 0))
+                    if focus == 0:
+                        self._on_duel_accept()
+                    else:
+                        self._on_duel_decline()
+                    return
+            except Exception:
+                pass
             try:
                 self._close_challenge_select_overlay()
                 self._close_flip_difficulty_overlay()
@@ -779,6 +800,26 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
+        # If a duel invite overlay is visible, toggle focus between Accept/Decline.
+        try:
+            overlay = getattr(self, "_duel_invite_overlay", None)
+            if overlay is not None and overlay.isVisible():
+                if overlay.is_accept_focused():
+                    overlay.focus_decline()
+                else:
+                    overlay.focus_accept()
+                return
+        except Exception:
+            pass
+        # If the in-tab duel alert bar is visible, toggle focus between Accept/Decline.
+        try:
+            alert = getattr(self, "_duel_alert_frame", None)
+            if alert is not None and alert.isVisible():
+                self._duel_alert_focus = 0 if getattr(self, "_duel_alert_focus", 0) != 0 else 1
+                self._apply_duel_alert_focus_styles()
+                return
+        except Exception:
+            pass
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
@@ -832,6 +873,26 @@ class ChallengesMixin:
             if (now - float(getattr(self, "_last_ch_nav_ts", 0.0) or 0.0)) < 0.12:
                 return
             self._last_ch_nav_ts = now
+        except Exception:
+            pass
+        # If a duel invite overlay is visible, toggle focus between Accept/Decline.
+        try:
+            overlay = getattr(self, "_duel_invite_overlay", None)
+            if overlay is not None and overlay.isVisible():
+                if overlay.is_accept_focused():
+                    overlay.focus_decline()
+                else:
+                    overlay.focus_accept()
+                return
+        except Exception:
+            pass
+        # If the in-tab duel alert bar is visible, toggle focus between Accept/Decline.
+        try:
+            alert = getattr(self, "_duel_alert_frame", None)
+            if alert is not None and alert.isVisible():
+                self._duel_alert_focus = 0 if getattr(self, "_duel_alert_focus", 0) != 0 else 1
+                self._apply_duel_alert_focus_styles()
+                return
         except Exception:
             pass
         # Challenge left/right no longer navigates overlay pages
