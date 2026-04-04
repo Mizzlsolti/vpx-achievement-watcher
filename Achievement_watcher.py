@@ -430,7 +430,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         except Exception:
             pass
 
-
+    def _in_game_now(self) -> bool:
         try:
             w = getattr(self, "watcher", None)
             return bool(w and (w.game_active or w._vp_player_visible()))

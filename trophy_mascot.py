@@ -3160,7 +3160,7 @@ class GUITrophie(QWidget):
         if options:
             self._show_comment_key("gui_duel_expired", random.choice(options), IDLE)
 
-
+    def _fire_tab_tip(self, tab_name: str) -> None:
         tab_map = {
             "dashboard":        "tab_dashboard",
             "effects":          "tab_effects",
