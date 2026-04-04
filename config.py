@@ -478,6 +478,7 @@ class AppConfig:
     CLOUD_ENABLED: bool = False
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
+    POPPER_DB_PATH: str = ""
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
@@ -511,6 +512,7 @@ class AppConfig:
             TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
+            POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
         )
 
     @staticmethod
@@ -566,7 +568,8 @@ class AppConfig:
                 "CLOUD_BACKUP_ENABLED": cloud_backup_val,
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "TUTORIAL_COMPLETED": getattr(self, "TUTORIAL_COMPLETED", False),
-                "OVERLAY": clean_overlay
+                "OVERLAY": clean_overlay,
+                "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
             }
 
             d = os.path.dirname(path)
