@@ -450,6 +450,26 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("mascots_apply",   "Applied skins are remembered even after you restart the watcher!"),
         ("mascots_hide",    "Not a fan of mascots? You can hide Trophie or Steely with the checkboxes above!"),
     ],
+    "tab_duels": [
+        ("duels_intro",    "Score Duels let you challenge other players head-to-head!"),
+        ("duels_invite",   "Send a duel invitation and see who scores higher on the same table!"),
+        ("duels_accept",   "You have 15 seconds to accept an incoming duel — stay alert!"),
+        ("duels_history",  "Check your duel history to see your win rate against rivals!"),
+        ("duels_cloud",    "Duels require Cloud Sync to communicate with other players!"),
+        ("duels_table",    "Pick a table you know well for duels — home advantage matters!"),
+        ("duels_rematch",  "Lost a duel? Challenge them again — revenge is sweet!"),
+        ("duels_hotkey",   "Use your Challenge Left/Right hotkeys to navigate duel invitations!"),
+    ],
+    "tab_challenges": [
+        ("ch_intro",       "Challenges test your skill against the clock — beat the target score!"),
+        ("ch_select",      "Use Left/Right to browse available challenges, then press Action to start!"),
+        ("ch_timer",       "Keep an eye on the countdown — every second counts in a challenge!"),
+        ("ch_retry",       "Failed a challenge? Try again! Practice makes perfect!"),
+        ("ch_streak",      "Build a winning streak to climb the challenge leaderboard!"),
+        ("ch_score",       "Beat the target score before time runs out to win the challenge!"),
+        ("ch_hotkey",      "Bind your Challenge hotkeys in the Controls tab for quick access!"),
+        ("ch_ingame",      "Challenges can only be started while a game is running in VPX!"),
+    ],
 }
 
 _GUI_EVENT_TIPS: list[tuple[str, str]] = [
@@ -3181,6 +3201,9 @@ class GUITrophie(QWidget):
             "aweditor":         "tab_aweditor",
             "available maps":   "tab_maps",
             "maps":             "tab_maps",
+            "score duels":      "tab_duels",
+            "duels":            "tab_duels",
+            "challenges":       "tab_challenges",
         }
         for key_part, tip_cat in tab_map.items():
             if key_part in tab_name:
@@ -3666,7 +3689,7 @@ class OverlayTrophie(QWidget):
                 except Exception:
                     self._show_comment_key(_key, _comment, HAPPY)
 
-            QTimer.singleShot(self._ROM_START_POLL_INTERVAL_MS, _poll)
+            QTimer.singleShot(2000, _poll)
 
     def on_session_ended(self, rom: str) -> None:
         if self._session_start is None:
