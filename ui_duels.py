@@ -441,9 +441,13 @@ class DuelsMixin:
         layout.addStretch(1)
         self._add_tab_help_button(layout, "duels")
         self.main_tabs.addTab(tab, "⚔️ Score Duels")
+        self._duels_tab_index = self.main_tabs.count() - 1
 
         # ── Populate table dropdown from maps cache ──────────────────────────
         self._populate_duel_table_combo()
+
+        # ── Refresh table dropdown when this tab becomes active ──────────────
+        self.main_tabs.currentChanged.connect(self._on_duels_tab_activated)
 
         # ── Fetch opponent players from cloud in background ──────────────────
         if getattr(self.cfg, "CLOUD_ENABLED", False):
@@ -477,7 +481,13 @@ class DuelsMixin:
         combo box.  Falls back to vps_id_mapping.json (ROMs the user has ever
         assigned a VPS-ID) when _all_maps_cache has no matching entries, e.g.
         on first launch before the map list has been loaded.
+
+        Preserves the current selection if the same ROM is still available
+        after repopulating.
         """
+        # Preserve current selection before clearing.
+        prev_rom = self._cmb_duel_table.currentData() or ""
+
         self._cmb_duel_table.clear()
         self._cmb_duel_table.addItem("— Select Table —", "")
         cache = getattr(self, "_all_maps_cache", None) or []
@@ -555,12 +565,24 @@ class DuelsMixin:
 
         self._duel_table_completer_model.setStringList(suggestions)
 
+        # Restore the previous selection if it is still available.
+        if prev_rom:
+            idx = self._cmb_duel_table.findData(prev_rom)
+            if idx >= 0:
+                self._cmb_duel_table.setCurrentIndex(idx)
+
         # Connect completer activation to select correct combo entry.
         try:
             self._duel_table_completer.activated.disconnect()
         except Exception:
             pass
         self._duel_table_completer.activated.connect(self._on_duel_table_completer_activated)
+
+    def _on_duels_tab_activated(self, index: int) -> None:
+        """Refresh the table dropdown whenever the Score Duels tab becomes active."""
+        if index == getattr(self, "_duels_tab_index", -1):
+            if hasattr(self, "_cmb_duel_table"):
+                self._populate_duel_table_combo()
 
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
