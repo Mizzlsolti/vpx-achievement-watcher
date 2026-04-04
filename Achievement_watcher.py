@@ -1743,9 +1743,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             conn = sqlite3.connect(db_path)
             try:
                 cursor = conn.execute(
-                    "SELECT ROM, CUSTOM3 FROM Games"
+                    "SELECT GameFileName, GameName, CUSTOM3 FROM Games"
                     " WHERE CUSTOM3 IS NOT NULL AND CUSTOM3 != ''"
-                    " AND ROM IS NOT NULL AND ROM != ''"
                 )
                 rows = cursor.fetchall()
             except sqlite3.OperationalError as exc:
@@ -1779,14 +1778,65 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             )
             return
 
+        # ----------------------------------------------------------------
+        # Build lookup structures from the in-memory cache for fast matching
+        # ----------------------------------------------------------------
+        # Map: lowercase vpx basename → cache entry  (for exact filename match)
+        cache_by_vpx: dict[str, dict] = {}
+        # Map: normalized title → cache entry  (for fuzzy name match)
+        cache_by_title: dict[str, dict] = {}
+        for entry in self._all_maps_cache:
+            vpx_path = entry.get("vpx_path", "")
+            if vpx_path:
+                cache_by_vpx[os.path.basename(vpx_path).lower()] = entry
+            title = entry.get("title", "")
+            if title:
+                norm = _normalize_term(_strip_version_from_name(title))
+                if norm and norm not in cache_by_title:
+                    cache_by_title[norm] = entry
+
+        # ----------------------------------------------------------------
+        # Match each Popper row against the cache
+        # ----------------------------------------------------------------
         imported = 0
         skipped = 0
+        matched_by_file = 0
+        matched_by_name = 0
+        unmatched = 0
         for row in rows:
             try:
-                rom = str(row[0]).strip().lower()
-                vps_id = str(row[1]).strip()
-                if not rom or not vps_id:
+                game_filename = str(row[0] or "").strip()
+                game_name = str(row[1] or "").strip()
+                vps_id = str(row[2] or "").strip()
+                if not vps_id:
                     continue
+
+                matched_entry = None
+
+                # Strategy 1: exact VPX filename match
+                if game_filename:
+                    matched_entry = cache_by_vpx.get(game_filename.lower())
+                    if matched_entry:
+                        matched_by_file += 1
+
+                # Strategy 2: normalized name match
+                # Note: when multiple cache entries share the same normalized title
+                # (rare collision), the first entry encountered in cache order is used.
+                if matched_entry is None and game_name:
+                    norm_game = _normalize_term(_strip_version_from_name(game_name))
+                    matched_entry = cache_by_title.get(norm_game)
+                    if matched_entry:
+                        matched_by_name += 1
+
+                if matched_entry is None:
+                    unmatched += 1
+                    continue
+
+                rom = matched_entry.get("rom", "")
+                if not rom:
+                    # Matched a cache entry but it has no ROM identifier — skip silently
+                    continue
+
                 if mapping.get(rom):
                     skipped += 1
                 else:
@@ -1802,8 +1852,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self._cloud_upload_vps_mapping()
 
         for entry in self._all_maps_cache:
-            rom = entry.get("rom", "").lower()
-            if rom in mapping and mapping[rom]:
+            rom = entry.get("rom", "")
+            if rom and mapping.get(rom):
                 entry["vps_id"] = mapping[rom]
 
         self._filter_available_maps()
@@ -1812,7 +1862,10 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             self, "Import Complete",
             f"Import complete.\n"
             f"{imported} VPS-ID(s) imported from PinUP Popper.\n"
-            f"{skipped} already mapped (skipped)."
+            f"{skipped} already mapped (skipped).\n\n"
+            f"Matched by filename: {matched_by_file}\n"
+            f"Matched by name: {matched_by_name}\n"
+            f"No local table found: {unmatched}"
         )
 
     def _init_tooltips_main(self):
