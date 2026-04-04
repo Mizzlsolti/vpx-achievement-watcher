@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
 from config import p_aweditor
-from duel_engine import DuelEngine, DuelStatus
+from duel_engine import Duel, DuelEngine, DuelStatus
 from watcher_core import _strip_version_from_name
 
 
@@ -821,14 +821,27 @@ class DuelsMixin:
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
 
-        duel = self._duel_engine.send_invitation(opponent_id, table_rom, table_name,
-                                                  opponent_name=opponent_name)
-        if duel:
+        duel_or_error = self._duel_engine.send_invitation(opponent_id, table_rom, table_name,
+                                                           opponent_name=opponent_name)
+        if isinstance(duel_or_error, Duel):
             self._lbl_duel_status.setText(
                 f"✅ Invitation sent to '{opponent_name or opponent_id}' for '{table_name}'!"
             )
             self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
             self._refresh_active_duels()
+        elif duel_or_error == "duplicate":
+            self._lbl_duel_status.setText(
+                "⚠️ A pending duel for this opponent and table already exists."
+            )
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "no_player_id":
+            self._lbl_duel_status.setText(
+                "⚠️ Player ID not configured. Please set your Player ID in Settings."
+            )
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "no_opponent":
+            self._lbl_duel_status.setText("⚠️ Opponent ID is required.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
         else:
             self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync.")
             self._lbl_duel_status.setStyleSheet("color:#CC4444; font-style:italic;")
@@ -954,6 +967,12 @@ class DuelsMixin:
                     self._trophie_overlay.on_duel_declined()
             except Exception:
                 pass
+
+    def _on_duel_cancel(self, duel_id: str) -> None:
+        """Cancel a pending duel invitation that was sent by this player."""
+        self._duel_engine.cancel_duel(duel_id)
+        self._refresh_active_duels()
+        self._refresh_duel_history()
 
     # ── Slot: incoming invitation ─────────────────────────────────────────────
 
@@ -1276,8 +1295,21 @@ class DuelsMixin:
             else:
                 tbl.setItem(row, 3, QTableWidgetItem("—"))
 
-            # Actions column placeholder.
-            tbl.setItem(row, 4, QTableWidgetItem(""))
+            # Actions column: Cancel button for PENDING duels sent by this player.
+            if duel.status == DuelStatus.PENDING and is_challenger:
+                btn_cancel = QPushButton("❌ Cancel")
+                btn_cancel.setFixedHeight(24)
+                btn_cancel.setStyleSheet(
+                    "QPushButton { background:#2a0000; color:#FF4444; border:1px solid #FF4444;"
+                    " border-radius:4px; padding:0 6px; font-size:11px; }"
+                    "QPushButton:hover { background:#4a0000; }"
+                )
+                btn_cancel.clicked.connect(
+                    lambda _checked=False, did=duel.duel_id: self._on_duel_cancel(did)
+                )
+                tbl.setCellWidget(row, 4, btn_cancel)
+            else:
+                tbl.setItem(row, 4, QTableWidgetItem(""))
 
     # ── Refresh: history table ─────────────────────────────────────────────────
 
@@ -1341,10 +1373,11 @@ class DuelsMixin:
 
             # Result with icon and color.
             result_map = {
-                DuelStatus.WON:      ("🏆 Won",     "#00AA00"),
-                DuelStatus.LOST:     ("💀 Lost",    "#AA0000"),
-                DuelStatus.EXPIRED:  ("⏰ Expired", "#666666"),
-                DuelStatus.DECLINED: ("❌ Declined","#666666"),
+                DuelStatus.WON:       ("🏆 Won",        "#00AA00"),
+                DuelStatus.LOST:      ("💀 Lost",        "#AA0000"),
+                DuelStatus.EXPIRED:   ("⏰ Expired",     "#666666"),
+                DuelStatus.DECLINED:  ("❌ Declined",    "#666666"),
+                DuelStatus.CANCELLED: ("🚫 Cancelled",   "#666666"),
             }
             result_text, result_color = result_map.get(duel.status, (duel.status.capitalize(), "#AAAAAA"))
             result_item = QTableWidgetItem(result_text)
