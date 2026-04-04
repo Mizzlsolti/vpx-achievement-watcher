@@ -1128,7 +1128,7 @@ class DuelsMixin:
             self._mini_overlay = MiniInfoOverlay(self)
         return self._mini_overlay
 
-    def _duel_notify(self, msg: str, color_hex: str, seconds: int = 6) -> None:
+    def _duel_notify(self, msg: str, color_hex: str = "#888888", seconds: int = 6) -> None:
         """Show a duel notification — in-tab label if GUI visible, MiniOverlay if systray, nothing if VPX running."""
         try:
             w = getattr(self, "watcher", None)
@@ -1293,11 +1293,9 @@ class DuelsMixin:
                     " font-size: 13px; padding: 0; }"
                     "QPushButton:hover { background: #1a2a2a; border-radius: 4px; }"
                 )
-                _vps_id = vps_id
-                _cfg = self.cfg
                 btn_info.clicked.connect(
-                    lambda _checked=False, vid=_vps_id, tname=table_display:
-                        CloudProgressVpsInfoDialog(_cfg, vid, table_name=tname, parent=self).exec()
+                    lambda _checked=False, vps_id=vps_id, tname=table_display:
+                        CloudProgressVpsInfoDialog(self.cfg, vps_id, table_name=tname, parent=self).exec()
                 )
                 cell_lay.addWidget(btn_info)
                 cell_lay.addStretch(1)
