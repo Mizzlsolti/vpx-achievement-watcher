@@ -39,7 +39,7 @@ def resource_path(rel: str) -> str:
             return p
     return os.path.join(APP_DIR, rel)
 
-WATCHER_VERSION = "2.9"
+WATCHER_VERSION = "2.9.1"
 
 # Custom-events polling constants
 _CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
