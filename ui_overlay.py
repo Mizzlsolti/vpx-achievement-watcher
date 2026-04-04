@@ -3608,9 +3608,9 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             count=max(5, int(20 * self._get_fx_intensity("fx_toast_burst_particles"))),
             color=QColor(get_theme_color(self.parent_gui.cfg, "accent")),
         )
-        # Always allocate burst margin; live fx check in _compose_image controls drawing
         self._burst_img_margin = 80
-        self._burst.start()
+        if self._is_fx_enabled("fx_toast_burst_particles"):
+            self._burst.start()
 
         # --- Neon ring pulse (level-up only) ---
         _neon_intensity = self._get_fx_intensity("fx_toast_neon_rings")
@@ -3638,7 +3638,8 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
 
         # --- Icon bounce animation ---
         self._bounce = IconBounce(duration=400.0, start_scale=1.3)
-        self._bounce.start()
+        if self._is_fx_enabled("fx_toast_icon_bounce"):
+            self._bounce.start()
 
         # --- Slide-in/slide-out entry/exit animation ---
         self._slide_motion = SlideMotion(entry_duration=250.0, exit_duration=200.0, distance=60)
@@ -4035,14 +4036,10 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             else:
                 slide_offset, opacity = 0, 1.0
 
-            # Expand window for burst/ring area; in portrait mode slide horizontally
-            # on-screen (which is the Y axis in landscape terms after rotation).
-            if portrait:
-                x_win = x - burst_margin
-                y_win = y - burst_margin + slide_offset
-            else:
-                x_win = x - burst_margin + slide_offset
-                y_win = y - burst_margin
+            # Slide offset is always applied to Y (bottom-to-top) in both
+            # portrait and landscape mode.
+            x_win = x - burst_margin
+            y_win = y - burst_margin + slide_offset
             self.setGeometry(x_win, y_win, EW, EH)
             self._label.setGeometry(0, 0, EW, EH)
             self._label.setPixmap(QPixmap.fromImage(img))

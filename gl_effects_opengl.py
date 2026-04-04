@@ -716,7 +716,14 @@ class SlideMotion:
         return self.is_active()
 
     def get_offset_and_opacity(self) -> tuple:
-        """Return ``(x_offset, opacity)`` for the current animation frame."""
+        """Return ``(y_offset, opacity)`` for the current animation frame.
+
+        A positive *y_offset* shifts the toast downward (below its final
+        resting position).  During entry the offset decreases from
+        ``distance`` → 0 so the toast slides upward into view.  During
+        exit it increases from 0 → ``distance`` so the toast slides
+        downward out of view.
+        """
         if self._entry_active:
             t = min(1.0, self._entry_elapsed / max(1.0, self._entry_duration))
             eased = ease_out_cubic(t)
