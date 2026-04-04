@@ -251,7 +251,7 @@ _STEPS = [
             "Score Duels let you challenge other players to async\n"
             "high-score battles on any table!\n\n"
             "How it works:\n"
-            "  1. Go to the Score Duels tab and search for a player by ID\n"
+            "  1. Go to the Score Duels tab and search for a player by Name\n"
             "  2. Select a table and send the invitation\n"
             "  3. Both players play the same table independently\n"
             "  4. Highest score wins!\n\n"
