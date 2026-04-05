@@ -21,6 +21,9 @@ from config import p_aweditor
 from duel_engine import Duel, DuelEngine, DuelStatus
 from watcher_core import _strip_version_from_name
 
+# Delay (ms) before the first fast opponent-score re-check after our own score is submitted.
+_DUEL_FAST_RECHECK_DELAY_MS = 12_000
+
 
 # ---------------------------------------------------------------------------
 # Floating duel invitation overlay (shown when GUI is minimized / in systray)
@@ -1557,7 +1560,7 @@ class DuelsMixin:
                 # Clear per-duel cooldown so the fast timer can proceed immediately.
                 for d in pending:
                     self._duel_recheck_cooldown.pop(d.duel_id, None)
-                QTimer.singleShot(12_000, self._recheck_active_duel_scores)
+                QTimer.singleShot(_DUEL_FAST_RECHECK_DELAY_MS, self._recheck_active_duel_scores)
         except Exception:
             pass
 

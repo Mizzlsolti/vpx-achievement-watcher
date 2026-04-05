@@ -2522,9 +2522,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 try:
                     _w = getattr(self, "watcher", None)
                     ch = getattr(_w, "challenge", {}) if _w is not None else {}
-                    if (ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once"):
-                        return
-                    if getattr(_w, "duel_active_for_current_table", False):
+                    if ((ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once")
+                            or getattr(_w, "duel_active_for_current_table", False)):
                         return
                 except Exception:
                     pass
