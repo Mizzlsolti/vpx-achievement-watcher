@@ -323,7 +323,7 @@ class DuelEngine:
 
         Used when a VPX game session is deemed invalid (too short or no score
         improvement).  Transitions the duel to ``CANCELLED``, persists the
-        ``cancel_reason``, and pushes the update to the cloud.
+        ``cancel_reason``, moves it to history, and pushes the update to the cloud.
 
         Parameters
         ----------
@@ -344,21 +344,12 @@ class DuelEngine:
             return False
         duel.status = DuelStatus.CANCELLED
         duel.cancel_reason = reason
+        duel.completed_at = time.time()
+        self._active.remove(duel)
+        self._history.append(duel)
         self._save_active()
-        # Report to cloud.
-        my_id = self._my_player_id()
-        if my_id:
-            node = f"duels/active/{duel_id}"
-            try:
-                existing = CloudSync.fetch_node(self._cfg, node)
-                if isinstance(existing, dict):
-                    existing["status"] = "CANCELLED"
-                    existing["cancel_reason"] = reason
-                    existing["cancelled_by"] = my_id
-                    existing["cancelled_at"] = time.time()
-                    CloudSync.set_node(self._cfg, node, existing)
-            except Exception as exc:
-                log(self._cfg, f"[DUEL] abort_duel cloud update failed: {exc}", "WARN")
+        self._save_history()
+        self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} aborted. Reason: {reason}")
         return True
 
@@ -371,7 +362,7 @@ class DuelEngine:
         my_id = self._my_player_id()
         if not my_id or not self._cfg.CLOUD_ENABLED:
             return []
-        if bool(self._cfg.OVERLAY.get("duels_do_not_disturb", True)):
+        if bool(self._cfg.OVERLAY.get("duels_do_not_disturb", False)):
             return []
 
         try:

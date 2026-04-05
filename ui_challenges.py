@@ -688,8 +688,7 @@ class ChallengesMixin:
             # the focused option instead of emitting the "not in-game" error.
             try:
                 if getattr(self, "_duel_invite_notify_state", None) is not None:
-                    self._duel_invite_notify_confirm()
-                    return
+                    return  # Duel invite handled by Left/Right directly
             except Exception:
                 pass
             # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
@@ -803,13 +802,24 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, navigate
-        # focus to Accept (left = move towards Accept).
+        # If a duel invite notification is showing in the mini overlay, accept directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
-                state["focused"] = 0  # left → Accept
-                self._duel_invite_notify_update()
+                duel_id = state.get("duel_id")
+                # Mark as handled to prevent double notification (Fix 4)
+                if not hasattr(self, "_duel_invite_handled_ids"):
+                    self._duel_invite_handled_ids = set()
+                self._duel_invite_handled_ids.add(duel_id)
+                self._duel_invite_notify_cancel()
+                try:
+                    self._get_mini_overlay().hide()
+                except Exception:
+                    pass
+                try:
+                    self._on_inbox_accept(duel_id)
+                except Exception:
+                    pass
                 return
         except Exception:
             pass
@@ -880,13 +890,24 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, navigate
-        # focus to Decline (right = move towards Decline).
+        # If a duel invite notification is showing in the mini overlay, decline directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
-                state["focused"] = 1  # right → Decline
-                self._duel_invite_notify_update()
+                duel_id = state.get("duel_id")
+                # Mark as handled to prevent double notification (Fix 4)
+                if not hasattr(self, "_duel_invite_handled_ids"):
+                    self._duel_invite_handled_ids = set()
+                self._duel_invite_handled_ids.add(duel_id)
+                self._duel_invite_notify_cancel()
+                try:
+                    self._get_mini_overlay().hide()
+                except Exception:
+                    pass
+                try:
+                    self._on_inbox_decline(duel_id)
+                except Exception:
+                    pass
                 return
         except Exception:
             pass
