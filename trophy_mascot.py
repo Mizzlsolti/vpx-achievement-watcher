@@ -1079,7 +1079,8 @@ class _SpeechBubble(QWidget):
         self._fading_out = False
         self._ptr_offset = -1
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.show()
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
     def set_pointer_offset(self, offset: int) -> None:
         self._ptr_offset = offset
