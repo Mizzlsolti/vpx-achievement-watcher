@@ -219,6 +219,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
         self.bridge.session_ended.connect(self._on_session_ended_duels)
+        self.bridge.session_started.connect(self._on_session_started_duels)
         self.bridge.duel_result.connect(self._on_duel_result)
         
         self._prefetch_blink_timer = QTimer(self)
@@ -2517,10 +2518,12 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
                 # Don't auto-open the main overlay when a challenge is active or
                 # being started (suppress_big_overlay_once is set at challenge start
                 # before the first challenge notification fires).
+                # Also suppress when a duel is active for the current table.
                 try:
                     _w = getattr(self, "watcher", None)
                     ch = getattr(_w, "challenge", {}) if _w is not None else {}
-                    if (ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once"):
+                    if ((ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once")
+                            or getattr(_w, "duel_active_for_current_table", False)):
                         return
                 except Exception:
                     pass
