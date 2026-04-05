@@ -912,9 +912,14 @@ class DuelsMixin:
         """Handle an incoming duel invitation.
 
         Updates the inbox table to show the new invitation.  When the window is
-        minimized or hidden (e.g. to the system tray) a floating
-        :class:`DuelInviteOverlay` is shown as a notification; it auto-hides
-        after 30 seconds without declining the invitation.
+        minimized or hidden (e.g. to the system tray) and VPX is **not** running,
+        the shared :class:`~ui_overlay.MiniInfoOverlay` is used to show a
+        notification with Accept / Decline options navigable via the Challenge
+        hotkeys.  The notification auto-hides after 60 seconds **without**
+        declining the invitation; it stays in the Duels-tab inbox.
+
+        When VPX *is* running the notification is silently skipped — no
+        auto-decline, the invitation stays in the inbox.
 
         Parameters
         ----------
@@ -931,29 +936,38 @@ class DuelsMixin:
         gui_hidden = not self.isVisible() or self.isMinimized()
 
         if gui_hidden:
-            # Close any previous invite overlay before showing a new one.
+            # If VPX is running, skip the notification entirely — no auto-decline.
             try:
-                prev = getattr(self, "_duel_invite_overlay", None)
-                if prev is not None and not getattr(prev, "_closed", True):
-                    prev.hide()
+                w = getattr(self, "watcher", None)
+                if w and (w.game_active or w._vp_player_visible()):
+                    return
             except Exception:
                 pass
 
-            def _accept_cb(did: str) -> None:
-                self._on_inbox_accept(did)
+            # Cancel any previously-active duel invite notification.
+            self._duel_invite_notify_cancel()
 
-            def _decline_cb(did: str) -> None:
-                self._on_inbox_decline(did)
+            # Store state for hotkey navigation (0 = Accept focused, 1 = Decline).
+            self._duel_invite_notify_state: dict = {
+                "duel_id":    duel_id,
+                "opponent":   opponent,
+                "table_name": table_name,
+                "focused":    0,
+            }
 
-            self._duel_invite_overlay = DuelInviteOverlay(
-                self, opponent, table_name, duel_id, _accept_cb, _decline_cb
-            )
-            # Clear the reference when the overlay is destroyed (WA_DeleteOnClose)
-            # to prevent RuntimeError from accessing a deleted C++ object.
-            self._duel_invite_overlay.destroyed.connect(
-                lambda: setattr(self, "_duel_invite_overlay", None)
-            )
-            self._duel_invite_overlay.show()
+            # Show the notification overlay for 60 s (no auto-decline on timeout).
+            try:
+                msg = self._duel_invite_notify_text(0)
+                self._get_mini_overlay().show_info(msg, seconds=60, color_hex="#FF7F00")
+            except Exception:
+                pass
+
+            # Cleanup timer — clears state after 60 s but does NOT decline.
+            self._duel_invite_notify_timer = QTimer(self)
+            self._duel_invite_notify_timer.setSingleShot(True)
+            self._duel_invite_notify_timer.setInterval(60_000)
+            self._duel_invite_notify_timer.timeout.connect(self._duel_invite_notify_cancel)
+            self._duel_invite_notify_timer.start()
         else:
             # GUI is visible — switch to the Score Duels tab so the user notices.
             for i in range(self.main_tabs.count()):
@@ -961,6 +975,78 @@ class DuelsMixin:
                 if tab_text == "⚔️ Score Duels" or (tab_text.startswith("⚔️ Score Duels (") and tab_text.endswith(")")):
                     self.main_tabs.setCurrentIndex(i)
                     break
+
+    # ── Helpers: duel invite notification overlay ─────────────────────────────
+
+    def _duel_invite_notify_text(self, focused: int) -> str:
+        """Return the HTML message string for the duel invite notification.
+
+        Parameters
+        ----------
+        focused : int
+            ``0`` to visually highlight *Accept*, ``1`` to highlight *Decline*.
+        """
+        state = getattr(self, "_duel_invite_notify_state", None)
+        if state is None:
+            return ""
+        opponent  = _html_escape(state.get("opponent",   "?"))
+        table     = _html_escape(state.get("table_name", "?"))
+        if focused == 0:
+            accept_part  = "<b>[✅ Accept]</b>"
+            decline_part = "Decline"
+        else:
+            accept_part  = "Accept"
+            decline_part = "<b>[❌ Decline]</b>"
+        return (
+            f"⚔️ Duel von <b>{opponent}</b> — Tisch: <b>{table}</b><br>"
+            f"{accept_part} / {decline_part}"
+        )
+
+    def _duel_invite_notify_update(self) -> None:
+        """Refresh the notification overlay text to reflect the current focus."""
+        state = getattr(self, "_duel_invite_notify_state", None)
+        if state is None:
+            return
+        try:
+            msg = self._duel_invite_notify_text(state.get("focused", 0))
+            self._get_mini_overlay().update_message(msg, "#FF7F00")
+        except Exception:
+            pass
+
+    def _duel_invite_notify_confirm(self) -> None:
+        """Execute the focused option (Accept or Decline) and clear state."""
+        state = getattr(self, "_duel_invite_notify_state", None)
+        if state is None:
+            return
+        duel_id = state.get("duel_id")
+        focused = state.get("focused", 0)
+        # Clear state and hide the overlay before acting.
+        self._duel_invite_notify_cancel()
+        try:
+            self._get_mini_overlay().hide()
+        except Exception:
+            pass
+        if focused == 0:
+            try:
+                self._on_inbox_accept(duel_id)
+            except Exception:
+                pass
+        else:
+            try:
+                self._on_inbox_decline(duel_id)
+            except Exception:
+                pass
+
+    def _duel_invite_notify_cancel(self) -> None:
+        """Clear the duel invite notification state (no auto-decline)."""
+        try:
+            timer = getattr(self, "_duel_invite_notify_timer", None)
+            if timer is not None:
+                timer.stop()
+                self._duel_invite_notify_timer = None
+        except Exception:
+            pass
+        self._duel_invite_notify_state = None
 
     def _on_duel_invitation_timeout(self) -> None:
         """Legacy no-op: countdown timer removed. Kept to avoid AttributeError."""
