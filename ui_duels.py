@@ -13,7 +13,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QComboBox, QCompleter, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QFrame, QTabWidget,
+    QHeaderView, QFrame, QTabWidget, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
@@ -445,6 +445,21 @@ class DuelsMixin:
         )
         self._tbl_duel_history.setMinimumHeight(120)
         lay_history.addWidget(self._tbl_duel_history)
+
+        row_clear_history = QHBoxLayout()
+        row_clear_history.addStretch(1)
+        self._btn_clear_duel_history = QPushButton("🗑️ Clear History")
+        self._btn_clear_duel_history.setToolTip("Delete all completed duel history entries")
+        self._btn_clear_duel_history.setFixedHeight(28)
+        self._btn_clear_duel_history.setStyleSheet(
+            "QPushButton { background-color:#2a0000; color:#FF4444; border:1px solid #FF4444;"
+            " border-radius:5px; padding:0 14px; font-weight:bold; }"
+            "QPushButton:hover { background-color:#4a0000; }"
+        )
+        self._btn_clear_duel_history.clicked.connect(self._on_clear_duel_history)
+        row_clear_history.addWidget(self._btn_clear_duel_history)
+        lay_history.addLayout(row_clear_history)
+
         layout.addWidget(grp_history)
 
         # ── e) Bottom (Duel Rules + Help) ─────────────────────────────────────
@@ -1676,6 +1691,22 @@ class DuelsMixin:
             else:
                 dt = "—"
             tbl.setItem(row, 5, QTableWidgetItem(dt))
+
+    def _on_clear_duel_history(self) -> None:
+        """Ask for confirmation then wipe all completed duel history entries."""
+        reply = QMessageBox.question(
+            self,
+            "Clear Duel History",
+            "Are you sure you want to delete all duel history entries? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        self._duel_engine.clear_history()
+        self._refresh_duel_history()
+        self._lbl_duel_status.setText("✅ Duel history cleared.")
+        self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
 
     # ── Session-started hook: detect active duel ──────────────────────────────
 

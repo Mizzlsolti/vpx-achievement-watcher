@@ -729,6 +729,12 @@ class DuelEngine:
         """Return a copy of the completed duel history list (newest first)."""
         return list(reversed(self._history))
 
+    def clear_history(self) -> None:
+        """Remove all entries from the duel history."""
+        self._history.clear()
+        self._save_history()
+        log(self._cfg, "[DUEL] Duel history cleared.")
+
     def validate_table(self, table_rom: str, maps_cache: list = None) -> bool:
         """Check whether a table ROM is available in the local maps cache.
 
