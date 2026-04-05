@@ -324,10 +324,10 @@ class DuelsMixin:
         lay_inbox.addWidget(self._tbl_duel_inbox)
 
         # ── Do-Not-Disturb checkbox ──────────────────────────────────────────
-        self._chk_duel_dnd = QCheckBox("🔕 Keine Duelle empfangen (Do Not Disturb)")
+        self._chk_duel_dnd = QCheckBox("🔕 Do Not Disturb (No Duels Received)")
         self._chk_duel_dnd.setToolTip(
-            "Wenn aktiviert, werden keine neuen Duell-Einladungen empfangen.\n"
-            "Bereits laufende Duelle sind davon nicht betroffen."
+            "When enabled, no new duel invitations will be received.\n"
+            "Already active duels are not affected."
         )
         self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)))
         self._chk_duel_dnd.setStyleSheet(
@@ -1157,7 +1157,7 @@ class DuelsMixin:
             accept_part  = "Accept"
             decline_part = "<b>[❌ Decline]</b>"
         return (
-            f"⚔️ Duel von <b>{opponent}</b> — Tisch: <b>{table}</b><br>"
+            f"⚔️ Duel from <b>{opponent}</b> — Table: <b>{table}</b><br>"
             f"{accept_part} / {decline_part}"
         )
 
@@ -1784,7 +1784,7 @@ class DuelsMixin:
         my_id = self.cfg.OVERLAY.get("player_id", "").strip()
         is_challenger = (duel.challenger == my_id)
         opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
-        msg = f"⚔️ Duel aktiv gegen {opponent_name}!"
+        msg = f"⚔️ Duel active against {opponent_name}!"
         try:
             self._get_mini_overlay().show_info(msg, seconds=6, color_hex="#FF7F00")
         except Exception:
