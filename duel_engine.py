@@ -371,6 +371,8 @@ class DuelEngine:
         my_id = self._my_player_id()
         if not my_id or not self._cfg.CLOUD_ENABLED:
             return []
+        if bool(self._cfg.OVERLAY.get("duels_do_not_disturb", True)):
+            return []
 
         try:
             all_duels = CloudSync.fetch_node(self._cfg, "duels")
