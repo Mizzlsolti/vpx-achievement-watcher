@@ -1651,17 +1651,11 @@ def draw_orbit_loop(p: QPainter, widget) -> None:
 def draw_solenoid_buzz(p: QPainter, widget) -> None:
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    tw = widget._tw
-    th = widget._th
-    pad = widget._pad
-    cx = tw // 2 + pad
-    cy = th // 2 + int(th * 0.20) + pad
+    cx, cy, tw, th, pad = _steely_center(widget)
     t = widget._passive_t
-    extra_x = widget._passive_extra_x
-    extra_y = widget._passive_extra_y
-
-    sol_x = cx + int(tw * 0.32) + int(extra_x)
-    sol_y = cy + int(th * 0.10) + int(extra_y)
+    # cx/cy from _steely_center already include passive_extra_x/y — no extra offset needed
+    sol_x = cx + int(tw * 0.32)
+    sol_y = cy + int(th * 0.10)
     sol_w = max(10, tw // 7)
     sol_h = max(8, th // 8)
 
