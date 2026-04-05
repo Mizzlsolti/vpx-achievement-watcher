@@ -14,8 +14,8 @@ import random
 
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import (
-    QColor, QConicalGradient, QFont, QLinearGradient, QPainter, QPainterPath,
-    QPen, QRadialGradient,
+    QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen,
+    QRadialGradient,
 )
 
 # ---------------------------------------------------------------------------
@@ -151,85 +151,31 @@ def draw_reading(p: QPainter, widget) -> None:
     bw = int(tw * 0.28)
     bh = int(th * 0.22)
 
-    # Drop shadow under whole book
-    p.setOpacity(0.28)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 0, 60))
-    p.drawRoundedRect(bx - bw + 3, by + 3, bw * 2 + 2, bh + 2, 3, 3)
-    p.setOpacity(1.0)
-
-    # Spine gradient (leather look)
-    spine_w = max(3, bw // 8)
-    spine_grad = QLinearGradient(float(bx - spine_w), 0.0, float(bx + spine_w), 0.0)
-    spine_grad.setColorAt(0.00, QColor(0x40, 0x22, 0x08))
-    spine_grad.setColorAt(0.25, QColor(0x70, 0x42, 0x18))
-    spine_grad.setColorAt(0.50, QColor(0x90, 0x5A, 0x28))
-    spine_grad.setColorAt(0.75, QColor(0x60, 0x38, 0x14))
-    spine_grad.setColorAt(1.00, QColor(0x38, 0x1C, 0x06))
-    p.setPen(QPen(QColor(40, 20, 5), 1))
-    p.setBrush(spine_grad)
-    p.drawRect(bx - spine_w, by, spine_w * 2, bh)
-
-    # Left page — warm paper gradient
-    l_grad = QLinearGradient(float(bx - bw), 0.0, float(bx), 0.0)
-    l_grad.setColorAt(0.00, QColor(0xD8, 0xD0, 0xB8))
-    l_grad.setColorAt(0.20, QColor(0xE8, 0xE2, 0xCC))
-    l_grad.setColorAt(0.50, QColor(0xF5, 0xF0, 0xDC))
-    l_grad.setColorAt(0.80, QColor(0xF0, 0xEB, 0xD5))
-    l_grad.setColorAt(1.00, QColor(0xE0, 0xD8, 0xC0))
-    path_l = QPainterPath()
-    path_l.moveTo(float(bx), float(by))
-    path_l.lineTo(float(bx - bw), float(by + int(bh * 0.05)))
-    path_l.lineTo(float(bx - bw), float(by + bh))
-    path_l.lineTo(float(bx), float(by + bh))
-    path_l.closeSubpath()
+    # Left page
     p.setPen(QPen(QColor(80, 50, 20), 1))
-    p.fillPath(path_l, l_grad)
+    p.setBrush(_BEIGE)
+    path_l = QPainterPath()
+    path_l.moveTo(float(bx),           float(by))
+    path_l.lineTo(float(bx - bw),      float(by + int(bh * 0.05)))
+    path_l.lineTo(float(bx - bw),      float(by + bh))
+    path_l.lineTo(float(bx),           float(by + bh))
+    path_l.closeSubpath()
+    p.fillPath(path_l, _BEIGE)
     p.drawPath(path_l)
 
-    # Right page — slightly cooler paper
-    r_grad = QLinearGradient(float(bx), 0.0, float(bx + bw), 0.0)
-    r_grad.setColorAt(0.00, QColor(0xE0, 0xD8, 0xC0))
-    r_grad.setColorAt(0.20, QColor(0xEE, 0xE8, 0xD2))
-    r_grad.setColorAt(0.50, QColor(0xF5, 0xF2, 0xE0))
-    r_grad.setColorAt(0.80, QColor(0xE8, 0xE2, 0xCC))
-    r_grad.setColorAt(1.00, QColor(0xD8, 0xD0, 0xB8))
+    # Right page
     path_r = QPainterPath()
-    path_r.moveTo(float(bx), float(by))
-    path_r.lineTo(float(bx + bw), float(by + int(bh * 0.05)))
-    path_r.lineTo(float(bx + bw), float(by + bh))
-    path_r.lineTo(float(bx), float(by + bh))
+    path_r.moveTo(float(bx),           float(by))
+    path_r.lineTo(float(bx + bw),      float(by + int(bh * 0.05)))
+    path_r.lineTo(float(bx + bw),      float(by + bh))
+    path_r.lineTo(float(bx),           float(by + bh))
     path_r.closeSubpath()
-    p.fillPath(path_r, r_grad)
+    p.fillPath(path_r, QColor(0xF0, 0xEB, 0xD5))
     p.drawPath(path_r)
 
-    # Environment reflection on pages
-    env = QLinearGradient(float(bx - bw), float(by), float(bx + bw * 0.6), float(by + bh * 0.6))
-    env.setColorAt(0.0, QColor(255, 255, 255, 0))
-    env.setColorAt(0.4, QColor(255, 255, 255, 30))
-    env.setColorAt(0.6, QColor(255, 255, 255, 30))
-    env.setColorAt(1.0, QColor(255, 255, 255, 0))
-    p.setBrush(env)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.fillPath(path_r, env)
-
-    # Page lines on left
-    p.setPen(QPen(QColor(180, 160, 120, 120), 1))
-    for i in range(4):
-        ly = by + int(bh * 0.20) + i * int(bh * 0.17)
-        p.drawLine(bx - bw + 6, ly, bx - 6, ly)
-    # Page lines on right
-    for i in range(4):
-        ly = by + int(bh * 0.20) + i * int(bh * 0.17)
-        p.drawLine(bx + 6, ly, bx + bw - 6, ly)
-
-    # Bevel on book edges
-    p.setPen(QPen(QColor(255, 255, 255, 70), 1))
-    p.drawLine(bx - bw, by + int(bh * 0.05), bx - bw, by + bh)
-    p.drawLine(bx - bw, by + int(bh * 0.05), bx, by)
-    p.setPen(QPen(QColor(0, 0, 0, 60), 1))
-    p.drawLine(bx - bw, by + bh, bx + bw, by + bh)
-    p.drawLine(bx + bw, by + int(bh * 0.05), bx + bw, by + bh)
+    # Spine line
+    p.setPen(QPen(QColor(80, 50, 20), 2))
+    p.drawLine(bx, by, bx, by + bh)
 
     # Page-turn animation
     if t % 3.0 < 0.2:
@@ -250,52 +196,16 @@ def draw_clipboard_check(p: QPainter, widget) -> None:
     bw = int(tw * 0.24)
     bh = int(th * 0.35)
 
-    # Drop shadow
-    p.setOpacity(0.25)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 0, 60))
-    p.drawRoundedRect(bx + 3, by + 3, bw, bh, 3, 3)
-    p.setOpacity(1.0)
-
-    # Board with wood-grain gradient (5 stops)
-    board_grad = QLinearGradient(float(bx), 0.0, float(bx + bw), 0.0)
-    board_grad.setColorAt(0.00, QColor(0xA0, 0x70, 0x38))
-    board_grad.setColorAt(0.25, QColor(0xC8, 0x96, 0x50))
-    board_grad.setColorAt(0.50, QColor(0xD8, 0xAA, 0x64))
-    board_grad.setColorAt(0.75, QColor(0xC0, 0x8A, 0x48))
-    board_grad.setColorAt(1.00, QColor(0x98, 0x68, 0x30))
+    # Board
     p.setPen(QPen(_BROWN, 2))
-    p.setBrush(board_grad)
+    p.setBrush(_TAN)
     p.drawRoundedRect(bx, by, bw, bh, 3, 3)
 
-    # Bevel on board
-    p.setPen(QPen(QColor(255, 255, 255, 70), 1))
-    p.drawLine(bx, by, bx + bw, by)
-    p.drawLine(bx, by, bx, by + bh)
-    p.setPen(QPen(QColor(0, 0, 0, 70), 1))
-    p.drawLine(bx, by + bh, bx + bw, by + bh)
-    p.drawLine(bx + bw, by, bx + bw, by + bh)
-
-    # Metal clip with QConicalGradient + specular
+    # Clip
+    p.setBrush(QColor(0x80, 0x80, 0x80))
+    p.setPen(QPen(QColor(0x50, 0x50, 0x50), 1))
     clip_w = max(4, bw // 3)
     clip_x = bx + (bw - clip_w) // 2
-    clip_cx = clip_x + clip_w // 2
-    clip_cy = by - 1
-    cg = QConicalGradient(float(clip_cx), float(clip_cy), 0.0)
-    cg.setColorAt(0.00, QColor(0xC0, 0xC8, 0xD8))
-    cg.setColorAt(0.25, QColor(0xFF, 0xFF, 0xFF))
-    cg.setColorAt(0.50, QColor(0x80, 0x88, 0x98))
-    cg.setColorAt(0.75, QColor(0xE0, 0xE0, 0xE8))
-    cg.setColorAt(1.00, QColor(0xC0, 0xC8, 0xD8))
-    p.setPen(QPen(QColor(0x50, 0x50, 0x50), 1))
-    p.setBrush(cg)
-    p.drawRoundedRect(clip_x, by - 4, clip_w, 8, 2, 2)
-    # Specular highlight on clip
-    spec = QRadialGradient(float(clip_x + clip_w // 4), float(by - 3), float(clip_w * 0.3))
-    spec.setColorAt(0.0, QColor(255, 255, 255, 160))
-    spec.setColorAt(1.0, QColor(255, 255, 255, 0))
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(spec)
     p.drawRoundedRect(clip_x, by - 4, clip_w, 8, 2, 2)
 
     # Lines and checkmarks
@@ -309,16 +219,6 @@ def draw_clipboard_check(p: QPainter, widget) -> None:
             p.setPen(QPen(check_color, 2))
             p.drawLine(line_x, ly + 4, line_x + 3, ly + 8)
             p.drawLine(line_x + 3, ly + 8, line_x + 8, ly)
-
-    # Environment reflection stripe
-    env = QLinearGradient(float(bx), float(by), float(bx + bw * 0.7), float(by + bh * 0.7))
-    env.setColorAt(0.0, QColor(255, 255, 255, 0))
-    env.setColorAt(0.4, QColor(255, 255, 255, 28))
-    env.setColorAt(0.6, QColor(255, 255, 255, 28))
-    env.setColorAt(1.0, QColor(255, 255, 255, 0))
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(env)
-    p.drawRoundedRect(bx, by, bw, bh, 3, 3)
     p.restore()
 
 
@@ -328,46 +228,20 @@ def draw_thinking(p: QPainter, widget) -> None:
     cx, cy, tw, th, pad = _trophy_center(widget)
     t = widget._passive_t
 
+    # Small rising circles
     bubble_cx = cx + int(tw * 0.25)
     bubble_cy = cy - int(th * 0.30)
+    p.setPen(QPen(QColor(180, 210, 240), 1))
+    p.setBrush(QColor(240, 248, 255, 200))
+    for i, (ox, oy, r) in enumerate([(0, 18, 4), (5, 10, 6), (12, 0, 10)]):
+        p.drawEllipse(bubble_cx + ox - r, bubble_cy + oy - r, r * 2, r * 2)
 
-    # Shadow under thought cloud
-    p.setOpacity(0.20)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 0, 50))
+    # Main oval cloud
     cw, ch = int(tw * 0.30), int(th * 0.18)
     cloud_x = bubble_cx - cw // 2 + 12
     cloud_y = bubble_cy - ch // 2
-    p.drawEllipse(cloud_x + 3, cloud_y + 4, cw, ch)
-    p.setOpacity(1.0)
-
-    # Small rising circles with QRadialGradient shading
-    for i, (ox, oy, r) in enumerate([(0, 18, 4), (5, 10, 6), (12, 0, 10)]):
-        bcx = bubble_cx + ox
-        bcy = bubble_cy + oy
-        bg = QRadialGradient(float(bcx - r // 3), float(bcy - r // 3), float(r * 1.0))
-        bg.setColorAt(0.0, QColor(255, 255, 255, 220))
-        bg.setColorAt(0.5, QColor(220, 238, 255, 190))
-        bg.setColorAt(1.0, QColor(180, 210, 240, 100))
-        p.setPen(QPen(QColor(160, 200, 240), 1))
-        p.setBrush(bg)
-        p.drawEllipse(bcx - r, bcy - r, r * 2, r * 2)
-
-    # Main oval cloud with gradient
-    cloud_grad = QRadialGradient(float(cloud_x + cw // 3), float(cloud_y + ch // 3), float(max(cw, ch) * 0.7))
-    cloud_grad.setColorAt(0.0, QColor(255, 255, 255, 240))
-    cloud_grad.setColorAt(0.5, QColor(235, 246, 255, 210))
-    cloud_grad.setColorAt(1.0, QColor(190, 220, 248, 150))
-    p.setBrush(cloud_grad)
+    p.setBrush(QColor(240, 248, 255, 220))
     p.setPen(QPen(QColor(160, 200, 240), 1))
-    p.drawEllipse(cloud_x, cloud_y, cw, ch)
-
-    # Inner glow
-    inner_glow = QRadialGradient(float(cloud_x + cw // 3), float(cloud_y + ch // 3), float(cw * 0.3))
-    inner_glow.setColorAt(0.0, QColor(200, 230, 255, 60))
-    inner_glow.setColorAt(1.0, QColor(200, 230, 255, 0))
-    p.setBrush(inner_glow)
-    p.setPen(Qt.PenStyle.NoPen)
     p.drawEllipse(cloud_x, cloud_y, cw, ch)
 
     # Content inside cloud
@@ -392,67 +266,29 @@ def draw_chart_analysis(p: QPainter, widget) -> None:
     chart_w = int(tw * 0.30)
     chart_h = int(th * 0.28)
 
-    # Drop shadow
-    p.setOpacity(0.25)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 0, 60))
-    p.drawRect(chart_x + 3, chart_y + 3, chart_w, chart_h)
-    p.setOpacity(1.0)
-
-    # Background with subtle gradient
-    bg_grad = QLinearGradient(float(chart_x), float(chart_y), float(chart_x), float(chart_y + chart_h))
-    bg_grad.setColorAt(0.0, QColor(248, 250, 255))
-    bg_grad.setColorAt(0.5, QColor(240, 242, 250))
-    bg_grad.setColorAt(1.0, QColor(228, 232, 244))
+    # Background
     p.setPen(QPen(QColor(180, 180, 190), 1))
-    p.setBrush(bg_grad)
+    p.setBrush(QColor(240, 242, 248))
     p.drawRect(chart_x, chart_y, chart_w, chart_h)
-
-    # Bevel frame
-    p.setPen(QPen(QColor(255, 255, 255, 80), 1))
-    p.drawLine(chart_x, chart_y, chart_x + chart_w, chart_y)
-    p.drawLine(chart_x, chart_y, chart_x, chart_y + chart_h)
-    p.setPen(QPen(QColor(0, 0, 0, 60), 1))
-    p.drawLine(chart_x, chart_y + chart_h, chart_x + chart_w, chart_y + chart_h)
-    p.drawLine(chart_x + chart_w, chart_y, chart_x + chart_w, chart_y + chart_h)
 
     # Axes
     p.setPen(QPen(QColor(80, 80, 100), 1))
     p.drawLine(chart_x + 4, chart_y + chart_h - 4, chart_x + chart_w - 2, chart_y + chart_h - 4)
     p.drawLine(chart_x + 4, chart_y + 2, chart_x + 4, chart_y + chart_h - 4)
 
-    # Bars with glossy gradient (highlight on top)
+    # Bars
     bar_heights = [0.45, 0.70, 0.55, 0.85]
-    bar_colors = [
-        (0x1A, 0x3A, 0x5C),
-        (0x22, 0x4A, 0x70),
-        (0x18, 0x38, 0x58),
-        (0x20, 0x48, 0x6C),
-    ]
     bar_count = len(bar_heights)
     bar_w = max(3, (chart_w - 10) // (bar_count * 2))
     grow = min(1.0, t / 2.0)
-    for i, (bh_ratio, (r, g, b)) in enumerate(zip(bar_heights, bar_colors)):
+    for i, bh_ratio in enumerate(bar_heights):
         target_h = int((chart_h - 8) * bh_ratio)
         actual_h = int(target_h * grow)
-        if actual_h <= 0:
-            continue
-        bxi = chart_x + 6 + i * (bar_w + 3)
-        byi = chart_y + chart_h - 4 - actual_h
-        bar_grad = QLinearGradient(float(bxi), float(byi), float(bxi), float(byi + actual_h))
-        bar_grad.setColorAt(0.0, QColor(min(255, r + 60), min(255, g + 60), min(255, b + 80)))
-        bar_grad.setColorAt(0.3, QColor(r + 20, g + 20, b + 30))
-        bar_grad.setColorAt(1.0, QColor(r, g, b))
-        p.setBrush(bar_grad)
+        bx = chart_x + 6 + i * (bar_w + 3)
+        by = chart_y + chart_h - 4 - actual_h
+        p.setBrush(_DARK_BLUE)
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawRect(bxi, byi, bar_w, actual_h)
-        # Glossy highlight on top portion
-        gloss = QLinearGradient(float(bxi), float(byi), float(bxi + bar_w), float(byi))
-        gloss.setColorAt(0.0, QColor(255, 255, 255, 50))
-        gloss.setColorAt(0.5, QColor(255, 255, 255, 90))
-        gloss.setColorAt(1.0, QColor(255, 255, 255, 20))
-        p.setBrush(gloss)
-        p.drawRect(bxi, byi, bar_w, max(2, actual_h // 3))
+        p.drawRect(bx, by, bar_w, actual_h)
     p.restore()
 
 
@@ -462,6 +298,7 @@ def draw_glasses_adjust(p: QPainter, widget) -> None:
     cx, cy, tw, th, pad = _trophy_center(widget)
     t = widget._passive_t
 
+    # Eye level approximate
     eye_y = cy - int(th * 0.26) + int(th * 0.12) + 4
     slide_down = 0
     if t % 4.0 < 0.8:
@@ -471,44 +308,13 @@ def draw_glasses_adjust(p: QPainter, widget) -> None:
     lens_sep = max(6, tw // 6)
     gy = eye_y + slide_down
 
-    # Drop shadow under glasses
-    p.setOpacity(0.20)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(0, 0, 0, 50))
-    p.drawEllipse(cx - lens_sep - lens_r + 2, gy - lens_r + 3, lens_r * 2, lens_r * 2)
-    p.drawEllipse(cx + lens_sep - lens_r + 2, gy - lens_r + 3, lens_r * 2, lens_r * 2)
-    p.setOpacity(1.0)
-
-    # Frame (dark acetate gradient)
-    p.setPen(QPen(QColor(30, 30, 30), 2))
-    for lx in (cx - lens_sep, cx + lens_sep):
-        frame_grad = QRadialGradient(float(lx - lens_r // 3), float(gy - lens_r // 3), float(lens_r * 1.2))
-        frame_grad.setColorAt(0.0, QColor(60, 60, 65))
-        frame_grad.setColorAt(0.7, QColor(35, 35, 40))
-        frame_grad.setColorAt(1.0, QColor(20, 20, 25))
-        p.setBrush(frame_grad)
-        p.drawEllipse(lx - lens_r, gy - lens_r, lens_r * 2, lens_r * 2)
-
-    # Lens glass gradient (convex look)
-    for lx in (cx - lens_sep, cx + lens_sep):
-        lens_grad = QRadialGradient(float(lx - lens_r // 3), float(gy - lens_r // 3), float(lens_r))
-        lens_grad.setColorAt(0.0, QColor(220, 240, 255, 120))
-        lens_grad.setColorAt(0.4, QColor(180, 215, 248, 70))
-        lens_grad.setColorAt(1.0, QColor(140, 190, 230, 30))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(lens_grad)
-        p.drawEllipse(lx - lens_r + 1, gy - lens_r + 1, lens_r * 2 - 2, lens_r * 2 - 2)
-        # Specular highlight
-        spec = QRadialGradient(float(lx - lens_r // 2), float(gy - lens_r // 2), float(lens_r * 0.4))
-        spec.setColorAt(0.0, QColor(255, 255, 255, 160))
-        spec.setColorAt(1.0, QColor(255, 255, 255, 0))
-        p.setBrush(spec)
-        p.drawEllipse(lx - lens_r + 1, gy - lens_r + 1, lens_r, lens_r)
-
-    # Bridge and temples
-    p.setPen(QPen(QColor(30, 30, 30), 2))
-    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.setPen(QPen(QColor(40, 40, 40), 2))
+    p.setBrush(QColor(200, 230, 255, 60))
+    p.drawEllipse(cx - lens_sep - lens_r, gy - lens_r, lens_r * 2, lens_r * 2)
+    p.drawEllipse(cx + lens_sep - lens_r, gy - lens_r, lens_r * 2, lens_r * 2)
+    # Bridge
     p.drawLine(cx - lens_sep + lens_r, gy, cx + lens_sep - lens_r, gy)
+    # Temples
     p.drawLine(cx - lens_sep - lens_r, gy, cx - lens_sep - lens_r - 6, gy - 2)
     p.drawLine(cx + lens_sep + lens_r, gy, cx + lens_sep + lens_r + 6, gy - 2)
     p.restore()
