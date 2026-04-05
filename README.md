@@ -162,6 +162,8 @@ Configure hotkeys and input bindings for the overlay and challenges. Supports ke
 
 The Achievement Watcher uses the following open-source projects and data sources:
 
+Thanks to this people:
+
 | Source | Repository |
 |--------|-----------|
 | **NVRAM Maps** by tomlogic | [pinmame-nvram-maps](https://github.com/tomlogic/pinmame-nvram-maps) |
@@ -170,4 +172,3 @@ The Achievement Watcher uses the following open-source projects and data sources
 | **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
 | **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |
 
-Many thanks to all contributors! 🙏
