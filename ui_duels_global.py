@@ -150,26 +150,22 @@ class GlobalDuelFeedWidget(QWidget):
             challenger_name = str(row_data.get("challenger_name", "?"))
             opponent_name   = str(row_data.get("opponent_name", "?"))
             table_name      = str(row_data.get("table_name", row_data.get("table_rom", "?")))
-            status          = str(row_data.get("status", ""))
             ch_score        = int(row_data.get("challenger_score", -1))
             op_score        = int(row_data.get("opponent_score", -1))
             completed_at    = float(row_data.get("completed_at", 0))
 
-            # Determine winner / result column
-            if status == DuelStatus.WON:
-                # challenger won
-                winner_name = challenger_name
-                if ch_score >= 0 and op_score >= 0:
+            # Determine winner / result column by comparing scores directly.
+            # The status field (WON/LOST) is relative to whoever last called
+            # submit_result() and is therefore unreliable for a global view.
+            # challenger_name, opponent_name, challenger_score and opponent_score
+            # are always stored correctly in the cloud.
+            if ch_score >= 0 and op_score >= 0:
+                if ch_score >= op_score:
+                    winner_name = challenger_name
                     score_text = f"{ch_score:,} vs {op_score:,}"
                 else:
-                    score_text = ""
-            elif status == DuelStatus.LOST:
-                # challenger lost → opponent won
-                winner_name = opponent_name
-                if op_score >= 0 and ch_score >= 0:
+                    winner_name = opponent_name
                     score_text = f"{op_score:,} vs {ch_score:,}"
-                else:
-                    score_text = ""
             else:
                 winner_name = ""
                 score_text = ""
