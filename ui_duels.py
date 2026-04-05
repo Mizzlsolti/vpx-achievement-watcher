@@ -13,7 +13,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QComboBox, QCompleter, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QFrame, QTabWidget, QMessageBox,
+    QHeaderView, QFrame, QTabWidget, QMessageBox, QCheckBox,
 )
 from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
