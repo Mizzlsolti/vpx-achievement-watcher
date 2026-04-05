@@ -338,7 +338,7 @@ class DuelsMixin:
             "When enabled, no new duel invitations will be received.\n"
             "Already active duels are not affected."
         )
-        self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)))
+        self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False)))
         self._chk_duel_dnd.setStyleSheet(
             "QCheckBox { color: #FF7F00; font-weight: bold; font-size: 10pt; padding: 4px; }"
         )
@@ -514,19 +514,25 @@ class DuelsMixin:
             self._fetch_duel_opponents()
 
         # ── Polling timers ───────────────────────────────────────────────────
-        # Poll for incoming invitations every 30 seconds (cloud only).
+        # Poll for incoming invitations every 15 seconds (cloud only).
         self._duel_poll_timer = QTimer(self)
-        self._duel_poll_timer.setInterval(30_000)
+        self._duel_poll_timer.setInterval(15_000)
         self._duel_poll_timer.timeout.connect(self._poll_duel_invitations)
-        dnd = bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True))
+        dnd = bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False))
         if getattr(self.cfg, "CLOUD_ENABLED", False) and not dnd:
             self._duel_poll_timer.start()
 
-        # Check duel expiry every 60 seconds.
+        # Check duel expiry every 30 seconds.
         self._duel_expiry_timer = QTimer(self)
-        self._duel_expiry_timer.setInterval(60_000)
+        self._duel_expiry_timer.setInterval(30_000)
         self._duel_expiry_timer.timeout.connect(self._check_duel_expiry)
         self._duel_expiry_timer.start()
+
+        # Periodic refresh of inbox and active duels tables every 15 seconds.
+        self._duel_refresh_timer = QTimer(self)
+        self._duel_refresh_timer.setInterval(15_000)
+        self._duel_refresh_timer.timeout.connect(self._periodic_duel_refresh)
+        self._duel_refresh_timer.start()
 
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
         self._duel_recheck_cooldown: dict = {}
@@ -988,6 +994,10 @@ class DuelsMixin:
         if not duel_id:
             return
 
+        if not hasattr(self, "_duel_invite_handled_ids"):
+            self._duel_invite_handled_ids = set()
+        self._duel_invite_handled_ids.add(duel_id)
+
         # Check VPX running — cannot accept while VPX is active.
         try:
             w = getattr(self, "watcher", None)
@@ -1048,6 +1058,9 @@ class DuelsMixin:
         """Decline an incoming duel invitation from the inbox table."""
         if not duel_id:
             return
+        if not hasattr(self, "_duel_invite_handled_ids"):
+            self._duel_invite_handled_ids = set()
+        self._duel_invite_handled_ids.add(duel_id)
         self._duel_engine.decline_duel(duel_id)
         self._refresh_invitation_inbox()
         self._refresh_active_duels()
@@ -1101,6 +1114,12 @@ class DuelsMixin:
         # Always refresh the inbox table so the new invitation is visible.
         self._refresh_invitation_inbox()
 
+        # Skip if this duel was already handled (accept/decline) to prevent double notification.
+        handled = getattr(self, "_duel_invite_handled_ids", set())
+        if duel_id in handled:
+            handled.discard(duel_id)
+            return
+
         gui_hidden = not self.isVisible() or self.isMinimized()
 
         if gui_hidden:
@@ -1123,19 +1142,12 @@ class DuelsMixin:
                 "focused":    0,
             }
 
-            # Show the notification overlay for 60 s (no auto-decline on timeout).
+            # Show the notification overlay with no auto-hide (stays until player acts).
             try:
                 msg = self._duel_invite_notify_text(0)
-                self._get_mini_overlay().show_info(msg, seconds=60, color_hex="#FF7F00")
+                self._get_mini_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
             except Exception:
                 pass
-
-            # Cleanup timer — clears state after 60 s but does NOT decline.
-            self._duel_invite_notify_timer = QTimer(self)
-            self._duel_invite_notify_timer.setSingleShot(True)
-            self._duel_invite_notify_timer.setInterval(60_000)
-            self._duel_invite_notify_timer.timeout.connect(self._duel_invite_notify_cancel)
-            self._duel_invite_notify_timer.start()
         else:
             # GUI is visible — switch to the Score Duels tab so the user notices.
             for i in range(self.main_tabs.count()):
@@ -1167,7 +1179,8 @@ class DuelsMixin:
             decline_part = "<b>[❌ Decline]</b>"
         return (
             f"⚔️ Duel from <b>{opponent}</b> — Table: <b>{table}</b><br>"
-            f"{accept_part} / {decline_part}"
+            f"{accept_part} / {decline_part}<br>"
+            f"<small>◀ Left = Accept  |  Right = Decline ▶</small>"
         )
 
     def _duel_invite_notify_update(self) -> None:
@@ -1351,7 +1364,7 @@ class DuelsMixin:
         called periodically by self._duel_poll_timer every 30 seconds when
         Cloud Sync is enabled.
         """
-        if bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)):
+        if bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False)):
             return
         import threading
         def _poll():
@@ -1423,6 +1436,16 @@ class DuelsMixin:
                         Q_ARG(int, 8),
                     )
         threading.Thread(target=_poll, daemon=True).start()
+
+    # ── Polling: periodic refresh ──────────────────────────────────────────────
+
+    @pyqtSlot()
+    def _periodic_duel_refresh(self) -> None:
+        try:
+            self._refresh_invitation_inbox()
+            self._refresh_active_duels()
+        except Exception:
+            pass
 
     # ── Polling: expiry check ──────────────────────────────────────────────────
 
@@ -1941,7 +1964,7 @@ class DuelsMixin:
                 # message shows even though VPX is no longer running.
                 waiting_msg = "⏳ Score submitted! Waiting for opponent's score..."
                 try:
-                    self._get_mini_overlay().show_info(waiting_msg, seconds=8, color_hex="#FF7F00")
+                    self._get_mini_overlay().show_info(waiting_msg, seconds=10, color_hex="#FF7F00")
                 except Exception:
                     pass
 
@@ -2001,6 +2024,17 @@ class DuelsMixin:
                 opp_score = duel.opponent_score if is_challenger else duel.challenger_score
                 try:
                     self.bridge.duel_result.emit(duel.duel_id, result, my_score, opp_score)
+                except Exception:
+                    pass
+                # Show result notification via MiniInfoOverlay (suppressed when VPX is running)
+                try:
+                    if result == "won":
+                        res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_color = "#00CC44"
+                    else:
+                        res_msg = f"💀 DUEL LOST. You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_color = "#CC2200"
+                    self._duel_notify(res_msg, res_color, seconds=10)
                 except Exception:
                     pass
                 self._refresh_active_duels()

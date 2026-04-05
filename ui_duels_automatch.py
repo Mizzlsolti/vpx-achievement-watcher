@@ -160,6 +160,7 @@ class AutoMatchWidget(QWidget):
         self._elapsed = 0
         self._btn_automatch.setEnabled(False)
         self._row_status.setVisible(True)
+        self._lbl_info.setText("0 players in queue • 0 shared tables")
         self._lbl_info.setVisible(True)
         self._update_countdown_label()
         self._poll_timer.start()
@@ -232,7 +233,7 @@ class AutoMatchWidget(QWidget):
         if not self._searching:
             return
         if result is None:
-            return  # error – keep searching
+            return  # error – keep searching, keep last info visible
         if "opponent_name" in result:
             # Match found!
             self._stop_search()
