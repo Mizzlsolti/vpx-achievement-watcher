@@ -3431,6 +3431,8 @@ class GUITrophie(QWidget):
         return time.time() < self._silenced_until
 
     def _show_comment(self, text: str, state: str = TALKING) -> None:
+        if not self.isVisible():
+            return
         if self._is_silenced():
             return
         self._dismiss_bubble()
@@ -4178,6 +4180,8 @@ class OverlayTrophie(QWidget):
         return time.time() < self._silenced_until
 
     def _show_comment(self, text: str, state: str = TALKING) -> None:
+        if not self.isVisible():
+            return
         if self._is_silenced():
             return
         self._dismiss_bubble()

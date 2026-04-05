@@ -368,9 +368,13 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
                 self._trophie_gui.show()
                 QTimer.singleShot(800, self._trophie_gui.greet)
+            else:
+                self._trophie_gui.hide()
             if self.cfg.OVERLAY.get("trophie_overlay_enabled", True):
                 self._trophie_overlay.show()
                 QTimer.singleShot(1200, self._trophie_overlay.greet)
+            else:
+                self._trophie_overlay.hide()
             # Enable zank/bicker system when both trophies are visible
             _TROPHIE_SHARED["gui_visible"] = (
                 bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)) and
@@ -2118,11 +2122,15 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         self.activateWindow()
         self.raise_()
         if getattr(self, "_trophie_gui", None):
-            QTimer.singleShot(400, self._trophie_gui.re_greet)
+            if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
+                QTimer.singleShot(400, self._trophie_gui.re_greet)
 
     def showEvent(self, event):
         super().showEvent(event)
-        _TROPHIE_SHARED["gui_visible"] = True
+        _TROPHIE_SHARED["gui_visible"] = (
+            bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)) and
+            bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True))
+        )
         try:
             if getattr(self, "_trophie_gui", None):
                 self._trophie_gui.update_position(self.centralWidget().size())

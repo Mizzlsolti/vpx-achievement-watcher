@@ -262,6 +262,7 @@ class SystemMixin:
             if enabled:
                 self._trophie_gui.show()
             else:
+                self._trophie_gui._dismiss_bubble()
                 self._trophie_gui.hide()
         except Exception:
             pass
@@ -276,6 +277,7 @@ class SystemMixin:
             if enabled:
                 self._trophie_overlay.show()
             else:
+                self._trophie_overlay._dismiss_bubble()
                 self._trophie_overlay.hide()
         except Exception:
             pass
