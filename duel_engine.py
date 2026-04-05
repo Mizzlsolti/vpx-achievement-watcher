@@ -769,6 +769,8 @@ class DuelEngine:
                         break
                 raw_name = romnames.get(table_rom) or table_rom
                 table_name = _strip_version_from_name(raw_name)
+                if "(" in table_name:
+                    table_name = table_name[:table_name.index("(")].strip()
             except Exception:
                 table_name = table_rom
             opponent_id   = entry.get("player_id", pid)
