@@ -569,6 +569,12 @@ _GUI_DUEL: dict[str, list[str]] = {
         "The arena is empty...",
         "Patience... they'll come.",
     ],
+    "gui_duel_aborted": [
+        "That doesn't count! Play the full game!",
+        "No quitting early in a duel!",
+        "Rage quit? The duel is void!",
+        "You gotta earn it! No shortcuts!",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -763,6 +769,12 @@ _OV_DUEL: dict[str, list[str]] = {
         "Nobody home... try again later!",
         "The arena is empty...",
         "Patience... they'll come.",
+    ],
+    "ov_duel_aborted": [
+        "That doesn't count! Play the full game!",
+        "No quitting early in a duel!",
+        "Rage quit? The duel is void!",
+        "You gotta earn it! No shortcuts!",
     ],
 }
 
@@ -3259,6 +3271,14 @@ class GUITrophie(QWidget):
         if options:
             self._show_comment_key("gui_automatch_timeout", random.choice(options), SAD)
 
+    def on_duel_aborted(self) -> None:
+        """React when a duel is aborted due to an invalid session."""
+        self._last_interaction = time.time()
+        self._draw.set_state(SAD)
+        options = _GUI_DUEL.get("gui_duel_aborted", [])
+        if options:
+            self._show_comment_key("gui_duel_aborted", random.choice(options), SAD)
+
     def _fire_tab_tip(self, tab_name: str) -> None:
         tab_map = {
             "dashboard":        "tab_dashboard",
@@ -3954,6 +3974,13 @@ class OverlayTrophie(QWidget):
         options = _OV_DUEL.get("ov_automatch_timeout", [])
         if options:
             self._show_comment_key("ov_automatch_timeout", random.choice(options), SAD)
+
+    def on_duel_aborted(self) -> None:
+        """React when a duel is aborted due to an invalid session."""
+        self._draw.set_state(SAD)
+        options = _OV_DUEL.get("ov_duel_aborted", [])
+        if options:
+            self._show_comment_key("ov_duel_aborted", random.choice(options), SAD)
 
     def on_heat_changed(self, heat_pct: int) -> None:
         self._last_game_ts = time.time()
