@@ -620,6 +620,13 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "• Tables must have a <b>VPS-ID</b> assigned for duels to work.<br>"
             "• Duels expire if not accepted or completed within the time limit.<br>"
             "• Cloud Sync must be enabled for duels to work."
+            "<br><br>"
+            "<b>🔀 Auto-Match</b><br>"
+            "• Press Auto-Match to join the matchmaking queue.<br>"
+            "• The system automatically finds an opponent with matching tables (shared VPS-IDs).<br>"
+            "• A random shared table is selected and a duel invitation is sent.<br>"
+            "• The opponent still needs to accept or decline the invitation.<br>"
+            "• Search times out after 5 minutes if no match is found.<br>"
         ),
         "appearance_overlay": (
             "<b>🖼 Overlay</b><br><br>"
