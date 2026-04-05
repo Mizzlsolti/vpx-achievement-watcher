@@ -743,7 +743,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
             "• <b>Challenge / Duel Action</b>: Bind a key or button to start or trigger a challenge or duel action.<br>"
-            "• <b>Challenge / Duel Left / Right</b>: Bind keys or buttons for left/right challenge and duel navigation. Also **accepts** duel invitations (Left) or **declines** duel invitations (Right) when a notification is showing.<br>"
+            "• <b>Challenge / Duel Left / Right</b>: Bind keys or buttons for left/right challenge and duel navigation. Also <b>accepts</b> duel invitations (Left) or <b>declines</b> duel invitations (Right) when a notification is showing.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
