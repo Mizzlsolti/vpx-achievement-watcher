@@ -742,8 +742,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "<b>🕹️ Controls</b><br><br>"
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Challenge / Duel Action</b>: Bind a key or button to start or trigger a challenge or duel action.<br>"
-            "• <b>Challenge / Duel Left / Right</b>: Bind keys or buttons for left/right challenge navigation and duel accept/decline (Left = Accept, Right = Decline).<br>"
+            "• <b>Challenge Action</b>: Bind a key or button to start or trigger a challenge.<br>"
+            "• <b>Challenge Left / Duel Accept</b> and <b>Challenge Right / Duel Decline</b>: Bind keys or buttons for left/right challenge navigation and duel accept/decline (Left = Accept, Right = Decline).<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
@@ -1049,7 +1049,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Challenge / Duel Action:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge Action:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
         lay_inputs.addWidget(QLabel("<b>Challenge Left / Duel Accept:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
         lay_inputs.addWidget(QLabel("<b>Challenge Right / Duel Decline:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
@@ -2049,8 +2049,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         _set_tip("cmb_toggle_src", "Choose whether to use a keyboard key or joystick button to show/hide the main overlay.")
         _set_tip("btn_bind_toggle", "Assign the hotkey used to show/hide the main stats overlay. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination (e.g. Ctrl+F9).")
         _set_tip("lbl_toggle_binding", "Currently assigned hotkey for the main overlay.")
-        _set_tip("cmb_ch_hotkey_src", "Input source for the challenge 'Action/Start' button.")
-        _set_tip("btn_ch_hotkey_bind", "Assign the hotkey used to start challenges or select options. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
+        _set_tip("cmb_ch_hotkey_src", "Input source for the Challenge Action button.")
+        _set_tip("btn_ch_hotkey_bind", "Assign the hotkey used to start challenges. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
         _set_tip("lbl_ch_hotkey_binding", "Currently assigned hotkey for challenge actions.")
         _set_tip("cmb_ch_left_src", "Input source for navigating left in Challenge and Duel menus.")
         _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left in Challenge and Duel menus. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
