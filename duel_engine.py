@@ -196,12 +196,15 @@ class DuelEngine:
             The newly created Duel on success.
         str
             An error-reason string on failure: ``"no_player_id"``,
-            ``"no_opponent"``, ``"duplicate"``, or ``"cloud_error"``.
+            ``"no_cloud"``, ``"no_opponent"``, ``"duplicate"``, or ``"cloud_error"``.
         """
         my_id = self._my_player_id()
         if not my_id:
             log(self._cfg, "[DUEL] send_invitation: player_id not configured.", "WARN")
             return "no_player_id"
+        if not getattr(self._cfg, "CLOUD_ENABLED", False):
+            log(self._cfg, "[DUEL] send_invitation: Cloud Sync is disabled.", "WARN")
+            return "no_cloud"
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
             return "no_opponent"
