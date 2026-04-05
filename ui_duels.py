@@ -1110,6 +1110,14 @@ class DuelsMixin:
                         msg = f"⏰ Your duel invitation on {duel.table_name or duel.table_rom} expired (not accepted)."
                         color = "#888888"
                     elif duel.status == DuelStatus.CANCELLED:
+                        # Reset duel-active flag on watcher regardless of game state so
+                        # achievements and challenges are unblocked after a cancel.
+                        try:
+                            w = getattr(self, "watcher", None)
+                            if w is not None and duel.table_rom.lower().strip() == (w.current_rom or "").lower().strip():
+                                w.duel_active_for_current_table = False
+                        except Exception:
+                            pass
                         msg = f"🚫 Your duel on {duel.table_name or duel.table_rom} was cancelled."
                         color = "#888888"
                     else:
@@ -1155,6 +1163,16 @@ class DuelsMixin:
 
         expired = self._duel_engine.check_expiry()
         if expired:
+            # Reset duel-active flag on watcher if any expired duel matches the
+            # current session ROM so achievements are unblocked after expiry.
+            try:
+                w = getattr(self, "watcher", None)
+                if w is not None:
+                    cur_rom = (w.current_rom or "").lower().strip()
+                    if cur_rom and any(d.table_rom.lower().strip() == cur_rom for d in expired):
+                        w.duel_active_for_current_table = False
+            except Exception:
+                pass
             self._refresh_invitation_inbox()
             self._refresh_active_duels()
             self._refresh_duel_history()
@@ -1426,6 +1444,52 @@ class DuelsMixin:
                 dt = "—"
             tbl.setItem(row, 5, QTableWidgetItem(dt))
 
+    # ── Session-started hook: detect active duel ──────────────────────────────
+
+    @pyqtSlot(str, str)
+    def _on_session_started_duels(self, rom: str, table_name: str) -> None:
+        """Called when VPX starts a game session.
+
+        Checks whether an ACCEPTED or ACTIVE duel exists for the current ROM.
+        If so, sets ``watcher.duel_active_for_current_table = True`` to block
+        achievements, challenges and the main overlay for this session, and
+        shows a brief in-game notification via MiniInfoOverlay.
+        """
+        if not rom:
+            return
+        rom_lower = rom.lower().strip()
+        try:
+            active = self._duel_engine.get_active_duels()
+        except Exception:
+            return
+
+        matching = [d for d in active
+                    if d.table_rom.lower().strip() == rom_lower
+                    and d.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE)]
+        if not matching:
+            return
+
+        # Flag the watcher so achievements/overlay are suppressed this session.
+        try:
+            w = getattr(self, "watcher", None)
+            if w is not None:
+                w.duel_active_for_current_table = True
+        except Exception:
+            pass
+
+        # Show in-game notification directly via MiniInfoOverlay, bypassing
+        # _duel_notify's VPX-running suppression — the point is to show it
+        # exactly when the game starts.
+        duel = matching[0]
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        is_challenger = (duel.challenger == my_id)
+        opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
+        msg = f"⚔️ Duel aktiv gegen {opponent_name}!"
+        try:
+            self._get_mini_overlay().show_info(msg, seconds=6, color_hex="#FF7F00")
+        except Exception:
+            pass
+
     # ── Session-ended hook: submit duel scores ─────────────────────────────────
 
     def _on_session_ended_duels(self, rom: str) -> None:
@@ -1481,6 +1545,21 @@ class DuelsMixin:
                     self._refresh_duel_history()
             except Exception:
                 pass
+
+        # If any duel is now ACTIVE (score submitted, waiting for opponent),
+        # schedule a fast re-check so the result overlay appears promptly.
+        try:
+            active_after = self._duel_engine.get_active_duels()
+            pending = [d for d in active_after
+                       if d.table_rom.lower().strip() == rom_lower
+                       and d.status == DuelStatus.ACTIVE]
+            if pending:
+                # Clear per-duel cooldown so the fast timer can proceed immediately.
+                for d in pending:
+                    self._duel_recheck_cooldown.pop(d.duel_id, None)
+                QTimer.singleShot(12_000, self._recheck_active_duel_scores)
+        except Exception:
+            pass
 
     # ── Re-check ACTIVE duel scores (race condition mitigation) ────────────────
 

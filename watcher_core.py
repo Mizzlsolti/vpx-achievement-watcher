@@ -2493,6 +2493,9 @@ class Watcher:
             if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] timed: ignored (no active game)", "WARN")
                 return
+            if getattr(self, "duel_active_for_current_table", False):
+                log(self.cfg, "[CHALLENGE] timed: blocked — duel active for current table", "WARN")
+                return
             ch = getattr(self, "challenge", {}) or {}
             if ch.get("active") and ch.get("kind") == "timed":
                 log(self.cfg, "[CHALLENGE] timed already active – ignored duplicate")
@@ -2685,6 +2688,9 @@ class Watcher:
             if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] flip: ignored (no active game)", "WARN")
                 return
+            if getattr(self, "duel_active_for_current_table", False):
+                log(self.cfg, "[CHALLENGE] flip: blocked — duel active for current table", "WARN")
+                return
 
             ch = getattr(self, "challenge", {}) or {}
             if ch.get("active"):
@@ -2771,6 +2777,9 @@ class Watcher:
         try:
             if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] heat: ignored (no active game)", "WARN")
+                return
+            if getattr(self, "duel_active_for_current_table", False):
+                log(self.cfg, "[CHALLENGE] heat: blocked — duel active for current table", "WARN")
                 return
 
             ch = getattr(self, "challenge", {}) or {}
@@ -4892,6 +4901,8 @@ class Watcher:
         self.start_time = time.time()
         self._custom_events_session_start = self.start_time
         self.game_active = True
+        self.duel_active_for_current_table = False  # UI will set True if an active duel matches
+        self.last_session_score = 0
         self.players.clear()
         self._toasted_titles = set()
 
@@ -5033,101 +5044,115 @@ class Watcher:
                     log(self.cfg, f"[CHALLENGE] result finalize failed: {e}", "WARN")
             else:
                 log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
-                try:
-                    self._export_summary(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
 
+                # Save the session score so the duel handler can submit it.
                 try:
-                    self.export_overlay_snapshot(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
+                    self.last_session_score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
+                except Exception:
+                    self.last_session_score = 0
 
-                # Fire the overlay signal immediately after the snapshot data is ready,
-                # before slow achievement persistence and cloud uploads.
-                try:
-                    if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
-                        if self.current_rom and self._has_any_map(self.current_rom):
-                            self.bridge.overlay_show.emit()
-                        elif not self.current_rom and self.current_table:
-                            # No-ROM table: show overlay if custom events are configured
-                            _custom_json = os.path.join(
-                                p_aweditor(self.cfg), f"{self.current_table}.custom.json"
-                            )
-                            if os.path.isfile(_custom_json):
+                # When a duel is active for this table, skip achievements, toasts, main
+                # overlay, and cloud uploads — only the duel score submission matters.
+                _duel_active = getattr(self, "duel_active_for_current_table", False)
+                if _duel_active:
+                    log(self.cfg, f"[DUEL] Active duel for {self.current_rom} — skipping achievements, main overlay and cloud upload")
+                else:
+                    try:
+                        self._export_summary(end_audits, duration_sec)
+                    except Exception as e:
+                        log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
+
+                    try:
+                        self.export_overlay_snapshot(end_audits, duration_sec)
+                    except Exception as e:
+                        log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
+
+                    # Fire the overlay signal immediately after the snapshot data is ready,
+                    # before slow achievement persistence and cloud uploads.
+                    try:
+                        if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
+                            if self.current_rom and self._has_any_map(self.current_rom):
                                 self.bridge.overlay_show.emit()
+                            elif not self.current_rom and self.current_table:
+                                # No-ROM table: show overlay if custom events are configured
+                                _custom_json = os.path.join(
+                                    p_aweditor(self.cfg), f"{self.current_table}.custom.json"
+                                )
+                                if os.path.isfile(_custom_json):
+                                    self.bridge.overlay_show.emit()
+                                else:
+                                    log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
                             else:
-                                log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
-                        else:
-                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
-                except Exception as e:
-                    log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
+                                log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
+                    except Exception as e:
+                        log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
-                try:
-                    self._persist_and_toast_achievements(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
-
-                if self.current_rom and self._has_any_map(self.current_rom):
                     try:
-                        s_rules = self._collect_player_rules_for_rom(self.current_rom)
-                        
-                        unique_achs = set()
-                        for r in s_rules:
-                            if isinstance(r, dict) and r.get("title"):
-                                unique_achs.add(str(r.get("title")).strip())
-                        total_achs = len(unique_achs)
-                        
-                        if total_achs > 0:
-                            state = self._ach_state_load()
+                        self._persist_and_toast_achievements(end_audits, duration_sec)
+                    except Exception as e:
+                        log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
+
+                    if self.current_rom and self._has_any_map(self.current_rom):
+                        try:
+                            s_rules = self._collect_player_rules_for_rom(self.current_rom)
                             
-                            unlocked_titles = set()
-                            for e in state.get("session", {}).get(self.current_rom, []):
-                                t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
-                                if t: unlocked_titles.add(t)
+                            unique_achs = set()
+                            for r in s_rules:
+                                if isinstance(r, dict) and r.get("title"):
+                                    unique_achs.add(str(r.get("title")).strip())
+                            total_achs = len(unique_achs)
+                            
+                            if total_achs > 0:
+                                state = self._ach_state_load()
                                 
-                            unlocked_total = len(unlocked_titles)
-                            _rom = self.current_rom
-                            _cfg = self.cfg
-                            _br = self.bridge
-                            from cloud_sync import CloudSync
-                            threading.Thread(
-                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br, _CS=CloudSync:
-                                    _CS.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
-                                daemon=True,
-                            ).start()
-                            # Retroactive upload: if this ROM now has a VPS-ID but was previously
-                            # blocked (progress_upload_log has no entry or a different vps_id),
-                            # the upload above will succeed this time. Record the vps_id used.
-                            try:
-                                from ui_vps import _load_vps_mapping
-                                _vps_mapping = _load_vps_mapping(self.cfg)
-                                _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
-                                if _vps_id:
-                                    _upload_log = _load_progress_upload_log(self.cfg)
-                                    _prev_vps_id = _upload_log.get(self.current_rom, "")
-                                    if _prev_vps_id != _vps_id:
-                                        _upload_log[self.current_rom] = _vps_id
-                                        _save_progress_upload_log(self.cfg, _upload_log)
-                                        log(self.cfg, f"[CLOUD] Progress upload log updated for {self.current_rom} -> vps_id={_vps_id}")
-                            except Exception as e:
-                                log(self.cfg, f"[CLOUD] Progress upload log update failed: {e}", "WARN")
-                    except Exception as e:
-                        log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
+                                unlocked_titles = set()
+                                for e in state.get("session", {}).get(self.current_rom, []):
+                                    t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
+                                    if t: unlocked_titles.add(t)
+                                    
+                                unlocked_total = len(unlocked_titles)
+                                _rom = self.current_rom
+                                _cfg = self.cfg
+                                _br = self.bridge
+                                from cloud_sync import CloudSync
+                                threading.Thread(
+                                    target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br, _CS=CloudSync:
+                                        _CS.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
+                                    daemon=True,
+                                ).start()
+                                # Retroactive upload: if this ROM now has a VPS-ID but was previously
+                                # blocked (progress_upload_log has no entry or a different vps_id),
+                                # the upload above will succeed this time. Record the vps_id used.
+                                try:
+                                    from ui_vps import _load_vps_mapping
+                                    _vps_mapping = _load_vps_mapping(self.cfg)
+                                    _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
+                                    if _vps_id:
+                                        _upload_log = _load_progress_upload_log(self.cfg)
+                                        _prev_vps_id = _upload_log.get(self.current_rom, "")
+                                        if _prev_vps_id != _vps_id:
+                                            _upload_log[self.current_rom] = _vps_id
+                                            _save_progress_upload_log(self.cfg, _upload_log)
+                                            log(self.cfg, f"[CLOUD] Progress upload log updated for {self.current_rom} -> vps_id={_vps_id}")
+                                except Exception as e:
+                                    log(self.cfg, f"[CLOUD] Progress upload log update failed: {e}", "WARN")
+                        except Exception as e:
+                            log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
-                # CAT upload: custom tables have no ROM; upload via cat_registry if approved
-                if not self.current_rom and self.current_table:
-                    try:
-                        from cat_registry import upload_cat_progress
-                        upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)
-                    except Exception as e:
-                        log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
+                    # CAT upload: custom tables have no ROM; upload via cat_registry if approved
+                    if not self.current_rom and self.current_table:
+                        try:
+                            from cat_registry import upload_cat_progress
+                            upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)
+                        except Exception as e:
+                            log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
 
         finally:
             self.current_table = None
             self.current_rom = None
             self.start_time = None
             self.game_active = False
+            self.duel_active_for_current_table = False
             self.start_audits = {}
             self.challenge = {} 
             self.players.clear()
