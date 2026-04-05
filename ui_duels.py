@@ -1361,7 +1361,7 @@ class DuelsMixin:
         GUI thread and refreshes the Active Duels table.  Also calls
         sync_active_duel_states() to detect when the challenger's pending duel
         has been accepted or declined by the opponent.  This method is
-        called periodically by self._duel_poll_timer every 30 seconds when
+        called periodically by self._duel_poll_timer every 15 seconds when
         Cloud Sync is enabled.
         """
         if bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False)):
@@ -2025,7 +2025,7 @@ class DuelsMixin:
                     self.bridge.duel_result.emit(duel.duel_id, result, my_score, opp_score)
                 except Exception:
                     pass
-                # Show result notification (only visible when VPX is closed, _duel_notify handles this)
+                # Show result notification (only visible when VPX is closed; _duel_notify handles this)
                 try:
                     if result == "won":
                         res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"
