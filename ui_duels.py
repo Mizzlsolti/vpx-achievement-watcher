@@ -532,7 +532,8 @@ class DuelsMixin:
         self._duel_refresh_timer = QTimer(self)
         self._duel_refresh_timer.setInterval(15_000)
         self._duel_refresh_timer.timeout.connect(self._periodic_duel_refresh)
-        self._duel_refresh_timer.start()
+        if getattr(self.cfg, "CLOUD_ENABLED", False):
+            self._duel_refresh_timer.start()
 
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
         self._duel_recheck_cooldown: dict = {}
@@ -993,6 +994,9 @@ class DuelsMixin:
         """
         if not duel_id:
             return
+        if not hasattr(self, "_duel_invite_handled_ids"):
+            self._duel_invite_handled_ids = set()
+        self._duel_invite_handled_ids.add(duel_id)
 
         if not hasattr(self, "_duel_invite_handled_ids"):
             self._duel_invite_handled_ids = set()
@@ -1361,7 +1365,7 @@ class DuelsMixin:
         GUI thread and refreshes the Active Duels table.  Also calls
         sync_active_duel_states() to detect when the challenger's pending duel
         has been accepted or declined by the opponent.  This method is
-        called periodically by self._duel_poll_timer every 30 seconds when
+        called periodically by self._duel_poll_timer every 15 seconds when
         Cloud Sync is enabled.
         """
         if bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False)):
@@ -1448,6 +1452,15 @@ class DuelsMixin:
             pass
 
     # ── Polling: expiry check ──────────────────────────────────────────────────
+
+    @pyqtSlot()
+    def _periodic_duel_refresh(self) -> None:
+        """Periodically refresh inbox and active duels tables (every 15 seconds)."""
+        try:
+            self._refresh_invitation_inbox()
+            self._refresh_active_duels()
+        except Exception:
+            pass
 
     def _check_duel_expiry(self) -> None:
         """Check for expired duels via the engine and refresh both tables.

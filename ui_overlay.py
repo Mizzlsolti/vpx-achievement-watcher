@@ -1921,10 +1921,14 @@ class MiniInfoOverlay(QWidget):
     def _compose_html(self) -> str:
         pt = getattr(self, "_body_pt", 20)
         fam = str(getattr(self, "_font_family", "Segoe UI")).replace("'", "").replace('"', "").replace(";", "").replace("<", "").replace(">", "")
+        if self._remaining > 0:
+            countdown = f"<br><span style='color:{self._hint};'>closing in {self._remaining}…</span>"
+        else:
+            countdown = ""
         return (
             f"<div style='font-size:{pt}pt;font-family:\"{fam}\";'>"
             f"<span style='color:{self._red};'>{self._base_msg}</span>"
-            f"<br><span style='color:{self._hint};'>closing in {self._remaining}…</span>"
+            f"{countdown}"
             f"</div>"
         )
 
@@ -2015,7 +2019,8 @@ class MiniInfoOverlay(QWidget):
 
     def show_info(self, message: str, seconds: int = 5, center: tuple[int, int] | None = None, color_hex: str | None = None):
         self._base_msg = str(message or "").strip()
-        self._remaining = max(1, int(seconds))
+        # seconds=0 means persistent (no auto-hide); positive values auto-hide after N seconds
+        self._remaining = max(1, int(seconds)) if int(seconds) > 0 else 0
         if color_hex:
             try:
                 self._red = color_hex
@@ -2024,7 +2029,8 @@ class MiniInfoOverlay(QWidget):
         self._last_center = self._primary_center()
         self._timer.stop()
         self._refresh_view()
-        self._timer.start()
+        if self._remaining > 0:
+            self._timer.start()
 
     def update_message(self, message: str, color_hex: str | None = None) -> None:
         """Update the displayed message without resetting the countdown timer.

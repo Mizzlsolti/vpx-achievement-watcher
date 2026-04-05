@@ -807,6 +807,10 @@ class ChallengesMixin:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
                 duel_id = state.get("duel_id")
+                # Mark as handled to prevent double notification (Fix 4)
+                if not hasattr(self, "_duel_invite_handled_ids"):
+                    self._duel_invite_handled_ids = set()
+                self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
                     self._get_mini_overlay().hide()
@@ -891,6 +895,10 @@ class ChallengesMixin:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
                 duel_id = state.get("duel_id")
+                # Mark as handled to prevent double notification (Fix 4)
+                if not hasattr(self, "_duel_invite_handled_ids"):
+                    self._duel_invite_handled_ids = set()
+                self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
                     self._get_mini_overlay().hide()

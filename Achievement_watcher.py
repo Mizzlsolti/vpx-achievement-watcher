@@ -609,9 +609,9 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "<b>🎯 My Duels</b><br>"
             "• <b>Start New Duel</b>: Search for a player by Name and select a table to challenge them.<br>"
             "• <b>Incoming Invitations</b>: When someone challenges you, the Score Duels tab switches automatically "
-            "(if the GUI is open). If the GUI is minimized, a notification overlay appears — press "
-            "<b>Left</b> to accept or <b>Right</b> to decline directly.<br>"
-            "• Invitations stay visible until you accept or decline.<br>"
+            "(if the GUI is open). If the GUI is minimized, a notification overlay appears — "
+            "press <b>Left</b> to accept or <b>Right</b> to decline directly.<br>"
+            "• Invitations stay visible until you accept or decline — they do not auto-hide.<br>"
             "• <b>Active Duels</b>: Shows all pending and in-progress duels with status indicators.<br>"
             "• <b>Duel History</b>: Browse your completed duels with results and scores.<br><br>"
             "<b>🌍 Global Feed</b><br>"
@@ -743,7 +743,7 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
             "• <b>Challenge / Duel Action</b>: Bind a key or button to start or trigger a challenge or duel action.<br>"
-            "• <b>Challenge / Duel Left / Right</b>: Bind keys or buttons for left/right challenge and duel navigation. Also <b>accepts</b> duel invitations (Left) or <b>declines</b> duel invitations (Right) when a notification is showing.<br>"
+            "• <b>Challenge / Duel Left / Right</b>: Bind keys or buttons for left/right challenge navigation and duel accept/decline (Left = Accept, Right = Decline).<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
@@ -1050,8 +1050,8 @@ class MainWindow(QMainWindow, CloudStatsMixin, AWEditorMixin, SystemMixin, Appea
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
         lay_inputs.addWidget(QLabel("<b>Challenge / Duel Action:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge / Duel Left:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge / Duel Right:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge Left / Duel Accept:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
+        lay_inputs.addWidget(QLabel("<b>Challenge Right / Duel Decline:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
 
         grp_voice = QGroupBox("Voice & Audio")
