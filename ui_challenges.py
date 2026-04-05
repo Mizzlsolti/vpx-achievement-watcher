@@ -684,8 +684,15 @@ class ChallengesMixin:
             pass
 
         if not self._in_game_now():
-            # If a duel invite overlay is visible, confirm the focused button instead
-            # of showing the "not in-game" error.
+            # If a duel invite notification is showing in the mini overlay, confirm
+            # the focused option instead of emitting the "not in-game" error.
+            try:
+                if getattr(self, "_duel_invite_notify_state", None) is not None:
+                    self._duel_invite_notify_confirm()
+                    return
+            except Exception:
+                pass
+            # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
             try:
                 overlay = getattr(self, "_duel_invite_overlay", None)
                 if overlay is not None and overlay.isVisible():
@@ -796,7 +803,17 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite overlay is visible, toggle focus between Accept/Decline.
+        # If a duel invite notification is showing in the mini overlay, navigate
+        # focus to Accept (left = move towards Accept).
+        try:
+            state = getattr(self, "_duel_invite_notify_state", None)
+            if state is not None:
+                state["focused"] = 0  # left → Accept
+                self._duel_invite_notify_update()
+                return
+        except Exception:
+            pass
+        # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
         try:
             overlay = getattr(self, "_duel_invite_overlay", None)
             if overlay is not None and overlay.isVisible():
@@ -863,7 +880,17 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite overlay is visible, toggle focus between Accept/Decline.
+        # If a duel invite notification is showing in the mini overlay, navigate
+        # focus to Decline (right = move towards Decline).
+        try:
+            state = getattr(self, "_duel_invite_notify_state", None)
+            if state is not None:
+                state["focused"] = 1  # right → Decline
+                self._duel_invite_notify_update()
+                return
+        except Exception:
+            pass
+        # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
         try:
             overlay = getattr(self, "_duel_invite_overlay", None)
             if overlay is not None and overlay.isVisible():

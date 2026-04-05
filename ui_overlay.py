@@ -2026,6 +2026,22 @@ class MiniInfoOverlay(QWidget):
         self._refresh_view()
         self._timer.start()
 
+    def update_message(self, message: str, color_hex: str | None = None) -> None:
+        """Update the displayed message without resetting the countdown timer.
+
+        Useful when the message content changes mid-display (e.g. toggling the
+        focused option in a duel invite) but the remaining time must not change.
+        Has no effect if the overlay is not currently visible.
+        """
+        self._base_msg = str(message or "").strip()
+        if color_hex:
+            try:
+                self._red = color_hex
+            except Exception:
+                pass
+        if self.isVisible():
+            self._refresh_view()
+
 def read_active_players(base_dir: str):
     ap_dir = os.path.join(base_dir, "session_stats", "Highlights", "activePlayers")
     if not os.path.isdir(ap_dir):
