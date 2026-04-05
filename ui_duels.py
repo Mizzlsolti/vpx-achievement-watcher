@@ -492,6 +492,10 @@ class DuelsMixin:
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
         self._duel_recheck_cooldown: dict = {}
 
+        # Duel session tracking: start timestamp and baseline score.
+        self._duel_session_start_ts: float = 0.0
+        self._duel_baseline_score: int = 0
+
         # Initial populate.
         self._refresh_invitation_inbox()
         self._refresh_active_duels()
@@ -1260,6 +1264,21 @@ class DuelsMixin:
             except Exception:
                 pass
 
+    def _notify_trophies_duel_aborted(self) -> None:
+        """Trigger duel-aborted reactions on both Trophie instances."""
+        try:
+            t = getattr(self, "_trophie_gui", None)
+            if t:
+                t.on_duel_aborted()
+        except Exception:
+            pass
+        try:
+            t = getattr(self, "_trophie_overlay", None)
+            if t:
+                t.on_duel_aborted()
+        except Exception:
+            pass
+
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
     def _poll_duel_invitations(self) -> None:
@@ -1759,18 +1778,7 @@ class DuelsMixin:
                 f"⚠️ Duel aborted: Session too short ({int(elapsed)}s). Minimum: {self._DUEL_MIN_PLAY_SECONDS}s.",
                 "#FFAA00", 8,
             )
-            try:
-                t = getattr(self, "_trophie_gui", None)
-                if t:
-                    t.on_duel_aborted()
-            except Exception:
-                pass
-            try:
-                t = getattr(self, "_trophie_overlay", None)
-                if t:
-                    t.on_duel_aborted()
-            except Exception:
-                pass
+            self._notify_trophies_duel_aborted()
             self._refresh_active_duels()
             return
 
@@ -1794,18 +1802,7 @@ class DuelsMixin:
                 except Exception:
                     pass
             self._duel_notify("⚠️ Duel aborted: No score improvement detected.", "#FFAA00", 8)
-            try:
-                t = getattr(self, "_trophie_gui", None)
-                if t:
-                    t.on_duel_aborted()
-            except Exception:
-                pass
-            try:
-                t = getattr(self, "_trophie_overlay", None)
-                if t:
-                    t.on_duel_aborted()
-            except Exception:
-                pass
+            self._notify_trophies_duel_aborted()
             self._refresh_active_duels()
             return
 
