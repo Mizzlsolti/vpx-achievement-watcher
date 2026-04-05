@@ -242,6 +242,7 @@ DEFAULT_OVERLAY.setdefault("pp_overlay_challenge", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_timer", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_heat", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_flip", False)
+DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", True)
 
 _ALLOWED_OVERLAY_KEYS = [
     "theme",
@@ -363,6 +364,7 @@ _ALLOWED_OVERLAY_KEYS = [
     # Per-overlay post-processing toggles
     "pp_overlay_main", "pp_overlay_toast", "pp_overlay_challenge",
     "pp_overlay_timer", "pp_overlay_heat", "pp_overlay_flip",
+    "duels_do_not_disturb",
 ]
 
 CHALLENGES_ENABLED = True

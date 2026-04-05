@@ -322,6 +322,20 @@ class DuelsMixin:
         )
         self._tbl_duel_inbox.setMinimumHeight(80)
         lay_inbox.addWidget(self._tbl_duel_inbox)
+
+        # ── Do-Not-Disturb checkbox ──────────────────────────────────────────
+        self._chk_duel_dnd = QCheckBox("🔕 Keine Duelle empfangen (Do Not Disturb)")
+        self._chk_duel_dnd.setToolTip(
+            "Wenn aktiviert, werden keine neuen Duell-Einladungen empfangen.\n"
+            "Bereits laufende Duelle sind davon nicht betroffen."
+        )
+        self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)))
+        self._chk_duel_dnd.setStyleSheet(
+            "QCheckBox { color: #FF7F00; font-weight: bold; font-size: 10pt; padding: 4px; }"
+        )
+        self._chk_duel_dnd.stateChanged.connect(self._on_duels_dnd_toggled)
+        layout.addWidget(self._chk_duel_dnd)
+
         layout.addWidget(grp_inbox)
 
         # ── b) Start New Duel ────────────────────────────────────────────────
@@ -495,7 +509,8 @@ class DuelsMixin:
         self._duel_poll_timer = QTimer(self)
         self._duel_poll_timer.setInterval(30_000)
         self._duel_poll_timer.timeout.connect(self._poll_duel_invitations)
-        if getattr(self.cfg, "CLOUD_ENABLED", False):
+        dnd = bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True))
+        if getattr(self.cfg, "CLOUD_ENABLED", False) and not dnd:
             self._duel_poll_timer.start()
 
         # Check duel expiry every 60 seconds.
@@ -1294,6 +1309,25 @@ class DuelsMixin:
         except Exception:
             pass
 
+    # ── Do-Not-Disturb handler ─────────────────────────────────────────────────
+
+    def _on_duels_dnd_toggled(self, state: int) -> None:
+        """Toggle Do-Not-Disturb for duel invitations."""
+        enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duels_do_not_disturb"] = bool(enabled)
+        self.cfg.save()
+        if enabled:
+            try:
+                self._duel_poll_timer.stop()
+            except Exception:
+                pass
+        else:
+            if getattr(self.cfg, "CLOUD_ENABLED", False):
+                try:
+                    self._duel_poll_timer.start()
+                except Exception:
+                    pass
+
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
     def _poll_duel_invitations(self) -> None:
@@ -1308,6 +1342,8 @@ class DuelsMixin:
         called periodically by self._duel_poll_timer every 30 seconds when
         Cloud Sync is enabled.
         """
+        if bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)):
+            return
         import threading
         def _poll():
             new_duels = self._duel_engine.receive_invitations()
