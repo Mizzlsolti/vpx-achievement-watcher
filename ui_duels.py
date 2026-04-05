@@ -384,6 +384,16 @@ class DuelsMixin:
 
         layout.addWidget(grp_new)
 
+        # ── b2) OR separator + Auto-Match ────────────────────────────────────
+        lbl_or = QLabel("── OR ──")
+        lbl_or.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_or.setStyleSheet("color:#555555; font-size:9pt; margin:4px 0;")
+        layout.addWidget(lbl_or)
+
+        from ui_duels_automatch import AutoMatchWidget
+        self._automatch_widget = AutoMatchWidget(self, self.cfg, self._duel_engine)
+        layout.addWidget(self._automatch_widget)
+
         # ── c) Active Duels ──────────────────────────────────────────────────
         grp_active = QGroupBox("🔵 Active Duels")
         lay_active = QVBoxLayout(grp_active)
@@ -562,7 +572,14 @@ class DuelsMixin:
             "🏆 SCORING\n"
             "• Both players play the table independently\n"
             "• Scores are submitted and compared via the cloud\n"
-            "• Highest score wins the duel"
+            "• Highest score wins the duel\n\n"
+            "🔀 AUTO-MATCH\n"
+            "• Press Auto-Match to join the matchmaking queue\n"
+            "• You are matched with players who share at least one table (by VPS-ID)\n"
+            "• A random shared table is automatically selected\n"
+            "• The matched opponent must still accept the invitation\n"
+            "• Search times out after 5 minutes\n"
+            "• Cloud Sync must be enabled\n\n"
         )
         box = QMessageBox(self)
         box.setWindowTitle("📜 Score Duel Rules")

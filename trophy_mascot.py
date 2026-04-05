@@ -554,6 +554,21 @@ _GUI_DUEL: dict[str, list[str]] = {
         "Duel expired. Onwards to the next challenge!",
         "Too slow! The invite window closed.",
     ],
+    "gui_automatch_started": [
+        "Looking for trouble, huh?",
+        "Let's find you a worthy opponent!",
+        "The arena awaits!",
+    ],
+    "gui_automatch_found": [
+        "Found one! Game on!",
+        "A challenger appears!",
+        "Match made! Time to duel!",
+    ],
+    "gui_automatch_timeout": [
+        "Nobody home... try again later!",
+        "The arena is empty...",
+        "Patience... they'll come.",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -733,6 +748,21 @@ _OV_DUEL: dict[str, list[str]] = {
         "Too slow! That duel just expired!",
         "Duel expired. The clock waits for nobody!",
         "That invite timed out. Watch for the next one!",
+    ],
+    "ov_automatch_started": [
+        "Looking for trouble, huh?",
+        "Let's find you a worthy opponent!",
+        "The arena awaits!",
+    ],
+    "ov_automatch_found": [
+        "Found one! Game on!",
+        "A challenger appears!",
+        "Match made! Time to duel!",
+    ],
+    "ov_automatch_timeout": [
+        "Nobody home... try again later!",
+        "The arena is empty...",
+        "Patience... they'll come.",
     ],
 }
 
@@ -3206,6 +3236,29 @@ class GUITrophie(QWidget):
         if options:
             self._show_comment_key("gui_duel_expired", random.choice(options), IDLE)
 
+    def on_automatch_started(self) -> None:
+        """React when the player starts an Auto-Match search."""
+        self._last_interaction = time.time()
+        self._draw.set_state(SURPRISED)
+        options = _GUI_DUEL.get("gui_automatch_started", [])
+        if options:
+            self._show_comment_key("gui_automatch_started", random.choice(options), SURPRISED)
+
+    def on_automatch_found(self) -> None:
+        """React when an Auto-Match opponent is found."""
+        self._last_interaction = time.time()
+        self._draw.set_state(HAPPY)
+        options = _GUI_DUEL.get("gui_automatch_found", [])
+        if options:
+            self._show_comment_key("gui_automatch_found", random.choice(options), HAPPY)
+
+    def on_automatch_timeout(self) -> None:
+        """React when the Auto-Match search times out without finding an opponent."""
+        self._draw.set_state(SAD)
+        options = _GUI_DUEL.get("gui_automatch_timeout", [])
+        if options:
+            self._show_comment_key("gui_automatch_timeout", random.choice(options), SAD)
+
     def _fire_tab_tip(self, tab_name: str) -> None:
         tab_map = {
             "dashboard":        "tab_dashboard",
@@ -3880,6 +3933,27 @@ class OverlayTrophie(QWidget):
         options = _OV_DUEL.get("ov_duel_expired", [])
         if options:
             self._show_comment_key("ov_duel_expired", random.choice(options), IDLE)
+
+    def on_automatch_started(self) -> None:
+        """React when the player starts an Auto-Match search."""
+        self._draw.set_state(SURPRISED)
+        options = _OV_DUEL.get("ov_automatch_started", [])
+        if options:
+            self._show_comment_key("ov_automatch_started", random.choice(options), SURPRISED)
+
+    def on_automatch_found(self) -> None:
+        """React when an Auto-Match opponent is found."""
+        self._draw.set_state(HAPPY)
+        options = _OV_DUEL.get("ov_automatch_found", [])
+        if options:
+            self._show_comment_key("ov_automatch_found", random.choice(options), HAPPY)
+
+    def on_automatch_timeout(self) -> None:
+        """React when the Auto-Match search times out without finding an opponent."""
+        self._draw.set_state(SAD)
+        options = _OV_DUEL.get("ov_automatch_timeout", [])
+        if options:
+            self._show_comment_key("ov_automatch_timeout", random.choice(options), SAD)
 
     def on_heat_changed(self, heat_pct: int) -> None:
         self._last_game_ts = time.time()

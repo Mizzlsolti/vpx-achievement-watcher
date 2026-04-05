@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import sys
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
@@ -627,6 +629,177 @@ class DuelEngine:
             if isinstance(entry, dict) and entry.get("rom", "").lower() == rom_lower:
                 return True
         return False
+
+    # ── Matchmaking ──────────────────────────────────────────────────────────
+
+    # TTL for matchmaking queue entries (5 minutes).
+    _MATCHMAKING_TTL = 300
+
+    def join_matchmaking(self) -> bool:
+        """Add the local player to the cloud matchmaking queue.
+
+        Collects all VPS-IDs from ``vps_id_mapping.json``, writes an entry to
+        ``duels/matchmaking/{player_id}`` in the cloud, and returns True on
+        success.  Returns False when Cloud Sync is disabled, the player has no
+        VPS-IDs, or the upload fails.
+        """
+        if not getattr(self._cfg, "CLOUD_ENABLED", False):
+            log(self._cfg, "[DUEL] join_matchmaking: Cloud Sync is disabled.", "WARN")
+            return False
+        my_id = self._my_player_id()
+        if not my_id:
+            log(self._cfg, "[DUEL] join_matchmaking: player_id not configured.", "WARN")
+            return False
+        try:
+            from ui_vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(self._cfg)
+        except Exception as exc:
+            log(self._cfg, f"[DUEL] join_matchmaking: could not load VPS mapping: {exc}", "WARN")
+            vps_mapping = {}
+        vps_ids = list(vps_mapping.values())
+        if not vps_ids:
+            log(self._cfg, "[DUEL] join_matchmaking: no VPS-IDs found.", "WARN")
+            return False
+        now = time.time()
+        entry = {
+            "player_id":   my_id,
+            "player_name": self._my_player_name(),
+            "vps_ids":     vps_ids,
+            "queued_at":   now,
+            "expires_at":  now + self._MATCHMAKING_TTL,
+        }
+        node = f"duels/matchmaking/{my_id}"
+        ok = CloudSync.set_node(self._cfg, node, entry)
+        if not ok:
+            log(self._cfg, "[DUEL] join_matchmaking: cloud write failed.", "WARN")
+        else:
+            log(self._cfg, f"[DUEL] Joined matchmaking queue with {len(vps_ids)} VPS-IDs.")
+        return ok
+
+    def poll_matchmaking(self) -> Optional[dict]:
+        """Poll the matchmaking queue for a compatible opponent.
+
+        Fetches all entries from ``duels/matchmaking/``, filters out own entry,
+        expired entries, and players with whom an active duel already exists.
+        For remaining candidates the VPS-ID intersection is computed.  If a
+        match is found the newer player (higher ``queued_at``) creates the duel
+        via :meth:`send_invitation` and removes both queue entries.
+
+        Returns
+        -------
+        dict
+            ``{"opponent_name": ..., "table_name": ..., "duel_id": ...}`` when
+            a match is found and this player creates the duel.
+            ``{"queue_count": N, "shared_tables": M}`` when the queue was read
+            but no match was created (either no candidates or we are the older
+            player waiting for the other side to create the duel).
+        None
+            On error.
+        """
+        if not getattr(self._cfg, "CLOUD_ENABLED", False):
+            return None
+        my_id = self._my_player_id()
+        if not my_id:
+            return None
+        try:
+            all_entries = CloudSync.fetch_node(self._cfg, "duels/matchmaking")
+        except Exception as exc:
+            log(self._cfg, f"[DUEL] poll_matchmaking: fetch error: {exc}", "WARN")
+            return None
+        if not isinstance(all_entries, dict):
+            return {"queue_count": 0, "shared_tables": 0}
+        now = time.time()
+        # Load own VPS-IDs.
+        try:
+            from ui_vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(self._cfg)
+        except Exception:
+            vps_mapping = {}
+        my_vps_ids = set(vps_mapping.values())
+        # Determine own queued_at (for first-come principle).
+        my_entry = all_entries.get(my_id)
+        my_queued_at = float(my_entry.get("queued_at", 0)) if isinstance(my_entry, dict) else 0.0
+        # Active opponent IDs (skip if we already have a duel against them).
+        active_opponents = set()
+        for d in self._active:
+            if d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
+                active_opponents.add(d.challenger)
+                active_opponents.add(d.opponent)
+        active_opponents.discard(my_id)
+        max_shared = 0
+        queue_count = 0
+        for pid, entry in all_entries.items():
+            if pid == my_id:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            if float(entry.get("expires_at", 0)) < now:
+                continue
+            if pid in active_opponents:
+                continue
+            queue_count += 1
+            their_vps_ids = set(entry.get("vps_ids") or [])
+            shared = my_vps_ids & their_vps_ids
+            if len(shared) > max_shared:
+                max_shared = len(shared)
+            if not shared:
+                continue
+            their_queued_at = float(entry.get("queued_at", 0))
+            # First-come principle: only the NEWER player (higher queued_at) creates
+            # the duel; the older player waits to receive the invitation.
+            if my_queued_at <= their_queued_at:
+                continue  # We arrived first – wait for the other side to create
+            # We are the newer player – create the duel now.
+            chosen_vps_id = random.choice(list(shared))
+            # Reverse-lookup: find the ROM that owns this VPS-ID.
+            table_rom = ""
+            for rom, vid in vps_mapping.items():
+                if vid == chosen_vps_id:
+                    table_rom = rom
+                    break
+            if not table_rom:
+                continue
+            # Resolve display name.
+            try:
+                from watcher_core import _strip_version_from_name
+                romnames = {}
+                for obj in list(sys.modules.values()):
+                    if hasattr(obj, "ROMNAMES") and isinstance(getattr(obj, "ROMNAMES"), dict):
+                        romnames = obj.ROMNAMES
+                        break
+                raw_name = romnames.get(table_rom) or table_rom
+                table_name = _strip_version_from_name(raw_name)
+            except Exception:
+                table_name = table_rom
+            opponent_id   = entry.get("player_id", pid)
+            opponent_name = entry.get("player_name", pid)
+            result = self.send_invitation(opponent_id, table_rom, table_name,
+                                          opponent_name=opponent_name)
+            if isinstance(result, Duel):
+                duel_id = result.duel_id
+                # Remove both queue entries.
+                CloudSync.set_node(self._cfg, f"duels/matchmaking/{my_id}", None)
+                CloudSync.set_node(self._cfg, f"duels/matchmaking/{pid}", None)
+                log(self._cfg, f"[DUEL] Auto-Match: duel created against {opponent_name} on {table_name}.")
+                return {"opponent_name": opponent_name, "table_name": table_name, "duel_id": duel_id}
+        return {"queue_count": queue_count, "shared_tables": max_shared}
+
+    def leave_matchmaking(self) -> bool:
+        """Remove the local player's entry from the matchmaking queue.
+
+        Returns True on success (including when no entry existed), False on
+        network error.
+        """
+        my_id = self._my_player_id()
+        if not my_id:
+            return True
+        node = f"duels/matchmaking/{my_id}"
+        ok = CloudSync.set_node(self._cfg, node, None)
+        if ok:
+            log(self._cfg, "[DUEL] Left matchmaking queue.")
+        else:
+            log(self._cfg, "[DUEL] leave_matchmaking: cloud delete failed.", "WARN")
+        return ok
 
     # ── Private helpers ──────────────────────────────────────────────────────
 
