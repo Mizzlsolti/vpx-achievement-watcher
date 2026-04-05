@@ -287,6 +287,7 @@ def tick_flipper_catch(widget) -> None:
 
 # ---------------------------------------------------------------------------
 # Shared centre helper (tracks the animated ball position incl. bob/jump)
+# NOTE: Mirrors _trophy_center() in trophy_animations.py — keep in sync.
 # ---------------------------------------------------------------------------
 
 def _steely_center(widget):

@@ -43,6 +43,7 @@ _BEIGE      = QColor(0xF5, 0xF0, 0xDC)
 _DARK_BLUE  = QColor(0x1A, 0x3A, 0x5C)
 
 
+# NOTE: _trophy_center() is mirrored by _steely_center() in steely_animations.py — keep in sync.
 def _trophy_center(widget):
     """Return (cx, cy, tw, th, pad) tracking the animated character centre.
 
