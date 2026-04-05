@@ -1253,11 +1253,10 @@ class _TrophieDrawWidget(QWidget):
 
     # Passive animation modes — cycle through these to keep the trophy lively
     _PASSIVE_MODES = [
-        "bumper_float", "spinner_target", "insert_light_pulse", "chrome_ball_shimmer",
-        "slingshot_wobble", "bonus_multiplier_fade", "rubber_bounce", "orbit_shot",
-        "pop_bumper_stretch", "plunger_nod", "jackpot_sparkle", "ball_lock_yawn",
-        "drop_target_dance", "flipper_wave", "trough_snore", "tilt_shiver",
-        "multiball_confetti", "ball_save_peek", "loop_dizzy",
+        "reading", "clipboard_check", "thinking", "chart_analysis",
+        "glasses_adjust", "coffee_sip", "typing", "eureka_moment",
+        "filing", "stamp_approve", "calculator", "magnifying_glass",
+        "presentation", "sticky_notes", "paper_airplane", "pencil_tap",
     ]
     _PASSIVE_MODE_MIN_MS = 8000
     _PASSIVE_MODE_MAX_MS = 20000
@@ -1318,6 +1317,9 @@ class _TrophieDrawWidget(QWidget):
         # Particle lists for trophy_animations passive modes
         self._snore_particles: list = []       # for snore mode and SLEEPY state
         self._confetti_particles: list = []    # for celebrate mode
+        # Trophie event animation state
+        self._trophie_event_anim: str = ""
+        self._trophie_event_anim_t: float = 0.0
 
         # Subclass-settable passive offsets (used for Steely-specific modes)
         self._passive_extra_x: float = 0.0
@@ -1444,25 +1446,23 @@ class _TrophieDrawWidget(QWidget):
             else:
                 self._yawn_amount = max(0.0, self._yawn_amount - dt * 2.0)
 
-            # New passive animations — delegate to trophy_animations
+            # Passive animations — delegate to trophy_animations
             if self._state == IDLE:
                 _mode = self._passive_mode
-                if _mode == "drop_target_dance":
-                    trophy_animations.tick_drop_target_dance(self)
-                elif _mode == "flipper_wave":
-                    trophy_animations.tick_flipper_wave(self)
-                elif _mode == "trough_snore":
-                    trophy_animations.tick_trough_snore(self)
-                elif _mode == "tilt_shiver":
-                    trophy_animations.tick_tilt_shiver(self)
-                elif _mode == "multiball_confetti":
-                    trophy_animations.tick_multiball_confetti(self)
-                elif _mode == "ball_save_peek":
-                    trophy_animations.tick_ball_save_peek(self)
-                elif _mode == "loop_dizzy":
-                    trophy_animations.tick_loop_dizzy(self)
-            elif self._state == SLEEPY:
-                trophy_animations.tick_trough_snore(self)
+                tick_fn = getattr(trophy_animations, f"tick_{_mode}", None)
+                if tick_fn:
+                    tick_fn(self)
+
+        # Trophie event animation tick
+        if self._trophie_event_anim:
+            self._trophie_event_anim_t += dt
+            ev_tick = getattr(trophy_animations, f"tick_event_{self._trophie_event_anim}", None)
+            if ev_tick:
+                ev_tick(self)
+            duration = getattr(trophy_animations, "EVENT_ANIM_DURATIONS", {}).get(self._trophie_event_anim, 3.0)
+            if self._trophie_event_anim_t >= duration:
+                self._trophie_event_anim = ""
+                self._trophie_event_anim_t = 0.0
 
         self.update()
 
@@ -1488,6 +1488,11 @@ class _TrophieDrawWidget(QWidget):
     def start_dismiss(self, callback=None) -> None:
         self._dismiss_cb = callback
         self.set_state(DISMISSING)
+
+    def start_event_anim(self, name: str) -> None:
+        """Trigger a named event animation on Trophie (GUI mascot)."""
+        self._trophie_event_anim = name
+        self._trophie_event_anim_t = 0.0
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -1586,15 +1591,29 @@ class _TrophieDrawWidget(QWidget):
         if self._state == IDLE and self._passive_mode in ("chrome_ball_shimmer", "playfield_glass_shimmer"):
             self._draw_shimmer(p)
 
-        # ── New passive animation overlays (trophy_animations) ────────────────
-        if self._state == IDLE and self._passive_mode == "flipper_wave":
-            trophy_animations.draw_flipper_wave(p, self)
-        if self._passive_mode == "trough_snore" or self._state == SLEEPY:
-            trophy_animations.draw_trough_snore(p, self)
-        if self._state == IDLE and self._passive_mode == "multiball_confetti":
-            trophy_animations.draw_multiball_confetti(p, self)
-        if self._state == IDLE and self._passive_mode == "loop_dizzy":
-            trophy_animations.draw_loop_dizzy(p, self)
+        # ── Passive animation overlays (trophy_animations) ────────────────────
+        if self._state == IDLE:
+            draw_fn = getattr(trophy_animations, f"draw_{self._passive_mode}", None)
+            if draw_fn:
+                draw_fn(p, self)
+        # ── Emotion-state prop overlays ───────────────────────────────────────
+        if self._state == TALKING:
+            trophy_animations.draw_state_talking(p, self)
+        elif self._state == HAPPY:
+            trophy_animations.draw_state_happy(p, self)
+        elif self._state == SAD:
+            trophy_animations.draw_state_sad(p, self)
+        elif self._state == SLEEPY:
+            trophy_animations.draw_state_sleepy(p, self)
+        elif self._state == SURPRISED:
+            trophy_animations.draw_state_surprised(p, self)
+        elif self._state == DISMISSING:
+            trophy_animations.draw_state_dismissing(p, self)
+        # ── Trophie event animation overlays ─────────────────────────────────
+        if self._trophie_event_anim:
+            draw_ev = getattr(trophy_animations, f"draw_event_{self._trophie_event_anim}", None)
+            if draw_ev:
+                draw_ev(p, self)
 
         p.end()
 
@@ -2444,6 +2463,28 @@ class _PinballDrawWidget(_TrophieDrawWidget):
             steely_animations.draw_event_show_off(p, self)
         elif self._event_anim == "nervous":
             steely_animations.draw_event_nervous(p, self)
+        elif self._event_anim == "proud":
+            steely_animations.draw_event_proud(p, self)
+        elif self._event_anim == "offended":
+            steely_animations.draw_event_offended(p, self)
+        # ── Passive mode pinball prop overlays ───────────────────────────────
+        if self._state == IDLE:
+            _draw_fn = getattr(steely_animations, f"draw_{self._passive_mode}", None)
+            if _draw_fn:
+                _draw_fn(p, self)
+        # ── Emotion-state pinball prop overlays ───────────────────────────────
+        if self._state == TALKING:
+            steely_animations.draw_state_talking(p, self)
+        elif self._state == HAPPY:
+            steely_animations.draw_state_happy(p, self)
+        elif self._state == SAD:
+            steely_animations.draw_state_sad(p, self)
+        elif self._state == SLEEPY:
+            steely_animations.draw_state_sleepy(p, self)
+        elif self._state == SURPRISED:
+            steely_animations.draw_state_surprised(p, self)
+        elif self._state == DISMISSING:
+            steely_animations.draw_state_dismissing(p, self)
         p.end()
 
     def _draw_trophy(self, p: QPainter, cx: int, cy: int) -> None:
