@@ -810,7 +810,8 @@ def draw_state_sleepy(p: QPainter, widget) -> None:
         p.drawRect(bx, by - i * (bh + 1), bw, bh)
 
     # ZZZ
-    for i, (zx, zy, zs) in enumerate([(bx + 4, by - int(th * 0.25) - i * 8, max(6, tw // 10) - i) for i in range(3)]):
+    zzz_data = [(bx + 4, by - int(th * 0.25) - j * 8, max(6, tw // 10) - j) for j in range(3)]
+    for i, (zx, zy, zs) in enumerate(zzz_data):
         alpha = int(180 - i * 40)
         p.setPen(QColor(210, 210, 255, alpha))
         font = QFont("Arial", zs, QFont.Weight.Bold)

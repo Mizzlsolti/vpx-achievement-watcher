@@ -1547,7 +1547,7 @@ def draw_event_overheat(p: QPainter, widget) -> None:
         for i in range(6):
             angle = i * math.pi / 3 + t * 5.0
             r0 = radius + 8
-            r1 = r0 + random.randint(4, 10)
+            r1 = r0 + 4 + int(3 * abs(math.sin(t * 7.0 + i * 1.3)))
             p.drawLine(
                 cx + int(math.cos(angle) * r0),
                 cy + int(math.sin(angle) * r0),

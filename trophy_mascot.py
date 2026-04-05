@@ -1454,7 +1454,7 @@ class _TrophieDrawWidget(QWidget):
                     tick_fn(self)
 
         # Trophie event animation tick
-        if hasattr(self, '_trophie_event_anim') and self._trophie_event_anim:
+        if self._trophie_event_anim:
             self._trophie_event_anim_t += dt
             ev_tick = getattr(trophy_animations, f"tick_event_{self._trophie_event_anim}", None)
             if ev_tick:
@@ -1610,7 +1610,7 @@ class _TrophieDrawWidget(QWidget):
         elif self._state == DISMISSING:
             trophy_animations.draw_state_dismissing(p, self)
         # ── Trophie event animation overlays ─────────────────────────────────
-        if hasattr(self, '_trophie_event_anim') and self._trophie_event_anim:
+        if self._trophie_event_anim:
             draw_ev = getattr(trophy_animations, f"draw_event_{self._trophie_event_anim}", None)
             if draw_ev:
                 draw_ev(p, self)
