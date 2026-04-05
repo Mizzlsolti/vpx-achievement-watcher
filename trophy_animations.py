@@ -1311,9 +1311,9 @@ def draw_paper_airplane(p: QPainter, widget) -> None:
     start_x = int(cx - tw * 0.5)
     step = max(1, int(tw * 1.0 * progress) // 8)
     for i in range(0, int(tw * 1.0 * progress), step):
-        px2 = start_x + i
-        py2 = cy - int(th * 0.25) - int(math.sin((i / (tw * 1.0)) * math.pi) * th * 0.18)
-        p.drawPoint(px2, py2)
+        trail_x = start_x + i
+        trail_y = cy - int(th * 0.25) - int(math.sin((i / (tw * 1.0)) * math.pi) * th * 0.18)
+        p.drawPoint(trail_x, trail_y)
 
     # Subtle shadow underneath airplane
     p.setOpacity(0.18)
@@ -1941,8 +1941,8 @@ def draw_state_dismissing(p: QPainter, widget) -> None:
     # Page lines
     p.setPen(QPen(QColor(160, 145, 115, 100), 1))
     for li in range(4):
-        ly2 = -bh // 2 + int(bh * 0.15) + li * int(bh * 0.18)
-        p.drawLine(-bw + 4, ly2, -4, ly2)
+        line_y = -bh // 2 + int(bh * 0.15) + li * int(bh * 0.18)
+        p.drawLine(-bw + 4, line_y, -4, line_y)
     p.restore()
 
     # Right page with paper texture gradient
@@ -1967,8 +1967,8 @@ def draw_state_dismissing(p: QPainter, widget) -> None:
     # Page lines
     p.setPen(QPen(QColor(160, 145, 115, 100), 1))
     for li in range(4):
-        ly2 = -bh // 2 + int(bh * 0.15) + li * int(bh * 0.18)
-        p.drawLine(4, ly2, bw - 4, ly2)
+        line_y = -bh // 2 + int(bh * 0.15) + li * int(bh * 0.18)
+        p.drawLine(4, line_y, bw - 4, line_y)
     p.restore()
 
     # Spine (dark gradient at centre)

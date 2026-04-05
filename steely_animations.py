@@ -286,6 +286,43 @@ def tick_flipper_catch(widget) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shared centre helper (tracks the animated ball position incl. bob/jump)
+# ---------------------------------------------------------------------------
+
+def _steely_center(widget):
+    """Return (cx, cy, tw, th, pad) tracking the animated ball centre.
+
+    Mirrors the bob/jump/wiggle/passive-extra transforms from paintEvent so
+    that overlay props drawn relative to (cx, cy) follow the ball.
+    """
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    base_cx = tw // 2 + pad
+    base_cy = th // 2 + int(th * 0.20) + pad
+
+    state = getattr(widget, '_state', 'idle')
+    passive_mode = getattr(widget, '_passive_mode', '')
+    bob_t = getattr(widget, '_bob_t', 0.0)
+    if state == 'idle' and passive_mode in ("rubber_bounce", "rubber_ring_bounce"):
+        bob = -abs(math.sin(bob_t * 2.0)) * 10.0
+    else:
+        bob = math.sin(bob_t) * 3.0
+
+    jump = getattr(widget, '_jump_offset', 0.0) if getattr(widget, '_jumping', False) else 0.0
+
+    wiggle_t = getattr(widget, '_wiggle_t', 0.0)
+    wiggle_x = math.sin(wiggle_t) * 4.0 if state == 'surprised' else 0.0
+
+    extra_x = getattr(widget, '_passive_extra_x', 0.0)
+    extra_y = getattr(widget, '_passive_extra_y', 0.0)
+
+    cx = base_cx + int(wiggle_x + extra_x)
+    cy = base_cy + int(bob + jump + extra_y)
+    return cx, cy, tw, th, pad
+
+
+# ---------------------------------------------------------------------------
 # Passive mode draw (overlay) helpers — called from _PinballDrawWidget.paintEvent()
 # ---------------------------------------------------------------------------
 
