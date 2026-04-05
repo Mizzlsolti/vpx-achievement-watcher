@@ -13,7 +13,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QComboBox, QCompleter, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QFrame,
+    QHeaderView, QFrame, QTabWidget,
 )
 from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
@@ -280,8 +280,18 @@ class DuelsMixin:
 
     def _build_tab_duels(self):
         """Build the '⚔️ Score Duels' tab and wire up all timers."""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
+        # Outer tab widget that holds both sub-tabs
+        outer_tab = QWidget()
+        outer_layout = QVBoxLayout(outer_tab)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        self._duels_subtabs = QTabWidget()
+        outer_layout.addWidget(self._duels_subtabs)
+
+        # ── Sub-tab 1: My Duels ───────────────────────────────────────────────
+        my_duels_tab = QWidget()
+        layout = QVBoxLayout(my_duels_tab)
 
         # Instantiate the duel engine.
         self._duel_engine = DuelEngine(self.cfg)
@@ -427,10 +437,22 @@ class DuelsMixin:
         lay_history.addWidget(self._tbl_duel_history)
         layout.addWidget(grp_history)
 
-        # ── e) Bottom ────────────────────────────────────────────────────────
+        # ── e) Bottom (Duel Rules + Help) ─────────────────────────────────────
         layout.addStretch(1)
         self._add_tab_duels_bottom_buttons(layout)
-        self.main_tabs.addTab(tab, "⚔️ Score Duels")
+
+        self._duels_subtabs.addTab(my_duels_tab, "🎯 My Duels")
+
+        # ── Sub-tab 2: Global Feed ────────────────────────────────────────────
+        from ui_duels_global import GlobalDuelFeedWidget
+        self._global_feed_widget = GlobalDuelFeedWidget(self.cfg)
+        self._duels_subtabs.addTab(self._global_feed_widget, "🌍 Global Feed")
+
+        # Connect sub-tab change to auto-refresh global feed on activation
+        self._duels_subtabs.currentChanged.connect(self._on_duels_subtab_changed)
+
+        # Add outer tab to main tab bar
+        self.main_tabs.addTab(outer_tab, "⚔️ Score Duels")
         self._duels_tab_index = self.main_tabs.count() - 1
 
         # ── Populate table dropdown from maps cache ──────────────────────────
@@ -495,6 +517,24 @@ class DuelsMixin:
         row.addWidget(btn_help)
         layout.addLayout(row)
 
+    def _on_duels_subtab_changed(self, index: int) -> None:
+        """Auto-refresh global feed when the user switches to it."""
+        try:
+            tab_text = self._duels_subtabs.tabText(index).lower()
+            # Notify Trophie of sub-tab switch
+            try:
+                trophie = getattr(self, "_trophie_gui", None)
+                if trophie is not None:
+                    trophie.on_subtab_changed(tab_text)
+            except Exception:
+                pass
+            if "global" in tab_text:
+                feed = getattr(self, "_global_feed_widget", None)
+                if feed is not None:
+                    feed.refresh()
+        except Exception:
+            pass
+
     def _show_duel_rules(self) -> None:
         """Show the Score Duel rules dialog."""
         from PyQt6.QtWidgets import QMessageBox
@@ -508,8 +548,9 @@ class DuelsMixin:
             "• Only players with a valid Player Name appear\n"
             "• Players using the default name \"Player\" are hidden\n\n"
             "🎰 TABLE SELECTION\n"
-            "• Tables must have an NVRAM map AND be locally installed\n"
-            "• Only approved custom tables (CAT Registry) are included\n\n"
+            "• Tables must have an NVRAM map, a VPS-ID, AND be locally installed\n"
+            "• Only approved custom tables (CAT Registry) are included\n"
+            "• A VPS-ID must be assigned for score verification and matching\n\n"
             "🔗 MATCHING\n"
             "• Both players must have the same ROM name for the table\n"
             "• If the opponent does not have the table installed, the duel is automatically declined\n\n"

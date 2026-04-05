@@ -460,6 +460,11 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("duels_rematch",  "Lost a duel? Challenge them again — revenge is sweet!"),
         ("duels_hotkey",   "Use your Challenge Left/Right hotkeys to navigate duel invitations!"),
     ],
+    "tab_duels_global": [
+        ("tab_global_1",   "Let's see who's been dueling!"),
+        ("tab_global_2",   "The arena never sleeps!"),
+        ("tab_global_3",   "Scouting the competition, smart move!"),
+    ],
     "tab_challenges": [
         ("ch_intro",       "Challenges test your skill against the clock — beat the target score!"),
         ("ch_select",      "Use Left/Right to browse available challenges, then press Action to start!"),
@@ -3224,6 +3229,7 @@ class GUITrophie(QWidget):
             "maps":             "tab_maps",
             "score duels":      "tab_duels",
             "duels":            "tab_duels",
+            "global feed":      "tab_duels_global",
             "challenges":       "tab_challenges",
         }
         for key_part, tip_cat in tab_map.items():
