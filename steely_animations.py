@@ -286,43 +286,6 @@ def tick_flipper_catch(widget) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Shared centre helper (tracks the animated ball position incl. bob/jump)
-# ---------------------------------------------------------------------------
-
-def _steely_center(widget):
-    """Return (cx, cy, tw, th, pad) tracking the animated ball centre.
-
-    Mirrors the bob/jump/wiggle/passive-extra transforms from paintEvent so
-    that overlay props drawn relative to (cx, cy) follow the ball.
-    """
-    tw = widget._tw
-    th = widget._th
-    pad = widget._pad
-    base_cx = tw // 2 + pad
-    base_cy = th // 2 + int(th * 0.20) + pad
-
-    state = getattr(widget, '_state', 'idle')
-    passive_mode = getattr(widget, '_passive_mode', '')
-    bob_t = getattr(widget, '_bob_t', 0.0)
-    if state == 'idle' and passive_mode in ("rubber_bounce", "rubber_ring_bounce"):
-        bob = -abs(math.sin(bob_t * 2.0)) * 10.0
-    else:
-        bob = math.sin(bob_t) * 3.0
-
-    jump = getattr(widget, '_jump_offset', 0.0) if getattr(widget, '_jumping', False) else 0.0
-
-    wiggle_t = getattr(widget, '_wiggle_t', 0.0)
-    wiggle_x = math.sin(wiggle_t) * 4.0 if state == 'surprised' else 0.0
-
-    extra_x = getattr(widget, '_passive_extra_x', 0.0)
-    extra_y = getattr(widget, '_passive_extra_y', 0.0)
-
-    cx = base_cx + int(wiggle_x + extra_x)
-    cy = base_cy + int(bob + jump + extra_y)
-    return cx, cy, tw, th, pad
-
-
-# ---------------------------------------------------------------------------
 # Passive mode draw (overlay) helpers — called from _PinballDrawWidget.paintEvent()
 # ---------------------------------------------------------------------------
 
@@ -336,7 +299,11 @@ def draw_multiball(p: QPainter, widget) -> None:
     particles = getattr(widget, "_ghost_particles", [])
     if not particles:
         return
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -406,7 +373,11 @@ def draw_tilt_warning(p: QPainter, widget) -> None:
     if not (1.0 <= cycle_t < 3.5):
         return
     flash_alpha = int(140 + 110 * abs(math.sin(cycle_t * 5.0)))
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     text = "TILT"
 
@@ -1651,11 +1622,17 @@ def draw_orbit_loop(p: QPainter, widget) -> None:
 def draw_solenoid_buzz(p: QPainter, widget) -> None:
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     t = widget._passive_t
-    # cx/cy from _steely_center already include passive_extra_x/y — no extra offset needed
-    sol_x = cx + int(tw * 0.32)
-    sol_y = cy + int(th * 0.10)
+    extra_x = widget._passive_extra_x
+    extra_y = widget._passive_extra_y
+
+    sol_x = cx + int(tw * 0.32) + int(extra_x)
+    sol_y = cy + int(th * 0.10) + int(extra_y)
     sol_w = max(10, tw // 7)
     sol_h = max(8, th // 8)
 
@@ -1869,7 +1846,11 @@ def draw_lane_change(p: QPainter, widget) -> None:
 
 def draw_event_jackpot_glow(p: QPainter, widget) -> None:
     """Gold glow ring, sparkles, and DMD-style JACKPOT display above Steely."""
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     t = widget._event_anim_t
     duration = EVENT_ANIM_DURATIONS["jackpot_glow"]
@@ -1972,7 +1953,11 @@ def draw_event_victory_lap(p: QPainter, widget) -> None:
     duration = EVENT_ANIM_DURATIONS["victory_lap"]
     if t > duration * 0.95:
         return
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     fade = max(0.0, 1.0 - t / duration)
     rx = int(tw * 0.30)
@@ -2028,7 +2013,11 @@ def draw_event_victory_lap(p: QPainter, widget) -> None:
 def draw_event_drain_fall(p: QPainter, widget) -> None:
     """Drain hole and BALL SAVE text during drain_fall with 3D metallic rim."""
     t = widget._event_anim_t
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
 
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -2100,7 +2089,11 @@ def draw_event_drain_fall(p: QPainter, widget) -> None:
 
 def draw_event_overheat(p: QPainter, widget) -> None:
     """Red heat tint, smoke, solenoid coils and sparks during overheat."""
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     t = widget._event_anim_t
     duration = EVENT_ANIM_DURATIONS["overheat"]
@@ -2213,7 +2206,11 @@ def draw_event_overheat(p: QPainter, widget) -> None:
 def draw_event_plunger_entry(p: QPainter, widget) -> None:
     """Motion blur streak and 3D plunger rod during plunger-entry launch."""
     t = widget._event_anim_t
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
 
     p.save()
@@ -2314,7 +2311,11 @@ def draw_event_show_off(p: QPainter, widget) -> None:
     t = widget._event_anim_t
     duration = EVENT_ANIM_DURATIONS["show_off"]
     fade = max(0.0, 1.0 - t / duration)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
 
     p.save()
@@ -2409,7 +2410,11 @@ def draw_event_nervous(p: QPainter, widget) -> None:
     if t > duration:
         return
     intensity = min(1.0, t / 2.0)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
 
     p.save()
@@ -2527,7 +2532,11 @@ def draw_event_proud(p: QPainter, widget) -> None:
     t = widget._event_anim_t
     duration = EVENT_ANIM_DURATIONS["proud"]
     fade = max(0.0, 1.0 - t / duration)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
 
     p.save()
@@ -2632,7 +2641,11 @@ def draw_event_proud(p: QPainter, widget) -> None:
 def draw_event_offended(p: QPainter, widget) -> None:
     """Outlane wall with metallic shading on the side Steely rolled toward."""
     t = widget._event_anim_t
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     extra_x = widget._passive_extra_x
 
     p.save()
@@ -2717,7 +2730,11 @@ def draw_state_talking(p: QPainter, widget) -> None:
     """Pulsing bumper ring around Steely while talking — with QConicalGradient."""
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     radius = int(min(tw, th) * 0.38)
     t = widget._passive_t
     alpha = int(120 + 100 * abs(math.sin(t * 4.0)))
@@ -2760,7 +2777,11 @@ def draw_state_happy(p: QPainter, widget) -> None:
     """Flipper at bottom in 'up' position while happy — 5-stop gradient + specular."""
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     flipper_cy = cy + int(th * 0.40)
     flipper_len = int(tw * 0.40)
     flipper_w = max(6, th // 12)
@@ -2912,7 +2933,11 @@ def draw_state_sleepy(p: QPainter, widget) -> None:
     """Trough gutter at bottom and floating ZZZ — 5-stop metallic gradient."""
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
 
     trough_y = th + pad - max(6, th // 10)
     trough_w = int(tw * 0.55)
@@ -2986,7 +3011,11 @@ def draw_state_surprised(p: QPainter, widget) -> None:
     """TILT flash with double-layer glow and diagonal tilt indicator line."""
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    cx, cy, tw, th, pad = _steely_center(widget)
+    tw = widget._tw
+    th = widget._th
+    pad = widget._pad
+    cx = tw // 2 + pad
+    cy = th // 2 + int(th * 0.20) + pad
     t = widget._passive_t
     flash_alpha = int(140 + 110 * abs(math.sin(t * 6.0)))
     text = "TILT"
