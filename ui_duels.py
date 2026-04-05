@@ -588,8 +588,15 @@ class DuelsMixin:
         self._cmb_duel_table.clear()
         self._cmb_duel_table.addItem("— Select Table —", "")
         cache = getattr(self, "_all_maps_cache", None) or []
+        try:
+            from ui_vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(self.cfg)
+        except Exception:
+            vps_mapping = {}
         entries = sorted(
-            (e for e in cache if isinstance(e, dict) and e.get("has_map") and e.get("is_local")),
+            (e for e in cache if isinstance(e, dict)
+             and e.get("has_map") and e.get("is_local")
+             and e.get("rom", "").lower().strip() in vps_mapping),
             key=lambda e: e.get("title", e.get("rom", "")).lower(),
         )
         for entry in entries:
@@ -601,11 +608,8 @@ class DuelsMixin:
         if not entries:
             # Fallback: use vps_id_mapping.json (always present if the user has
             # ever assigned a VPS-ID to a table, even before the map list loads).
-            try:
-                from ui_vps import _load_vps_mapping
-                mapping = _load_vps_mapping(self.cfg)
-            except Exception:
-                mapping = {}
+            # ROMs in this mapping already have a VPS-ID by definition.
+            mapping = vps_mapping
             if mapping:
                 romnames = getattr(getattr(self, "watcher", None), "ROMNAMES", {})
                 fallback_entries = sorted(mapping.keys(), key=lambda r: (romnames.get(r) or r).lower())
@@ -630,7 +634,7 @@ class DuelsMixin:
                             continue  # Not approved → skip
                         clean_name = _strip_version_from_name(table_key)
                         display = clean_name
-                        if table_key not in existing_data:
+                        if table_key not in existing_data and table_key in vps_mapping:
                             self._cmb_duel_table.addItem(display, table_key)
         except Exception:
             pass
@@ -804,6 +808,15 @@ class DuelsMixin:
             self._lbl_duel_status.setText("⚠️ Select a valid table first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
+        try:
+            from ui_vps import _load_vps_mapping
+            _vps_mapping = _load_vps_mapping(self.cfg)
+        except Exception:
+            _vps_mapping = {}
+        if table_rom not in _vps_mapping:
+            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned for this table. Assign one in Available Maps first.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
         if not getattr(self.cfg, "CLOUD_ENABLED", False):
             self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
@@ -829,6 +842,12 @@ class DuelsMixin:
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
         elif duel_or_error == "no_opponent":
             self._lbl_duel_status.setText("⚠️ Opponent ID is required.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "no_cloud":
+            self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "no_vps_id":
+            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned for this table. Assign one in Available Maps first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
         else:
             self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync.")
