@@ -369,6 +369,7 @@ def draw_tilt_warning(p: QPainter, widget) -> None:
     """Flash 'TILT' text with double-layer glow while in the tilt_warning phase."""
     t = widget._passive_t
     cycle_t = t % 7.0
+    # Only flash during the hold/tilt phase (1.0–3.5 s)
     if not (1.0 <= cycle_t < 3.5):
         return
     flash_alpha = int(140 + 110 * abs(math.sin(cycle_t * 5.0)))
@@ -1237,7 +1238,7 @@ def draw_drain(p: QPainter, widget) -> None:
         font = QFont("Arial Black", max(5, tw // 12), QFont.Weight.Black)
         p.setFont(font)
         p.setPen(text_color)
-        label = "BALL SAVE"
+        label = "BALL SAVE" if cycle_t >= 2.0 else "DRAIN"
         fm = p.fontMetrics()
         p.drawText(cx - fm.horizontalAdvance(label) // 2, drain_y - drain_h - 2, label)
 
