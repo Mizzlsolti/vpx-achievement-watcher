@@ -492,6 +492,10 @@ class DuelsMixin:
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
         self._duel_recheck_cooldown: dict = {}
 
+        # Duel session tracking: start timestamp and baseline score.
+        self._duel_session_start_ts: float = 0.0
+        self._duel_baseline_score: int = 0
+
         # Initial populate.
         self._refresh_invitation_inbox()
         self._refresh_active_duels()
@@ -557,10 +561,11 @@ class DuelsMixin:
             "• Cloud Sync must be enabled for both players\n"
             "• Only players with a valid Player Name appear\n"
             "• Players using the default name \"Player\" are hidden\n\n"
-            "🎰 TABLE SELECTION\n"
-            "• Tables must have an NVRAM map, a VPS-ID, AND be locally installed\n"
-            "• Only approved custom tables (CAT Registry) are included\n"
-            "• A VPS-ID must be assigned for score verification and matching\n\n"
+            "🎰 TABLE REQUIREMENTS\n"
+            "• NVRAM map must exist (or CAT table must be enabled)\n"
+            "• Table must be locally installed (.vpx found)\n"
+            "• VPS-ID must be assigned\n"
+            "• All three conditions are mandatory\n\n"
             "🔗 MATCHING\n"
             "• Both players must have the same ROM name for the table\n"
             "• If the opponent does not have the table installed, the duel is automatically declined\n\n"
@@ -569,6 +574,11 @@ class DuelsMixin:
             "• Invitations are visible in the 📬 Incoming Invitations table\n"
             "• VPX must NOT be running when accepting\n"
             "• Unanswered invitations expire automatically\n\n"
+            "⏱️ SESSION RULES\n"
+            "• Minimum play time: 60 seconds\n"
+            "• Score must improve from baseline\n"
+            "• Quitting VPX early aborts the duel\n"
+            "• NVRAM highscore is captured at session start\n\n"
             "🏆 SCORING\n"
             "• Both players play the table independently\n"
             "• Scores are submitted and compared via the cloud\n"
@@ -612,8 +622,9 @@ class DuelsMixin:
             vps_mapping = {}
         entries = sorted(
             (e for e in cache if isinstance(e, dict)
-             and e.get("has_map") and e.get("is_local")
-             and e.get("rom", "").lower().strip() in vps_mapping),
+             and e.get("is_local")
+             and e.get("rom", "").lower().strip() in vps_mapping
+             and (e.get("has_map") or e.get("cat_enabled", False))),
             key=lambda e: e.get("title", e.get("rom", "")).lower(),
         )
         for entry in entries:
@@ -825,13 +836,41 @@ class DuelsMixin:
             self._lbl_duel_status.setText("⚠️ Select a valid table first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
+
+        # Triple-condition validation before sending.
+        cache = getattr(self, "_all_maps_cache", []) or []
+        cache_entry = next(
+            (e for e in cache
+             if isinstance(e, dict) and e.get("rom", "").lower().strip() == table_rom.lower().strip()),
+            None,
+        )
+        if not cache_entry:
+            self._lbl_duel_status.setText("⚠️ Table not found in local cache. Reload Available Maps.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+        is_cat = cache_entry.get("is_cat", False)
+        if is_cat:
+            if not cache_entry.get("cat_enabled"):
+                self._lbl_duel_status.setText("⚠️ This CAT table is not enabled for duels.")
+                self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+                return
+        else:
+            if not cache_entry.get("has_map"):
+                self._lbl_duel_status.setText("⚠️ No NVRAM map for this table. Cannot duel.")
+                self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+                return
+        if not cache_entry.get("is_local"):
+            self._lbl_duel_status.setText("⚠️ Table not locally installed.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+            return
+
         try:
             from ui_vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(self.cfg)
         except Exception:
             _vps_mapping = {}
-        if table_rom not in _vps_mapping:
-            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned for this table. Assign one in Available Maps first.")
+        if table_rom.lower().strip() not in {k.lower().strip() for k in _vps_mapping}:
+            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned. Assign one in Available Maps first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
         if not getattr(self.cfg, "CLOUD_ENABLED", False):
@@ -840,7 +879,8 @@ class DuelsMixin:
             return
 
         duel_or_error = self._duel_engine.send_invitation(opponent_id, table_rom, table_name,
-                                                           opponent_name=opponent_name)
+                                                           opponent_name=opponent_name,
+                                                           maps_cache=cache)
         if isinstance(duel_or_error, Duel):
             self._lbl_duel_status.setText(
                 f"✅ Invitation sent to '{opponent_name or opponent_id}' for '{table_name}'!"
@@ -863,8 +903,20 @@ class DuelsMixin:
         elif duel_or_error == "no_cloud":
             self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "table_not_found":
+            self._lbl_duel_status.setText("⚠️ Table not found in local cache. Reload Available Maps.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "no_nvram_map":
+            self._lbl_duel_status.setText("⚠️ No NVRAM map for this table. Cannot duel.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "cat_not_enabled":
+            self._lbl_duel_status.setText("⚠️ This CAT table is not enabled for duels.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        elif duel_or_error == "not_local":
+            self._lbl_duel_status.setText("⚠️ Table not locally installed.")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
         elif duel_or_error == "no_vps_id":
-            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned for this table. Assign one in Available Maps first.")
+            self._lbl_duel_status.setText("⚠️ No VPS-ID assigned. Assign one in Available Maps first.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
         else:
             self._lbl_duel_status.setText("❌ Failed to send invitation. Check Cloud Sync.")
@@ -1211,6 +1263,21 @@ class DuelsMixin:
                 self._get_mini_overlay().show_info(msg, seconds=seconds, color_hex=color_hex)
             except Exception:
                 pass
+
+    def _notify_trophies_duel_aborted(self) -> None:
+        """Trigger duel-aborted reactions on both Trophie instances."""
+        try:
+            t = getattr(self, "_trophie_gui", None)
+            if t:
+                t.on_duel_aborted()
+        except Exception:
+            pass
+        try:
+            t = getattr(self, "_trophie_overlay", None)
+            if t:
+                t.on_duel_aborted()
+        except Exception:
+            pass
 
     # ── Polling: invitation poll ───────────────────────────────────────────────
 
@@ -1656,14 +1723,34 @@ class DuelsMixin:
         except Exception:
             pass
 
+        # Capture session start timestamp and baseline NVRAM highscore.
+        self._duel_session_start_ts = time.time()
+        try:
+            w = getattr(self, "watcher", None)
+            baseline = 0
+            if w:
+                baseline = int(getattr(w, "current_highscore", 0) or 0)
+                if baseline <= 0:
+                    baseline = int(getattr(w, "last_session_score", 0) or 0)
+            self._duel_baseline_score = baseline
+            from watcher_core import log as _log
+            _log(self.cfg, f"[DUEL] Baseline score captured for {rom}: {baseline}")
+        except Exception:
+            self._duel_baseline_score = 0
+
     # ── Session-ended hook: submit duel scores ─────────────────────────────────
 
-    def _on_session_ended_duels(self, rom: str) -> None:
-        """Called when a game session ends. Submits scores for any ACCEPTED
-        duels on the finished ROM.
+    _DUEL_MIN_PLAY_SECONDS = 60
 
-        Looks up the latest high score from the watcher and calls
-        ``DuelEngine.submit_result()`` for each matching duel.
+    def _on_session_ended_duels(self, rom: str) -> None:
+        """Called when a game session ends. Validates the session and submits
+        scores for any ACCEPTED duels on the finished ROM.
+
+        Session validity checks (each triggers an abort if failed):
+        1. Elapsed time must be ≥ 60 seconds.
+        2. Score must have improved from the baseline captured at session start.
+
+        If both checks pass, delegates to ``DuelEngine.submit_result()``.
         """
         if not rom:
             return
@@ -1679,6 +1766,22 @@ class DuelsMixin:
         if not matching:
             return
 
+        # ── Session validity checks ─────────────────────────────────────────
+        elapsed = time.time() - getattr(self, "_duel_session_start_ts", 0)
+        if elapsed < self._DUEL_MIN_PLAY_SECONDS:
+            for duel in matching:
+                try:
+                    self._duel_engine.abort_duel(duel.duel_id, reason="session_too_short")
+                except Exception:
+                    pass
+            self._duel_notify(
+                f"⚠️ Duel aborted: Session too short ({int(elapsed)}s). Minimum: {self._DUEL_MIN_PLAY_SECONDS}s.",
+                "#FFAA00", 8,
+            )
+            self._notify_trophies_duel_aborted()
+            self._refresh_active_duels()
+            return
+
         # Get the latest score from the watcher.
         score = 0
         try:
@@ -1691,6 +1794,19 @@ class DuelsMixin:
         except Exception:
             pass
 
+        baseline = getattr(self, "_duel_baseline_score", 0)
+        if score <= baseline:
+            for duel in matching:
+                try:
+                    self._duel_engine.abort_duel(duel.duel_id, reason="no_score_improvement")
+                except Exception:
+                    pass
+            self._duel_notify("⚠️ Duel aborted: No score improvement detected.", "#FFAA00", 8)
+            self._notify_trophies_duel_aborted()
+            self._refresh_active_duels()
+            return
+
+        # ── Valid session → submit score ────────────────────────────────────
         for duel in matching:
             try:
                 if score <= 0:

@@ -61,6 +61,7 @@ class Duel:
     challenger_score: int   = -1    # final score of challenger (-1 = not yet submitted)
     opponent_score:   int   = -1    # final score of opponent (-1 = not yet submitted)
     expires_at:       float = 0.0   # Unix timestamp when invitation expires
+    cancel_reason:    str   = ""    # reason for cancellation (set by abort_duel)
 
 
 def _duel_from_dict(d: dict) -> Duel:
@@ -80,6 +81,7 @@ def _duel_from_dict(d: dict) -> Duel:
         challenger_score=int(d.get("challenger_score", SCORE_NOT_SUBMITTED)),
         opponent_score=int(d.get("opponent_score", SCORE_NOT_SUBMITTED)),
         expires_at=float(d.get("expires_at", 0)),
+        cancel_reason=str(d.get("cancel_reason", "")),
     )
 
 
@@ -178,7 +180,8 @@ class DuelEngine:
     # ── Public API ───────────────────────────────────────────────────────────
 
     def send_invitation(self, opponent_id: str, table_rom: str, table_name: str = "",
-                        opponent_name: str = "") -> Union[Duel, str]:
+                        opponent_name: str = "",
+                        maps_cache: Optional[list] = None) -> Union[Duel, str]:
         """Create a new duel invitation and upload it to the cloud.
 
         Parameters
@@ -191,6 +194,12 @@ class DuelEngine:
             Human-readable display name for the table.
         opponent_name : str, optional
             Display name of the opponent player.
+        maps_cache : list, optional
+            Available maps cache entries.  When provided, the table is
+            validated against the triple-condition rules before the
+            invitation is sent.  Omit (or pass ``None``) to skip the
+            cache-based validation (e.g. auto-match flow already
+            guarantees a valid VPS-ID intersection).
 
         Returns
         -------
@@ -198,7 +207,9 @@ class DuelEngine:
             The newly created Duel on success.
         str
             An error-reason string on failure: ``"no_player_id"``,
-            ``"no_cloud"``, ``"no_opponent"``, ``"duplicate"``, or ``"cloud_error"``.
+            ``"no_cloud"``, ``"no_opponent"``, ``"duplicate"``,
+            ``"cloud_error"``, ``"table_not_found"``, ``"no_nvram_map"``,
+            ``"cat_not_enabled"``, ``"not_local"``, or ``"no_vps_id"``.
         """
         my_id = self._my_player_id()
         if not my_id:
@@ -210,6 +221,13 @@ class DuelEngine:
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
             return "no_opponent"
+
+        # Triple-condition validation when maps_cache is provided.
+        if maps_cache is not None:
+            ok, err = self.validate_table_for_duel(table_rom, maps_cache)
+            if not ok:
+                log(self._cfg, f"[DUEL] send_invitation blocked: {err} for {table_rom}", "WARN")
+                return err
 
         # Prevent duplicate invitation for the same opponent + table while one is PENDING/ACCEPTED/ACTIVE.
         norm_rom = table_rom.lower().strip()
@@ -239,6 +257,110 @@ class DuelEngine:
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Invitation sent: {duel.duel_id} → '{opponent_name or 'opponent'}' ({table_rom})")
         return duel
+
+    def validate_table_for_duel(self, table_rom: str, maps_cache: list = None) -> tuple:
+        """Validate that a table meets all 3 requirements for duels.
+
+        Requirements
+        ------------
+        1. NVRAM map exists (``has_map == True``) **or** CAT table is enabled
+           (``is_cat == True`` and ``cat_enabled == True``).
+        2. Table is locally installed (``is_local == True``).
+        3. ROM has a VPS-ID assigned in ``vps_id_mapping.json``.
+
+        Parameters
+        ----------
+        table_rom : str
+            ROM name of the table to validate.
+        maps_cache : list, optional
+            Available maps cache entries (list of dicts).  Defaults to ``[]``.
+
+        Returns
+        -------
+        tuple[bool, str]
+            ``(True, "")`` on success.
+            ``(False, error_code)`` on failure.  Error codes:
+            ``"table_not_found"``, ``"no_nvram_map"``, ``"cat_not_enabled"``,
+            ``"not_local"``, ``"no_vps_id"``.
+        """
+        if maps_cache is None:
+            maps_cache = []
+
+        norm = table_rom.lower().strip()
+        entry = next(
+            (e for e in maps_cache
+             if isinstance(e, dict) and e.get("rom", "").lower().strip() == norm),
+            None,
+        )
+
+        if not entry:
+            return False, "table_not_found"
+
+        is_cat = entry.get("is_cat", False)
+
+        if is_cat:
+            if not entry.get("cat_enabled"):
+                return False, "cat_not_enabled"
+        else:
+            if not entry.get("has_map"):
+                return False, "no_nvram_map"
+
+        if not entry.get("is_local"):
+            return False, "not_local"
+
+        try:
+            from ui_vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(self._cfg)
+        except Exception:
+            vps_mapping = {}
+        if norm not in {k.lower().strip() for k in vps_mapping}:
+            return False, "no_vps_id"
+
+        return True, ""
+
+    def abort_duel(self, duel_id: str, reason: str = "aborted") -> bool:
+        """Abort a duel and report to cloud.
+
+        Used when a VPX game session is deemed invalid (too short or no score
+        improvement).  Transitions the duel to ``CANCELLED``, persists the
+        ``cancel_reason``, and pushes the update to the cloud.
+
+        Parameters
+        ----------
+        duel_id : str
+            ID of the duel to abort.
+        reason : str, optional
+            Human-readable reason string stored on the duel record.
+            Defaults to ``"aborted"``.
+
+        Returns
+        -------
+        bool
+            ``True`` if the duel was found and aborted; ``False`` otherwise.
+        """
+        duel = self._find_active(duel_id)
+        if not duel:
+            log(self._cfg, f"[DUEL] abort_duel: duel {duel_id} not found.", "WARN")
+            return False
+        duel.status = DuelStatus.CANCELLED
+        duel.cancel_reason = reason
+        self._save_active()
+        # Report to cloud.
+        my_id = self._my_player_id()
+        if my_id:
+            node = f"duels/active/{duel_id}"
+            try:
+                existing = CloudSync.fetch_node(self._cfg, node)
+                if isinstance(existing, dict):
+                    existing["status"] = "CANCELLED"
+                    existing["cancel_reason"] = reason
+                    existing["cancelled_by"] = my_id
+                    existing["cancelled_at"] = time.time()
+                    CloudSync.set_node(self._cfg, node, existing)
+            except Exception as exc:
+                log(self._cfg, f"[DUEL] abort_duel cloud update failed: {exc}", "WARN")
+        log(self._cfg, f"[DUEL] Duel {duel_id} aborted. Reason: {reason}")
+        return True
 
     def receive_invitations(self) -> List[Duel]:
         """Poll the cloud for pending duel invitations addressed to this player.
