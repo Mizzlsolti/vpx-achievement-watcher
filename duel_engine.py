@@ -322,8 +322,9 @@ class DuelEngine:
         """Abort a duel and report to cloud.
 
         Used when a VPX game session is deemed invalid (too short or no score
-        improvement).  Transitions the duel to ``CANCELLED``, persists the
-        ``cancel_reason``, moves it to history, and pushes the update to the cloud.
+        improvement).  Transitions the duel to ``CANCELLED``, moves it to
+        history, persists the ``cancel_reason``, and pushes the update to the
+        cloud.
 
         Parameters
         ----------

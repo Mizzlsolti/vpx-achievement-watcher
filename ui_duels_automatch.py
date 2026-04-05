@@ -233,7 +233,7 @@ class AutoMatchWidget(QWidget):
         if not self._searching:
             return
         if result is None:
-            return  # error – keep searching
+            return  # error – keep searching, keep last info visible
         if "opponent_name" in result:
             # Match found!
             self._stop_search()

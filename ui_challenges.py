@@ -684,11 +684,11 @@ class ChallengesMixin:
             pass
 
         if not self._in_game_now():
-            # If a duel invite notification is showing in the mini overlay, confirm
-            # the focused option instead of emitting the "not in-game" error.
+            # If a duel invite notification is showing in the mini overlay, ignore
+            # the hotkey — Left/Right handle accept/decline directly.
             try:
                 if getattr(self, "_duel_invite_notify_state", None) is not None:
-                    return  # Duel invite handled by Left/Right directly
+                    return  # ignore hotkey while duel invite notification is showing
             except Exception:
                 pass
             # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
@@ -802,7 +802,7 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, accept directly.
+        # If a duel invite notification is showing in the mini overlay, Left = Accept directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
@@ -890,7 +890,7 @@ class ChallengesMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, decline directly.
+        # If a duel invite notification is showing in the mini overlay, Right = Decline directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:

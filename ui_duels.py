@@ -338,7 +338,7 @@ class DuelsMixin:
             "When enabled, no new duel invitations will be received.\n"
             "Already active duels are not affected."
         )
-        self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", True)))
+        self._chk_duel_dnd.setChecked(bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False)))
         self._chk_duel_dnd.setStyleSheet(
             "QCheckBox { color: #FF7F00; font-weight: bold; font-size: 10pt; padding: 4px; }"
         )
@@ -998,6 +998,10 @@ class DuelsMixin:
             self._duel_invite_handled_ids = set()
         self._duel_invite_handled_ids.add(duel_id)
 
+        if not hasattr(self, "_duel_invite_handled_ids"):
+            self._duel_invite_handled_ids = set()
+        self._duel_invite_handled_ids.add(duel_id)
+
         # Check VPX running — cannot accept while VPX is active.
         try:
             w = getattr(self, "watcher", None)
@@ -1114,7 +1118,7 @@ class DuelsMixin:
         # Always refresh the inbox table so the new invitation is visible.
         self._refresh_invitation_inbox()
 
-        # Skip if this duel was just accepted/declined (prevents double-show).
+        # Skip if this duel was already handled (accept/decline) to prevent double notification.
         handled = getattr(self, "_duel_invite_handled_ids", set())
         if duel_id in handled:
             handled.discard(duel_id)
@@ -1142,7 +1146,7 @@ class DuelsMixin:
                 "focused":    0,
             }
 
-            # Show the notification overlay (no auto-hide; stays until player acts).
+            # Show the notification overlay with no auto-hide (stays until player acts).
             try:
                 msg = self._duel_invite_notify_text(0)
                 self._get_mini_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
@@ -1436,6 +1440,16 @@ class DuelsMixin:
                         Q_ARG(int, 8),
                     )
         threading.Thread(target=_poll, daemon=True).start()
+
+    # ── Polling: periodic refresh ──────────────────────────────────────────────
+
+    @pyqtSlot()
+    def _periodic_duel_refresh(self) -> None:
+        try:
+            self._refresh_invitation_inbox()
+            self._refresh_active_duels()
+        except Exception:
+            pass
 
     # ── Polling: expiry check ──────────────────────────────────────────────────
 
@@ -2025,7 +2039,7 @@ class DuelsMixin:
                     self.bridge.duel_result.emit(duel.duel_id, result, my_score, opp_score)
                 except Exception:
                     pass
-                # Show result notification (only visible when VPX is closed; _duel_notify handles this)
+                # Show result notification via MiniInfoOverlay (suppressed when VPX is running)
                 try:
                     if result == "won":
                         res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"
