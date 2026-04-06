@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
-from trophy_mascot import _TrophieDrawWidget, _PinballDrawWidget
+from mascot.mascot import _TrophieDrawWidget, _PinballDrawWidget
 
 # ---------------------------------------------------------------------------
 # Skin definitions

@@ -1,8 +1,8 @@
 """steely_animations.py — Tick and draw helpers for Steely the pinball mascot
 (_PinballDrawWidget / OverlayTrophie).
 
-This module is imported by trophy_mascot.py to keep that file from growing
-further.  It follows the same pattern as trophy_animations.py:
+This module is imported by mascot.py to keep that file from growing
+further.  It follows the same pattern as trophie_animations.py:
   - tick_* functions receive the widget instance and modify _passive_extra_x,
     _passive_extra_y, _passive_angle and particle lists.
   - draw_* functions receive an active QPainter and the widget instance and

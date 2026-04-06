@@ -1,4 +1,4 @@
-"""trophy_mascot.py — Trophie mascot companion for VPX Achievement Watcher.
+"""mascot.py — Trophie mascot companion for VPX Achievement Watcher.
 
 Two instances:
   - GUITrophie  : bottom-left corner of the MainWindow central widget
@@ -17,8 +17,8 @@ import time
 from datetime import datetime
 from typing import Optional
 
-import trophy_animations
-import steely_animations
+from mascot import trophie_animations as trophy_animations
+from mascot import steely_animations
 
 from PyQt6.QtCore import (
     QPoint, QRect, QRectF, QSize, Qt, QTimer,
