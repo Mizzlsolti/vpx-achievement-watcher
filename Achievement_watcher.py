@@ -382,6 +382,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         except Exception:
             return False
 
+    def _player_is_visible(self) -> bool:
+        """Strict check: True only when the VPX Player window is visible (not just the editor)."""
+        try:
+            w = getattr(self, "watcher", None)
+            return bool(w and w._vp_player_visible())
+        except Exception:
+            return False
+
     def _on_subtab_changed_appearance(self, idx: int) -> None:
         self._notify_trophie_subtab(self.appearance_subtabs.tabText(idx))
 
