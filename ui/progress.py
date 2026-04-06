@@ -13,10 +13,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer, QUrl
 
-from config import f_custom_achievements_progress, f_global_ach, p_aweditor
-from cloud_sync import CloudSync
-from watcher_core import _strip_version_from_name
-from badges import RARITY_TIERS
+from core.config import f_custom_achievements_progress, f_global_ach, p_aweditor
+from core.cloud_sync import CloudSync
+from core.watcher_core import _strip_version_from_name
+from core.badges import RARITY_TIERS
 from .vps import VpsAchievementInfoDialog
 
 

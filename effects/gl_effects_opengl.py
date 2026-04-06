@@ -22,7 +22,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QWidget
 
-from theme import get_theme, get_theme_color, DEFAULT_THEME
+from core.theme import get_theme, get_theme_color, DEFAULT_THEME
 
 _HAS_OPENGL = False
 try:

@@ -13,7 +13,7 @@ from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from watcher_core import AppConfig, Bridge
 
-from watcher_core import (
+from .watcher_core import (
     log,
     save_json,
     load_json,
@@ -34,7 +34,7 @@ from watcher_core import (
     ensure_dir,
     is_excluded_field,
 )
-from config import f_custom_achievements_progress
+from .config import f_custom_achievements_progress
 
 _FIREBASE_ILLEGAL_CHARS_RE = re.compile(r'[.$#\[\]/]')
 

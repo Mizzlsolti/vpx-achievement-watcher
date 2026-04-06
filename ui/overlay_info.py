@@ -16,8 +16,8 @@ from ui.overlay_base import (
     _force_topmost,
     _start_topmost_timer,
 )
-from theme import get_theme_color
-from gl_effects_opengl import (
+from core.theme import get_theme_color
+from effects.gl_effects_opengl import (
     draw_glow_border as _draw_glow_border,
     BreathingPulse,
     ScanIn, GlowSweep, ColorMorph,

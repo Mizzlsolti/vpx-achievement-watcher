@@ -16,9 +16,9 @@ from PyQt6.QtGui import (
     QPainter, QImage, QPen, QLinearGradient, QBrush,
 )
 
-from watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, p_highlights, load_json, f_custom_achievements_progress
-from theme import get_theme_color, get_theme, DEFAULT_THEME
-from gl_effects_opengl import (
+from core.watcher_core import APP_DIR, register_raw_input_for_window, p_aweditor, p_highlights, load_json, f_custom_achievements_progress
+from core.theme import get_theme_color, get_theme, DEFAULT_THEME
+from effects.gl_effects_opengl import (
     draw_glow_border as _draw_glow_border,
     ease_out_bounce as _ease_out_bounce,
     ease_out_cubic as _ease_out_cubic,
@@ -45,7 +45,7 @@ try:
 except Exception:
     _sound_mod = None
 
-from post_processing import (
+from effects.post_processing import (
     PostBloom, PostMotionBlur, PostChromaticAberration,
     PostVignette, PostFilmGrain, PostScanlines,
 )

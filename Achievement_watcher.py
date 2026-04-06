@@ -37,13 +37,13 @@ from ctypes import wintypes
 import ssl
 from urllib.request import Request, urlopen
 
-from config import (
+from core.config import (
     AppConfig, f_achievements_state, f_global_ach,
     f_vps_mapping, f_vpsdb_cache,
     f_custom_achievements_progress, p_aweditor,
 )
-from cloud_sync import CloudSync
-from watcher_core import (
+from core.cloud_sync import CloudSync
+from core.watcher_core import (
     APP_DIR, Watcher,
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
     WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
@@ -58,14 +58,14 @@ from watcher_core import (
     _is_valid_rom_name,
     WATCHER_VERSION,
 )
-from badges import (
+from core.badges import (
     compute_player_level, LEVEL_TABLE, PRESTIGE_THRESHOLD, compute_rarity, RARITY_TIERS,
     BADGE_DEFINITIONS,
 )
 
 from ui.dialogs import FeedbackDialog, AchievementBeatenDialog
-from tutorial import TutorialWizardDialog
-from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
+from core.tutorial import TutorialWizardDialog
+from core.theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
 from ui.cloud_stats import CloudStatsMixin
 from aweditor import AWEditorMixin
 from ui.system import SystemMixin
@@ -83,8 +83,8 @@ from ui.vps import (
 )
 from ui.available_maps import _AvailableMapsWorker
 
-import notifications as _notif
-import sound
+import core.notifications as _notif
+import core.sound as sound
 
 from mascot.mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
 

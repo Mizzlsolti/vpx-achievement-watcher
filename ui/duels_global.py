@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QVBoxLayout, QWidget,
 )
 
-from duel_engine import DuelStatus
+from core.duel_engine import DuelStatus
 
 _TABLE_STYLE = (
     "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"

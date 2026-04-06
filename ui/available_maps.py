@@ -4,7 +4,7 @@ import os
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from watcher_core import (
+from core.watcher_core import (
     AppConfig,
     log,
     run_vpxtool_get_rom,

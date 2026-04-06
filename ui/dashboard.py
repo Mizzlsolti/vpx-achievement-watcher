@@ -12,9 +12,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot, Q_ARG, QMetaObject
 
-import notifications as _notif
-from cloud_sync import CloudSync
-from watcher_core import _strip_version_from_name, _is_valid_rom_name
+import core.notifications as _notif
+from core.cloud_sync import CloudSync
+from core.watcher_core import _strip_version_from_name, _is_valid_rom_name
 from .dialogs import AchievementBeatenDialog
 
 

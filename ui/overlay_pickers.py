@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 from PyQt6.QtCore import Qt, QRect, QPoint
 from PyQt6.QtGui import QFont, QFontMetrics
 
-from theme import get_theme_color
+from core.theme import get_theme_color
 from ui.overlay_base import _BasePositionPicker
 
 

@@ -21,7 +21,7 @@ from typing import Optional, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from watcher_core import AppConfig, Bridge
 
-from watcher_core import (
+from .watcher_core import (
     log,
     load_json,
     ensure_dir,
@@ -29,7 +29,7 @@ from watcher_core import (
     p_aweditor,
     _strip_version_from_name,
 )
-from cloud_sync import CloudSync
+from .cloud_sync import CloudSync
 
 # ---------------------------------------------------------------------------
 # Registry

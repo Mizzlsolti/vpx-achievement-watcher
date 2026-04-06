@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer
 
-from watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir, _strip_version_from_name
+from core.watcher_core import AppConfig, WATCHER_VERSION, log, ensure_dir, _strip_version_from_name
 
 
 _REPO_ISSUES_URL = "https://github.com/Mizzlsolti/vpx-achievement-watcher/issues/new"
