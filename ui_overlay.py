@@ -1977,8 +1977,10 @@ class MiniInfoOverlay(QWidget):
         W, H = img.width(), img.height()
         
         use_saved = bool(ov.get("notifications_saved", False))
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         
         if use_saved:
             if self._portrait_mode:
@@ -2298,8 +2300,10 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         W, H = img.width(), img.height()
         self.setFixedSize(W, H)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         portrait = bool(ov.get("flip_counter_portrait", ov.get("portrait_mode", True)))
         use_saved = bool(ov.get("flip_counter_saved", ov.get("flip_counter_custom", False)))
         if use_saved:
@@ -2397,8 +2401,10 @@ class FlipCounterPositionPicker(QWidget):
                 x0 = int(ov.get("flip_counter_x_landscape", 100))
                 y0 = int(ov.get("flip_counter_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
 
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
@@ -2407,12 +2413,12 @@ class FlipCounterPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -2535,8 +2541,10 @@ class TimerPositionPicker(QWidget):
                 x0 = int(ov.get("ch_timer_x_landscape", 100))
                 y0 = int(ov.get("ch_timer_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2544,12 +2552,12 @@ class TimerPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -2654,8 +2662,10 @@ class ToastPositionPicker(QWidget):
                 x0 = int(ov.get("ach_toast_x_landscape", 100))
                 y0 = int(ov.get("ach_toast_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2663,12 +2673,12 @@ class ToastPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -2791,8 +2801,10 @@ class ChallengeOVPositionPicker(QWidget):
                 x0 = int(ov.get("ch_ov_x_landscape", 100))
                 y0 = int(ov.get("ch_ov_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
         self.setGeometry(x, y, self._w, self._h)
@@ -2800,12 +2812,12 @@ class ChallengeOVPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -2910,9 +2922,11 @@ class MiniInfoPositionPicker(QWidget):
                 x0 = int(ov.get("notifications_x_landscape", 100))
                 y0 = int(ov.get("notifications_y_landscape", 100))
         else:
-            # Wenn noch nie gespeichert, starte in der Mitte
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            # Wenn noch nie gespeichert, starte in der Mitte (auf dem Primary Screen)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
 
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
@@ -2921,12 +2935,12 @@ class MiniInfoPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -2937,26 +2951,35 @@ class MiniInfoPositionPicker(QWidget):
         pad_h = 22
         max_text_width = 520
         _accent = get_theme_color(self.parent_gui.cfg, "accent")
-        html = (
-            f"<div style='font-size:{body_pt}pt;font-family:\"{font_family}\";'>"
-            f"<span style='color:{_accent};'>NVRAM file not found or not readable</span>"
-            f"<br><span style='color:#DDDDDD;'>closing in 5…</span>"
-            f"</div>"
-        )
-        tmp = QLabel()
-        tmp.setTextFormat(Qt.TextFormat.RichText)
-        tmp.setStyleSheet(f"color:{_accent};background:transparent;")
-        tmp.setFont(QFont(font_family, body_pt))
-        tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tmp.setText(html)
-        tmp.setFixedWidth(max_text_width)
-        tmp.adjustSize()
-        text_w = tmp.width()
-        text_h = tmp.sizeHint().height()
-        W = max(200, text_w + pad_w)
-        H = max(60, text_h + pad_h)
-        return W, H
+        # Measure against all possible notification messages to find the largest size
+        candidate_messages = [
+            f"<span style='color:{_accent};'>CHALLENGE COMPLETE!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>TIME'S UP!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>No NVRAM map available. Challenges require a map for score.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
+            f"<span style='color:{_accent};'>No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>NVRAM file not found or not readable</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>💀 DUEL LOST. You: 42,069,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
+            f"<span style='color:{_accent};'>Challenge can only be started in-game.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>Overlay only available after VPX end</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+        ]
+        max_w, max_h = 200, 60
+        for msg_html in candidate_messages:
+            html = f"<div style='font-size:{body_pt}pt;font-family:\"{font_family}\";'>{msg_html}</div>"
+            tmp = QLabel()
+            tmp.setTextFormat(Qt.TextFormat.RichText)
+            tmp.setStyleSheet(f"color:{_accent};background:transparent;")
+            tmp.setFont(QFont(font_family, body_pt))
+            tmp.setWordWrap(True)
+            tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            tmp.setText(html)
+            tmp.setFixedWidth(max_text_width)
+            tmp.adjustSize()
+            text_w = tmp.width()
+            text_h = tmp.sizeHint().height()
+            max_w = max(max_w, text_w + pad_w)
+            max_h = max(max_h, text_h + pad_h)
+        return max_w, max_h
 
     def _sync_from_cfg(self):
         try:
@@ -3177,8 +3200,10 @@ class StatusOverlay(_OverlayFxMixin, QWidget):
         W, H = img.width(), img.height()
 
         use_saved = bool(ov.get("status_overlay_saved", False))
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
 
         if use_saved:
             if self._portrait_mode:
@@ -3353,8 +3378,10 @@ class StatusOverlayPositionPicker(QWidget):
                 x0 = int(ov.get("status_overlay_x_landscape", 100))
                 y0 = int(ov.get("status_overlay_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
 
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
@@ -3363,12 +3390,12 @@ class StatusOverlayPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
@@ -3490,8 +3517,10 @@ class OverlayPositionPicker(QWidget):
             x0 = int(ov.get("pos_x", 100))
             y0 = int(ov.get("pos_y", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
             
         w_clamp = min(self._w, geo.width())
         h_clamp = min(self._h, geo.height())
@@ -3504,12 +3533,12 @@ class OverlayPositionPicker(QWidget):
         self.raise_()
 
     def _safe_screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _sync_from_cfg(self):
@@ -4036,8 +4065,10 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
             W = EW - 2 * burst_margin
             H = EH - 2 * burst_margin
             use_saved = bool(ov.get("ach_toast_saved", ov.get("ach_toast_custom", False)))
-            screen = QApplication.primaryScreen()
-            geo = screen.availableGeometry() if screen else QRect(0, 0, 1280, 720)
+            screens = QApplication.screens() or []
+            geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+            for s in screens[1:]:
+                geo = geo.united(s.availableGeometry())
             if use_saved:
                 if portrait:
                     x = int(ov.get("ach_toast_x_portrait", 100))
@@ -4388,8 +4419,10 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
             return
         W, H = img.width(), img.height()
         self.setFixedSize(W, H)
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         ov = self.parent_gui.cfg.OVERLAY or {}
         portrait = bool(ov.get("ch_timer_portrait", ov.get("portrait_mode", True)))
         use_saved = bool(ov.get("ch_timer_saved", ov.get("ch_timer_custom", False)))
@@ -4885,8 +4918,10 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         img = self._compose_image()
         W, H = img.width(), img.height()
         self.setFixedSize(W, H)
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         ov = self.parent_gui.cfg.OVERLAY or {}
         portrait = bool(ov.get("ch_ov_portrait", ov.get("portrait_mode", True)))
         use_saved = bool(ov.get("ch_ov_saved", ov.get("ch_ov_custom", False)))
@@ -5194,8 +5229,10 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         img = self._compose_image()
         W, H = img.width(), img.height()
         self.setFixedSize(W, H)
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         ov = self.parent_gui.cfg.OVERLAY or {}
         use_saved = bool(ov.get("ch_ov_saved", ov.get("ch_ov_custom", False)))
         portrait = bool(ov.get("ch_ov_portrait", ov.get("portrait_mode", True)))
@@ -5454,8 +5491,10 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         W, H = img.width(), img.height()
         self.setFixedSize(W, H)
         ov = self.parent_gui.cfg.OVERLAY or {}
-        scr = QApplication.primaryScreen()
-        geo = scr.availableGeometry() if scr else QRect(0, 0, 1280, 720)
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
         portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
         use_saved = bool(ov.get("heat_bar_saved", ov.get("heat_bar_custom", False)))
         if use_saved:
@@ -5524,8 +5563,10 @@ class HeatBarPositionPicker(QWidget):
                 x0 = int(ov.get("heat_bar_x_landscape", 20))
                 y0 = int(ov.get("heat_bar_y_landscape", 100))
         else:
-            x0 = int(geo.left() + (geo.width() - self._w) // 2)
-            y0 = int(geo.top() + (geo.height() - self._h) // 2)
+            _pscr = QApplication.primaryScreen()
+            _pgeo = _pscr.availableGeometry() if _pscr else geo
+            x0 = int(_pgeo.left() + (_pgeo.width() - self._w) // 2)
+            y0 = int(_pgeo.top() + (_pgeo.height() - self._h) // 2)
 
         x = min(max(geo.left(), x0), geo.right() - self._w)
         y = min(max(geo.top(),  y0), geo.bottom() - self._h)
@@ -5534,12 +5575,12 @@ class HeatBarPositionPicker(QWidget):
         self.raise_()
 
     def _screen_geo(self) -> QRect:
-        try:
-            scr = QApplication.primaryScreen()
-            if scr:
-                return scr.availableGeometry()
-        except Exception:
-            pass
+        screens = QApplication.screens() or []
+        if screens:
+            vgeo = screens[0].availableGeometry()
+            for s in screens[1:]:
+                vgeo = vgeo.united(s.availableGeometry())
+            return vgeo
         return QRect(0, 0, 1280, 720)
 
     def _calc_overlay_size(self) -> tuple[int, int]:
