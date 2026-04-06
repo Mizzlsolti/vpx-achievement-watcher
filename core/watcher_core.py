@@ -1,10 +1,8 @@
-
 from __future__ import annotations
 
 import random
-import subprocess
-import hashlib
 import shutil
+import subprocess
 import os, sys, time, json, re, glob, threading, uuid
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
@@ -17,101 +15,12 @@ except Exception:
     ZoneInfo = None
 
 try:
-    import requests
-except Exception:
-    requests = None
-
-try:
     import win32gui
 except Exception:
     win32gui = None
 
 import ctypes
 from ctypes import wintypes
-import ssl
-from urllib.request import Request, urlopen
-
-def resource_path(rel: str) -> str:
-    base = getattr(sys, "_MEIPASS", None)
-    if base and os.path.isdir(base):
-        p = os.path.join(base, rel)
-        if os.path.exists(p):
-            return p
-    return os.path.join(APP_DIR, rel)
-
-WATCHER_VERSION = "2.9.1"
-
-# Custom-events polling constants
-_CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
-_CUSTOM_EVENT_STARTUP_GRACE_SEC = 10.0  # seconds after session start during which triggers are discarded
-
-
-def _strip_version_from_name(name: str) -> str:
-    """Remove all trailing parenthesised/bracketed suffixes and bare version numbers.
-
-    Examples:
-        "Medieval Madness (Williams)"             -> "Medieval Madness"
-        "AC/DC (Premium) (V1.13b)"                -> "AC/DC"
-        "Theatre of Magic [VPX]"                  -> "Theatre of Magic"
-        "Attack from Mars (Remake) (2.0)"         -> "Attack from Mars"
-        "Shovel Knight (Original 2017) v1.2.1"    -> "Shovel Knight"
-    """
-    result = name
-    while True:
-        # Use separate patterns for each delimiter type to avoid matching
-        # unbalanced pairs such as "(Name]".
-        stripped = re.sub(r"\s*\([^\)]*\)\s*$", "", result, flags=re.IGNORECASE).strip()
-        stripped = re.sub(r"\s*\[[^\]]*\]\s*$", "", stripped, flags=re.IGNORECASE).strip()
-        # Also strip trailing bare version numbers such as "v1.2.1", "v2.0", "v1.2.1-beta"
-        stripped = re.sub(r"\s+v\d+(?:\.\d+)*(?:[.-]\S+)?$", "", stripped, flags=re.IGNORECASE).strip()
-        if stripped == result:
-            break
-        result = stripped
-    return result
-
-
-# Alias used by callers that want to strip all parenthesised/bracketed suffixes.
-_clean_table_name = _strip_version_from_name
-
-
-def _is_valid_rom_name(rom: str) -> bool:
-    """Return True if *rom* is a valid VPinMAME ROM name (only [A-Za-z0-9_]).
-
-    Custom achievement table names (e.g. "Blood Machines (Original 2022)") contain
-    spaces and special characters and must never be used as Firebase path segments.
-    """
-    return bool(rom and re.fullmatch(r"[A-Za-z0-9_]+", rom))
-
-
-def _fetch_json_url(url: str, timeout: int = 25) -> dict:
-    ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
-    if requests:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": ua})
-        r.raise_for_status()
-        return r.json()
-    req = Request(url, headers={"User-Agent": ua})
-    ctx = ssl.create_default_context()
-    with urlopen(req, timeout=timeout, context=ctx) as resp:
-        if resp.status < 200 or resp.status >= 300:
-            raise RuntimeError(f"HTTP {resp.status} for {url}")
-        raw = resp.read()
-    try:
-        return json.loads(raw.decode("utf-8"))
-    except Exception:
-        return json.loads(raw)
-
-def _fetch_bytes_url(url: str, timeout: int = 25) -> bytes:
-    ua = "AchievementWatcher/1.0 (+https://github.com/Mizzlsolti)"
-    if requests:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": ua})
-        r.raise_for_status()
-        return r.content
-    req = Request(url, headers={"User-Agent": ua})
-    ctx = ssl.create_default_context()
-    with urlopen(req, timeout=timeout, context=ctx) as resp:
-        if resp.status < 200 or resp.status >= 300:
-            raise RuntimeError(f"HTTP {resp.status} for {url}")
-        return resp.read()
 
 from .input_hook import (
     JOYINFOEX, JOY_RETURNALL, JOYERR_NOERROR, _joyGetPosEx,
@@ -124,14 +33,67 @@ from .input_hook import (
     register_raw_input_for_window,
 )
 
-if getattr(sys, 'frozen', False):
-    # Running as a PyInstaller-bundled .exe
-    # sys.executable always points to the actual .exe regardless of working directory
-    APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
-else:
-    # Running as a plain Python script (development)
-    APP_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+from .config import (
+    AppConfig, DEFAULT_OVERLAY, DEFAULT_LOG_SUPPRESS,
+    CHALLENGES_ENABLED, VK_LSHIFT, VK_RSHIFT,
+    HEAT_HOLD_RATE, HEAT_PRESS_BURST, HEAT_COOLDOWN_RATE,
+    EXCLUDED_FIELDS, EXCLUDED_FIELDS_LC, is_excluded_field,
+    p_maps, p_local_maps, p_session, p_highlights, p_achievements,
+    p_rom_spec, f_global_ach, f_achievements_state, f_log, f_index,
+    f_romnames, p_vps, p_vps_img, f_vps_mapping, f_vpsdb_cache,
+    p_aweditor, p_aweditor_data, p_custom_events, f_custom_achievements_progress,
+    f_legacy_cleanup_marker, f_progress_upload_log,
+    f_rom_keys_lowercased_marker, f_rom_keys_cloud_cleaned_marker,
+    _load_progress_upload_log, _save_progress_upload_log,
+    _migrate_runtime_dirs,
+    APP_DIR, CONFIG_FILE,
+)
+
+from .watcher_io import (
+    resource_path,
+    _strip_version_from_name,
+    _clean_table_name,
+    _is_valid_rom_name,
+    _fetch_json_url,
+    _fetch_bytes_url,
+    VPXTOOL_EXE, VPXTOOL_DIRNAME, VPXTOOL_PATH, VPXTOOL_URL,
+    ensure_vpxtool,
+    run_vpxtool_get_rom,
+    run_vpxtool_get_script_authors,
+    run_vpxtool_info_show,
+    _parse_authors_from_script,
+    PREFETCH_MODE, PREFETCH_LOG_EVERY, ROLLING_HISTORY_PER_ROM,
+    ensure_dir,
+    _ts,
+    _set_folder_hidden,
+    quiet_prefixes,
+    log,
+    _raw_load_json,
+    _raw_save_json,
+    LEGACY_SALT, BASE_SALT,
+    _generate_legacy_signature,
+    _generate_signature,
+    _is_secure_path,
+    load_json,
+    save_json,
+    secure_save_json,
+    secure_load_json,
+    write_text,
+    apply_tooltips,
+    sanitize_filename,
+)
+
+from .watcher_migrate import (
+    _is_weird_value,
+    _migrate_rom_keys_to_lowercase,
+)
+
+WATCHER_VERSION = "2.9.1"
+
+# Custom-events polling constants
+_CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
+_CUSTOM_EVENT_STARTUP_GRACE_SEC = 10.0  # seconds after session start during which triggers are discarded
+
 print(f"[CONFIG] APP_DIR resolved to: {APP_DIR}")
 print(f"[CONFIG] CONFIG_FILE: {CONFIG_FILE}")
 
@@ -174,572 +136,10 @@ MANUFACTURER_EMOJI: dict[str, str] = {
     "Midway":    "🟤",
 }
 
-from .config import (
-    AppConfig, DEFAULT_OVERLAY, DEFAULT_LOG_SUPPRESS,
-    CHALLENGES_ENABLED, VK_LSHIFT, VK_RSHIFT,
-    HEAT_HOLD_RATE, HEAT_PRESS_BURST, HEAT_COOLDOWN_RATE,
-    EXCLUDED_FIELDS, EXCLUDED_FIELDS_LC, is_excluded_field,
-    p_maps, p_local_maps, p_session, p_highlights, p_achievements,
-    p_rom_spec, f_global_ach, f_achievements_state, f_log, f_index,
-    f_romnames, p_vps, p_vps_img, f_vps_mapping, f_vpsdb_cache,
-    p_aweditor, p_aweditor_data, p_custom_events, f_custom_achievements_progress,
-    f_legacy_cleanup_marker, f_progress_upload_log,
-    f_rom_keys_lowercased_marker, f_rom_keys_cloud_cleaned_marker,
-    _load_progress_upload_log, _save_progress_upload_log,
-    _migrate_runtime_dirs,
-)
 
 GITHUB_BASE = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e"
 INDEX_URL = f"{GITHUB_BASE}/index.json"
 ROMNAMES_URL = f"{GITHUB_BASE}/romnames.json"
-VPXTOOL_EXE = "vpxtool.exe"
-VPXTOOL_DIRNAME = "tools"
-VPXTOOL_PATH = os.path.join(APP_DIR, VPXTOOL_DIRNAME, VPXTOOL_EXE)
-VPXTOOL_URL = "https://github.com/francisdb/vpxtool/releases/download/v0.26.0/vpxtool-Windows-x86_64-v0.26.0.zip"
-
-
-def ensure_vpxtool(cfg: AppConfig) -> str | None:
-    import zipfile
-    import io
-    try:
-        if os.path.isfile(VPXTOOL_PATH):
-            return VPXTOOL_PATH
-
-        log(cfg, f"[VPXTOOL] Download from {VPXTOOL_URL}...")
-        data = _fetch_bytes_url(VPXTOOL_URL, timeout=30)
-        ensure_dir(os.path.dirname(VPXTOOL_PATH))
-        
-        with zipfile.ZipFile(io.BytesIO(data)) as z:
-            with open(VPXTOOL_PATH, "wb") as f:
-                f.write(z.read("vpxtool.exe"))
-
-        try:
-            os.chmod(VPXTOOL_PATH, 0o755)
-        except Exception:
-            pass
-
-        log(cfg, f"[VPXTOOL] Successfully downloaded and unzipped -> {VPXTOOL_PATH}")
-        return VPXTOOL_PATH
-    except Exception as e:
-        log(cfg, f"[VPXTOOL] download failed: {e}", "ERROR")
-        return None
-
-def run_vpxtool_get_rom(cfg: AppConfig, vpx_path: str, suppress_warn: bool = False) -> str | None:
-
-    if not vpx_path or not os.path.isfile(vpx_path):
-        return None
-
-    exe = ensure_vpxtool(cfg)
-    if not exe:
-        return None
-    try:
-        key = os.path.abspath(vpx_path).lower()
-    except Exception:
-        key = str(vpx_path)
-    if not hasattr(run_vpxtool_get_rom, "_warned_keys"):
-        run_vpxtool_get_rom._warned_keys = set()
-    warned = run_vpxtool_get_rom._warned_keys 
-
-    cmd = [exe, "romname", vpx_path]
-    try:
-        cp = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=20,
-            creationflags=0x08000000
-        )
-        out = ((cp.stdout or "") + "\n" + (cp.stderr or "")).strip()
-
-        if cp.returncode != 0:
-            if key not in warned:
-                if not suppress_warn:
-                    log(cfg, f"[VPXTOOL] romname failed rc={cp.returncode}: {out}", "WARN")
-                warned.add(key)
-            return None
-
-        lines = (cp.stdout or "").strip().splitlines()
-        if lines:
-            rom = lines[-1].strip().strip('"').strip("'")
-            if re.fullmatch(r"[A-Za-z0-9_]+", rom or ""):
-                if key in warned:
-                    warned.discard(key)
-                return rom.lower()
-
-        m = re.search(r"\b([A-Za-z0-9_]{2,})\b", out)
-        if m:
-            if key in warned:
-                warned.discard(key)
-            return m.group(1).lower()
-
-        if key not in warned:
-            if not suppress_warn:
-                log(cfg, f"[VPXTOOL] romname returned no parsable output: {out}", "WARN")
-            warned.add(key)
-        return None
-
-    except Exception as e:
-        if key not in warned:
-            if not suppress_warn:
-                log(cfg, f"[VPXTOOL] romname exception: {e}", "WARN")
-            warned.add(key)
-        return None
-
-
-def run_vpxtool_get_script_authors(cfg: "AppConfig", vpx_path: str) -> list:
-    """
-    Runs: vpxtool script show "<vpx_path>"
-    Parses the VBS script output for author names from comment lines.
-    Returns a list of author name strings (possibly empty).
-    No logging — silent failure is OK.
-    """
-    if not vpx_path or not os.path.isfile(vpx_path):
-        return []
-
-    exe = ensure_vpxtool(cfg)
-    if not exe:
-        return []
-
-    cmd = [exe, "script", "show", vpx_path]
-    try:
-        cp = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            creationflags=0x08000000,
-            encoding="utf-8",
-            errors="replace",
-        )
-        script = cp.stdout or ""
-        return _parse_authors_from_script(script)
-    except Exception:
-        return []
-
-
-def run_vpxtool_info_show(cfg: "AppConfig", vpx_path: str) -> dict:
-    """
-    Runs: vpxtool info show "<vpx_path>"
-    Parses the human-readable key: value output into a dict.
-    Returns a dict with keys like 'table_name', 'version', 'author', 'release_date',
-    'description', 'blurb', 'rules', 'save_revision', 'save_date', 'vpx_version'.
-    Returns {} on any failure (silent).
-    """
-    if not vpx_path or not os.path.isfile(vpx_path):
-        return {}
-
-    exe = ensure_vpxtool(cfg)
-    if not exe:
-        return {}
-
-    cmd = [exe, "info", "show", vpx_path]
-    try:
-        cp = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=20,
-            creationflags=0x08000000,
-            encoding="utf-8",
-            errors="replace",
-        )
-        output = cp.stdout or ""
-        result = {}
-        for line in output.splitlines():
-            m = re.match(r"^\s*(.+?):\s+(.*)$", line)
-            if m:
-                raw_key = m.group(1).strip()
-                value = m.group(2).strip()
-                key = re.sub(r"\s+", "_", raw_key).lower()
-                result[key] = value
-        return result
-    except Exception:
-        return {}
-
-
-def _parse_authors_from_script(script: str) -> list:
-    """
-    Parse author names from a VBS script.
-    Looks for comment lines containing author indicators.
-    Returns a deduplicated list of primary author name tokens.
-
-    Primary author patterns searched (case-insensitive):
-      ' Table by JPSalas
-      ' Author: nFozzy, Fleep
-      ' Authors: Brad1X, Sixtoe
-      ' Created by Tom Tower
-      ' VPX by Dozer
-      ' VPX recreation by g5k
-      ' Original by George H
-      ' Adapted by Flukemaster
-
-    Lines after a '  Thanks to:' / '  Credits:' marker are treated as
-    contributor credits and excluded from the primary author list.
-    """
-    authors = []
-    seen = set()
-    in_credits_section = False
-
-    # Detect entry into a thanks/credits block
-    _credits_re = re.compile(r"^\s*'[^']*(?:thanks?\s+to|credits?)\s*:", re.IGNORECASE)
-
-    # Match comment lines with primary author-like patterns.
-    # vpx(?:\s+\w+)*\s+by handles "VPX by", "VPX recreation by", "VPX conversion by", etc.
-    _primary_re = re.compile(
-        r"^\s*'[^']*(?:author(?:s)?|created\s+by|table\s+by|vpx(?:\s+\w+)*\s+by"
-        r"|original\s+by|adapted\s+by|remake\s+by|mod\s+by|script\s+by"
-        r"|recreation\s+by|conversion\s+by|made\s+by)\s*:?\s*(.+)",
-        re.IGNORECASE,
-    )
-
-    for line in script.splitlines():
-        # Entering a thanks/credits section — stop collecting primary authors
-        if _credits_re.match(line):
-            in_credits_section = True
-            continue
-        if in_credits_section:
-            continue
-
-        m = _primary_re.match(line)
-        if m:
-            raw = m.group(1).strip().strip("'").strip()
-            # Split on common separators: comma, ampersand, " and ", " & "
-            tokens = re.split(r"\s*[,&]\s*|\s+and\s+", raw, flags=re.IGNORECASE)
-            for tok in tokens:
-                tok = tok.strip().strip("'\"").strip()
-                # Remove trailing version/year info like "(v1.0)" or "2024"
-                tok = re.sub(r"\s*[\(\[].*", "", tok).strip()
-                if tok and len(tok) >= 2:
-                    key = tok.lower()
-                    if key not in seen:
-                        seen.add(key)
-                        authors.append(tok)
-    return authors
-
-
-PREFETCH_MODE = "background"
-PREFETCH_LOG_EVERY = 50
-ROLLING_HISTORY_PER_ROM = 10
-
-def ensure_dir(path): os.makedirs(path, exist_ok=True)
-def _ts(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-def _set_folder_hidden(path: str):
-    """Set Windows FILE_ATTRIBUTE_HIDDEN on *path*. No-op on non-Windows."""
-    try:
-        FILE_ATTRIBUTE_HIDDEN = 0x02
-        ctypes.windll.kernel32.SetFileAttributesW(str(path), FILE_ATTRIBUTE_HIDDEN)
-    except Exception:
-        pass
-
-quiet_prefixes: tuple[str, ...] = ()
-
-def log(cfg: AppConfig, msg: str, level: str = "INFO"):
-    try:
-        suppress_list = (getattr(cfg, "LOG_SUPPRESS", None) or DEFAULT_LOG_SUPPRESS) if cfg else DEFAULT_LOG_SUPPRESS
-        for pat in suppress_list:
-            if pat and pat in str(msg):
-                return
-    except Exception:
-        pass
-    line = f"[{_ts()}] [{level}] {msg}"
-    suppress_console = any(str(msg).startswith(p) for p in quiet_prefixes) if quiet_prefixes else False
-    try:
-        ensure_dir(os.path.dirname(f_log(cfg)))
-        with open(f_log(cfg), "a", encoding="utf-8") as fp:
-            fp.write(line + "\n")
-    except Exception:
-        pass
-    if not suppress_console:
-        print(line)
-
-def _raw_load_json(path, default=None):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-def _raw_save_json(path, obj):
-    tmp = None
-    try:
-        ensure_dir(os.path.dirname(path))
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(obj, f, indent=2, ensure_ascii=False)
-            f.flush()
-        try:
-            os.replace(tmp, path)
-        except Exception:
-            os.rename(tmp, path)
-        return True
-    except Exception:
-        try:
-            if tmp and os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
-        return False
-
-# ==========================================
-# ANTI-CHEAT SECURITY
-# ==========================================
-LEGACY_SALT = "VPX_S3cr3t_H4sh_9921!"
-BASE_SALT = "VpX_W@tcher_2024!"
-
-def _generate_legacy_signature(data: dict) -> str:
-    d = dict(data)
-    d.pop("_signature", None)
-    s = json.dumps(d, sort_keys=True, separators=(',', ':'))
-    return hashlib.sha256((s + LEGACY_SALT).encode('utf-8')).hexdigest()
-
-def _generate_signature(data: dict) -> str:
-    d = dict(data)
-    d.pop("_signature", None)
-    
-    score_val = str(d.get("score", "0"))
-    duration_val = str(d.get("duration", "0"))
-    session_val = str(d.get("session_id", "none"))
-    
-    dynamic_salt = f"{score_val}_{duration_val}_{session_val}_{BASE_SALT}"
-    s = json.dumps(d, sort_keys=True, separators=(',', ':'))
-    return hashlib.sha256((s + dynamic_salt).encode('utf-8')).hexdigest()
-
-def _is_secure_path(path: str) -> bool:
-    """Determines whether a file should be protected by anti-tamper signature.
-
-    Uses a whitelist approach: only gameplay-relevant local state files that
-    can directly affect achievements, scores, or progress are protected.
-    Non-critical files (config, caches, tool data, reference/definition files)
-    are intentionally left unsigned.
-
-    Protected categories:
-    - Achievement state (achievements_state.json)
-    - Challenge result history (session_stats/challenges/history/*.json)
-    - Session summary data (session_stats/Highlights/*.summary.json)
-    - Active player session state (session_stats/Highlights/activePlayers/*.json)
-    """
-    if not path:
-        return False
-    p = path.lower().replace("\\", "/")
-
-    if not p.endswith(".json"):
-        return False
-
-    # Achievement state – the main persisted achievement/progress store
-    if p.endswith("achievements_state.json"):
-        return True
-
-    # Challenge result history – local score/result records per ROM
-    if "/session_stats/challenges/history/" in p:
-        return True
-
-    # Session summary files – per-session result snapshots used for display and uploads
-    if "/session_stats/highlights/" in p and p.endswith(".summary.json"):
-        return True
-
-    # Active player session state – in-progress session data
-    if "/session_stats/highlights/activeplayers/" in p:
-        return True
-
-    return False
-
-def load_json(path, default=None):
-    data = _raw_load_json(path, None)
-    if data is None:
-        return default
-        
-    if _is_secure_path(path) and isinstance(data, dict):
-        sig = data.pop("_signature", None)
-        if not sig:
-            # Unsigned legacy file (e.g. from v2.5) – do not block; migrate to v2.6 protection now.
-            print(f"[SECURITY] Unsigned legacy file detected: {path}. Upgrading to v2.6 protection now.")
-            save_json(path, data)
-            return data
-            
-        expected_new = _generate_signature(data)
-        expected_legacy = _generate_legacy_signature(data)
-        
-        if sig == expected_new:
-            # File is already on the new security standard
-            data["_signature"] = sig
-        elif sig == expected_legacy:
-            # File is using the old security standard - allow it to load
-            print(f"[SECURITY] Legacy save file detected: {path}. Access granted. Upgrading immediately.")
-            data["_signature"] = sig
-            save_json(path, data)
-        else:
-            print(f"\n[SECURITY] TAMPERING DETECTED IN: {path}")
-            print("[SECURITY] The file has been blocked and will not be loaded!\n")
-            return default
-            
-    return data
-
-def save_json(path, obj):
-    if _is_secure_path(path) and isinstance(obj, dict):
-        try:
-            obj["_signature"] = _generate_signature(obj)
-        except Exception:
-            pass
-    return _raw_save_json(path, obj)
-
-secure_save_json = save_json
-secure_load_json = load_json
-
-def write_text(path, text):
-    tmp = None
-    try:
-        ensure_dir(os.path.dirname(path))
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(text)
-            try:
-                f.flush()
-                os.fsync(f.fileno())
-            except Exception:
-                pass
-        try:
-            os.replace(tmp, path)
-        except Exception:
-            os.rename(tmp, path)
-        return True
-    except Exception:
-        try:
-            if tmp and os.path.exists(tmp):
-                os.remove(tmp)
-        except Exception:
-            pass
-        return False
-
-def _is_weird_value(x: int) -> bool:
-    try:
-        return abs(int(x)) >= 400_000_000
-    except Exception:
-        return False
-
-def apply_tooltips(owner, tips: dict):
-    for name, text in (tips or {}).items():
-        try:
-            w = getattr(owner, name, None)
-            if w:
-                w.setToolTip(text)
-        except Exception:
-            pass
-
-def sanitize_filename(s):
-    s = re.sub(r"[^\w\-. ]+", "_", str(s))
-    return s.strip().replace(" ", "_")
-
-
-def _migrate_rom_keys_to_lowercase(cfg: "AppConfig") -> None:
-    """One-time migration: normalize all ROM keys to lowercase in state/log files and rename
-    .ach.json files.  Runs only once per installation, guarded by a marker file.
-    """
-    marker = f_rom_keys_lowercased_marker(cfg)
-    if os.path.isfile(marker):
-        return
-
-    migrated = False
-
-    # 1. Migrate achievements_state.json
-    state_path = f_achievements_state(cfg)
-    if os.path.isfile(state_path):
-        try:
-            state = secure_load_json(state_path, {}) or {}
-            changed = False
-
-            # Migrate state["session"] — dict keyed by ROM name
-            session = state.get("session", {})
-            if isinstance(session, dict) and any(k != k.lower() for k in session):
-                new_session: dict = {}
-                for rom_key, ach_list in session.items():
-                    lc_key = rom_key.lower()
-                    if lc_key not in new_session:
-                        new_session[lc_key] = []
-                    # Merge achievement lists, deduplicate by title (keep earlier timestamp)
-                    existing: dict = {
-                        e["title"]: e
-                        for e in new_session[lc_key]
-                        if isinstance(e, dict) and "title" in e
-                    }
-                    for entry in (ach_list if isinstance(ach_list, list) else []):
-                        if not isinstance(entry, dict) or "title" not in entry:
-                            continue
-                        title = entry["title"]
-                        if title not in existing:
-                            existing[title] = entry
-                        elif entry.get("ts", "") < existing[title].get("ts", ""):
-                            existing[title] = entry  # keep earlier timestamp
-                    new_session[lc_key] = list(existing.values())
-                state["session"] = new_session
-                changed = True
-
-            # Migrate state["roms_played"] — list of ROM names
-            roms_played = state.get("roms_played", [])
-            if isinstance(roms_played, list) and any(
-                r != r.lower() for r in roms_played if isinstance(r, str)
-            ):
-                state["roms_played"] = list(
-                    dict.fromkeys(r.lower() for r in roms_played if isinstance(r, str))
-                )
-                changed = True
-
-            if changed:
-                secure_save_json(state_path, state)
-                log(cfg, "[MIGRATE] Lowercased ROM keys in achievements_state.json")
-                migrated = True
-        except Exception as e:
-            log(cfg, f"[MIGRATE] rom_keys_lowercase: achievements_state error: {e}", "WARN")
-
-    # 2. Migrate progress_upload_log.json
-    try:
-        log_data = _load_progress_upload_log(cfg)
-        if log_data and any(k != k.lower() for k in log_data):
-            new_log: dict = {}
-            for rom_key, vps_id in log_data.items():
-                lc_key = rom_key.lower()
-                if lc_key not in new_log:
-                    new_log[lc_key] = vps_id
-            _save_progress_upload_log(cfg, new_log)
-            log(cfg, "[MIGRATE] Lowercased ROM keys in progress_upload_log.json")
-            migrated = True
-    except Exception as e:
-        log(cfg, f"[MIGRATE] rom_keys_lowercase: progress_upload_log error: {e}", "WARN")
-
-    # 3. Rename uppercase .ach.json files in the rom-specific achievements directory
-    rom_spec_dir = p_rom_spec(cfg)
-    if os.path.isdir(rom_spec_dir):
-        try:
-            for fn in os.listdir(rom_spec_dir):
-                if not fn.lower().endswith(".ach.json"):
-                    continue
-                stem = fn[: -len(".ach.json")]
-                if stem == stem.lower():
-                    continue  # already lowercase, nothing to do
-                lc_fn = stem.lower() + ".ach.json"
-                old_path = os.path.join(rom_spec_dir, fn)
-                new_path = os.path.join(rom_spec_dir, lc_fn)
-                if os.path.isfile(new_path):
-                    # Lowercase file already exists — remove the uppercase duplicate
-                    os.remove(old_path)
-                    log(cfg, f"[MIGRATE] Removed uppercase ROM spec: {fn} (lowercase exists)")
-                else:
-                    os.rename(old_path, new_path)
-                    log(cfg, f"[MIGRATE] Renamed ROM spec: {fn} → {lc_fn}")
-                migrated = True
-        except Exception as e:
-            log(cfg, f"[MIGRATE] rom_keys_lowercase: .ach.json error: {e}", "WARN")
-
-    # Write marker file so this migration only runs once
-    try:
-        ensure_dir(os.path.dirname(marker))
-        with open(marker, "w", encoding="utf-8") as _f:
-            _f.write("1")
-    except Exception as e:
-        log(cfg, f"[MIGRATE] rom_keys_lowercase: could not write marker: {e}", "WARN")
-
-    if migrated:
-        log(cfg, "[MIGRATE] ROM keys lowercase migration complete")
 
 
 from .badges import (
