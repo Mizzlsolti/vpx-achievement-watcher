@@ -1098,7 +1098,7 @@ class DuelsMixin:
 
         Updates the inbox table to show the new invitation.  When the window is
         minimized or hidden (e.g. to the system tray) and VPX is **not** running,
-        the shared :class:`~ui_overlay.MiniInfoOverlay` is used to show a
+        the shared :class:`~ui.overlay.MiniInfoOverlay` is used to show a
         notification with Accept / Decline options navigable via the Challenge
         hotkeys.  The notification auto-hides after 60 seconds **without**
         declining the invitation; it stays in the Duels-tab inbox.
@@ -1262,7 +1262,7 @@ class DuelsMixin:
     def _show_duel_result_overlay(self, result: str, your_score: int, their_score: int) -> None:
         """Display a brief result overlay after a duel completes.
 
-        Uses :class:`~ui_overlay.MiniInfoOverlay` (the System Notifications
+        Uses :class:`~ui.overlay.MiniInfoOverlay` (the System Notifications
         widget) to show a win, loss, or expiry message with the final scores.
 
         Parameters
@@ -1291,7 +1291,7 @@ class DuelsMixin:
     # ── Helper: mini overlay accessor ────────────────────────────────────────
 
     def _get_mini_overlay(self):
-        """Return the shared :class:`~ui_overlay.MiniInfoOverlay` instance.
+        """Return the shared :class:`~ui.overlay.MiniInfoOverlay` instance.
 
         Creates it lazily on first access so that the import is deferred and
         circular-import issues are avoided.

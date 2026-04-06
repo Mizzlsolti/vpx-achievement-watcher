@@ -87,7 +87,7 @@ def _link_program(vertex_src: str, fragment_src: str):
 _GL_CIRCLE_SEGMENTS = 64
 
 # ===========================================================================
-# 1. Helper functions (public API; previously private in ui_overlay.py)
+# 1. Helper functions (public API; previously private in ui_overlay.py, now in effects/gl_effects_opengl.py)
 # ===========================================================================
 
 def draw_glow_border(painter: QPainter, x: int, y: int, w: int, h: int,
@@ -136,7 +136,7 @@ def ease_out_cubic(t: float) -> float:
 
 
 # ===========================================================================
-# 2. Overlay Effect Widgets (moved from ui_overlay.py, public names)
+# 2. Overlay Effect Widgets (moved from ui_overlay.py into effects/gl_effects_opengl.py, public names)
 # ===========================================================================
 
 class EffectsWidget(QWidget):
@@ -145,7 +145,7 @@ class EffectsWidget(QWidget):
 
     Replaces ``OverlayEffectsWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects_opengl import EffectsWidget as OverlayEffectsWidget
+        from effects.gl_effects_opengl import EffectsWidget as OverlayEffectsWidget
     """
 
     _PARTICLE_COUNT = 28
@@ -316,7 +316,7 @@ class ShineWidget(QWidget):
 
     Replaces ``_OverlayShineWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects_opengl import ShineWidget as _OverlayShineWidget
+        from effects.gl_effects_opengl import ShineWidget as _OverlayShineWidget
     """
 
     _BAR_TOP_FRAC  = 0.25   # fraction of widget height where bar area starts
@@ -387,7 +387,7 @@ class HighlightWidget(QWidget):
 
     Replaces ``_OverlayHighlightWidget`` in ``ui_overlay.py``; import with::
 
-        from gl_effects_opengl import HighlightWidget as _OverlayHighlightWidget
+        from effects.gl_effects_opengl import HighlightWidget as _OverlayHighlightWidget
     """
 
     _FLASH_COLOR   = QColor(255, 200, 80)

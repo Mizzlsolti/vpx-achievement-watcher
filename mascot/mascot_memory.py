@@ -2,7 +2,7 @@
 
 Central module for all memory-driven, adaptive mascot personality logic shared
 by Steely and Trophie.  Integrates with ``_TrophieMemory`` from
-``trophy_mascot.py`` and extends it with:
+``mascot/trophy_data.py`` and ``mascot/trophy_widgets.py`` and extends it with:
 
   - Session / achievement milestones
   - Performance coaching per table
@@ -21,7 +21,7 @@ Public API
 ----------
 Construct one ``MascotMemorySystem`` per application run and keep it alive::
 
-    from mascot_memory import MascotMemorySystem
+    from mascot.mascot_memory import MascotMemorySystem
     mms = MascotMemorySystem(base_dir, trophie_memory=mem)
 
 Then call the appropriate hook and pass the returned comment string to whichever
