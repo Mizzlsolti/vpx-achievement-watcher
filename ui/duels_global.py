@@ -160,17 +160,22 @@ class GlobalDuelFeedWidget(QWidget):
             # challenger_name, opponent_name, challenger_score and opponent_score
             # are always stored correctly in the cloud.
             if ch_score >= 0 and op_score >= 0:
-                if ch_score >= op_score:
+                if ch_score == op_score:
                     winner_name = challenger_name
                     score_text = f"{ch_score:,} vs {op_score:,}"
+                    result_text = f"🤝 Tie ({challenger_name} wins)"
+                elif ch_score > op_score:
+                    winner_name = challenger_name
+                    score_text = f"{ch_score:,} vs {op_score:,}"
+                    result_text = f"🏆 {winner_name}"
                 else:
                     winner_name = opponent_name
                     score_text = f"{op_score:,} vs {ch_score:,}"
+                    result_text = f"🏆 {winner_name}"
             else:
                 winner_name = ""
                 score_text = ""
-
-            result_text = f"🏆 {winner_name}" if winner_name else "—"
+                result_text = "—"
 
             # Date column
             if completed_at:
