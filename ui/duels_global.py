@@ -163,7 +163,7 @@ class GlobalDuelFeedWidget(QWidget):
                 if ch_score == op_score:
                     winner_name = challenger_name
                     score_text = f"{ch_score:,} vs {op_score:,}"
-                    result_text = "🤝 Tie (Challenger wins)"
+                    result_text = f"🤝 Tie ({challenger_name} wins)"
                 elif ch_score > op_score:
                     winner_name = challenger_name
                     score_text = f"{ch_score:,} vs {op_score:,}"
