@@ -911,9 +911,8 @@ class OverlayPagesMixin:
     _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
     _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
 
-    def _overlay_page6_show(self):
-        """Show Page 6: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
-        self._ensure_overlay()
+    def _overlay_page6_build_html(self) -> str:
+        """Build and return the full HTML string for Page 6 (Score Duels Auto-Match)."""
         state = getattr(self, "_p6_state", "IDLE")
 
         _tc_primary = get_theme_color(self.cfg, "primary")
@@ -925,26 +924,47 @@ class OverlayPagesMixin:
         fs_body  = int(self.cfg.OVERLAY.get("base_body_size", 12))
         fs_hint  = int(self.cfg.OVERLAY.get("base_hint_size", 10))
 
-        # Common header
+        # Scale up from base sizes for impact on a cabinet display
+        fs_page_title  = fs_title + 6   # e.g. 23pt  – "⚔️ Score Duels"
+        fs_status      = fs_title + 2   # e.g. 19pt  – state label
+        fs_value       = fs_body  + 6   # e.g. 18pt  – info values
+        fs_label       = fs_body  + 4   # e.g. 16pt  – info labels
+        fs_action      = fs_body  + 2   # e.g. 14pt  – action hints
+
+        # Outer wrapper table: single cell, fills width, centers everything vertically
         header = (
-            f"<div style='text-align:center; color:{_tc_primary}; font-size:{fs_title}pt;"
-            f" font-weight:bold; padding:4px 0 2px 0;'>⚔️ Score Duels</div>"
-            f"<div style='border-top:1px solid {_tc_border}; margin:4px 8px;'></div>"
+            f"<table width='100%' cellspacing='0' cellpadding='0'>"
+            f"<tr><td align='center' style='padding:8px 0 4px 0;"
+            f" color:{_tc_primary}; font-size:{fs_page_title}pt; font-weight:bold;'>"
+            f"⚔️ Score Duels"
+            f"</td></tr>"
+            f"<tr><td>"
+            f"<table width='100%' cellspacing='0' cellpadding='0'><tr>"
+            f"<td style='border-top:2px solid {_tc_border};'></td>"
+            f"</tr></table>"
+            f"</td></tr>"
         )
 
         if state == "IDLE":
             body = (
-                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 2}pt;"
-                f" font-weight:bold; padding:10px 0 6px 0;'>🔍 Auto-Match</div>"
-                f"<div style='display:flex; justify-content:space-between; padding:4px 16px;"
-                f" font-size:{fs_body}pt;'>"
-                f"<span style='color:{_tc_accent};'>◀ Start Search</span>"
-                f"<span style='color:#888;'>Cancel ▶</span>"
-                f"</div>"
-                f"<div style='color:#888; font-size:{fs_hint}pt; padding:10px 16px 4px 16px;"
-                f" font-style:italic;'>"
-                f"Use ◀ Left to start searching for an opponent. Keep the overlay open until a match is found."
-                f"</div>"
+                f"<tr><td align='center' style='padding:12px 0 8px 0;"
+                f" color:{_tc_accent}; font-size:{fs_status}pt; font-weight:bold;'>"
+                f"🔍 Auto-Match"
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 12px 0;"
+                f" color:#888; font-size:{fs_hint}pt; font-style:italic;'>"
+                f"Find an opponent on a shared table automatically."
+                f"</td></tr>"
+                f"<tr>"
+                f"<td width='50%' align='left' style='padding:6px 16px 6px 8px;"
+                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
+                f"◀ Start Search"
+                f"</td>"
+                f"<td width='50%' align='right' style='padding:6px 8px 6px 16px;"
+                f" font-size:{fs_action}pt; color:#888;'>"
+                f"Close ▶"
+                f"</td>"
+                f"</tr>"
             )
         elif state == "SEARCHING":
             elapsed = int(getattr(self, "_p6_elapsed_sec", 0))
@@ -952,49 +972,110 @@ class OverlayPagesMixin:
             queue  = int(getattr(self, "_p6_queue_count", 0))
             shared = int(getattr(self, "_p6_shared_tables", 0))
             body = (
-                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 1}pt;"
-                f" font-weight:bold; padding:8px 0 4px 0;'>🔍 Searching for opponent...</div>"
-                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
-                f"Queue: {queue} player{'s' if queue != 1 else ''}</div>"
-                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
-                f"Shared Tables: {shared}</div>"
-                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px 8px 16px;'>"
-                f"Search Time: {mins}:{secs:02d}</div>"
-                f"<div style='text-align:right; padding:4px 16px; font-size:{fs_body}pt;'>"
-                f"<span style='color:{_tc_accent};'>Cancel ▶</span>"
-                f"</div>"
-                f"<div style='color:#888; font-size:{fs_hint}pt; padding:4px 16px;"
-                f" font-style:italic;'>"
-                f"Press ▶ Right to cancel the search. Keep the overlay open until a match is found."
-                f"</div>"
+                f"<tr><td align='center' style='padding:10px 0 8px 0;"
+                f" color:{_tc_accent}; font-size:{fs_status}pt; font-weight:bold;'>"
+                f"🔍 Searching for opponent..."
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:0 0 6px 0;'>"
+                f"<table cellspacing='0' cellpadding='0'>"
+                f"<tr>"
+                f"<td align='right' style='padding:4px 8px 4px 0;"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>Queue:</td>"
+                f"<td align='left' style='padding:4px 0 4px 8px;"
+                f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
+                f"{queue} player{'s' if queue != 1 else ''}"
+                f"</td>"
+                f"</tr>"
+                f"<tr>"
+                f"<td align='right' style='padding:4px 8px 4px 0;"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>Shared Tables:</td>"
+                f"<td align='left' style='padding:4px 0 4px 8px;"
+                f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
+                f"{shared}"
+                f"</td>"
+                f"</tr>"
+                f"<tr>"
+                f"<td align='right' style='padding:4px 8px 4px 0;"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>Search Time:</td>"
+                f"<td align='left' style='padding:4px 0 4px 8px;"
+                f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
+                f"{mins}:{secs:02d}"
+                f"</td>"
+                f"</tr>"
+                f"</table>"
+                f"</td></tr>"
+                f"<tr>"
+                f"<td align='right' style='padding:6px 8px 4px 0;"
+                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
+                f"Cancel ▶"
+                f"</td>"
+                f"</tr>"
             )
         else:  # MATCH_FOUND
             opponent = _html_mod.escape(str(getattr(self, "_p6_opponent_name", "")))
             table    = _html_mod.escape(str(getattr(self, "_p6_table_name", "")))
             body = (
-                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 2}pt;"
-                f" font-weight:bold; padding:8px 0 6px 0;'>⚔️ MATCH FOUND!</div>"
-                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
-                f"Opponent: {opponent}</div>"
-                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px 8px 16px;'>"
-                f"Table: {table}</div>"
-                f"<div style='display:flex; justify-content:space-between; padding:4px 16px;"
-                f" font-size:{fs_body}pt;'>"
-                f"<span style='color:{_tc_accent};'>◀ Accept</span>"
-                f"<span style='color:#888;'>Decline ▶</span>"
-                f"</div>"
-                f"<div style='color:#888; font-size:{fs_hint}pt; padding:10px 16px 4px 16px;"
-                f" font-style:italic;'>"
-                f"Press ◀ Left to accept or ▶ Right to decline. Launch the table yourself to begin."
-                f"</div>"
+                f"<tr><td align='center' style='padding:10px 0 8px 0;"
+                f" color:{_tc_accent}; font-size:{fs_status}pt; font-weight:bold;'>"
+                f"⚔️ MATCH FOUND!"
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 2px 0;"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>"
+                f"Opponent:"
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 6px 0;"
+                f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
+                f"{opponent}"
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 2px 0;"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>"
+                f"Table:"
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 10px 0;"
+                f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
+                f"{table}"
+                f"</td></tr>"
+                f"<tr>"
+                f"<td width='50%' align='left' style='padding:6px 16px 6px 8px;"
+                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
+                f"◀ Accept"
+                f"</td>"
+                f"<td width='50%' align='right' style='padding:6px 8px 6px 16px;"
+                f" font-size:{fs_action}pt; color:#888;'>"
+                f"Decline ▶"
+                f"</td>"
+                f"</tr>"
             )
 
         html = (
             f"<div style='background:{_tc_bg}; padding:8px; border-radius:8px;"
             f" border:1px solid {_tc_border};'>"
             f"{header}{body}"
+            f"</table>"
             f"</div>"
         )
+        return html
+
+    def _overlay_page6_refresh(self):
+        """Update Page 6 content in-place without triggering a slide/fade transition.
+
+        Used by the 1-second tick timer so only the HTML text is updated, avoiding
+        the constant flickering caused by a full transition_to() animation each second.
+        """
+        if not (self.overlay and self.overlay.isVisible()):
+            return
+        html = self._overlay_page6_build_html()
+        self.overlay.set_html(html, "Score Duels")
+        try:
+            self.overlay.request_rotation()
+        except Exception:
+            pass
+
+    def _overlay_page6_show(self):
+        """Show Page 6: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
+        self._ensure_overlay()
+        html = self._overlay_page6_build_html()
+        state = getattr(self, "_p6_state", "IDLE")
 
         self._show_page_with_transition(lambda: self.overlay.set_html(html, "Score Duels"))
 
@@ -1067,7 +1148,7 @@ class OverlayPagesMixin:
             return
         self._p6_elapsed_sec = int(getattr(self, "_p6_elapsed_sec", 0)) + 1
         if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
-            self._overlay_page6_show()
+            self._overlay_page6_refresh()
 
     def _overlay_page6_do_poll(self):
         """Run poll_matchmaking() in a background thread."""
