@@ -87,7 +87,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self._heat_bar_picker = None
             self.btn_heat_bar_place.setText("Place / Save Heat Bar position")
             return
-        self._heat_bar_picker = HeatBarPositionPicker(self, width_hint=48, height_hint=260)
+        self._heat_bar_picker = HeatBarPositionPicker(self)
         self.btn_heat_bar_place.setText("Save Heat Bar position")
 
     def _on_flip_counter_portrait_toggle(self, state: int):
@@ -138,7 +138,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self._flip_counter_picker = None
             self.btn_flip_counter_place.setText("Place / Save Flip-Counter position")
             return
-        self._flip_counter_picker = FlipCounterPositionPicker(self, width_hint=380, height_hint=130)
+        self._flip_counter_picker = FlipCounterPositionPicker(self)
         self.btn_flip_counter_place.setText("Save Flip-Counter position")
 
     def _on_overlay_auto_close_toggle(self, state: int):
@@ -212,7 +212,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.btn_ch_ov_place.setText("Place / Save ChallengeOV position")
             self._refresh_challenge_select_overlay()
             return
-        self._ch_ov_picker = ChallengeOVPositionPicker(self, width_hint=520, height_hint=200)
+        self._ch_ov_picker = ChallengeOVPositionPicker(self)
         self.btn_ch_ov_place.setText("Save ChallengeOV position")
 
     def _on_ach_toast_portrait_toggle(self, state: int):
@@ -314,7 +314,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.btn_mini_info_place.setText("Place / Save position")
             return
         
-        self._mini_info_picker = MiniInfoPositionPicker(self, width_hint=420, height_hint=100)
+        self._mini_info_picker = MiniInfoPositionPicker(self)
         self.btn_mini_info_place.setText("Save position")
 
     def _on_status_overlay_enabled_toggle(self, state: int):
@@ -433,7 +433,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self._ch_timer_picker = None
             self.btn_ch_timer_place.setText("Place / Save timer position")
             return
-        self._ch_timer_picker = TimerPositionPicker(self, width_hint=400, height_hint=120)
+        self._ch_timer_picker = TimerPositionPicker(self)
         self.btn_ch_timer_place.setText("Save timer position")
 
     def _on_overlay_place_clicked(self):

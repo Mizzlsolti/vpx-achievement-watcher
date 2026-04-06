@@ -955,13 +955,9 @@ class OverlayPagesMixin:
                 f" color:#CCCCCC; font-size:{fs_body + 2}pt;'>"
                 f"Find an opponent on a shared table automatically."
                 f"</td></tr>"
-                f"<tr><td align='center' style='padding:6px 0 2px 0;"
+                f"<tr><td align='center' style='padding:6px 0 6px 0;"
                 f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
                 f"◀ Start Search"
-                f"</td></tr>"
-                f"<tr><td align='center' style='padding:2px 0 6px 0;"
-                f" font-size:{fs_action}pt; color:#888;'>"
-                f"Close ▶"
                 f"</td></tr>"
                 f"<tr><td align='center' style='padding:8px 0 4px 0;"
                 f" font-size:{fs_body}pt; color:#888; font-style:italic;'>"
@@ -970,7 +966,8 @@ class OverlayPagesMixin:
             )
         elif state == "SEARCHING":
             elapsed = int(getattr(self, "_p6_elapsed_sec", 0))
-            mins, secs = divmod(elapsed, 60)
+            remaining = max(0, 300 - elapsed)
+            mins, secs = divmod(remaining, 60)
             queue  = int(getattr(self, "_p6_queue_count", 0))
             shared = int(getattr(self, "_p6_shared_tables", 0))
             body = (
@@ -998,10 +995,10 @@ class OverlayPagesMixin:
                 f"</tr>"
                 f"<tr>"
                 f"<td align='right' style='padding:4px 8px 4px 0;"
-                f" color:{_tc_primary}; font-size:{fs_label}pt;'>Search Time:</td>"
+                f" color:{_tc_primary}; font-size:{fs_label}pt;'>Time Left:</td>"
                 f"<td align='left' style='padding:4px 0 4px 8px;"
                 f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
-                f"{mins}:{secs:02d}"
+                f"{mins}:{secs:02d} / 5:00"
                 f"</td>"
                 f"</tr>"
                 f"</table>"
@@ -1153,6 +1150,11 @@ class OverlayPagesMixin:
         if getattr(self, "_p6_state", "IDLE") != "SEARCHING":
             return
         self._p6_elapsed_sec = int(getattr(self, "_p6_elapsed_sec", 0)) + 1
+        if self._p6_elapsed_sec >= 300:
+            self._overlay_page6_stop_search()
+            if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+                self._overlay_page6_refresh()
+            return
         if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_refresh()
 
