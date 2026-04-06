@@ -579,7 +579,7 @@ class EffectsMixin:
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
         """Open an overlay in demo mode with simulated triggers."""
         # Lazy import avoids module-level circular dependency
-        from ui_overlay import (
+        from .overlay import (
             AchToastWindow, ChallengeSelectOverlay, ChallengeCountdownOverlay,
             HeatBarometerOverlay, FlipCounterOverlay,
         )
@@ -632,7 +632,7 @@ class EffectsMixin:
                 # Main overlay: show the existing overlay window with demo triggers
                 try:
                     if getattr(self, "overlay", None) is None:
-                        from ui_overlay import OverlayWindow
+                        from .overlay import OverlayWindow
                         self.overlay = OverlayWindow(self)
                     win = self.overlay
 

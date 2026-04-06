@@ -63,32 +63,32 @@ from badges import (
     BADGE_DEFINITIONS,
 )
 
-from ui_dialogs import FeedbackDialog, AchievementBeatenDialog
+from ui.dialogs import FeedbackDialog, AchievementBeatenDialog
 from tutorial import TutorialWizardDialog
 from theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
-from ui_cloud_stats import CloudStatsMixin
+from ui.cloud_stats import CloudStatsMixin
 from aweditor import AWEditorMixin
-from ui_system import SystemMixin
-from ui_appearance import AppearanceMixin
-from ui_challenges import ChallengesMixin
-from ui_progress import ProgressMixin
-from ui_dashboard import DashboardMixin
-from ui_overlay_pages import OverlayPagesMixin
-from ui_duels import DuelsMixin
+from ui.system import SystemMixin
+from ui.appearance import AppearanceMixin
+from ui.challenges import ChallengesMixin
+from ui.progress import ProgressMixin
+from ui.dashboard import DashboardMixin
+from ui.overlay_pages import OverlayPagesMixin
+from ui.duels import DuelsMixin
 
-from ui_vps import (
+from ui.vps import (
     VpsPickerDialog, VpsAchievementInfoDialog, CloudProgressVpsInfoDialog,
     _load_vpsdb, _load_vps_mapping, _save_vps_mapping, _vps_find, _table_has_rom,
     _normalize_term, _find_table_file_by_filename_and_authors,
 )
-from ui_available_maps import _AvailableMapsWorker
+from ui.available_maps import _AvailableMapsWorker
 
 import notifications as _notif
 import sound
 
 from trophy_mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
 
-from ui_overlay import (
+from ui.overlay import (
     OverlayWindow,
     MiniInfoOverlay,
     StatusOverlay,

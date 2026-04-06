@@ -309,7 +309,7 @@ class DuelEngine:
             return False, "not_local"
 
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             vps_mapping = _load_vps_mapping(self._cfg)
         except Exception:
             vps_mapping = {}
@@ -773,7 +773,7 @@ class DuelEngine:
             log(self._cfg, "[DUEL] join_matchmaking: player_id not configured.", "WARN")
             return False
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             vps_mapping = _load_vps_mapping(self._cfg)
         except Exception as exc:
             log(self._cfg, f"[DUEL] join_matchmaking: could not load VPS mapping: {exc}", "WARN")
@@ -833,7 +833,7 @@ class DuelEngine:
         now = time.time()
         # Load own VPS-IDs.
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             vps_mapping = _load_vps_mapping(self._cfg)
         except Exception:
             vps_mapping = {}

@@ -13,7 +13,7 @@ from PyQt6.QtGui import QFont
 from theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
 from watcher_core import apply_tooltips
 import sound
-from ui_overlay import (
+from .overlay import (
     ToastPositionPicker,
     OverlayPositionPicker,
     ChallengeOVPositionPicker,
@@ -23,8 +23,8 @@ from ui_overlay import (
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
 )
-from ui_effects import EffectsMixin
-from ui_mascots import MascotsMixin
+from .effects import EffectsMixin
+from .mascots import MascotsMixin
 
 
 class AppearanceMixin(MascotsMixin, EffectsMixin):

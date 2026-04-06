@@ -413,7 +413,7 @@ class DuelsMixin:
         lbl_or.setStyleSheet("color:#555555; font-size:9pt; margin:4px 0;")
         layout.addWidget(lbl_or)
 
-        from ui_duels_automatch import AutoMatchWidget
+        from .duels_automatch import AutoMatchWidget
         self._automatch_widget = AutoMatchWidget(self, self.cfg, self._duel_engine)
         layout.addWidget(self._automatch_widget)
 
@@ -492,7 +492,7 @@ class DuelsMixin:
         self._duels_subtabs.addTab(my_duels_tab, "🎯 My Duels")
 
         # ── Sub-tab 2: Global Feed ────────────────────────────────────────────
-        from ui_duels_global import GlobalDuelFeedWidget
+        from .duels_global import GlobalDuelFeedWidget
         self._global_feed_widget = GlobalDuelFeedWidget(self.cfg)
         self._duels_subtabs.addTab(self._global_feed_widget, "🌍 Global Feed")
 
@@ -662,7 +662,7 @@ class DuelsMixin:
         self._cmb_duel_table.addItem("— Select Table —", "")
         cache = getattr(self, "_all_maps_cache", None) or []
         try:
-            from ui_vps import _load_vps_mapping
+            from .vps import _load_vps_mapping
             vps_mapping = _load_vps_mapping(self.cfg)
         except Exception:
             vps_mapping = {}
@@ -911,7 +911,7 @@ class DuelsMixin:
             return
 
         try:
-            from ui_vps import _load_vps_mapping
+            from .vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(self.cfg)
         except Exception:
             _vps_mapping = {}
@@ -1297,7 +1297,7 @@ class DuelsMixin:
         circular-import issues are avoided.
         """
         if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
-            from ui_overlay import MiniInfoOverlay  # deferred import
+            from .overlay import MiniInfoOverlay  # deferred import
             self._mini_overlay = MiniInfoOverlay(self)
         return self._mini_overlay
 
@@ -1712,7 +1712,7 @@ class DuelsMixin:
             # Table name with optional ℹ️ info badge.
             table_display = duel.table_name or duel.table_rom
             try:
-                from ui_vps import _load_vps_mapping, CloudProgressVpsInfoDialog
+                from .vps import _load_vps_mapping, CloudProgressVpsInfoDialog
                 vps_mapping = _load_vps_mapping(self.cfg)
                 vps_id = vps_mapping.get(duel.table_rom, "")
             except Exception:

@@ -376,7 +376,7 @@ class FlipCounterOverlay(_OverlayFxMixin, QWidget):
         self._anim_timer.start()  # always run; live fx checks in _compose_image
 
         # Post-processing widget (drawn on top of flip counter content)
-        from ui_overlay import PostProcessingWidget
+        from .overlay import PostProcessingWidget
         self._pp_widget = PostProcessingWidget(self, overlay_type="flip")
 
         self._render_and_place()

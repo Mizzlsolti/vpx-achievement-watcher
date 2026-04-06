@@ -18,8 +18,8 @@ from watcher_core import (
     secure_load_json, secure_save_json,
     compute_player_level,
 )
-from ui_dialogs import FeedbackDialog
-from ui_vps import _load_vps_mapping, _save_vps_mapping
+from .dialogs import FeedbackDialog
+from .vps import _load_vps_mapping, _save_vps_mapping
 from trophy_mascot import _TROPHIE_SHARED
 
 
@@ -564,7 +564,7 @@ class SystemMixin:
         try:
             vps_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/vps_mapping")
             if vps_data and isinstance(vps_data, dict):
-                from ui_vps import _save_vps_mapping
+                from .vps import _save_vps_mapping
                 _save_vps_mapping(self.cfg, vps_data)
                 vps_mapping_restored = True
                 log(self.cfg, f"[CLOUD] VPS mapping restored: {len(vps_data)} entries")
@@ -759,7 +759,7 @@ class SystemMixin:
 
             # 2. Upload VPS mapping
             try:
-                from ui_vps import _load_vps_mapping
+                from .vps import _load_vps_mapping
                 mapping = _load_vps_mapping(self.cfg)
                 if CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping):
                     results.append(f"✅ VPS mapping ({len(mapping)} entries)")
@@ -868,7 +868,7 @@ class SystemMixin:
         if not pid or pid == "unknown":
             return
         try:
-            from ui_vps import _load_vps_mapping
+            from .vps import _load_vps_mapping
             mapping = _load_vps_mapping(self.cfg)
             CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping)
             log(self.cfg, f"[CLOUD] VPS mapping uploaded: {len(mapping)} entries")
@@ -887,7 +887,7 @@ class SystemMixin:
                     INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log,
                     VPXTOOL_PATH, ensure_vpxtool
                 )
-                from ui_vps import VPSDB_URL
+                from .vps import VPSDB_URL
                 import os
 
                 cfg = self.cfg
