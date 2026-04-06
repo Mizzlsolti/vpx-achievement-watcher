@@ -12,8 +12,8 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
-from cloud_sync import CloudSync, _sanitize_firebase_keys
-from watcher_core import (
+from core.cloud_sync import CloudSync, _sanitize_firebase_keys
+from core.watcher_core import (
     ensure_dir, log, sanitize_filename,
     secure_load_json, secure_save_json,
     compute_player_level,

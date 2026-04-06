@@ -3328,7 +3328,7 @@ class GUITrophie(QWidget):
             src = self._cfg.OVERLAY.get("toggle_input_source", "keyboard")
             vk = self._cfg.OVERLAY.get("toggle_vk", 120)
             if src == "keyboard":
-                from input_hook import vk_to_name_en
+                from core.input_hook import vk_to_name_en
                 key_name = vk_to_name_en(int(vk))
             else:
                 key_name = f"Joy btn {vk}"

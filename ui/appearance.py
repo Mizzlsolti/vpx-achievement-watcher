@@ -10,9 +10,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
-from watcher_core import apply_tooltips
-import sound
+from core.theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
+from core.watcher_core import apply_tooltips
+import core.sound as sound
 from .overlay import (
     ToastPositionPicker,
     OverlayPositionPicker,

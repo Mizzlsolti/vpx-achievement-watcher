@@ -15,10 +15,10 @@ import uuid
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Union
 
-import sound
-from config import p_session
-from cloud_sync import CloudSync
-from watcher_core import log
+from . import sound
+from .config import p_session
+from .cloud_sync import CloudSync
+from .watcher_core import log
 
 
 class DuelStatus:

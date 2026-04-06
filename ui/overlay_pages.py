@@ -13,10 +13,10 @@ import urllib.request
 from PyQt6.QtCore import Qt, pyqtSlot, Q_ARG, QMetaObject, QObject, pyqtSignal, QTimer
 from PyQt6.QtWidgets import QApplication
 
-from config import p_aweditor, f_custom_achievements_progress
-from watcher_core import log, _strip_version_from_name, secure_load_json
-from badges import compute_player_level
-from theme import get_theme_color
+from core.config import p_aweditor, f_custom_achievements_progress
+from core.watcher_core import log, _strip_version_from_name, secure_load_json
+from core.badges import compute_player_level
+from core.theme import get_theme_color
 
 
 class OverlayPagesMixin:

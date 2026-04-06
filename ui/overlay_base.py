@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtCore import Qt, QRect, QPoint, QTimer
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 
-from theme import get_theme_color, get_theme, DEFAULT_THEME
+from core.theme import get_theme_color, get_theme, DEFAULT_THEME
 
 
 # ---------------------------------------------------------------------------

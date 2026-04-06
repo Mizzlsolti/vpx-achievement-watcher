@@ -17,9 +17,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
-from config import p_aweditor
-from duel_engine import Duel, DuelEngine, DuelStatus
-from watcher_core import _strip_version_from_name
+from core.config import p_aweditor
+from core.duel_engine import Duel, DuelEngine, DuelStatus
+from core.watcher_core import _strip_version_from_name
 
 # Delay (ms) before the first fast opponent-score re-check after our own score is submitted.
 _DUEL_FAST_RECHECK_DELAY_MS = 5_000

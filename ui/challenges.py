@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 from PyQt6.QtCore import Qt, QTimer
-from watcher_core import log, sanitize_filename
+from core.watcher_core import log, sanitize_filename
 from .overlay import (
     FlipCounterOverlay,
     HeatBarometerOverlay,
@@ -14,7 +14,7 @@ from .overlay import (
     ChallengeCountdownOverlay,
     ChallengeStartCountdown,
 )
-import sound
+import core.sound as sound
 
 
 class ChallengesMixin:

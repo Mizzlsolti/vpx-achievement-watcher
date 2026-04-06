@@ -113,7 +113,7 @@ def _fetch_bytes_url(url: str, timeout: int = 25) -> bytes:
             raise RuntimeError(f"HTTP {resp.status} for {url}")
         return resp.read()
 
-from input_hook import (
+from .input_hook import (
     JOYINFOEX, JOY_RETURNALL, JOYERR_NOERROR, _joyGetPosEx,
     RIDEV_INPUTSINK, WM_KEYDOWN, WM_SYSKEYDOWN, WM_HOTKEY, WH_KEYBOARD_LL,
     KBDLLHOOKSTRUCT, GlobalKeyHook,
@@ -174,7 +174,7 @@ MANUFACTURER_EMOJI: dict[str, str] = {
     "Midway":    "🟤",
 }
 
-from config import (
+from .config import (
     AppConfig, DEFAULT_OVERLAY, DEFAULT_LOG_SUPPRESS,
     CHALLENGES_ENABLED, VK_LSHIFT, VK_RSHIFT,
     HEAT_HOLD_RATE, HEAT_PRESS_BURST, HEAT_COOLDOWN_RATE,
@@ -742,7 +742,7 @@ def _migrate_rom_keys_to_lowercase(cfg: "AppConfig") -> None:
         log(cfg, "[MIGRATE] ROM keys lowercase migration complete")
 
 
-from badges import (
+from .badges import (
     LEVEL_TABLE, PRESTIGE_THRESHOLD, MAX_PRESTIGE,
     RARITY_TIERS, compute_rarity, compute_player_level,
     BADGE_DEFINITIONS, BADGE_LOOKUP, BADGE_CHECKS,

@@ -53,8 +53,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from theme import get_theme_color
-from watcher_core import (
+from core.theme import get_theme_color
+from core.watcher_core import (
     CONFIG_FILE,
     ensure_dir,
     ensure_vpxtool,

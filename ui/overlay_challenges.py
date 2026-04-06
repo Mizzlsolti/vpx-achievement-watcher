@@ -15,8 +15,8 @@ from ui.overlay_base import (
     _theme_bg_qcolor,
     _start_topmost_timer,
 )
-from theme import get_theme_color
-from gl_effects_opengl import (
+from core.theme import get_theme_color
+from effects.gl_effects_opengl import (
     draw_glow_border as _draw_glow_border,
     ease_out_cubic as _ease_out_cubic,
     BreathingPulse, CarouselSlide, SnapScale, HeatPulse,
