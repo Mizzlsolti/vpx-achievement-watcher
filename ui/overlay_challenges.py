@@ -828,6 +828,10 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         # Derive the canvas width from the measured box_w so every box fits.
         total_spacing = spacing * (n - 1)
         w = max(300, n * box_w + total_spacing + 2 * pad_lr)
+        # Clamp to the ChallengeSelectOverlay width so the overlay isn't oversized.
+        w = min(w, max(300, int(round(520 * factor))))
+        # Recalculate box_w to fit the boxes within the clamped width.
+        box_w = max(40, (w - 2 * pad_lr - total_spacing) // n)
         avail_w = w - 2 * pad_lr
 
         # Measure title height with word-wrap before creating the image so the

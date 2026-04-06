@@ -505,6 +505,10 @@ class Watcher:
                     except Exception:
                         return
                     if _vpx_window_visible():
+                        if getattr(self, "challenge", {}).get("suppress_big_overlay_once", False):
+                            return
+                        if getattr(self, "challenge", {}).get("active", False):
+                            return
                         if rom:
                             msg = f"No NVRAM map found for ROM '{identifier}'."
                         else:
@@ -586,6 +590,8 @@ class Watcher:
                     # Don't show while a challenge is active; the challenge start
                     # message would appear before this notification otherwise.
                     try:
+                        if getattr(self, "challenge", {}).get("suppress_big_overlay_once", False):
+                            return
                         if getattr(self, "challenge", {}).get("active", False):
                             return
                     except Exception:
@@ -1872,7 +1878,7 @@ class Watcher:
                 pass
 
             try:
-                for img in ("VPinballX64.exe", "VPinballX.exe", "VPinballX_GL.exe", "VPinball.exe"):
+                for img in ("VPinballX64.exe", "VPinballX.exe", "VPinballX_GL.exe", "VPinball.exe", "B2SBackglassServerEXE.exe"):
                     try:
                         subprocess.run(
                             ["taskkill", "/IM", img, "/T", "/F"],
