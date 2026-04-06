@@ -934,6 +934,18 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         lay_inputs.addWidget(QLabel("<b>Challenge Right / Duel Decline:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
 
+        lbl_flipper_hint = QLabel(
+            '💡 <b>Tip:</b> For the best experience, bind <b>Challenge Left</b> and <b>Challenge Right</b> '
+            'to your flipper buttons (left and right flipper keys). '
+            'This way you can navigate challenges and duels without taking your hands off the machine!'
+        )
+        lbl_flipper_hint.setWordWrap(True)
+        lbl_flipper_hint.setStyleSheet(
+            "color: #888888; margin-top: 4px; font-size: 9pt; padding: 6px 10px; "
+            "background: #1a1a1a; border: 1px solid #333; border-radius: 5px;"
+        )
+        layout.addWidget(lbl_flipper_hint)
+
         grp_voice = QGroupBox("Voice & Audio")
         lay_voice = QVBoxLayout(grp_voice)
         row_v1 = QHBoxLayout(); row_v1.addWidget(QLabel("AI Voice Volume (Challenges):"))
