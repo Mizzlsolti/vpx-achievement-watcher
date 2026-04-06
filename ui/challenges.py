@@ -829,6 +829,21 @@ class ChallengesMixin:
         except Exception:
             pass
         # Alert bar removed — skip duel alert frame focus toggle
+        # Page 6 (Score Duels): intercept Left for duel actions.
+        try:
+            if (
+                getattr(self, "_overlay_page", -1) == 5
+                and getattr(self, "overlay", None) is not None
+                and self.overlay.isVisible()
+            ):
+                p6_state = getattr(self, "_p6_state", "IDLE")
+                if p6_state == "IDLE":
+                    self._overlay_page6_start_search()
+                elif p6_state == "MATCH_FOUND":
+                    self._overlay_page6_accept()
+                return
+        except Exception:
+            pass
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
@@ -917,6 +932,23 @@ class ChallengesMixin:
         except Exception:
             pass
         # Alert bar removed — skip duel alert frame focus toggle
+        # Page 6 (Score Duels): intercept Right for duel actions.
+        try:
+            if (
+                getattr(self, "_overlay_page", -1) == 5
+                and getattr(self, "overlay", None) is not None
+                and self.overlay.isVisible()
+            ):
+                p6_state = getattr(self, "_p6_state", "IDLE")
+                if p6_state == "SEARCHING":
+                    self._overlay_page6_stop_search()
+                    if self.overlay and self.overlay.isVisible():
+                        self._overlay_page6_show()
+                elif p6_state == "MATCH_FOUND":
+                    self._overlay_page6_decline()
+                return
+        except Exception:
+            pass
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
