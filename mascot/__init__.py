@@ -3,14 +3,9 @@
 Exports the main classes and shared state from the mascot sub-modules.
 """
 
-from mascot.mascot import (
-    GUITrophie,
-    OverlayTrophie,
-    _TROPHIE_SHARED,
-    _TrophieMemory,
-    _TrophieDrawWidget,
-    _PinballDrawWidget,
-)
+from mascot.trophy_data import _TROPHIE_SHARED, _TrophieMemory
+from mascot.trophy_render import _TrophieDrawWidget, _PinballDrawWidget
+from mascot.trophy_widgets import GUITrophie, OverlayTrophie
 from mascot.mascot_memory import MascotMemorySystem
 
 __all__ = [
