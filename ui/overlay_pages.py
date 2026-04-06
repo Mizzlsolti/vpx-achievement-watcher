@@ -908,6 +908,9 @@ class OverlayPagesMixin:
 
     # ── Page 6: Score Duels Auto-Match ───────────────────────────────────────
 
+    _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
+    _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
+
     def _overlay_page6_show(self):
         """Show Page 6: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
         self._ensure_overlay()
@@ -1006,11 +1009,11 @@ class OverlayPagesMixin:
         """Lazily initialise the poll and tick timers for page 6."""
         if getattr(self, "_p6_poll_timer", None) is None:
             self._p6_poll_timer = QTimer(self)
-            self._p6_poll_timer.setInterval(5_000)
+            self._p6_poll_timer.setInterval(self._P6_POLL_INTERVAL_MS)
             self._p6_poll_timer.timeout.connect(self._overlay_page6_do_poll)
         if getattr(self, "_p6_tick_timer", None) is None:
             self._p6_tick_timer = QTimer(self)
-            self._p6_tick_timer.setInterval(1_000)
+            self._p6_tick_timer.setInterval(self._P6_TICK_INTERVAL_MS)
             self._p6_tick_timer.timeout.connect(self._overlay_page6_tick)
 
     def _overlay_page6_start_search(self):
