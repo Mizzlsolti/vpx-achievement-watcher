@@ -581,9 +581,9 @@ class SystemMixin:
         # Restore CAT achievement progress from Cloud
         cat_progress_restored = False
         try:
-            from cat_registry import CAT_REGISTRY
-            from config import f_custom_achievements_progress
-            from watcher_core import _strip_version_from_name
+            from core.cat_registry import CAT_REGISTRY
+            from core.config import f_custom_achievements_progress
+            from core.watcher_core import _strip_version_from_name
 
             cap_path = f_custom_achievements_progress(self.cfg)
             ensure_dir(os.path.dirname(cap_path))
@@ -692,9 +692,9 @@ class SystemMixin:
 
         def _worker():
             from datetime import datetime, timezone
-            from watcher_core import compute_player_level
-            from config import f_custom_achievements_progress
-            from watcher_core import secure_load_json
+            from core.watcher_core import compute_player_level
+            from core.config import f_custom_achievements_progress
+            from core.watcher_core import secure_load_json
             results = []
             errors = []
 
@@ -818,8 +818,8 @@ class SystemMixin:
             cat_uploaded = 0
             cat_errors = 0
             try:
-                from cat_registry import upload_cat_progress
-                from config import f_custom_achievements_progress
+                from core.cat_registry import upload_cat_progress
+                from core.config import f_custom_achievements_progress
                 all_cat_progress = secure_load_json(f_custom_achievements_progress(self.cfg)) or {}
                 if isinstance(all_cat_progress, dict):
                     for table_key in all_cat_progress:
@@ -882,7 +882,7 @@ class SystemMixin:
 
         def _worker():
             try:
-                from watcher_core import (
+                from core.watcher_core import (
                     f_index, f_romnames, f_vpsdb_cache,
                     INDEX_URL, ROMNAMES_URL, _fetch_bytes_url, ensure_dir, load_json, log,
                     VPXTOOL_PATH, ensure_vpxtool
@@ -939,7 +939,7 @@ class SystemMixin:
 
         def _worker():
             try:
-                from watcher_core import _fetch_json_url, log
+                from core.watcher_core import _fetch_json_url, log
 
                 RELEASES_API = "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/releases/latest"
 
@@ -1092,7 +1092,7 @@ class SystemMixin:
         def _download_and_install():
             try:
                 import os, tempfile, subprocess
-                from watcher_core import _fetch_bytes_url, log
+                from core.watcher_core import _fetch_bytes_url, log
 
                 log(self.cfg, f"[UPDATE] Downloading Setup from {download_url}")
                 data = _fetch_bytes_url(download_url, timeout=120)
@@ -1128,7 +1128,7 @@ class SystemMixin:
                 QMetaObject.invokeMethod(self, "_on_update_ready_quit", _Qt.ConnectionType.QueuedConnection)
 
             except Exception as e:
-                from watcher_core import log
+                from core.watcher_core import log
                 log(self.cfg, f"[UPDATE] Download/install failed: {e}", "ERROR")
                 from PyQt6.QtCore import QMetaObject, Qt as _Qt, Q_ARG
                 QMetaObject.invokeMethod(self, "_on_update_download_failed",

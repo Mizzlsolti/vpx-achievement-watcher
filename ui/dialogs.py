@@ -172,7 +172,7 @@ class AchievementBeatenDialog(QDialog):
         # Table info via VPS data
         vps_id = ""
         try:
-            from config import p_vps_img
+            from core.config import p_vps_img
             from .vps import _load_vps_mapping, _load_vpsdb
             mapping = _load_vps_mapping(cfg)
             vps_id = mapping.get(rom, "") if mapping else ""

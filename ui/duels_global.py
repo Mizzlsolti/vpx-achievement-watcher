@@ -104,7 +104,7 @@ class GlobalDuelFeedWidget(QWidget):
 
     def _fetch_in_background(self) -> None:
         try:
-            from cloud_sync import CloudSync
+            from core.cloud_sync import CloudSync
             raw = CloudSync.fetch_node(self._cfg, "duels")
             if not isinstance(raw, dict):
                 rows: list = []

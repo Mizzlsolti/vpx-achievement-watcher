@@ -518,7 +518,7 @@ class CloudStatsMixin:
             badge_icon = ""
             if selected_badge_id:
                 try:
-                    from badges import BADGE_LOOKUP
+                    from core.badges import BADGE_LOOKUP
                     bdef = BADGE_LOOKUP.get(selected_badge_id)
                     if bdef:
                         badge_icon = f" <span title='{_html.escape(bdef[2])}' style='font-size:1em;'>{bdef[1]}</span>"

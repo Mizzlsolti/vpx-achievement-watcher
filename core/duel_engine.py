@@ -883,7 +883,7 @@ class DuelEngine:
                 continue
             # Resolve display name.
             try:
-                from watcher_core import _strip_version_from_name
+                from .watcher_core import _strip_version_from_name
                 romnames = {}
                 for obj in list(sys.modules.values()):
                     if hasattr(obj, "ROMNAMES") and isinstance(getattr(obj, "ROMNAMES"), dict):

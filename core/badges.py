@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from watcher_core import AppConfig
+    from .watcher_core import AppConfig
 
 # Runtime-Import um Circular Imports zu vermeiden:
 # AppConfig wird nur als Type-Hint verwendet
@@ -178,7 +178,7 @@ BADGE_LOOKUP = {b[0]: b for b in BADGE_DEFINITIONS}
 
 def _gather_badge_stats(cfg: "AppConfig", state: dict, watcher=None, rarity_cache: dict = None) -> dict:
     """Collect all statistics needed for badge evaluation."""
-    from watcher_core import secure_load_json
+    from .watcher_core import secure_load_json
     stats = {}
     try:
         # Total unique achievements

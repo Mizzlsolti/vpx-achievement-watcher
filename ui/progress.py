@@ -204,7 +204,7 @@ class ProgressMixin:
             rarity_map: dict = {}
             if self.cfg.CLOUD_ENABLED:
                 try:
-                    from cat_registry import lookup_by_table_key
+                    from core.cat_registry import lookup_by_table_key
                     result = lookup_by_table_key(table_key)
                     if result:
                         firebase_key = result[0]

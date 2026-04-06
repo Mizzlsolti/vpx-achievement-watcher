@@ -697,7 +697,7 @@ class DuelsMixin:
 
         # Add CAT tables from AWEditor (.custom.json files) — only approved entries.
         try:
-            from cat_registry import lookup_by_table_key
+            from core.cat_registry import lookup_by_table_key
             aw_dir = p_aweditor(self.cfg)
             if os.path.isdir(aw_dir):
                 existing_data = [self._cmb_duel_table.itemData(i) for i in range(self._cmb_duel_table.count())]
@@ -811,7 +811,7 @@ class DuelsMixin:
         self._btn_duel_refresh_players.setEnabled(False)
 
         def _load():
-            from cloud_sync import CloudSync
+            from core.cloud_sync import CloudSync
             try:
                 player_ids = CloudSync.fetch_player_ids(self.cfg) or []
                 my_id = self.cfg.OVERLAY.get("player_id", "").strip()
@@ -1394,7 +1394,7 @@ class DuelsMixin:
                     Qt.ConnectionType.QueuedConnection,
                 )
             if changed_duels:
-                from duel_engine import DuelStatus
+                from core.duel_engine import DuelStatus
                 QMetaObject.invokeMethod(
                     self, "_refresh_active_duels",
                     Qt.ConnectionType.QueuedConnection,
@@ -1611,7 +1611,7 @@ class DuelsMixin:
         tbl.setRowCount(0)
         my_id = self.cfg.OVERLAY.get("player_id", "").strip()
         now = time.time()
-        from duel_engine import ACTIVE_DUEL_TTL_SECONDS
+        from core.duel_engine import ACTIVE_DUEL_TTL_SECONDS
         for duel in duels:
             row = tbl.rowCount()
             tbl.insertRow(row)
@@ -1869,7 +1869,7 @@ class DuelsMixin:
                 if baseline <= 0:
                     baseline = int(getattr(w, "last_session_score", 0) or 0)
             self._duel_baseline_score = baseline
-            from watcher_core import log as _log
+            from core.watcher_core import log as _log
             _log(self.cfg, f"[DUEL] Baseline score captured for {rom}: {baseline}")
         except Exception:
             self._duel_baseline_score = 0
@@ -1946,7 +1946,7 @@ class DuelsMixin:
         for duel in matching:
             try:
                 if score <= 0:
-                    from watcher_core import log
+                    from core.watcher_core import log
                     log(self.cfg, f"[DUEL] Skipping score submission for {rom} — score is {score}", "WARN")
                     continue
                 result = self._duel_engine.submit_result(duel.duel_id, score)
@@ -2006,7 +2006,7 @@ class DuelsMixin:
         _DUEL_FAST_RECHECK_COOLDOWN_S is used.  Outside that window the
         normal 5-minute cooldown applies to avoid write amplification.
         """
-        from duel_engine import SCORE_NOT_SUBMITTED
+        from core.duel_engine import SCORE_NOT_SUBMITTED
         try:
             active = self._duel_engine.get_active_duels()
         except Exception:

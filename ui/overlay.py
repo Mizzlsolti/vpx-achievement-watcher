@@ -41,7 +41,7 @@ from effects.gl_effects_opengl import (
 )
 
 try:
-    import sound as _sound_mod
+    from core import sound as _sound_mod
 except Exception:
     _sound_mod = None
 
@@ -1057,7 +1057,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         table_title = ""
         try:
             romnames = getattr(self.parent_gui.watcher, "ROMNAMES", {}) or {}
-            from watcher_core import _strip_version_from_name
+            from core.watcher_core import _strip_version_from_name
             table_title = _strip_version_from_name(romnames.get(rom_name, ""))
         except Exception:
             pass
@@ -1096,7 +1096,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                         _cdata = load_json(_custom_json_path, {}) or {}
                         # Use the vpx filename (without .vpx) as the display title,
                         # stripping parenthetical content and version strings.
-                        from watcher_core import _strip_version_from_name as _svfn
+                        from core.watcher_core import _strip_version_from_name as _svfn
                         _tf = str(_cdata.get("table_file") or "").strip()
                         if _tf.lower().endswith(".vpx"):
                             custom_table_name = _svfn(_tf[:-4])
