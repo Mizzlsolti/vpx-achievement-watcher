@@ -503,13 +503,7 @@ class ChallengesMixin:
                     log(self.cfg, f"[CHALLENGE] countdown spawn – seconds={play_sec}")
                 except Exception:
                     pass
-                try:
-                    # Show 3…2…1…GO! countdown before the actual challenge timer
-                    csd = ChallengeStartCountdown(None)
-                    csd.finished.connect(lambda: _launch_timer(csd))
-                    csd.start()
-                except Exception:
-                    _launch_timer(None)
+                _launch_timer(None)
 
             def _launch_timer(csd_widget=None):
                 try:
@@ -582,8 +576,26 @@ class ChallengesMixin:
             if not has_map:
                 return
             if idx == 0:
+                try:
+                    ch = getattr(self.watcher, "challenge", {}) or {}
+                    if ch.get("active"):
+                        ch["active"] = False
+                        ch["completed"] = False
+                        ch["pending_kill_at"] = None
+                        self.watcher.challenge = ch
+                except Exception:
+                    pass
                 self.watcher.start_timed_challenge()
             elif idx == 2:
+                try:
+                    ch = getattr(self.watcher, "challenge", {}) or {}
+                    if ch.get("active"):
+                        ch["active"] = False
+                        ch["completed"] = False
+                        ch["pending_kill_at"] = None
+                        self.watcher.challenge = ch
+                except Exception:
+                    pass
                 self.watcher.start_heat_challenge()
             elif idx == 1:
                 self.watcher.start_flip_challenge(500)
@@ -785,6 +797,16 @@ class ChallengesMixin:
                 return
             elif sel == 0:
                 self._close_challenge_select_overlay()
+                # Clean up any stale challenge state before starting new one
+                try:
+                    ch = getattr(self.watcher, "challenge", {}) or {}
+                    if ch.get("active"):
+                        ch["active"] = False
+                        ch["completed"] = False
+                        ch["pending_kill_at"] = None
+                        self.watcher.challenge = ch
+                except Exception:
+                    pass
                 try:
                     self.watcher.start_timed_challenge()
                 except Exception:
@@ -792,6 +814,16 @@ class ChallengesMixin:
                 return
             elif sel == 2:
                 self._close_challenge_select_overlay()
+                # Clean up any stale challenge state before starting new one
+                try:
+                    ch = getattr(self.watcher, "challenge", {}) or {}
+                    if ch.get("active"):
+                        ch["active"] = False
+                        ch["completed"] = False
+                        ch["pending_kill_at"] = None
+                        self.watcher.challenge = ch
+                except Exception:
+                    pass
                 try:
                     self.watcher.start_heat_challenge()
                 except Exception:

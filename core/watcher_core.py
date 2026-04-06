@@ -1894,6 +1894,22 @@ class Watcher:
             log(self.cfg, f"[CHALLENGE] _kill_vpx_process failed: {e}", "WARN")
 
 
+    def _stop_active_challenge_if_different_kind(self, target_kind: str):
+        """Stop any currently active challenge of a different kind before starting a new one."""
+        ch = getattr(self, "challenge", {}) or {}
+        if not ch.get("active"):
+            return
+        old_kind = ch.get("kind")
+        if old_kind == target_kind:
+            return
+        if old_kind == "flip":
+            self.stop_flip_challenge()
+        elif old_kind == "heat":
+            self.stop_heat_challenge()
+        elif old_kind == "timed":
+            self.stop_timed_challenge()
+        self.challenge = {}
+
     def start_timed_challenge(self, total_seconds: int = 190):
         try:
             if not self.game_active or not self.current_rom:
@@ -1903,6 +1919,9 @@ class Watcher:
                 log(self.cfg, "[CHALLENGE] timed: blocked — duel active for current table", "WARN")
                 return
             ch = getattr(self, "challenge", {}) or {}
+            if ch.get("active") and ch.get("kind") != "timed":
+                self._stop_active_challenge_if_different_kind("timed")
+                ch = {}
             if ch.get("active") and ch.get("kind") == "timed":
                 log(self.cfg, "[CHALLENGE] timed already active – ignored duplicate")
                 return
@@ -2099,6 +2118,9 @@ class Watcher:
                 return
 
             ch = getattr(self, "challenge", {}) or {}
+            if ch.get("active") and ch.get("kind") != "flip":
+                self._stop_active_challenge_if_different_kind("flip")
+                ch = {}
             if ch.get("active"):
                 log(self.cfg, "[CHALLENGE] flip: another challenge already active – ignored", "WARN")
                 return
@@ -2189,6 +2211,9 @@ class Watcher:
                 return
 
             ch = getattr(self, "challenge", {}) or {}
+            if ch.get("active") and ch.get("kind") != "heat":
+                self._stop_active_challenge_if_different_kind("heat")
+                ch = {}
             if ch.get("active"):
                 log(self.cfg, "[CHALLENGE] heat: another challenge already active – ignored", "WARN")
                 return
