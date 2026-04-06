@@ -69,11 +69,17 @@ def _parse_version(v_str):
 
 
 def main():
-    # Import lazily to avoid circular dependency:
-    # Achievement_watcher → app.bootstrap → Achievement_watcher
+    # MainWindow is defined in Achievement_watcher.py which imports this module.
+    # By the time main() is called (via `if __name__ == "__main__": main()` at the
+    # end of Achievement_watcher.py), the module is already fully loaded in
+    # sys.modules as "__main__" (direct run) or "Achievement_watcher" (imported).
     import sys as _sys
-    _mod = _sys.modules.get("Achievement_watcher") or _sys.modules.get("__main__")
-    MainWindow = _mod.MainWindow
+    _aw_mod = _sys.modules.get("Achievement_watcher") or _sys.modules.get("__main__")
+    if _aw_mod is None or not hasattr(_aw_mod, "MainWindow"):
+        raise RuntimeError(
+            "main() must be called from Achievement_watcher.py (MainWindow not found)"
+        )
+    MainWindow = _aw_mod.MainWindow
 
     cfg = AppConfig.load()
     app = QApplication(sys.argv)

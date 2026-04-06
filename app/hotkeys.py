@@ -234,7 +234,7 @@ class HotkeysMixin:
                 try:
                     if eventType == b"windows_generic_MSG":
                         msg = ctypes.wintypes.MSG.from_address(int(message))
-                        if msg.message in (0x0100, 0x0104): # WM_KEYDOWN, WM_SYSKEYDOWN
+                        if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN):
                             vk = int(msg.wParam)
                             
                             if vk == 0x1B:
@@ -373,7 +373,7 @@ class HotkeysMixin:
                 try:
                     if eventType == b"windows_generic_MSG":
                         msg = ctypes.wintypes.MSG.from_address(int(message))
-                        if msg.message in (0x0100, 0x0104):
+                        if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN):
                             vk = int(msg.wParam)
                             
                             if vk == 0x1B:
