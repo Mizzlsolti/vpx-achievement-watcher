@@ -1445,16 +1445,6 @@ class DuelsMixin:
 
     @pyqtSlot()
     def _periodic_duel_refresh(self) -> None:
-        try:
-            self._refresh_invitation_inbox()
-            self._refresh_active_duels()
-        except Exception:
-            pass
-
-    # ── Polling: expiry check ──────────────────────────────────────────────────
-
-    @pyqtSlot()
-    def _periodic_duel_refresh(self) -> None:
         """Periodically refresh inbox and active duels tables (every 15 seconds)."""
         try:
             self._refresh_invitation_inbox()

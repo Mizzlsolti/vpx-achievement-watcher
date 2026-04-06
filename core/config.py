@@ -13,7 +13,8 @@ if getattr(sys, 'frozen', False):
     APP_DIR = os.path.dirname(os.path.abspath(sys.executable))
 else:
     # Running as a plain Python script (development)
-    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    # __file__ is core/config.py, so go one level up to reach the project root
+    APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 
 # ---------------------------------------------------------------------------
@@ -751,7 +752,7 @@ def _migrate_runtime_dirs(cfg):
 
     # Migrate notifications: merge old files into new unified store
     try:
-        import notifications as _notif
+        from . import notifications as _notif
         _notif.migrate_notifications(cfg)
     except Exception:
         pass
