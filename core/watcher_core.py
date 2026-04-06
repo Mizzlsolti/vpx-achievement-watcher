@@ -3480,7 +3480,7 @@ class Watcher:
                         continue
                     need = int(cond.get("min", 1))
 
-                    state = self._ach_state_load()
+                    state = _rom_state()
                     already_global = {
                         str(e.get("title", "")).strip()
                         for entries in state.get("global", {}).values()
@@ -3501,7 +3501,7 @@ class Watcher:
 
                     effective_progress = max(int(tally["progress"]), abs_val)
                     tally["progress"] = effective_progress
-                    self._ach_state_save(state)
+                    _rom_state_dirty = True
 
                     if effective_progress >= need:
                         if title in already_global:

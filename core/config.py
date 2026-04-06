@@ -366,6 +366,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "pp_overlay_main", "pp_overlay_toast", "pp_overlay_challenge",
     "pp_overlay_timer", "pp_overlay_heat", "pp_overlay_flip",
     "duels_do_not_disturb",
+    "ch_hotkey_debounce_ms",
+    "ch_finalize_delay_ms",
 ]
 
 CHALLENGES_ENABLED = True

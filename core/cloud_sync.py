@@ -38,6 +38,24 @@ from .config import f_custom_achievements_progress
 
 _FIREBASE_ILLEGAL_CHARS_RE = re.compile(r'[.$#\[\]/]')
 
+
+def _urlopen_ssl_aware(cfg, req, timeout: int):
+    """Open *req* with SSL verification; fall back to unverified on SSLError.
+
+    Tries a fully-verified TLS connection first.  If the connection fails with
+    an SSL error (e.g. outdated Windows root certificates), retries with
+    certificate verification disabled and logs a warning so users are aware.
+    """
+    ctx = ssl.create_default_context()
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except ssl.SSLError:
+        ctx_fb = ssl.create_default_context()
+        ctx_fb.check_hostname = False
+        ctx_fb.verify_mode = ssl.CERT_NONE
+        log(cfg, "[CLOUD] SSL verification failed, falling back to unverified", "WARN")
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx_fb)
+
 def _sanitize_firebase_keys(d: dict) -> dict:
     """Return a copy of *d* with all Firebase-illegal characters (. $ # [ ] /)
     in the keys replaced by underscores."""
@@ -234,9 +252,6 @@ class CloudSync:
                     return
 
                 _url = cfg.CLOUD_URL.strip().rstrip('/')
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
 
                 for rom, entry in progress_data.items():
                     if not isinstance(entry, dict):
@@ -248,7 +263,7 @@ class CloudSync:
                     endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
                     try:
                         del_req = urllib.request.Request(endpoint, method="DELETE")
-                        with urllib.request.urlopen(del_req, timeout=5, context=ctx):
+                        with _urlopen_ssl_aware(cfg, del_req, 5):
                             pass
                         log(cfg, f"[CLOUD] Deleted legacy progress entry for {rom}: missing vps_id")
                     except Exception as e:
@@ -291,9 +306,6 @@ class CloudSync:
                     return
 
                 _url = cfg.CLOUD_URL.strip().rstrip('/')
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
 
                 for rom in list(progress_data.keys()):
                     if rom == rom.lower():
@@ -302,7 +314,7 @@ class CloudSync:
                     endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
                     try:
                         del_req = urllib.request.Request(endpoint, method="DELETE")
-                        with urllib.request.urlopen(del_req, timeout=5, context=ctx):
+                        with _urlopen_ssl_aware(cfg, del_req, 5):
                             pass
                         log(cfg, f"[CLOUD] Deleted uppercase ROM progress entry: {rom}")
                     except Exception as e:
@@ -568,12 +580,8 @@ class CloudSync:
         for _attempt in range(_MAX_RETRIES):
             try:
                 import urllib.request
-                import ssl
                 req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                with _urlopen_ssl_aware(cfg, req, 7) as resp:
                     raw_data = resp.read().decode('utf-8')
                     data = json.loads(raw_data)
                 if not data: return []
@@ -598,12 +606,8 @@ class CloudSync:
         for _attempt in range(_MAX_RETRIES):
             try:
                 import urllib.request
-                import ssl
                 req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                with _urlopen_ssl_aware(cfg, req, 7) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
                 if isinstance(data, dict):
                     return list(data.keys())
@@ -626,12 +630,8 @@ class CloudSync:
         for _attempt in range(_MAX_RETRIES):
             try:
                 import urllib.request
-                import ssl
                 req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req, timeout=7, context=ctx) as resp:
+                with _urlopen_ssl_aware(cfg, req, 7) as resp:
                     return json.loads(resp.read().decode('utf-8'))
             except Exception as e:
                 if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
@@ -673,19 +673,17 @@ class CloudSync:
             return False
         url = cfg.CLOUD_URL.strip().rstrip('/')
         endpoint = f"{url}/{node_path}.json"
+        payload = None
         try:
-            import ssl
             payload = json.dumps(data).encode('utf-8')
             put_req = urllib.request.Request(endpoint, data=payload, method='PUT')
             put_req.add_header('Content-Type', 'application/json')
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            with urllib.request.urlopen(put_req, timeout=10, context=ctx) as resp:
+            with _urlopen_ssl_aware(cfg, put_req, 10):
                 pass
             return True
         except Exception as e:
-            log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {len(payload)} bytes): {e}", "WARN")
+            size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
+            log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
             return False
 
     @staticmethod

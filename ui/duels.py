@@ -998,10 +998,6 @@ class DuelsMixin:
             self._duel_invite_handled_ids = set()
         self._duel_invite_handled_ids.add(duel_id)
 
-        if not hasattr(self, "_duel_invite_handled_ids"):
-            self._duel_invite_handled_ids = set()
-        self._duel_invite_handled_ids.add(duel_id)
-
         # Check VPX running — cannot accept while VPX is active.
         try:
             w = getattr(self, "watcher", None)

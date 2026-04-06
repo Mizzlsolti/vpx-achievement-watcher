@@ -71,10 +71,7 @@ def compute_player_level(state: dict) -> dict:
     # Prestige calculation
     prestige = min(total // PRESTIGE_THRESHOLD, MAX_PRESTIGE)
     prestige_display = "★" * prestige + "☆" * (MAX_PRESTIGE - prestige)
-    if prestige < MAX_PRESTIGE:
-        effective = total - (prestige * PRESTIGE_THRESHOLD)
-    else:
-        effective = max(0, total - prestige * PRESTIGE_THRESHOLD)
+    effective = total - (prestige * PRESTIGE_THRESHOLD)
 
     current_level = 1
     current_name = LEVEL_TABLE[0][2]
