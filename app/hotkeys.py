@@ -53,7 +53,9 @@ class HotkeysMixin:
         return 0
 
     def keyPressEvent(self, event):
-        super().keyPressEvent(event)
+        fn = getattr(super(), 'keyPressEvent', None)
+        if fn:
+            fn(event)
 
     def _on_toggle_keyboard_event(self):
         now = time.monotonic()
