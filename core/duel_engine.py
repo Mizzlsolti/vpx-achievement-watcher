@@ -10,6 +10,7 @@ import json
 import os
 import random
 import sys
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
@@ -99,6 +100,7 @@ class DuelEngine:
 
     def __init__(self, cfg) -> None:
         self._cfg = cfg
+        self._lock = threading.RLock()
         self._active: List[Duel] = []
         self._history: List[Duel] = []
         self._load_local()
@@ -231,29 +233,30 @@ class DuelEngine:
 
         # Prevent duplicate invitation for the same opponent + table while one is PENDING/ACCEPTED/ACTIVE.
         norm_rom = table_rom.lower().strip()
-        for existing in self._active:
-            if (existing.table_rom == norm_rom
-                    and existing.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)):
-                # Block if same opponent (either direction).
-                if existing.opponent == opponent_id or existing.challenger == opponent_id:
-                    log(self._cfg, "[DUEL] send_invitation: duplicate – an active duel for this opponent/table already exists.", "WARN")
-                    return "duplicate"
+        with self._lock:
+            for existing in self._active:
+                if (existing.table_rom == norm_rom
+                        and existing.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)):
+                    # Block if same opponent (either direction).
+                    if existing.opponent == opponent_id or existing.challenger == opponent_id:
+                        log(self._cfg, "[DUEL] send_invitation: duplicate – an active duel for this opponent/table already exists.", "WARN")
+                        return "duplicate"
 
-        now = time.time()
-        duel = Duel(
-            duel_id=str(uuid.uuid4()),
-            challenger=my_id,
-            challenger_name=self._my_player_name(),
-            opponent=opponent_id,
-            opponent_name=opponent_name,
-            table_rom=table_rom.lower().strip(),
-            table_name=table_name or table_rom,
-            status=DuelStatus.PENDING,
-            created_at=now,
-            expires_at=now + INVITATION_TTL_SECONDS,
-        )
-        self._active.append(duel)
-        self._save_active()
+            now = time.time()
+            duel = Duel(
+                duel_id=str(uuid.uuid4()),
+                challenger=my_id,
+                challenger_name=self._my_player_name(),
+                opponent=opponent_id,
+                opponent_name=opponent_name,
+                table_rom=table_rom.lower().strip(),
+                table_name=table_name or table_rom,
+                status=DuelStatus.PENDING,
+                created_at=now,
+                expires_at=now + INVITATION_TTL_SECONDS,
+            )
+            self._active.append(duel)
+            self._save_active()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Invitation sent: {duel.duel_id} → '{opponent_name or 'opponent'}' ({table_rom})")
         return duel
@@ -339,17 +342,18 @@ class DuelEngine:
         bool
             ``True`` if the duel was found and aborted; ``False`` otherwise.
         """
-        duel = self._find_active(duel_id)
-        if not duel:
-            log(self._cfg, f"[DUEL] abort_duel: duel {duel_id} not found.", "WARN")
-            return False
-        duel.status = DuelStatus.CANCELLED
-        duel.cancel_reason = reason
-        duel.completed_at = time.time()
-        self._active.remove(duel)
-        self._history.append(duel)
-        self._save_active()
-        self._save_history()
+        with self._lock:
+            duel = self._find_active(duel_id)
+            if not duel:
+                log(self._cfg, f"[DUEL] abort_duel: duel {duel_id} not found.", "WARN")
+                return False
+            duel.status = DuelStatus.CANCELLED
+            duel.cancel_reason = reason
+            duel.completed_at = time.time()
+            self._active.remove(duel)
+            self._history.append(duel)
+            self._save_active()
+            self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} aborted. Reason: {reason}")
         return True
@@ -375,43 +379,44 @@ class DuelEngine:
         if not isinstance(all_duels, dict):
             return []
 
-        known_ids = {d.duel_id for d in self._active}
         new_duels: List[Duel] = []
-        for duel_id, data in all_duels.items():
-            if not isinstance(data, dict):
-                continue
-            if data.get("opponent") != my_id:
-                continue
-            if data.get("status") != DuelStatus.PENDING:
-                continue
-            if duel_id in known_ids:
-                continue
-            # Receiver-side dedup: skip if a duel for the same challenger + table_rom
-            # already exists in active with status PENDING/ACCEPTED/ACTIVE.
-            challenger_id = data.get("challenger", "")
-            table_rom_norm = data.get("table_rom", "").lower().strip()
-            duplicate = any(
-                d.table_rom == table_rom_norm
-                and d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)
-                and (d.challenger == challenger_id or d.opponent == challenger_id)
-                for d in self._active
-            )
-            if duplicate:
-                log(self._cfg, f"[DUEL] receive_invitations: skipping duplicate invite {duel_id} from {challenger_id}.", "WARN")
-                continue
-            duel = _duel_from_dict(data)
-            duel.duel_id = duel_id
-            self._active.append(duel)
-            known_ids.add(duel_id)
-            new_duels.append(duel)
-            log(self._cfg, f"[DUEL] New invitation received: {duel_id} from {duel.challenger_name}")
-            try:
-                sound.play("duel_received")
-            except Exception:
-                pass
+        with self._lock:
+            known_ids = {d.duel_id for d in self._active}
+            for duel_id, data in all_duels.items():
+                if not isinstance(data, dict):
+                    continue
+                if data.get("opponent") != my_id:
+                    continue
+                if data.get("status") != DuelStatus.PENDING:
+                    continue
+                if duel_id in known_ids:
+                    continue
+                # Receiver-side dedup: skip if a duel for the same challenger + table_rom
+                # already exists in active with status PENDING/ACCEPTED/ACTIVE.
+                challenger_id = data.get("challenger", "")
+                table_rom_norm = data.get("table_rom", "").lower().strip()
+                duplicate = any(
+                    d.table_rom == table_rom_norm
+                    and d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)
+                    and (d.challenger == challenger_id or d.opponent == challenger_id)
+                    for d in self._active
+                )
+                if duplicate:
+                    log(self._cfg, f"[DUEL] receive_invitations: skipping duplicate invite {duel_id} from {challenger_id}.", "WARN")
+                    continue
+                duel = _duel_from_dict(data)
+                duel.duel_id = duel_id
+                self._active.append(duel)
+                known_ids.add(duel_id)
+                new_duels.append(duel)
+                log(self._cfg, f"[DUEL] New invitation received: {duel_id} from {duel.challenger_name}")
+                try:
+                    sound.play("duel_received")
+                except Exception:
+                    pass
 
-        if new_duels:
-            self._save_active()
+            if new_duels:
+                self._save_active()
         return new_duels
 
     def accept_duel(self, duel_id: str) -> bool:
@@ -419,13 +424,14 @@ class DuelEngine:
 
         Returns True if the duel was found and successfully accepted.
         """
-        duel = self._find_active(duel_id)
-        if duel is None:
-            log(self._cfg, f"[DUEL] accept_duel: duel {duel_id} not found.", "WARN")
-            return False
-        duel.status = DuelStatus.ACCEPTED
-        duel.accepted_at = time.time()
-        self._save_active()
+        with self._lock:
+            duel = self._find_active(duel_id)
+            if duel is None:
+                log(self._cfg, f"[DUEL] accept_duel: duel {duel_id} not found.", "WARN")
+                return False
+            duel.status = DuelStatus.ACCEPTED
+            duel.accepted_at = time.time()
+            self._save_active()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} accepted.")
         try:
@@ -439,16 +445,17 @@ class DuelEngine:
 
         Returns True if the duel was found and declined.
         """
-        duel = self._find_active(duel_id)
-        if duel is None:
-            log(self._cfg, f"[DUEL] decline_duel: duel {duel_id} not found.", "WARN")
-            return False
-        duel.status = DuelStatus.DECLINED
-        duel.completed_at = time.time()
-        self._active.remove(duel)
-        self._history.append(duel)
-        self._save_active()
-        self._save_history()
+        with self._lock:
+            duel = self._find_active(duel_id)
+            if duel is None:
+                log(self._cfg, f"[DUEL] decline_duel: duel {duel_id} not found.", "WARN")
+                return False
+            duel.status = DuelStatus.DECLINED
+            duel.completed_at = time.time()
+            self._active.remove(duel)
+            self._history.append(duel)
+            self._save_active()
+            self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} declined.")
         try:
@@ -468,28 +475,29 @@ class DuelEngine:
 
         Returns True if the duel was found and cancelled.
         """
-        duel = self._find_active(duel_id)
-        if duel is None:
-            log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} not found.", "WARN")
-            return False
-        my_id = self._my_player_id()
-        if duel.status == DuelStatus.PENDING:
-            if duel.challenger != my_id:
-                log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not the challenger.", "WARN")
+        with self._lock:
+            duel = self._find_active(duel_id)
+            if duel is None:
+                log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} not found.", "WARN")
                 return False
-        elif duel.status == DuelStatus.ACCEPTED:
-            if duel.challenger != my_id and duel.opponent != my_id:
-                log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not a participant.", "WARN")
+            my_id = self._my_player_id()
+            if duel.status == DuelStatus.PENDING:
+                if duel.challenger != my_id:
+                    log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not the challenger.", "WARN")
+                    return False
+            elif duel.status == DuelStatus.ACCEPTED:
+                if duel.challenger != my_id and duel.opponent != my_id:
+                    log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not a participant.", "WARN")
+                    return False
+            else:
+                log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} cannot be cancelled (status={duel.status}).", "WARN")
                 return False
-        else:
-            log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} cannot be cancelled (status={duel.status}).", "WARN")
-            return False
-        duel.status = DuelStatus.CANCELLED
-        duel.completed_at = time.time()
-        self._active.remove(duel)
-        self._history.append(duel)
-        self._save_active()
-        self._save_history()
+            duel.status = DuelStatus.CANCELLED
+            duel.completed_at = time.time()
+            self._active.remove(duel)
+            self._history.append(duel)
+            self._save_active()
+            self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} cancelled.")
         return True
@@ -512,58 +520,59 @@ class DuelEngine:
         str or None
             The DuelStatus result ('won', 'lost', or 'expired'), or None on error.
         """
-        duel = self._find_active(duel_id)
-        if duel is None:
-            log(self._cfg, f"[DUEL] submit_result: duel {duel_id} not found.", "WARN")
-            return None
+        with self._lock:
+            duel = self._find_active(duel_id)
+            if duel is None:
+                log(self._cfg, f"[DUEL] submit_result: duel {duel_id} not found.", "WARN")
+                return None
 
-        my_id = self._my_player_id()
-        is_challenger = (duel.challenger == my_id)
+            my_id = self._my_player_id()
+            is_challenger = (duel.challenger == my_id)
 
-        if is_challenger:
-            duel.challenger_score = score
-        else:
-            duel.opponent_score = score
-
-        # Try to fetch the opponent's score from the cloud.
-        cloud_data = None
-        if self._cfg.CLOUD_ENABLED:
-            cloud_data = CloudSync.fetch_node(self._cfg, self._cloud_node_for_duel(duel_id))
-
-        if isinstance(cloud_data, dict):
             if is_challenger:
-                opp_val = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
-                duel.opponent_score = opp_val if opp_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+                duel.challenger_score = score
             else:
-                chall_val = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
-                duel.challenger_score = chall_val if chall_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+                duel.opponent_score = score
 
-        # Only determine winner if both scores have been submitted.
-        both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED
-                          and duel.opponent_score != SCORE_NOT_SUBMITTED)
-        if both_submitted:
-            # Challenger advantage on tie: challenger wins if scores are equal.
-            if duel.challenger_score > duel.opponent_score:
-                result = DuelStatus.WON if is_challenger else DuelStatus.LOST
-            elif duel.challenger_score < duel.opponent_score:
-                result = DuelStatus.LOST if is_challenger else DuelStatus.WON
+            # Try to fetch the opponent's score from the cloud.
+            cloud_data = None
+            if self._cfg.CLOUD_ENABLED:
+                cloud_data = CloudSync.fetch_node(self._cfg, self._cloud_node_for_duel(duel_id))
+
+            if isinstance(cloud_data, dict):
+                if is_challenger:
+                    opp_val = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
+                    duel.opponent_score = opp_val if opp_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+                else:
+                    chall_val = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
+                    duel.challenger_score = chall_val if chall_val != SCORE_NOT_SUBMITTED else SCORE_NOT_SUBMITTED
+
+            # Only determine winner if both scores have been submitted.
+            both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED
+                              and duel.opponent_score != SCORE_NOT_SUBMITTED)
+            if both_submitted:
+                # Challenger advantage on tie: challenger wins if scores are equal.
+                if duel.challenger_score > duel.opponent_score:
+                    result = DuelStatus.WON if is_challenger else DuelStatus.LOST
+                elif duel.challenger_score < duel.opponent_score:
+                    result = DuelStatus.LOST if is_challenger else DuelStatus.WON
+                else:
+                    # Tie: challenger gets the edge (home-field advantage rule).
+                    result = DuelStatus.WON if is_challenger else DuelStatus.LOST
             else:
-                # Tie: challenger gets the edge (home-field advantage rule).
-                result = DuelStatus.WON if is_challenger else DuelStatus.LOST
-        else:
-            # Score not yet available from the other side – mark ACTIVE and wait.
-            duel.status = DuelStatus.ACTIVE
+                # Score not yet available from the other side – mark ACTIVE and wait.
+                duel.status = DuelStatus.ACTIVE
+                self._save_active()
+                self._upload_duel(duel)
+                log(self._cfg, f"[DUEL] Score submitted for {duel_id}; waiting for opponent score.")
+                return None
+
+            duel.status = result
+            duel.completed_at = time.time()
+            self._active.remove(duel)
+            self._history.append(duel)
             self._save_active()
-            self._upload_duel(duel)
-            log(self._cfg, f"[DUEL] Score submitted for {duel_id}; waiting for opponent score.")
-            return None
-
-        duel.status = result
-        duel.completed_at = time.time()
-        self._active.remove(duel)
-        self._history.append(duel)
-        self._save_active()
-        self._save_history()
+            self._save_history()
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} result: {result} (challenger={duel.challenger_score}, opponent={duel.opponent_score})")
 
@@ -587,47 +596,48 @@ class DuelEngine:
         """
         now = time.time()
         expired: List[Duel] = []
-        for duel in list(self._active):
-            should_expire = False
-            if duel.status == DuelStatus.PENDING and duel.expires_at > 0 and now > duel.expires_at:
-                # Before expiring, check cloud state – the opponent may have accepted
-                # just before we run expiry (race condition guard).
-                if self._cfg.CLOUD_ENABLED:
+        with self._lock:
+            for duel in list(self._active):
+                should_expire = False
+                if duel.status == DuelStatus.PENDING and duel.expires_at > 0 and now > duel.expires_at:
+                    # Before expiring, check cloud state – the opponent may have accepted
+                    # just before we run expiry (race condition guard).
+                    if self._cfg.CLOUD_ENABLED:
+                        try:
+                            cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
+                            if isinstance(cloud_data, dict):
+                                cloud_status = cloud_data.get("status")
+                                if cloud_status == DuelStatus.ACCEPTED:
+                                    # Opponent accepted in the cloud – update local state.
+                                    duel.status = DuelStatus.ACCEPTED
+                                    duel.accepted_at = float(cloud_data.get("accepted_at", now))
+                                    self._save_active()
+                                    log(self._cfg, f"[DUEL] check_expiry: duel {duel.duel_id} was accepted in cloud – skipping expiry.")
+                                    continue
+                        except Exception:
+                            pass
+                    should_expire = True
+                elif duel.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
+                    # Accepted/active duels expire after 2 days from acceptance.
+                    ref_time = duel.accepted_at if duel.accepted_at > 0 else duel.created_at
+                    if ref_time > 0 and now > ref_time + ACTIVE_DUEL_TTL_SECONDS:
+                        should_expire = True
+
+                if should_expire:
+                    duel.status = DuelStatus.EXPIRED
+                    duel.completed_at = now
+                    self._active.remove(duel)
+                    self._history.append(duel)
+                    expired.append(duel)
+                    log(self._cfg, f"[DUEL] Duel {duel.duel_id} expired.")
                     try:
-                        cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
-                        if isinstance(cloud_data, dict):
-                            cloud_status = cloud_data.get("status")
-                            if cloud_status == DuelStatus.ACCEPTED:
-                                # Opponent accepted in the cloud – update local state.
-                                duel.status = DuelStatus.ACCEPTED
-                                duel.accepted_at = float(cloud_data.get("accepted_at", now))
-                                self._save_active()
-                                log(self._cfg, f"[DUEL] check_expiry: duel {duel.duel_id} was accepted in cloud – skipping expiry.")
-                                continue
+                        sound.play("duel_expired")
                     except Exception:
                         pass
-                should_expire = True
-            elif duel.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
-                # Accepted/active duels expire after 2 days from acceptance.
-                ref_time = duel.accepted_at if duel.accepted_at > 0 else duel.created_at
-                if ref_time > 0 and now > ref_time + ACTIVE_DUEL_TTL_SECONDS:
-                    should_expire = True
 
-            if should_expire:
-                duel.status = DuelStatus.EXPIRED
-                duel.completed_at = now
-                self._active.remove(duel)
-                self._history.append(duel)
-                expired.append(duel)
-                log(self._cfg, f"[DUEL] Duel {duel.duel_id} expired.")
-                try:
-                    sound.play("duel_expired")
-                except Exception:
-                    pass
-
-        if expired:
-            self._save_active()
-            self._save_history()
+            if expired:
+                self._save_active()
+                self._save_history()
 
         return expired
 
@@ -652,98 +662,115 @@ class DuelEngine:
         if not my_id or not self._cfg.CLOUD_ENABLED:
             return []
 
-        changed: List[Duel] = []
-        to_remove: List[Duel] = []
+        # Phase 1: Snapshot active duels under lock so the cloud fetches below
+        # do not race with list mutations on the GUI thread.
+        with self._lock:
+            snapshot = [
+                d for d in self._active
+                if (d.challenger == my_id or d.opponent == my_id)
+                and d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)
+            ]
 
-        for duel in list(self._active):
-            if duel.challenger != my_id and duel.opponent != my_id:
-                continue
-            if duel.status not in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
-                continue
-
+        # Phase 2: Fetch cloud state for each duel (outside lock – network I/O).
+        cloud_results: dict = {}
+        for duel in snapshot:
             try:
                 cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
+                cloud_results[duel.duel_id] = cloud_data
             except Exception as exc:
                 log(self._cfg, f"[DUEL] sync_active_duel_states fetch error for {duel.duel_id}: {exc}", "WARN")
-                continue
 
-            if not isinstance(cloud_data, dict):
-                continue
+        # Phase 3: Apply mutations under lock.
+        changed: List[Duel] = []
+        to_remove: List[Duel] = []
+        with self._lock:
+            for duel in snapshot:
+                cloud_data = cloud_results.get(duel.duel_id)
+                if not isinstance(cloud_data, dict):
+                    continue
+                # Skip if the duel was already removed from _active by another thread.
+                if duel not in self._active:
+                    continue
 
-            cloud_status = cloud_data.get("status")
-            if cloud_status == duel.status:
-                # For ACTIVE duels, still check if the other player's score arrived.
-                if duel.status == DuelStatus.ACTIVE:
+                cloud_status = cloud_data.get("status")
+                if cloud_status == duel.status:
+                    # For ACTIVE duels, still check if the other player's score arrived.
+                    if duel.status == DuelStatus.ACTIVE:
+                        is_challenger = (duel.challenger == my_id)
+                        if is_challenger:
+                            other_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
+                            if other_score != SCORE_NOT_SUBMITTED and duel.opponent_score == SCORE_NOT_SUBMITTED:
+                                duel.opponent_score = other_score
+                                self._save_active()
+                                log(self._cfg, f"[DUEL] sync: opponent score arrived for {duel.duel_id}.")
+                                changed.append(duel)
+                        else:
+                            other_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
+                            if other_score != SCORE_NOT_SUBMITTED and duel.challenger_score == SCORE_NOT_SUBMITTED:
+                                duel.challenger_score = other_score
+                                self._save_active()
+                                log(self._cfg, f"[DUEL] sync: challenger score arrived for {duel.duel_id}.")
+                                changed.append(duel)
+                    continue
+
+                if cloud_status == DuelStatus.ACCEPTED:
+                    duel.status = DuelStatus.ACCEPTED
+                    duel.accepted_at = float(cloud_data.get("accepted_at", time.time()))
+                    self._save_active()
+                    log(self._cfg, f"[DUEL] Duel {duel.duel_id} accepted by '{duel.opponent_name or 'opponent'}'.")
+                    changed.append(duel)
+
+                elif cloud_status in (DuelStatus.DECLINED, DuelStatus.EXPIRED, DuelStatus.CANCELLED):
+                    duel.status = cloud_status
+                    duel.completed_at = float(cloud_data.get("completed_at", time.time()))
+                    if duel not in to_remove:
+                        to_remove.append(duel)
+                    self._history.append(duel)
+                    changed.append(duel)
+                    log(self._cfg, f"[DUEL] Duel {duel.duel_id} {cloud_status} by '{duel.opponent_name or 'opponent'}'.")
+
+                elif cloud_status in (DuelStatus.WON, DuelStatus.LOST):
+                    ch_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
+                    op_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
                     is_challenger = (duel.challenger == my_id)
-                    if is_challenger:
-                        other_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
-                        if other_score != SCORE_NOT_SUBMITTED and duel.opponent_score == SCORE_NOT_SUBMITTED:
-                            duel.opponent_score = other_score
-                            self._save_active()
-                            log(self._cfg, f"[DUEL] sync: opponent score arrived for {duel.duel_id}.")
-                            changed.append(duel)
+                    if ch_score >= op_score:
+                        correct_status = DuelStatus.WON if is_challenger else DuelStatus.LOST
                     else:
-                        other_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
-                        if other_score != SCORE_NOT_SUBMITTED and duel.challenger_score == SCORE_NOT_SUBMITTED:
-                            duel.challenger_score = other_score
-                            self._save_active()
-                            log(self._cfg, f"[DUEL] sync: challenger score arrived for {duel.duel_id}.")
-                            changed.append(duel)
-                continue
+                        correct_status = DuelStatus.LOST if is_challenger else DuelStatus.WON
+                    duel.status = correct_status
+                    duel.completed_at = float(cloud_data.get("completed_at", time.time()))
+                    duel.challenger_score = ch_score
+                    duel.opponent_score = op_score
+                    if duel not in to_remove:
+                        to_remove.append(duel)
+                    self._history.append(duel)
+                    changed.append(duel)
+                    log(self._cfg, f"[DUEL] Duel {duel.duel_id} completed with status {correct_status}.")
 
-            if cloud_status == DuelStatus.ACCEPTED:
-                duel.status = DuelStatus.ACCEPTED
-                duel.accepted_at = float(cloud_data.get("accepted_at", time.time()))
+            if to_remove:
+                for d in to_remove:
+                    if d in self._active:
+                        self._active.remove(d)
                 self._save_active()
-                log(self._cfg, f"[DUEL] Duel {duel.duel_id} accepted by '{duel.opponent_name or 'opponent'}'.")
-                changed.append(duel)
-
-            elif cloud_status in (DuelStatus.DECLINED, DuelStatus.EXPIRED, DuelStatus.CANCELLED):
-                duel.status = cloud_status
-                duel.completed_at = float(cloud_data.get("completed_at", time.time()))
-                to_remove.append(duel)
-                self._history.append(duel)
-                changed.append(duel)
-                log(self._cfg, f"[DUEL] Duel {duel.duel_id} {cloud_status} by '{duel.opponent_name or 'opponent'}'.")
-
-            elif cloud_status in (DuelStatus.WON, DuelStatus.LOST):
-                ch_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
-                op_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
-                is_challenger = (duel.challenger == my_id)
-                if ch_score >= op_score:
-                    correct_status = DuelStatus.WON if is_challenger else DuelStatus.LOST
-                else:
-                    correct_status = DuelStatus.LOST if is_challenger else DuelStatus.WON
-                duel.status = correct_status
-                duel.completed_at = float(cloud_data.get("completed_at", time.time()))
-                duel.challenger_score = ch_score
-                duel.opponent_score = op_score
-                to_remove.append(duel)
-                self._history.append(duel)
-                changed.append(duel)
-                log(self._cfg, f"[DUEL] Duel {duel.duel_id} completed with status {correct_status}.")
-
-        if to_remove:
-            for d in to_remove:
-                if d in self._active:
-                    self._active.remove(d)
-            self._save_active()
-            self._save_history()
+                self._save_history()
 
         return changed
 
     def get_active_duels(self) -> List[Duel]:
         """Return a copy of the current active/pending duels list."""
-        return list(self._active)
+        with self._lock:
+            return list(self._active)
 
     def get_duel_history(self) -> List[Duel]:
         """Return a copy of the completed duel history list (newest first)."""
-        return list(reversed(self._history))
+        with self._lock:
+            return list(reversed(self._history))
 
     def clear_history(self) -> None:
         """Remove all entries from the duel history."""
-        self._history.clear()
-        self._save_history()
+        with self._lock:
+            self._history.clear()
+            self._save_history()
         log(self._cfg, "[DUEL] Duel history cleared.")
 
     def validate_table(self, table_rom: str, maps_cache: list = None) -> bool:
@@ -860,10 +887,11 @@ class DuelEngine:
         my_queued_at = float(my_entry.get("queued_at", 0)) if isinstance(my_entry, dict) else 0.0
         # Active opponent IDs (skip if we already have a duel against them).
         active_opponents = set()
-        for d in self._active:
-            if d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
-                active_opponents.add(d.challenger)
-                active_opponents.add(d.opponent)
+        with self._lock:
+            for d in self._active:
+                if d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
+                    active_opponents.add(d.challenger)
+                    active_opponents.add(d.opponent)
         active_opponents.discard(my_id)
         max_shared = 0
         queue_count = 0
