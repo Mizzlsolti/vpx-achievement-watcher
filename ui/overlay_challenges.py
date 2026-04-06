@@ -801,7 +801,6 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         factor = scaled_body_pt / 20.0
         # Match ChallengeSelectOverlay canvas size and padding exactly
         w = max(280, int(round(520 * factor)))
-        h = max(110, int(round(200 * factor)))
         pad_lr = max(10, int(round(20 * factor)))
         top_pad = max(12, int(round(24 * factor)))
         bottom_pad = max(9, int(round(18 * factor)))
@@ -826,10 +825,11 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         total_spacing = box_gap * (n - 1)
         box_w = max(40, (w - 2 * pad_lr - total_spacing) // n)
 
-        # Box vertical extents: fill space between title and hint
+        # Boxes are equal squares: height equals width
+        box_h = box_w
         boxes_y = top_pad + t_h + gap_title_desc
-        boxes_h = h - boxes_y - hint_gap - hint_line_h - bottom_pad
-        box_h = max(20, boxes_h)
+        # Height is determined dynamically to fit title + squares + hint
+        h = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
 
         # Font for names: constrained by box_w (longest label is "Difficult"/"← Back")
         inner_margin = max(2, int(round(3 * factor)))
