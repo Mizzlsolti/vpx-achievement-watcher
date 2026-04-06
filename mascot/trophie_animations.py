@@ -1,7 +1,7 @@
-"""trophy_animations.py — New passive animation tick and draw helpers for
+"""trophie_animations.py — New passive animation tick and draw helpers for
 _TrophieDrawWidget (GUITrophie).
 
-This module is imported by trophy_mascot.py to keep that file from growing
+This module is imported by mascot.py to keep that file from growing
 further.  Each tick_* function receives the draw-widget instance and updates
 its state fields (_passive_t, _passive_extra_x, _passive_extra_y,
 _passive_angle, _snore_particles, _confetti_particles).  Each draw_* function

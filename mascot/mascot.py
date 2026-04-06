@@ -1,4 +1,4 @@
-"""trophy_mascot.py — Trophie mascot companion for VPX Achievement Watcher.
+"""mascot.py — Trophie mascot companion for VPX Achievement Watcher.
 
 Two instances:
   - GUITrophie  : bottom-left corner of the MainWindow central widget
