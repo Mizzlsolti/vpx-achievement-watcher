@@ -312,6 +312,15 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
     # ── Duel mascot dispatchers ───────────────────────────────────────────────
 
+    def _msgbox_topmost(self, kind: str, title: str, msg: str):
+        """Show a top-most message box. *kind* is 'info' or 'warn'."""
+        if kind == "warn":
+            box = QMessageBox(QMessageBox.Icon.Warning, title, msg, QMessageBox.StandardButton.Ok, self)
+        else:
+            box = QMessageBox(QMessageBox.Icon.Information, title, msg, QMessageBox.StandardButton.Ok, self)
+        box.setWindowFlags(box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        box.exec()
+
     def _on_duel_received_mascot(self, opponent: str, table_name: str, duel_id: str) -> None:
         """Trigger mascot duel-received reactions."""
         try:

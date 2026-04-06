@@ -134,9 +134,11 @@ class _BasePositionPicker(QWidget):
     - _sync_from_cfg()
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, *, width_hint=None, height_hint=None):
         super().__init__(None)
         self.parent_gui = parent
+        self._width_hint = width_hint
+        self._height_hint = height_hint
         self.setWindowTitle(f"Place {self._picker_label()}")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -151,6 +153,10 @@ class _BasePositionPicker(QWidget):
         self._ccw = True
         self._sync_from_cfg()
         self._base_w, self._base_h = self._calc_overlay_size()
+        if self._width_hint is not None:
+            self._base_w = self._width_hint
+        if self._height_hint is not None:
+            self._base_h = self._height_hint
 
         if self._portrait:
             self._w, self._h = self._base_h, self._base_w
@@ -258,6 +264,10 @@ class _BasePositionPicker(QWidget):
         self._sync_from_cfg()
         if bool(self._portrait) != old_portrait:
             self._base_w, self._base_h = self._calc_overlay_size()
+            if self._width_hint is not None:
+                self._base_w = self._width_hint
+            if self._height_hint is not None:
+                self._base_h = self._height_hint
             if self._portrait:
                 self._w, self._h = self._base_h, self._base_w
             else:
