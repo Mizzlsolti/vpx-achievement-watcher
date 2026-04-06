@@ -1912,7 +1912,7 @@ class Watcher:
 
     def start_timed_challenge(self, total_seconds: int = 190):
         try:
-            if not self.game_active or not self.current_rom:
+            if (not self.game_active and not self._vp_player_visible()) or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] timed: ignored (no active game)", "WARN")
                 return
             if getattr(self, "duel_active_for_current_table", False):
@@ -2203,7 +2203,7 @@ class Watcher:
 
     def start_heat_challenge(self):
         try:
-            if not self.game_active or not self.current_rom:
+            if (not self.game_active and not self._vp_player_visible()) or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] heat: ignored (no active game)", "WARN")
                 return
             if getattr(self, "duel_active_for_current_table", False):
@@ -4332,6 +4332,7 @@ class Watcher:
         self.start_time = time.time()
         self._custom_events_session_start = self.start_time
         self.game_active = True
+        self.challenge = {}  # clear any stale challenge state from a previous session
         self.duel_active_for_current_table = False  # UI will set True if an active duel matches
         self.last_session_score = 0
         self.players.clear()
@@ -4371,6 +4372,8 @@ class Watcher:
     def on_session_end(self):
         if not self.game_active:
             return
+        # Mark inactive immediately so a second call (e.g. from stop() with join timeout) returns early.
+        self.game_active = False
 
         ch = getattr(self, "challenge", {}) or {}
         is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")

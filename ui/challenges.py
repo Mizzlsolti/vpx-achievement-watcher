@@ -643,6 +643,9 @@ class ChallengesMixin:
         return os.path.join(self.cfg.BASE, "session_stats", "challenges", "history", f"{sanitize_filename(rom)}.json")
 
     def _open_flip_difficulty_overlay(self):
+        # Mark immediately so nav keys don't desync _ch_ov_selected_idx during the
+        # async slide-out animation (callback fires ~180 ms later).
+        self._ch_pick_flip_diff = True
         def _do_open():
             # Hide challenge select after slide-out completes
             try:
