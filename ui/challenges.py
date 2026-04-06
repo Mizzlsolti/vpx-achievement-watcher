@@ -346,6 +346,15 @@ class ChallengesMixin:
             pass
 
         try:
+            # Guard: if overlay was just created (< 500 ms ago), skip re-creation to
+            # avoid the race where isVisible() returns False during the slide-in animation.
+            if getattr(self, "_ch_ov_is_open", False):
+                if time.monotonic() - getattr(self, "_ch_ov_opened_at", 0.0) < 0.5:
+                    return
+        except Exception:
+            pass
+
+        try:
             if getattr(self, "_challenge_select", None):
                 try:
                     self._challenge_select.close()
@@ -355,6 +364,7 @@ class ChallengesMixin:
             self._challenge_select = ChallengeSelectOverlay(self, selected_idx=int(self._ch_ov_selected_idx))
             self._challenge_select.show()
             self._challenge_select.raise_()
+            self._ch_ov_is_open = True
             if self._ch_active_source is None and self._last_ch_event_src:
                 self._ch_active_source = self._last_ch_event_src
             try:
@@ -378,6 +388,7 @@ class ChallengesMixin:
             pass
         self._challenge_select = None
         self._ch_active_source = None
+        self._ch_ov_is_open = False
         try:
             self._ch_ov_opened_at = 0.0
         except Exception:
@@ -769,7 +780,7 @@ class ChallengesMixin:
             return
 
         ovw = getattr(self, "_challenge_select", None)
-        if ovw and ovw.isVisible():
+        if ovw and (ovw.isVisible() or getattr(self, "_ch_ov_is_open", False)):
             sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
             if sel == 3:
                 self._close_challenge_select_overlay()
