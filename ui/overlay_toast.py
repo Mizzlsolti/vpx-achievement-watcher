@@ -31,7 +31,7 @@ from effects.gl_effects_opengl import (
 )
 
 try:
-    import sound as _sound_mod
+    from core import sound as _sound_mod
 except Exception:
     _sound_mod = None
 
@@ -340,7 +340,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
                         watcher = getattr(self.parent_gui, "watcher", None)
                         if watcher:
                             romnames = getattr(watcher, "ROMNAMES", {}) or {}
-                            from watcher_core import _strip_version_from_name
+                            from core.watcher_core import _strip_version_from_name
                             table_name = _strip_version_from_name(romnames.get(rom, ""))
                     except Exception:
                         pass

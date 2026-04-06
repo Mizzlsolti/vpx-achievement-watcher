@@ -80,7 +80,7 @@ def _vps_feature_stylesheet(tag: str) -> str:
 
 def _load_vpsdb(cfg) -> Optional[List[dict]]:
     """Load vpsdb.json, using a local cache with 24-hour TTL."""
-    from watcher_core import f_vpsdb_cache, ensure_dir
+    from core.watcher_core import f_vpsdb_cache, ensure_dir
     cache_path = f_vpsdb_cache(cfg)
     try:
         if os.path.isfile(cache_path):
@@ -114,7 +114,7 @@ def _load_vpsdb(cfg) -> Optional[List[dict]]:
 
 def _load_vps_mapping(cfg) -> dict:
     """Load vps_id_mapping.json, returning {} on error."""
-    from watcher_core import f_vps_mapping
+    from core.watcher_core import f_vps_mapping
     path = f_vps_mapping(cfg)
     try:
         if os.path.isfile(path):
@@ -129,7 +129,7 @@ def _load_vps_mapping(cfg) -> dict:
 
 def _save_vps_mapping(cfg, mapping: dict):
     """Save vps_id_mapping.json."""
-    from watcher_core import f_vps_mapping, ensure_dir
+    from core.watcher_core import f_vps_mapping, ensure_dir
     path = f_vps_mapping(cfg)
     ensure_dir(os.path.dirname(path))
     with open(path, "w", encoding="utf-8") as f:
@@ -818,7 +818,7 @@ class VpsPickerDialog(QDialog):
         self._cards: List[VpsCardWidget] = []
         self._selected_idx: int = -1
 
-        from watcher_core import p_vps_img
+        from core.watcher_core import p_vps_img
         self._img_dir = p_vps_img(cfg)
 
         self.setWindowTitle(f"Select VPS Table — {table_title} [{rom}]")
@@ -1187,7 +1187,7 @@ class CloudProgressVpsInfoDialog(QDialog):
         self.setMinimumWidth(640)
         self.setStyleSheet("background:#111; color:#DDD;")
 
-        from watcher_core import p_vps_img
+        from core.watcher_core import p_vps_img
         self._img_dir = p_vps_img(cfg)
 
         layout = QVBoxLayout(self)

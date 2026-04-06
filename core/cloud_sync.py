@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from watcher_core import AppConfig, Bridge
+    from .watcher_core import AppConfig, Bridge
 
 from .watcher_core import (
     log,

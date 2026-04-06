@@ -842,7 +842,7 @@ class DashboardMixin:
 
         def _task():
             try:
-                from watcher_core import _fetch_json_url
+                from core.watcher_core import _fetch_json_url
 
                 RELEASES_API = "https://api.github.com/repos/Mizzlsolti/vpx-achievement-watcher/releases/latest"
                 release = _fetch_json_url(RELEASES_API, timeout=5)

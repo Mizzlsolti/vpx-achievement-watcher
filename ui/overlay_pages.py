@@ -337,7 +337,7 @@ class OverlayPagesMixin:
                 # Check CAT registry once so we can suppress the "no NVRAM map"
                 # messages for officially registered custom tables.
                 try:
-                    from cat_registry import lookup_by_table_key as _lookup_cat
+                    from core.cat_registry import lookup_by_table_key as _lookup_cat
                     _cat_reg_result = _lookup_cat(last_table)
                 except Exception:
                     pass
@@ -376,7 +376,7 @@ class OverlayPagesMixin:
                                         _cat_cached is None
                                         or (time.time() - _cat_cached.get("ts", 0)) > _CAT_RARITY_TTL
                                     ):
-                                        from cloud_sync import CloudSync as _CS
+                                        from core.cloud_sync import CloudSync as _CS
                                         def _cat_rarity_worker(_fk=_cat_firebase_key):
                                             try:
                                                 rarity_data, total = _CS.fetch_rarity_for_cat(self.cfg, _fk)
@@ -491,7 +491,7 @@ class OverlayPagesMixin:
             _cached_r is None
             or (time.time() - _cached_r.get("ts", 0)) > _ROM_RARITY_TTL
         ):
-            from cloud_sync import CloudSync as _CS
+            from core.cloud_sync import CloudSync as _CS
             def _rom_rarity_worker(_r=rom):
                 try:
                     _rarity_data, _total = _CS.fetch_rarity_for_rom(self.cfg, _r)
@@ -559,7 +559,7 @@ class OverlayPagesMixin:
 
     def _overlay_page4_show(self):
         """Show Page 4: Cloud Leaderboard. Fetches data in the background."""
-        from cloud_sync import CloudSync
+        from core.cloud_sync import CloudSync
 
         self._ensure_overlay()
         ctx = self._get_last_session_context()

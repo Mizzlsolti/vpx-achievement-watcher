@@ -12,4 +12,6 @@ __all__ = [
     "theme",
     "tutorial",
     "watcher_core",
+    "watcher_io",
+    "watcher_migrate",
 ]
