@@ -72,6 +72,8 @@ class OverlayPagesMixin:
             enabled_pages.append(3)
         if ov.get("overlay_page5_enabled", True):
             enabled_pages.append(4)
+        if ov.get("overlay_page6_enabled", True):
+            enabled_pages.append(5)
 
         if not enabled_pages:
             enabled_pages = [0]
@@ -162,6 +164,9 @@ class OverlayPagesMixin:
         elif page_idx == 4:
             # Page 5: VPC Weekly Challenge Leaderboard
             self._overlay_page5_show()
+        elif page_idx == 5:
+            # Page 6: Score Duels Auto-Match
+            self._overlay_page6_show()
 
     # ── Last-played helpers ───────────────────────────────────────────────────
 
@@ -900,6 +905,286 @@ class OverlayPagesMixin:
                 signals.update_ui.emit(error_html, "VPC Weekly")
 
         threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
+
+    # ── Page 6: Score Duels Auto-Match ───────────────────────────────────────
+
+    _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
+    _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
+
+    def _overlay_page6_show(self):
+        """Show Page 6: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
+        self._ensure_overlay()
+        state = getattr(self, "_p6_state", "IDLE")
+
+        _tc_primary = get_theme_color(self.cfg, "primary")
+        _tc_accent  = get_theme_color(self.cfg, "accent")
+        _tc_border  = get_theme_color(self.cfg, "border")
+        _tc_bg      = get_theme_color(self.cfg, "bg")
+
+        fs_title = int(self.cfg.OVERLAY.get("base_title_size", 17))
+        fs_body  = int(self.cfg.OVERLAY.get("base_body_size", 12))
+        fs_hint  = int(self.cfg.OVERLAY.get("base_hint_size", 10))
+
+        # Common header
+        header = (
+            f"<div style='text-align:center; color:{_tc_primary}; font-size:{fs_title}pt;"
+            f" font-weight:bold; padding:4px 0 2px 0;'>⚔️ Score Duels</div>"
+            f"<div style='border-top:1px solid {_tc_border}; margin:4px 8px;'></div>"
+        )
+
+        if state == "IDLE":
+            body = (
+                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 2}pt;"
+                f" font-weight:bold; padding:10px 0 6px 0;'>🔍 Auto-Match</div>"
+                f"<div style='display:flex; justify-content:space-between; padding:4px 16px;"
+                f" font-size:{fs_body}pt;'>"
+                f"<span style='color:{_tc_accent};'>◀ Start Search</span>"
+                f"<span style='color:#888;'>Cancel ▶</span>"
+                f"</div>"
+                f"<div style='color:#888; font-size:{fs_hint}pt; padding:10px 16px 4px 16px;"
+                f" font-style:italic;'>"
+                f"Use ◀ Left to start searching for an opponent. Keep the overlay open until a match is found."
+                f"</div>"
+            )
+        elif state == "SEARCHING":
+            elapsed = int(getattr(self, "_p6_elapsed_sec", 0))
+            mins, secs = divmod(elapsed, 60)
+            queue  = int(getattr(self, "_p6_queue_count", 0))
+            shared = int(getattr(self, "_p6_shared_tables", 0))
+            body = (
+                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 1}pt;"
+                f" font-weight:bold; padding:8px 0 4px 0;'>🔍 Searching for opponent...</div>"
+                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
+                f"Queue: {queue} player{'s' if queue != 1 else ''}</div>"
+                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
+                f"Shared Tables: {shared}</div>"
+                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px 8px 16px;'>"
+                f"Search Time: {mins}:{secs:02d}</div>"
+                f"<div style='text-align:right; padding:4px 16px; font-size:{fs_body}pt;'>"
+                f"<span style='color:{_tc_accent};'>Cancel ▶</span>"
+                f"</div>"
+                f"<div style='color:#888; font-size:{fs_hint}pt; padding:4px 16px;"
+                f" font-style:italic;'>"
+                f"Press ▶ Right to cancel the search. Keep the overlay open until a match is found."
+                f"</div>"
+            )
+        else:  # MATCH_FOUND
+            opponent = _html_mod.escape(str(getattr(self, "_p6_opponent_name", "")))
+            table    = _html_mod.escape(str(getattr(self, "_p6_table_name", "")))
+            body = (
+                f"<div style='text-align:center; color:{_tc_accent}; font-size:{fs_body + 2}pt;"
+                f" font-weight:bold; padding:8px 0 6px 0;'>⚔️ MATCH FOUND!</div>"
+                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px;'>"
+                f"Opponent: {opponent}</div>"
+                f"<div style='color:{_tc_primary}; font-size:{fs_body}pt; padding:2px 16px 8px 16px;'>"
+                f"Table: {table}</div>"
+                f"<div style='display:flex; justify-content:space-between; padding:4px 16px;"
+                f" font-size:{fs_body}pt;'>"
+                f"<span style='color:{_tc_accent};'>◀ Accept</span>"
+                f"<span style='color:#888;'>Decline ▶</span>"
+                f"</div>"
+                f"<div style='color:#888; font-size:{fs_hint}pt; padding:10px 16px 4px 16px;"
+                f" font-style:italic;'>"
+                f"Press ◀ Left to accept or ▶ Right to decline. Launch the table yourself to begin."
+                f"</div>"
+            )
+
+        html = (
+            f"<div style='background:{_tc_bg}; padding:8px; border-radius:8px;"
+            f" border:1px solid {_tc_border};'>"
+            f"{header}{body}"
+            f"</div>"
+        )
+
+        self._show_page_with_transition(lambda: self.overlay.set_html(html, "Score Duels"))
+
+        # During SEARCHING, disable auto-close so the overlay stays open.
+        if state == "SEARCHING":
+            try:
+                self.overlay_auto_close_timer.stop()
+            except Exception:
+                pass
+
+    def _overlay_page6_init_timers(self):
+        """Lazily initialise the poll and tick timers for page 6."""
+        if getattr(self, "_p6_poll_timer", None) is None:
+            self._p6_poll_timer = QTimer(self)
+            self._p6_poll_timer.setInterval(self._P6_POLL_INTERVAL_MS)
+            self._p6_poll_timer.timeout.connect(self._overlay_page6_do_poll)
+        if getattr(self, "_p6_tick_timer", None) is None:
+            self._p6_tick_timer = QTimer(self)
+            self._p6_tick_timer.setInterval(self._P6_TICK_INTERVAL_MS)
+            self._p6_tick_timer.timeout.connect(self._overlay_page6_tick)
+
+    def _overlay_page6_start_search(self):
+        """Join matchmaking queue and enter SEARCHING state."""
+        # Validate prerequisites
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            return
+        duel_engine = getattr(self, "_duel_engine", None)
+        if duel_engine is None:
+            return
+
+        def _join():
+            ok = duel_engine.join_matchmaking()
+            QMetaObject.invokeMethod(
+                self, "_overlay_page6_on_joined",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, ok),
+            )
+
+        import threading as _threading
+        _threading.Thread(target=_join, daemon=True).start()
+
+    @pyqtSlot(bool)
+    def _overlay_page6_on_joined(self, ok: bool):
+        if not ok:
+            return
+        self._p6_state         = "SEARCHING"
+        self._p6_elapsed_sec   = 0
+        self._p6_queue_count   = 0
+        self._p6_shared_tables = 0
+        self._overlay_page6_init_timers()
+        self._p6_poll_timer.start()
+        self._p6_tick_timer.start()
+        # Notify mascot
+        try:
+            trophie = getattr(self, "_trophie_overlay", None)
+            if trophie is not None:
+                trophie.on_automatch_started()
+        except Exception:
+            pass
+        # Refresh display and disable auto-close
+        if getattr(self, "_overlay_page", -1) == 5:
+            self._overlay_page6_show()
+        # Immediate first poll
+        self._overlay_page6_do_poll()
+
+    @pyqtSlot()
+    def _overlay_page6_tick(self):
+        """Increment elapsed counter and refresh the SEARCHING display."""
+        if getattr(self, "_p6_state", "IDLE") != "SEARCHING":
+            return
+        self._p6_elapsed_sec = int(getattr(self, "_p6_elapsed_sec", 0)) + 1
+        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+            self._overlay_page6_show()
+
+    def _overlay_page6_do_poll(self):
+        """Run poll_matchmaking() in a background thread."""
+        if getattr(self, "_p6_state", "IDLE") != "SEARCHING":
+            return
+        duel_engine = getattr(self, "_duel_engine", None)
+        if duel_engine is None:
+            return
+
+        def _poll():
+            result = duel_engine.poll_matchmaking()
+            QMetaObject.invokeMethod(
+                self, "_overlay_page6_on_poll_result",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(object, result),
+            )
+
+        import threading as _threading
+        _threading.Thread(target=_poll, daemon=True).start()
+
+    @pyqtSlot(object)
+    def _overlay_page6_on_poll_result(self, result):
+        if getattr(self, "_p6_state", "IDLE") != "SEARCHING":
+            return
+        if result is None:
+            return  # network error – keep searching
+        if "opponent_name" in result:
+            # Match found → enter MATCH_FOUND state
+            self._overlay_page6_stop_timers()
+            self._p6_state         = "MATCH_FOUND"
+            self._p6_opponent_name = result.get("opponent_name", "")
+            raw_table              = result.get("table_name", "")
+            self._p6_table_name    = _strip_version_from_name(raw_table)
+            self._p6_duel_id       = result.get("duel_id", "")
+            # Play match-found sound (reuse duel_received)
+            try:
+                from core.sound import play_sound
+                play_sound(self.cfg, "duel_received")
+            except Exception:
+                pass
+            # Notify mascot
+            try:
+                trophie = getattr(self, "_trophie_overlay", None)
+                if trophie is not None:
+                    trophie.on_automatch_found()
+            except Exception:
+                pass
+            if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+                self._overlay_page6_show()
+        else:
+            self._p6_queue_count   = result.get("queue_count", 0)
+            self._p6_shared_tables = result.get("shared_tables", 0)
+
+    def _overlay_page6_stop_timers(self):
+        """Stop poll and tick timers without leaving the queue."""
+        try:
+            if getattr(self, "_p6_poll_timer", None):
+                self._p6_poll_timer.stop()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_p6_tick_timer", None):
+                self._p6_tick_timer.stop()
+        except Exception:
+            pass
+
+    def _overlay_page6_stop_search(self):
+        """Cancel search: stop timers, leave queue, reset to IDLE."""
+        self._overlay_page6_stop_timers()
+        self._p6_state = "IDLE"
+        duel_engine = getattr(self, "_duel_engine", None)
+        if duel_engine is not None:
+            import threading as _threading
+            _threading.Thread(target=duel_engine.leave_matchmaking, daemon=True).start()
+
+    def _overlay_page6_accept(self):
+        """Accept the matched duel (MATCH_FOUND state → Left hotkey)."""
+        if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
+            return
+        duel_id    = getattr(self, "_p6_duel_id", "")
+        self._p6_state = "IDLE"
+        if duel_id:
+            try:
+                self._on_inbox_accept(duel_id)
+            except Exception:
+                try:
+                    duel_engine = getattr(self, "_duel_engine", None)
+                    if duel_engine:
+                        duel_engine.accept_duel(duel_id)
+                except Exception:
+                    pass
+            try:
+                from core.sound import play_sound
+                play_sound(self.cfg, "duel_accepted")
+            except Exception:
+                pass
+        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+            self._overlay_page6_show()
+
+    def _overlay_page6_decline(self):
+        """Decline the matched duel (MATCH_FOUND state → Right hotkey)."""
+        if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
+            return
+        duel_id    = getattr(self, "_p6_duel_id", "")
+        self._p6_state = "IDLE"
+        if duel_id:
+            try:
+                self._on_inbox_decline(duel_id)
+            except Exception:
+                try:
+                    duel_engine = getattr(self, "_duel_engine", None)
+                    if duel_engine:
+                        duel_engine.decline_duel(duel_id)
+                except Exception:
+                    pass
+        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+            self._overlay_page6_show()
 
     # ── Cloud overlay slot ────────────────────────────────────────────────────
 

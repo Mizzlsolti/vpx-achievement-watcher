@@ -203,6 +203,7 @@ DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page5_enabled", True)
+DEFAULT_OVERLAY.setdefault("overlay_page6_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
@@ -285,7 +286,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
     "overlay_page2_enabled", "overlay_page3_enabled",
-    "overlay_page4_enabled", "overlay_page5_enabled",
+    "overlay_page4_enabled", "overlay_page5_enabled", "overlay_page6_enabled",
     "sound_enabled", "sound_volume", "sound_pack", "sound_events",
 
     # Granular fx_* effect toggles and intensities
