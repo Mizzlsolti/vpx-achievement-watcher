@@ -820,16 +820,21 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         fm_hint_pre = QFontMetrics(QFont(font_family, hint_pt))
         hint_line_h = fm_hint_pre.height()
 
-        # Vertical layout: calculate row height from remaining space
+        # Horizontal layout: 5 boxes side by side
         n = max(1, len(self._options))
-        y0 = top_pad + t_h + gap_title_desc
-        row_spacing = max(2, int(round(3 * factor)))  # 3px gap between rows at factor=1.0
-        rows_total_h = h - y0 - hint_gap - hint_line_h - bottom_pad
-        row_h = max(14, (rows_total_h - row_spacing * (n - 1)) // n)
+        box_gap = max(4, int(round(8 * factor)))
+        total_spacing = box_gap * (n - 1)
+        box_w = max(40, (w - 2 * pad_lr - total_spacing) // n)
 
-        # Row font: fit vertically inside row_h with a small inner margin
+        # Box vertical extents: fill space between title and hint
+        boxes_y = top_pad + t_h + gap_title_desc
+        boxes_h = h - boxes_y - hint_gap - hint_line_h - bottom_pad
+        box_h = max(20, boxes_h)
+
+        # Font for names: constrained by box_w (longest label is "Difficult"/"← Back")
         inner_margin = max(2, int(round(3 * factor)))
-        row_name_pt = max(9, int(round((row_h - 2 * inner_margin) * 72 / 96)))
+        box_name_pt = max(7, int(round(box_w / 9)))
+        flip_pt = max(6, box_name_pt - 2)  # flip count rendered 2pt smaller than the name
 
         img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
@@ -850,8 +855,8 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
             p.drawText(QRect(pad_lr, top_pad, avail_w, t_h), flags_center_wrap, title)
 
             def draw_option(ix: int, name: str, flips: int, selected: bool):
-                row_y = y0 + ix * (row_h + row_spacing)
-                rect = QRect(pad_lr, row_y, avail_w, row_h)
+                box_x = pad_lr + ix * (box_w + box_gap)
+                rect = QRect(box_x, boxes_y, box_w, box_h)
 
                 # Snap pulse: brief flash on selection change; fade-out on prev selection
                 snap_flash_alpha = 0
@@ -878,22 +883,25 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
                 p.drawRoundedRect(rect, 6, 6)
 
                 name_color = QColor(get_theme_color(self.parent_gui.cfg, "accent")) if selected else QColor("#FFFFFF")
-                name_pt = row_name_pt + (1 if selected else 0)
                 p.setPen(name_color)
-                p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
 
                 if int(flips) == -1:
-                    # Back option: centered text only
+                    # Back option: name centered in full box
+                    p.setFont(QFont(font_family, box_name_pt, QFont.Weight.Bold))
                     p.drawText(rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
                 else:
-                    # Name on the left, flip count on the right
-                    left_rect = QRect(pad_lr + inner_margin, row_y, avail_w * 2 // 3, row_h)
-                    p.drawText(left_rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), name)
+                    # Name in top half, flip count in bottom half
+                    half_h = box_h // 2
+                    name_rect = QRect(box_x + inner_margin, boxes_y + inner_margin,
+                                      box_w - 2 * inner_margin, half_h - inner_margin)
+                    flip_rect = QRect(box_x + inner_margin, boxes_y + half_h,
+                                      box_w - 2 * inner_margin, half_h - inner_margin)
+                    p.setFont(QFont(font_family, box_name_pt, QFont.Weight.Bold))
+                    p.drawText(name_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
                     p.setPen(QColor("#CCCCCC") if not selected else name_color)
-                    p.setFont(QFont(font_family, row_name_pt))
-                    right_rect = QRect(pad_lr, row_y, avail_w - inner_margin, row_h)
-                    p.drawText(right_rect, int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
-                               f"{int(flips)} flips")
+                    p.setFont(QFont(font_family, flip_pt))
+                    p.drawText(flip_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter),
+                               f"{int(flips)}")
 
             for i, (nm, fl) in enumerate(self._options):
                 draw_option(i, nm, fl, i == self._selected)
