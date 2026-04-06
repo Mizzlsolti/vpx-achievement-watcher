@@ -122,7 +122,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.watcher = watcher
         self.bridge = bridge
         self.setWindowTitle("VPX Achievement Watcher")
-        self.resize(1640, 1155)
+        self.resize(1640, 1224)
         
         icon = self._get_icon()
         self.setWindowIcon(icon)
