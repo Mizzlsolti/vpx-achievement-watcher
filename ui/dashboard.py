@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSlot, Q_ARG, QMetaObject
 import notifications as _notif
 from cloud_sync import CloudSync
 from watcher_core import _strip_version_from_name, _is_valid_rom_name
-from ui_dialogs import AchievementBeatenDialog
+from .dialogs import AchievementBeatenDialog
 
 
 def _parse_version(v_str):

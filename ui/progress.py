@@ -17,7 +17,7 @@ from config import f_custom_achievements_progress, f_global_ach, p_aweditor
 from cloud_sync import CloudSync
 from watcher_core import _strip_version_from_name
 from badges import RARITY_TIERS
-from ui_vps import VpsAchievementInfoDialog
+from .vps import VpsAchievementInfoDialog
 
 
 class ProgressMixin:

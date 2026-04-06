@@ -176,7 +176,7 @@ class AchToastWindow(_OverlayFxMixin, QWidget):
         self._fx_timer.start()
 
         # Post-processing widget (drawn on top of toast content)
-        from ui_overlay import PostProcessingWidget
+        from .overlay import PostProcessingWidget
         self._pp_widget = PostProcessingWidget(self, overlay_type="toast")
 
         # Hide before first render to prevent a single-frame flash at the wrong

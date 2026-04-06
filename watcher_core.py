@@ -1152,7 +1152,7 @@ class Watcher:
                     return
 
                 try:
-                    from ui_vps import _load_vps_mapping
+                    from ui.vps import _load_vps_mapping
                     mapping = _load_vps_mapping(self.cfg)
                     if mapping.get(rom):
                         return
@@ -1643,7 +1643,7 @@ class Watcher:
 
         refresh_file(f_index(self.cfg), INDEX_URL)
         refresh_file(f_romnames(self.cfg), ROMNAMES_URL)
-        from ui_vps import VPSDB_URL as _VPSDB_URL
+        from ui.vps import VPSDB_URL as _VPSDB_URL
         ensure_file(f_vpsdb_cache(self.cfg), _VPSDB_URL)
         try:
             ensure_vpxtool(self.cfg)
@@ -4765,7 +4765,7 @@ class Watcher:
 
         _current_vps_id = ""
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(self.cfg)
             _current_vps_id = (_vps_mapping.get(rom) or "").strip()
         except Exception:
@@ -5124,7 +5124,7 @@ class Watcher:
                                 # blocked (progress_upload_log has no entry or a different vps_id),
                                 # the upload above will succeed this time. Record the vps_id used.
                                 try:
-                                    from ui_vps import _load_vps_mapping
+                                    from ui.vps import _load_vps_mapping
                                     _vps_mapping = _load_vps_mapping(self.cfg)
                                     _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
                                     if _vps_id:

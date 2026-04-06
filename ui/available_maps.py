@@ -10,7 +10,7 @@ from watcher_core import (
     run_vpxtool_get_rom,
     run_vpxtool_info_show,
 )
-from ui_vps import _load_vps_mapping
+from .vps import _load_vps_mapping
 
 
 class _AvailableMapsWorker(QThread):

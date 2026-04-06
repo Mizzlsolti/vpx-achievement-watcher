@@ -73,7 +73,7 @@ class ChallengeCountdownOverlay(_OverlayFxMixin, QWidget):
         self._fx_timer.timeout.connect(self._on_fx_tick)
         self._fx_timer.start()
         # Post-processing widget (drawn on top of timer content)
-        from ui_overlay import PostProcessingWidget
+        from .overlay import PostProcessingWidget
         self._pp_widget = PostProcessingWidget(self, overlay_type="timer")
         self.show()
         try:
@@ -307,7 +307,7 @@ class ChallengeSelectOverlay(_OverlayFxMixin, QWidget):
         self._pulse_timer.start()  # always run; live fx checks in _compose_image
         self._pix = None
         # Post-processing widget (drawn on top of challenge select content)
-        from ui_overlay import PostProcessingWidget
+        from .overlay import PostProcessingWidget
         self._pp_widget = PostProcessingWidget(self, overlay_type="challenge")
         self._render_and_place()
         self.show()
@@ -1040,7 +1040,7 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
         self._pulse_timer.start()
         self._anim_t = 0.0
         # Post-processing widget (drawn on top of heat barometer content)
-        from ui_overlay import PostProcessingWidget
+        from .overlay import PostProcessingWidget
         self._pp_widget = PostProcessingWidget(self, overlay_type="heat")
         self._render_and_place()
         self.show()

@@ -4,7 +4,7 @@ import os
 import time
 from PyQt6.QtCore import Qt, QTimer
 from watcher_core import log, sanitize_filename
-from ui_overlay import (
+from .overlay import (
     FlipCounterOverlay,
     HeatBarometerOverlay,
     MiniInfoOverlay,

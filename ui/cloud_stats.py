@@ -311,7 +311,7 @@ class CloudStatsMixin:
                 except Exception:
                     pass
             try:
-                from ui_vps import CloudProgressVpsInfoDialog
+                from .vps import CloudProgressVpsInfoDialog
                 dlg = CloudProgressVpsInfoDialog(
                     cfg=self.cfg,
                     vps_id=vps_id,

@@ -123,7 +123,7 @@ class AutoMatchWidget(QWidget):
             return
         # Validate: player must have at least one VPS-ID.
         try:
-            from ui_vps import _load_vps_mapping
+            from .vps import _load_vps_mapping
             vps_mapping = _load_vps_mapping(self._cfg)
         except Exception:
             vps_mapping = {}

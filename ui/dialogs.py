@@ -173,7 +173,7 @@ class AchievementBeatenDialog(QDialog):
         vps_id = ""
         try:
             from config import p_vps_img
-            from ui_vps import _load_vps_mapping, _load_vpsdb
+            from .vps import _load_vps_mapping, _load_vpsdb
             mapping = _load_vps_mapping(cfg)
             vps_id = mapping.get(rom, "") if mapping else ""
 
@@ -196,7 +196,7 @@ class AchievementBeatenDialog(QDialog):
                             break
 
                 if vps_entry:
-                    from ui_vps import VpsHeroPanel, _process_pending_image_callbacks
+                    from .vps import VpsHeroPanel, _process_pending_image_callbacks
                     img_dir = p_vps_img(cfg)
                     hero = VpsHeroPanel(img_dir, parent=self)
                     hero.update_selection(vps_entry, tf_entry or {})

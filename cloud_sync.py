@@ -323,7 +323,7 @@ class CloudSync:
             return
         # Block upload if no VPS-ID assigned for this ROM
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(cfg)
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
@@ -337,7 +337,7 @@ class CloudSync:
             extra_data.setdefault("vps_id", _vps_id)
             # Enrich extra_data with VPS table metadata (table_name, author, version)
             try:
-                from ui_vps import _load_vpsdb
+                from ui.vps import _load_vpsdb
                 tables = _load_vpsdb(cfg)
                 if tables:
                     for t in tables:
@@ -451,7 +451,7 @@ class CloudSync:
             return
         # Block upload if no VPS-ID assigned for this ROM
         try:
-            from ui_vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping
             _vps_mapping = _load_vps_mapping(cfg)
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
@@ -505,7 +505,7 @@ class CloudSync:
             if _extra_vps_id:
                 payload["vps_id"] = _extra_vps_id
                 try:
-                    from ui_vps import _load_vpsdb
+                    from ui.vps import _load_vpsdb
                     tables = _load_vpsdb(cfg)
                     if tables:
                         for t in tables:
@@ -902,7 +902,7 @@ class CloudSync:
         try:
             vps_data = CloudSync.fetch_node(cfg, f"players/{pid}/vps_mapping")
             if vps_data and isinstance(vps_data, dict):
-                from ui_vps import _save_vps_mapping
+                from ui.vps import _save_vps_mapping
                 _save_vps_mapping(cfg, vps_data)
                 log(cfg, f"[CLOUD] restore_from_cloud: VPS mapping restored: {len(vps_data)} entries")
         except Exception as e:
