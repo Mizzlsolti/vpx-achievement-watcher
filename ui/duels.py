@@ -1740,6 +1740,8 @@ class DuelsMixin:
                 DuelStatus.CANCELLED: ("🚫 Cancelled",   "#666666"),
             }
             result_text, result_color = result_map.get(duel.status, (duel.status.capitalize(), "#AAAAAA"))
+            if duel.status == DuelStatus.CANCELLED and getattr(duel, "cancel_reason", "") == "aborted":
+                result_text = "🚫 Cancelled (aborted)"
             result_item = QTableWidgetItem(result_text)
             result_item.setForeground(QColor(result_color))
             tbl.setItem(row, 2, result_item)
@@ -1974,6 +1976,17 @@ class DuelsMixin:
                 for d in pending:
                     self._duel_recheck_cooldown.pop(d.duel_id, None)
                 QTimer.singleShot(_DUEL_FAST_RECHECK_DELAY_MS, self._recheck_active_duel_scores)
+        except Exception:
+            pass
+
+        # Always reset the duel-active flag so that the next normal session on
+        # this table is not blocked while waiting for the opponent's score.
+        # _on_session_started_duels() will re-set it to True if an active duel
+        # is still in progress when the next session begins.
+        try:
+            w = getattr(self, "watcher", None)
+            if w is not None:
+                w.duel_active_for_current_table = False
         except Exception:
             pass
 
