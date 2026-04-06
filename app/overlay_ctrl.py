@@ -338,7 +338,6 @@ class OverlayCtrlMixin:
         QTimer.singleShot(50, lambda: setattr(self.overlay, '_ensuring', False))
 
     def _show_overlay_latest(self):
-        import time as _time
 
         def _do_show():
             try:

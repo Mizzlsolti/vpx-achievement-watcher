@@ -17,7 +17,6 @@ from core.watcher_core import (
 class HotkeysMixin:
 
     def _get_hotkey_mods_now(self) -> int:
-        import ctypes
         user32 = ctypes.windll.user32
 
         def pressed(vk: int) -> bool:
