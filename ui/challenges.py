@@ -492,7 +492,13 @@ class ChallengesMixin:
                     log(self.cfg, f"[CHALLENGE] countdown spawn – seconds={play_sec}")
                 except Exception:
                     pass
-                _launch_timer(None)
+                try:
+                    # Show 3…2…1…GO! countdown before the actual challenge timer
+                    csd = ChallengeStartCountdown(None)
+                    csd.finished.connect(lambda: _launch_timer(csd))
+                    csd.start()
+                except Exception:
+                    _launch_timer(None)
 
             def _launch_timer(csd_widget=None):
                 try:
