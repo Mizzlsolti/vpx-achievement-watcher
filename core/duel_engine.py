@@ -663,7 +663,7 @@ class DuelEngine:
             return []
 
         # Phase 1: Snapshot active duels under lock so the cloud fetches below
-        # don't race with list mutations on the GUI thread.
+        # do not race with list mutations on the GUI thread.
         with self._lock:
             snapshot = [
                 d for d in self._active
