@@ -86,7 +86,7 @@ from ui.available_maps import _AvailableMapsWorker
 import notifications as _notif
 import sound
 
-from trophy_mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
+from mascot.mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
 
 from ui.overlay import (
     OverlayWindow,

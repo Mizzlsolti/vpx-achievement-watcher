@@ -45,7 +45,7 @@ from typing import Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     # Avoid a hard import cycle at runtime; _TrophieMemory is only used for
     # type annotations and attribute look-ups, not for isinstance checks.
-    from trophy_mascot import _TrophieMemory
+    from mascot.mascot import _TrophieMemory
 
 # ---------------------------------------------------------------------------
 # Player-type labels (used internally and exposed for callers)

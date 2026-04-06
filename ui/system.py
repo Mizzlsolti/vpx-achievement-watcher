@@ -20,7 +20,7 @@ from watcher_core import (
 )
 from .dialogs import FeedbackDialog
 from .vps import _load_vps_mapping, _save_vps_mapping
-from trophy_mascot import _TROPHIE_SHARED
+from mascot.mascot import _TROPHIE_SHARED
 
 
 def _parse_version(v_str):
