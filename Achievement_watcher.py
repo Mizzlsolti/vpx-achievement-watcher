@@ -15,14 +15,14 @@ from PyQt6.QtGui import QFontMetrics
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QTextEdit, QTextBrowser, QSystemTrayIcon, QMenu, QFileDialog, QMessageBox, QTabWidget,
+    QTextEdit, QTextBrowser, QFileDialog, QMessageBox, QTabWidget,
     QCheckBox, QSlider, QComboBox, QDialog, QGroupBox, QColorDialog, QLineEdit,
     QFontComboBox, QSpinBox, QDoubleSpinBox, QGridLayout, QProgressBar,
     QTableWidget, QTableWidgetItem, QHeaderView, QProgressDialog, QScrollArea, QCompleter,
     QFrame,
 )
-from PyQt6.QtCore import (Qt, pyqtSignal, QEvent, QTimer, QRect,
-                          QAbstractNativeEventFilter, QCoreApplication, QObject, QPoint, pyqtSlot,
+from PyQt6.QtCore import (Qt, QEvent, QTimer, QRect,
+                          QPoint, pyqtSlot,
                           QThread, QUrl, QStringListModel, QMetaObject, Q_ARG)
 from PyQt6.QtGui import (QIcon, QColor, QFont, QTransform, QPixmap,
                          QPainter, QImage, QPen)
@@ -45,17 +45,10 @@ from core.config import (
 from core.cloud_sync import CloudSync
 from core.watcher_core import (
     APP_DIR, Watcher,
-    JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
-    WM_HOTKEY, WM_KEYDOWN, WM_SYSKEYDOWN,
-    KBDLLHOOKSTRUCT, GlobalKeyHook,
-    ensure_dir, log, resource_path, sanitize_filename,
-    apply_tooltips,
-    register_raw_input_for_window, secure_load_json, secure_save_json, vk_to_name_en,
-    run_vpxtool_get_rom,
+    ensure_dir, log, resource_path,
     run_vpxtool_get_script_authors,
     run_vpxtool_info_show,
     _strip_version_from_name,
-    _is_valid_rom_name,
     WATCHER_VERSION,
 )
 from core.badges import (
