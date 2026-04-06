@@ -729,6 +729,11 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.chk_overlay_page5.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page5)
 
+        self.chk_overlay_page6 = QCheckBox("Page 6: Score Duels")
+        self.chk_overlay_page6.setChecked(bool(self.cfg.OVERLAY.get("overlay_page6_enabled", True)))
+        self.chk_overlay_page6.stateChanged.connect(self._save_overlay_page_settings)
+        lay_pages.addWidget(self.chk_overlay_page6)
+
         layout.addWidget(grp_pages)
 
         layout.addStretch(1)

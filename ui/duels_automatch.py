@@ -238,7 +238,12 @@ class AutoMatchWidget(QWidget):
             # Match found!
             self._stop_search()
             opponent = result.get("opponent_name", "")
-            table    = result.get("table_name", "")
+            raw_table = result.get("table_name", "")
+            try:
+                from core.watcher_core import _strip_version_from_name
+                table = _strip_version_from_name(raw_table)
+            except Exception:
+                table = raw_table
             self._show_result(
                 f"✅ Match found! Duel invitation sent to {opponent} on {table}",
                 "#00E500",
