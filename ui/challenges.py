@@ -25,6 +25,7 @@ class ChallengesMixin:
       - self.bridge
       - self.watcher
       - self._in_game_now()
+      - self._player_is_visible()
     """
 
     def register_flip_counter_handlers(self):
@@ -153,7 +154,7 @@ class ChallengesMixin:
             ch = getattr(self.watcher, "challenge", {}) or {}
             if not ch.get("active"):
                 return False
-            if not self._in_game_now():
+            if not self._player_is_visible():
                 ch["active"] = False
                 ch["pending_kill_at"] = None
                 self.watcher.challenge = ch
@@ -189,7 +190,7 @@ class ChallengesMixin:
             "#FF3B30",
         ),
         ("Challenge Aborted!", "#FF3B30"),
-        ("Challenge can only be started in-game.", "#FF3B30"),
+        ("Challenges disabled: No active VPX Player detected.", "#FF3B30"),
     ]
 
     def _on_mini_info_test(self):
@@ -317,11 +318,11 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
-        if not self._in_game_now():
+        if not self._player_is_visible():
             try:
                 self.bridge.challenge_info_show.emit(
-                    "Challenge can only be started in-game.",
-                    3,
+                    "Challenges disabled: No active VPX Player detected.",
+                    4,
                     "#FF3B30"
                 )
             except Exception:
@@ -676,7 +677,7 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        if not self._in_game_now():
+        if not self._player_is_visible():
             # If a duel invite notification is showing in the mini overlay, ignore
             # the hotkey — Left/Right handle accept/decline directly.
             try:
@@ -705,8 +706,8 @@ class ChallengesMixin:
                 pass
             try:
                 self.bridge.challenge_info_show.emit(
-                    "Challenge can only be started in-game.",
-                    3,
+                    "Challenges disabled: No active VPX Player detected.",
+                    4,
                     "#FF3B30"
                 )
             except Exception:
@@ -846,7 +847,7 @@ class ChallengesMixin:
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
-        if not self._in_game_now():
+        if not self._player_is_visible():
             try:
                 self._close_challenge_select_overlay()
                 self._close_flip_difficulty_overlay()
@@ -951,7 +952,7 @@ class ChallengesMixin:
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
-        if not self._in_game_now():
+        if not self._player_is_visible():
             try:
                 self._close_challenge_select_overlay()
                 self._close_flip_difficulty_overlay()

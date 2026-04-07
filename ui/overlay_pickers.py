@@ -256,7 +256,7 @@ class MiniInfoPositionPicker(_BasePositionPicker):
             f"<span style='color:{_accent};'>No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>NVRAM file not found or not readable</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>💀 DUEL LOST. You: 42,069,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>Challenge can only be started in-game.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>Challenges disabled: No active VPX Player detected.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>Overlay only available after VPX end</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
         ]
         max_w, max_h = 200, 60
