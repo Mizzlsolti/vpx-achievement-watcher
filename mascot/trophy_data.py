@@ -761,7 +761,6 @@ class _TrophieMemory:
         self.session_durations: list = []
         self.achievement_sessions: int = 0
         self.no_achievement_sessions: int = 0
-        self.heat_100_count: int = 0
         self.rom_play_counts: dict = {}
         self.dismiss_speed: list = []
         self.comments_shown: int = 0
@@ -782,7 +781,6 @@ class _TrophieMemory:
             self.session_durations = d.get("session_durations", [])
             self.achievement_sessions = int(d.get("achievement_sessions", 0))
             self.no_achievement_sessions = int(d.get("no_achievement_sessions", 0))
-            self.heat_100_count = int(d.get("heat_100_count", 0))
             self.rom_play_counts = d.get("rom_play_counts", {})
             self.dismiss_speed = d.get("dismiss_speed", [])
             self.comments_shown = int(d.get("comments_shown", 0))
@@ -800,7 +798,6 @@ class _TrophieMemory:
                 "session_durations": self.session_durations[-200:],
                 "achievement_sessions": self.achievement_sessions,
                 "no_achievement_sessions": self.no_achievement_sessions,
-                "heat_100_count": self.heat_100_count,
                 "rom_play_counts": self.rom_play_counts,
                 "dismiss_speed": self.dismiss_speed[-200:],
                 "comments_shown": self.comments_shown,
