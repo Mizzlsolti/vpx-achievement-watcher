@@ -63,7 +63,7 @@ from ui.cloud_stats import CloudStatsMixin
 from aweditor import AWEditorMixin
 from ui.system import SystemMixin
 from ui.appearance import AppearanceMixin
-from ui.challenges import ChallengesMixin
+from ui.overlays_mixin import OverlaysMixin
 from ui.progress import ProgressMixin
 from ui.dashboard import DashboardMixin
 from ui.overlay_pages import OverlayPagesMixin
@@ -87,20 +87,11 @@ from ui.overlay import (
     StatusOverlay,
     StatusOverlayPositionPicker,
     read_active_players,
-    FlipCounterOverlay,
-    FlipCounterPositionPicker,
-    TimerPositionPicker,
     ToastPositionPicker,
-    ChallengeOVPositionPicker,
     MiniInfoPositionPicker,
     OverlayPositionPicker,
     AchToastWindow,
     AchToastManager,
-    ChallengeCountdownOverlay,
-    ChallengeSelectOverlay,
-    FlipDifficultyOverlay,
-    HeatBarometerOverlay,
-    HeatBarPositionPicker,
 )
 
 from app.bootstrap import Bridge, main, _authors_match, _parse_version
@@ -109,7 +100,7 @@ from app.overlay_ctrl import OverlayCtrlMixin
 from app.hotkeys import HotkeysMixin
 
 
-class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudStatsMixin, AWEditorMixin, SystemMixin, AppearanceMixin, ChallengesMixin, ProgressMixin,
+class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudStatsMixin, AWEditorMixin, SystemMixin, AppearanceMixin, OverlaysMixin, ProgressMixin,
                  DashboardMixin, OverlayPagesMixin, DuelsMixin):
     CURRENT_VERSION = WATCHER_VERSION
     _HIGHSCORE_POLL_INTERVAL_MS = 300_000   # 5 minutes
@@ -143,11 +134,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.mini_info_show.connect(self._on_mini_info_show)
         self.bridge.ach_toast_show.connect(self._on_ach_toast_show)
         self._ach_toast_mgr = AchToastManager(self)
-        self.bridge.challenge_info_show.connect(self._on_challenge_info_show)
-        self.bridge.challenge_timer_start.connect(self._on_challenge_timer_start)
-        self.bridge.challenge_timer_stop.connect(self._on_challenge_timer_stop)
-        self.bridge.challenge_warmup_show.connect(self._on_challenge_warmup_show)
-        self.bridge.challenge_speak.connect(self._on_challenge_speak)
+        self.bridge.challenge_info_show.connect(self._on_mini_info_message)
         
         self.bridge.prefetch_started.connect(self._on_prefetch_started)
         self.bridge.prefetch_progress.connect(self._on_prefetch_progress)
@@ -181,9 +168,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._build_tab_system()
         self._build_tab_aweditor()
 
-        self.register_flip_counter_handlers()
-        self.register_heat_bar_handlers()
-
         self.timer_stats = QTimer(self)
         self.timer_stats.timeout.connect(self.update_stats)
         self.timer_stats.start(4000)
@@ -214,15 +198,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.overlay = None
         self._overlay_page = 0  # current page in the 4-page main overlay (0=Main Stats, 1=Achievement Progress, 2=Challenge Leaderboard, 3=Cloud Leaderboard)
 
-        self._challenge_select = None
-        self._challenge_select_test = None
-        self._ch_ov_selected_idx = 0
-        self._ch_active_source = None
-        self._last_ch_event_src = None
-        self._ch_pick_flip_diff = False
-        self._ch_flip_diff_idx = 1  
-        self._flip_diff_options = [("Easy", 400), ("Medium", 300), ("Difficult", 200), ("Pro", 100), ("← Back", -1)]
-        self._flip_diff_select = None
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
         # Transient state flags for the status badge
@@ -268,21 +243,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             self.bridge.session_ended.connect(self._trophie_overlay.on_session_ended)
             self.bridge.session_started.connect(
                 lambda rom, table: self._trophie_overlay.on_rom_start(rom, table or None)
-            )
-            self.bridge.challenge_timer_start.connect(
-                lambda *a: self._trophie_overlay.on_challenge_start()
-            )
-            self.bridge.challenge_timer_stop.connect(
-                lambda *a: self._trophie_overlay.on_challenge_stop()
-            )
-            self.bridge.challenge_timer_tick.connect(
-                lambda ms: self._trophie_overlay.on_challenge_timer_tick(ms)
-            )
-            self.bridge.challenge_won.connect(
-                lambda margin: self._trophie_overlay.on_challenge_won(margin)
-            )
-            self.bridge.challenge_lost.connect(
-                lambda attempts, margin: self._trophie_overlay.on_challenge_lost(attempts, margin)
             )
 
             # Duel mascot reactions
@@ -909,49 +869,24 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         grp_inputs = QGroupBox("Input Bindings & Hotkeys")
         lay_inputs = QGridLayout(grp_inputs)
-        
+
         self.cmb_toggle_src = QComboBox(); self.cmb_toggle_src.addItems(["keyboard", "joystick"]); self.cmb_toggle_src.setCurrentText(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")); self.cmb_toggle_src.currentTextChanged.connect(self._on_toggle_source_changed)
         self.btn_bind_toggle = QPushButton("Bind..."); self.btn_bind_toggle.clicked.connect(self._on_bind_toggle_clicked)
         self.lbl_toggle_binding = QLabel(self._toggle_binding_label_text())
-        
-        self.cmb_ch_hotkey_src = QComboBox(); self.cmb_ch_hotkey_src.addItems(["keyboard", "joystick"]); self.cmb_ch_hotkey_src.setCurrentText(self.cfg.OVERLAY.get("challenge_hotkey_input_source", "keyboard")); self.cmb_ch_hotkey_src.currentTextChanged.connect(lambda s: self._on_ch_src_changed("hotkey", s))
-        self.btn_ch_hotkey_bind = QPushButton("Bind..."); self.btn_ch_hotkey_bind.clicked.connect(lambda: self._on_bind_ch_clicked("hotkey"))
-        self.lbl_ch_hotkey_binding = QLabel(self._challenge_binding_label_text("hotkey"))
 
-        self.cmb_ch_left_src = QComboBox(); self.cmb_ch_left_src.addItems(["keyboard", "joystick"]); self.cmb_ch_left_src.setCurrentText(self.cfg.OVERLAY.get("challenge_left_input_source", "keyboard")); self.cmb_ch_left_src.currentTextChanged.connect(lambda s: self._on_ch_src_changed("left", s))
+        self.cmb_ch_left_src = QComboBox(); self.cmb_ch_left_src.addItems(["keyboard", "joystick"]); self.cmb_ch_left_src.setCurrentText(self.cfg.OVERLAY.get("challenge_left_input_source", "keyboard")); self.cmb_ch_left_src.currentTextChanged.connect(lambda s: self._on_nav_src_changed("left", s))
         self.btn_ch_left_bind = QPushButton("Bind..."); self.btn_ch_left_bind.clicked.connect(lambda: self._on_bind_ch_clicked("left"))
-        self.lbl_ch_left_binding = QLabel(self._challenge_binding_label_text("left"))
+        self.lbl_ch_left_binding = QLabel(self._nav_binding_label_text("left"))
 
-        self.cmb_ch_right_src = QComboBox(); self.cmb_ch_right_src.addItems(["keyboard", "joystick"]); self.cmb_ch_right_src.setCurrentText(self.cfg.OVERLAY.get("challenge_right_input_source", "keyboard")); self.cmb_ch_right_src.currentTextChanged.connect(lambda s: self._on_ch_src_changed("right", s))
+        self.cmb_ch_right_src = QComboBox(); self.cmb_ch_right_src.addItems(["keyboard", "joystick"]); self.cmb_ch_right_src.setCurrentText(self.cfg.OVERLAY.get("challenge_right_input_source", "keyboard")); self.cmb_ch_right_src.currentTextChanged.connect(lambda s: self._on_nav_src_changed("right", s))
         self.btn_ch_right_bind = QPushButton("Bind..."); self.btn_ch_right_bind.clicked.connect(lambda: self._on_bind_ch_clicked("right"))
-        self.lbl_ch_right_binding = QLabel(self._challenge_binding_label_text("right"))
+        self.lbl_ch_right_binding = QLabel(self._nav_binding_label_text("right"))
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Challenge Action:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_hotkey_src, 2, 1); lay_inputs.addWidget(self.btn_ch_hotkey_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_hotkey_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge Left / Duel Accept:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 3, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 3, 3)
-        lay_inputs.addWidget(QLabel("<b>Challenge Right / Duel Decline:</b>"), 4, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 4, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 4, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 4, 3)
+        lay_inputs.addWidget(QLabel("<b>Nav Left / Duel Accept:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
+        lay_inputs.addWidget(QLabel("<b>Nav Right / Duel Decline:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
-
-        lbl_flipper_hint = QLabel(
-            '💡 <b>Tip:</b> For the best experience, bind <b>Challenge Left</b> and <b>Challenge Right</b> '
-            'to your flipper buttons (left and right flipper keys). '
-            'This way you can navigate challenges and duels without taking your hands off the machine!'
-        )
-        lbl_flipper_hint.setWordWrap(True)
-        lbl_flipper_hint.setStyleSheet(
-            "color: #888888; margin-top: 4px; font-size: 9pt; padding: 6px 10px; "
-            "background: #1a1a1a; border: 1px solid #333; border-radius: 5px;"
-        )
-        layout.addWidget(lbl_flipper_hint)
-
-        grp_voice = QGroupBox("Voice & Audio")
-        lay_voice = QVBoxLayout(grp_voice)
-        row_v1 = QHBoxLayout(); row_v1.addWidget(QLabel("AI Voice Volume (Challenges):"))
-        self.sld_ch_volume = QSlider(Qt.Orientation.Horizontal); self.sld_ch_volume.setRange(0, 100); self.sld_ch_volume.setValue(int(self.cfg.OVERLAY.get("challenges_voice_volume", 80))); self.sld_ch_volume.valueChanged.connect(self._on_ch_volume_changed)
-        row_v1.addWidget(self.sld_ch_volume); self.lbl_ch_volume = QLabel(f"{self.sld_ch_volume.value()}%"); row_v1.addWidget(self.lbl_ch_volume)
-        self.chk_ch_voice_mute = QCheckBox("Mute all spoken announcements"); self.chk_ch_voice_mute.setChecked(bool(self.cfg.OVERLAY.get("challenges_voice_mute", False))); self.chk_ch_voice_mute.stateChanged.connect(self._on_ch_mute_toggled)
-        lay_voice.addLayout(row_v1); lay_voice.addWidget(self.chk_ch_voice_mute); layout.addWidget(grp_voice)
 
         layout.addStretch(1)
         self._add_tab_help_button(layout, "controls")
@@ -1940,17 +1875,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         _set_tip("cmb_toggle_src", "Choose whether to use a keyboard key or joystick button to show/hide the main overlay.")
         _set_tip("btn_bind_toggle", "Assign the hotkey used to show/hide the main stats overlay. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination (e.g. Ctrl+F9).")
         _set_tip("lbl_toggle_binding", "Currently assigned hotkey for the main overlay.")
-        _set_tip("cmb_ch_hotkey_src", "Input source for the Challenge Action button.")
-        _set_tip("btn_ch_hotkey_bind", "Assign the hotkey used to start challenges. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
-        _set_tip("lbl_ch_hotkey_binding", "Currently assigned hotkey for challenge actions.")
-        _set_tip("cmb_ch_left_src", "Input source for navigating left in Challenge and Duel menus.")
-        _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left in Challenge and Duel menus. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
-        _set_tip("lbl_ch_left_binding", "Currently assigned left navigation hotkey (used to navigate Challenge and Duel menus).")
-        _set_tip("cmb_ch_right_src", "Input source for navigating right in Challenge and Duel menus.")
-        _set_tip("btn_ch_right_bind", "Assign the hotkey used to navigate right in Challenge and Duel menus. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
-        _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey (used to navigate Challenge and Duel menus).")
-        _set_tip("sld_ch_volume", "Adjust the volume of the AI voice announcements.")
-        _set_tip("chk_ch_voice_mute", "Completely disable spoken voice announcements during challenges.")
+        _set_tip("cmb_ch_left_src", "Input source for navigating left in Duel menus.")
+        _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left / accept a duel. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
+        _set_tip("lbl_ch_left_binding", "Currently assigned left navigation hotkey (used to accept duels).")
+        _set_tip("cmb_ch_right_src", "Input source for navigating right in Duel menus.")
+        _set_tip("btn_ch_right_bind", "Assign the hotkey used to navigate right / decline a duel. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
+        _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey (used to decline duels).")
         
         # Cloud Tab
         _set_tip("cmb_cloud_category", "Select the leaderboard category you want to view.")
@@ -2442,18 +2372,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         def _stop_old():
             try:
                 if old_watcher:
-                    try:
-                        old_watcher.stop_timed_challenge()
-                    except Exception:
-                        pass
-                    try:
-                        old_watcher.stop_flip_challenge()
-                    except Exception:
-                        pass
-                    try:
-                        old_watcher.stop_heat_challenge()
-                    except Exception:
-                        pass
                     try:
                         old_watcher.stop()
                     except Exception:

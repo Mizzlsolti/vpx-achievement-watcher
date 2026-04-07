@@ -64,23 +64,6 @@ class HotkeysMixin:
         self._last_toggle_ts = now
         if getattr(self, "_overlay_busy", False):
             return
-            
-        try:
-            if getattr(self, "_challenge_select", None) and self._challenge_select.isVisible():
-                return
-            if getattr(self, "_flip_diff_select", None) and self._flip_diff_select.isVisible():
-                return
-        except Exception:
-            pass
-
-        # Während Challenge keine Overlay-Toggle erlauben
-        try:
-            ch = getattr(self.watcher, "challenge", {}) or {}
-            if ch.get("active") or ch.get("suppress_big_overlay_once"):
-                return
-        except Exception:
-            pass
-
         self._cycle_overlay_button()
 
     def _on_joy_toggle_poll(self):
