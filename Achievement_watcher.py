@@ -134,7 +134,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.mini_info_show.connect(self._on_mini_info_show)
         self.bridge.ach_toast_show.connect(self._on_ach_toast_show)
         self._ach_toast_mgr = AchToastManager(self)
-        self.bridge.challenge_info_show.connect(self._on_mini_info_message)
         
         self.bridge.prefetch_started.connect(self._on_prefetch_started)
         self.bridge.prefetch_progress.connect(self._on_prefetch_progress)
@@ -428,7 +427,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Reach Prestige 1–5 by unlocking 2000 achievements per star.<br>"
             "• <b>Level Table</b>: All levels from Rookie to VPX Elite with their achievement thresholds.<br>"
             "• <b>Badges</b>: 37 collectible badges earned through gameplay milestones. "
-            "Earn badges by unlocking achievements, completing challenges, reaching levels, "
+            "Earn badges by unlocking achievements, reaching levels, "
             "accumulating playtime, and more. "
             "Use the <b>Display Badge</b> dropdown to choose which badge icon appears next to "
             "your name on cloud leaderboards."
@@ -518,8 +517,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Each event can be individually enabled or disabled. Click the ▶ button to preview the sound.<br><br>"
             "• <b>Achievement Unlock</b>: Plays when a new achievement is earned.<br>"
             "• <b>Level Up</b>: Plays when your player level increases.<br>"
-            "• <b>Challenge Start</b>: Plays when a challenge begins.<br>"
-            "• <b>Challenge End</b>: Plays when a challenge finishes.<br>"
             "• <b>Overlay Open</b>: Plays when the stats overlay opens.<br>"
             "• <b>Overlay Close</b>: Plays when the stats overlay closes."
         ),
@@ -579,19 +576,17 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
         "controls": (
             "<b>🕹️ Controls</b><br><br>"
-            "The Controls tab lets you configure hotkeys and input bindings for the overlay and challenges.<br><br>"
+            "The Controls tab lets you configure hotkeys and input bindings for the overlay and Score Duels.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Challenge Action</b>: Bind a key or button to start or trigger a challenge.<br>"
-            "• <b>Challenge Left / Duel Accept</b> and <b>Challenge Right / Duel Decline</b>: Bind keys or buttons for left/right challenge navigation and duel accept/decline (Left = Accept, Right = Decline).<br>"
+            "• <b>Duel Accept (Left)</b> and <b>Duel Decline (Right)</b>: Bind keys or buttons to accept or decline incoming duel invitations.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
-            "• <b>AI Voice Volume</b>: Adjust the volume of spoken announcements during challenges.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
             "💡 Tip: You can combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
         ),
         "cloud": (
             "<b>☁️ Cloud</b><br><br>"
             "The Cloud tab lets you browse the global leaderboard stored in the cloud.<br><br>"
-            "• <b>Category</b>: Choose between Achievement Progress, Timed Challenge, Flip Challenge, or Heat Challenge.<br>"
+            "• <b>Category</b>: Choose Achievement Progress to view progress leaderboards.<br>"
             "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
             "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM."
         ),
@@ -620,8 +615,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "The Records &amp; Stats tab gives you an overview of high scores and statistics.<br><br>"
             "• <b>🌍 Global NVRAM Dumps</b>: All saved NVRAM scores for the selected table "
             "across all players.<br>"
-            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
-            "• <b>⚔️ Challenge Leaderboards</b>: Rankings from the latest challenge results."
+            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session."
         ),
         "aweditor": (
             "<b>🎯 AWEditor – Custom Achievement System for Non-ROM Tables</b><br><br>"

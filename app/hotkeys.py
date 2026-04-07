@@ -67,7 +67,7 @@ class HotkeysMixin:
         self._cycle_overlay_button()
 
     def _on_joy_toggle_poll(self):
-        def _need_ch(kind: str) -> int | None:
+        def _need_nav(kind: str) -> int | None:
             if str(self.cfg.OVERLAY.get(f"challenge_{kind}_input_source", "keyboard")).lower() != "joystick":
                 return None
             try:
@@ -76,9 +76,8 @@ class HotkeysMixin:
                 return None
         overlay_src = str(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")).lower()
         overlay_btn = int(self.cfg.OVERLAY.get("toggle_joy_button", 0) or 0) if overlay_src == "joystick" else 0
-        j_hotkey = _need_ch("hotkey")
-        j_left   = _need_ch("left")
-        j_right  = _need_ch("right")
+        j_left   = _need_nav("left")
+        j_right  = _need_nav("right")
 
         def _bit(btn: int | None) -> int:
             try:
@@ -87,10 +86,9 @@ class HotkeysMixin:
             except Exception:
                 return 0
         overlay_bit = _bit(overlay_btn)
-        hotkey_bit  = _bit(j_hotkey)
         left_bit    = _bit(j_left)
         right_bit   = _bit(j_right)
-        interested_mask = overlay_bit | hotkey_bit | left_bit | right_bit
+        interested_mask = overlay_bit | left_bit | right_bit
         if interested_mask == 0:
             self._joy_toggle_last_mask = 0
             return
@@ -109,27 +107,15 @@ class HotkeysMixin:
         self._joy_toggle_last_mask = mask_all
         if newly == 0:
             return
-        if hotkey_bit and (newly & hotkey_bit):
-            self._last_ch_event_src = "joystick"
-            self._on_challenge_hotkey()
-            return
         if left_bit and (newly & left_bit):
             self._last_ch_event_src = "joystick"
-            self._on_challenge_left()
+            self._on_nav_left()
             return
         if right_bit and (newly & right_bit):
             self._last_ch_event_src = "joystick"
-            self._on_challenge_right()
+            self._on_nav_right()
             return
         if overlay_bit and (newly & overlay_bit):
-            try:
-                ch_ov_visible = bool(getattr(self, "_challenge_select", None) and self._challenge_select.isVisible())
-                diff_ov_visible = bool(getattr(self, "_flip_diff_select", None) and self._flip_diff_select.isVisible())
-            except Exception:
-                ch_ov_visible = False
-                diff_ov_visible = False
-            if ch_ov_visible or diff_ov_visible or self._challenge_is_active():
-                return
             self._cycle_overlay_button()
             return
         
@@ -143,11 +129,11 @@ class HotkeysMixin:
     def _apply_toggle_source(self):
         try:
             src_overlay = str(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")).lower()
-            any_ch_joy = any(
+            any_nav_joy = any(
                 str(self.cfg.OVERLAY.get(f"challenge_{k}_input_source", "keyboard")).lower() == "joystick"
-                for k in ("hotkey", "left", "right")
+                for k in ("left", "right")
             )
-            need_poll = (src_overlay == "joystick") or any_ch_joy
+            need_poll = (src_overlay == "joystick") or any_nav_joy
             if need_poll:
                 self._joy_toggle_timer.start()
             else:
@@ -169,10 +155,6 @@ class HotkeysMixin:
             self._register_global_hotkeys()       
         except Exception:
             pass
-        try:
-            self._install_challenge_key_handling()  
-        except Exception:
-            pass     
 
     def _on_bind_toggle_clicked(self):
         # 1. Globale Hotkeys deaktivieren
@@ -438,12 +420,10 @@ class HotkeysMixin:
             except Exception:
                 pass
                 
-            if kind == "hotkey":
-                self.lbl_ch_hotkey_binding.setText(self._challenge_binding_label_text("hotkey"))
-            elif kind == "left":
-                self.lbl_ch_left_binding.setText(self._challenge_binding_label_text("left"))
+            if kind == "left":
+                self.lbl_ch_left_binding.setText(self._nav_binding_label_text("left"))
             else:
-                self.lbl_ch_right_binding.setText(self._challenge_binding_label_text("right"))
+                self.lbl_ch_right_binding.setText(self._nav_binding_label_text("right"))
                 
             self._refresh_input_bindings()
 
@@ -487,7 +467,6 @@ class HotkeysMixin:
             MOD_NOREPEAT = 0x4000
             ids = {
                 "overlay_toggle": 0xA11,
-                "ch_hotkey":      0xA21,
                 "ch_left":        0xA22,
                 "ch_right":       0xA23,
             }
@@ -503,10 +482,6 @@ class HotkeysMixin:
                 vk_overlay = int(self.cfg.OVERLAY.get("toggle_vk", 120))  # F9
                 mods_overlay = int(self.cfg.OVERLAY.get("toggle_mods", 0))
                 _reg_ch(ids["overlay_toggle"], vk_overlay, mods_overlay)
-            if str(self.cfg.OVERLAY.get("challenge_hotkey_input_source", "keyboard")).lower() == "keyboard":
-                vk = int(self.cfg.OVERLAY.get("challenge_hotkey_vk", 0x7A))
-                mods = int(self.cfg.OVERLAY.get("challenge_hotkey_mods", 0))
-                _reg_ch(ids["ch_hotkey"], vk, mods)
             if str(self.cfg.OVERLAY.get("challenge_left_input_source", "keyboard")).lower() == "keyboard":
                 vk = int(self.cfg.OVERLAY.get("challenge_left_vk", 0x25))
                 mods = int(self.cfg.OVERLAY.get("challenge_left_mods", 0))
@@ -528,15 +503,12 @@ class HotkeysMixin:
                                 hid = int(msg.wParam)
                                 if hid == self.ids["overlay_toggle"]:
                                     QTimer.singleShot(0, self.p._on_toggle_keyboard_event)
-                                elif hid == self.ids["ch_hotkey"]:
-                                    self.p._last_ch_event_src = "keyboard"
-                                    QTimer.singleShot(0, self.p._on_challenge_hotkey)
                                 elif hid == self.ids["ch_left"]:
                                     self.p._last_ch_event_src = "keyboard"
-                                    QTimer.singleShot(0, self.p._on_challenge_left)
+                                    QTimer.singleShot(0, self.p._on_nav_left)
                                 elif hid == self.ids["ch_right"]:
                                     self.p._last_ch_event_src = "keyboard"
-                                    QTimer.singleShot(0, self.p._on_challenge_right)
+                                    QTimer.singleShot(0, self.p._on_nav_right)
                     except Exception:
                         pass
                     return False, 0
@@ -544,7 +516,7 @@ class HotkeysMixin:
             self._hotkey_filter = _HotkeyFilter(self, ids)
             QCoreApplication.instance().installNativeEventFilter(self._hotkey_filter)
             if getattr(self.cfg, "LOG_CTRL", False):
-                log(self.cfg, "[HOTKEY] Registered overlay + challenge hotkeys (keyboard)")
+                log(self.cfg, "[HOTKEY] Registered overlay + nav hotkeys (keyboard)")
         except Exception as e:
             log(self.cfg, f"[HOTKEY] register failed: {e}", "WARN")
        

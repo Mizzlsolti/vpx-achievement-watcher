@@ -55,8 +55,6 @@ _ZANK_PAIRS: list[tuple[str, str, str]] = [
     # (trigger_key, gui_key, overlay_key)
     ("achievement", "zank_gui_predicted",    "zank_ov_saw_it"),
     ("game_over",   "zank_gui_no_talk",      "zank_ov_happens"),
-    ("challenge_win", "zank_gui_training",   "zank_ov_cheering"),
-    ("challenge_lose", "zank_gui_stats",     "zank_ov_not_my_fault"),
     ("idle_30m",    "zank_gui_come_back",    "zank_ov_left_us"),
     ("level_up",    "zank_gui_guidance",     "zank_ov_witnessed"),
     ("session_5h",  "zank_gui_hydration",    "zank_ov_legend"),
@@ -583,41 +581,6 @@ _OV_SESSION_END: list[tuple[str, str]] = [
     ("ov_5today",      "5 achievements today! Beast mode!"),
     ("ov_dry_spell",   "Dry spell... but legends never quit!"),
     ("ov_midnight",    "Midnight finish! Legendary!"),
-]
-
-_OV_CHALLENGE: list[tuple[str, str]] = [
-    ("ov_ch_accepted",   "Challenge accepted! Do not choke!"),
-    ("ov_ch_clock",      "Clock is ticking! FOCUS!"),
-    ("ov_ch_10s",        "10 SECONDS! GIVE IT EVERYTHING!"),
-    ("ov_ch_win",        "YOU WIN! I knew you could do it!"),
-    ("ov_ch_close",      "So close... Try again!"),
-    ("ov_ch_heartattack","THAT WAS CLOSE! Heart attack!"),
-    ("ov_ch_dominant",   "Dominant performance!"),
-    ("ov_ch_third",      "Third time is the charm... right?"),
-    ("ov_ch_notmyfault", "NOT MY FAULT!"),
-    ("ov_ch_record",     "NEW CHALLENGE RECORD! History made!"),
-    ("ov_ch_back",       "Back in the challenge ring!"),
-    ("ov_ch_5today",     "5 challenges today! Competitor of the year!"),
-    ("ov_ch_morning",    "Morning challenge! Warm those fingers up!"),
-    ("ov_ch_1sec",       "1 second away... I felt that"),
-]
-
-_OV_HEAT: list[tuple[str, str]] = [
-    ("ov_heat_65",    "Getting warm! Ease up a little!"),
-    ("ov_heat_85",    "CRITICAL HEAT! Your flippers are burning!"),
-    ("ov_heat_100",   "TOO HOT! Give those flippers a rest!"),
-    ("ov_heat_cool",  "Cooling down... smart move!"),
-    ("ov_heat_zone",  "Steady pace! You are in the zone!"),
-]
-
-_OV_FLIP: list[tuple[str, str]] = [
-    ("ov_flip_start",  "Flip counter active! Every flip counts!"),
-    ("ov_flip_25",     "Quarter way there! Warm up done!"),
-    ("ov_flip_50",     "Halfway there! Keep flipping!"),
-    ("ov_flip_75",     "75%! Almost there! Do not slow down!"),
-    ("ov_flip_90",     "Almost at your goal! Do not stop now!"),
-    ("ov_flip_over",   "You SMASHED your goal! Overachiever!"),
-    ("ov_flip_goal",   "GOAL! You hit your flip target!"),
 ]
 
 _OV_IDLE: list[tuple[str, str]] = [
