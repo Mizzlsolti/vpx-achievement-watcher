@@ -12,7 +12,6 @@ from .overlay import (
     ChallengeSelectOverlay,
     FlipDifficultyOverlay,
     ChallengeCountdownOverlay,
-    ChallengeStartCountdown,
 )
 import core.sound as sound
 
@@ -318,7 +317,7 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
-        if not self._player_is_visible():
+        if not self._in_game_now():
             try:
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
@@ -346,15 +345,6 @@ class ChallengesMixin:
             pass
 
         try:
-            # Guard: if overlay was just created (< 500 ms ago), skip re-creation to
-            # avoid the race where isVisible() returns False during the slide-in animation.
-            if getattr(self, "_ch_ov_is_open", False):
-                if time.monotonic() - getattr(self, "_ch_ov_opened_at", 0.0) < 0.5:
-                    return
-        except Exception:
-            pass
-
-        try:
             if getattr(self, "_challenge_select", None):
                 try:
                     self._challenge_select.close()
@@ -364,7 +354,6 @@ class ChallengesMixin:
             self._challenge_select = ChallengeSelectOverlay(self, selected_idx=int(self._ch_ov_selected_idx))
             self._challenge_select.show()
             self._challenge_select.raise_()
-            self._ch_ov_is_open = True
             if self._ch_active_source is None and self._last_ch_event_src:
                 self._ch_active_source = self._last_ch_event_src
             try:
@@ -388,7 +377,6 @@ class ChallengesMixin:
             pass
         self._challenge_select = None
         self._ch_active_source = None
-        self._ch_ov_is_open = False
         try:
             self._ch_ov_opened_at = 0.0
         except Exception:
@@ -576,26 +564,8 @@ class ChallengesMixin:
             if not has_map:
                 return
             if idx == 0:
-                try:
-                    ch = getattr(self.watcher, "challenge", {}) or {}
-                    if ch.get("active"):
-                        ch["active"] = False
-                        ch["completed"] = False
-                        ch["pending_kill_at"] = None
-                        self.watcher.challenge = ch
-                except Exception:
-                    pass
                 self.watcher.start_timed_challenge()
             elif idx == 2:
-                try:
-                    ch = getattr(self.watcher, "challenge", {}) or {}
-                    if ch.get("active"):
-                        ch["active"] = False
-                        ch["completed"] = False
-                        ch["pending_kill_at"] = None
-                        self.watcher.challenge = ch
-                except Exception:
-                    pass
                 self.watcher.start_heat_challenge()
             elif idx == 1:
                 self.watcher.start_flip_challenge(500)
@@ -643,9 +613,6 @@ class ChallengesMixin:
         return os.path.join(self.cfg.BASE, "session_stats", "challenges", "history", f"{sanitize_filename(rom)}.json")
 
     def _open_flip_difficulty_overlay(self):
-        # Mark immediately so nav keys don't desync _ch_ov_selected_idx during the
-        # async slide-out animation (callback fires ~180 ms later).
-        self._ch_pick_flip_diff = True
         def _do_open():
             # Hide challenge select after slide-out completes
             try:
@@ -709,7 +676,9 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        if not self._player_is_visible():
+        if not self._in_game_now():
+            # If a duel invite notification is showing in the mini overlay, ignore
+            # the hotkey — Left/Right handle accept/decline directly.
             try:
                 if getattr(self, "_duel_invite_notify_state", None) is not None:
                     return  # ignore hotkey while duel invite notification is showing
@@ -793,23 +762,13 @@ class ChallengesMixin:
             return
 
         ovw = getattr(self, "_challenge_select", None)
-        if ovw and (ovw.isVisible() or getattr(self, "_ch_ov_is_open", False)):
+        if ovw and ovw.isVisible():
             sel = int(getattr(self, "_ch_ov_selected_idx", 0) or 0) % 4
             if sel == 3:
                 self._close_challenge_select_overlay()
                 return
             elif sel == 0:
                 self._close_challenge_select_overlay()
-                # Clean up any stale challenge state before starting new one
-                try:
-                    ch = getattr(self.watcher, "challenge", {}) or {}
-                    if ch.get("active"):
-                        ch["active"] = False
-                        ch["completed"] = False
-                        ch["pending_kill_at"] = None
-                        self.watcher.challenge = ch
-                except Exception:
-                    pass
                 try:
                     self.watcher.start_timed_challenge()
                 except Exception:
@@ -817,16 +776,6 @@ class ChallengesMixin:
                 return
             elif sel == 2:
                 self._close_challenge_select_overlay()
-                # Clean up any stale challenge state before starting new one
-                try:
-                    ch = getattr(self.watcher, "challenge", {}) or {}
-                    if ch.get("active"):
-                        ch["active"] = False
-                        ch["completed"] = False
-                        ch["pending_kill_at"] = None
-                        self.watcher.challenge = ch
-                except Exception:
-                    pass
                 try:
                     self.watcher.start_heat_challenge()
                 except Exception:

@@ -794,47 +794,54 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
     def _compose_image(self) -> QImage:
         ov = self.parent_gui.cfg.OVERLAY or {}
         font_family = str(ov.get("font_family", "Segoe UI"))
-        scaled_body_pt = 20
+        base_body_pt = 20
+        scaled_body_pt = 20  # Flip difficulty overlay is always fixed size (100%)
         hint_pt = max(8, int(round(scaled_body_pt * 0.8)))
+        text_color = QColor("#FFFFFF")
         hi_color = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
 
         factor = scaled_body_pt / 20.0
-        # Match ChallengeSelectOverlay canvas size and padding exactly
-        w = max(280, int(round(520 * factor)))
-        pad_lr = max(10, int(round(20 * factor)))
-        top_pad = max(12, int(round(24 * factor)))
+        pad_lr = max(12, int(round(24 * factor)))
+        top_pad = max(13, int(round(26 * factor)))
         bottom_pad = max(9, int(round(18 * factor)))
-        hint_gap = max(5, int(round(10 * factor)))
         gap_title_desc = max(4, int(round(8 * factor)))
+        spacing = max(10, int(round(18 * factor)))
+        hint_line_h = max(10, int(round(18 * factor)))
+        hint_gap = max(4, int(round(8 * factor)))
+        inner_pad = max(6, int(round(12 * factor)))
+
+        # Measure the actual text widths of every option (name + "N flips") so
+        # box_w is guaranteed to be wide enough to show all labels without clipping.
+        n = max(1, len(self._options))
+        flips_pt = scaled_body_pt
+        name_pt_check = scaled_body_pt + 2  # selected boxes use the +2 variant
+        fm_name_check = QFontMetrics(QFont(font_family, name_pt_check, QFont.Weight.Bold))
+        fm_flips_check = QFontMetrics(QFont(font_family, flips_pt))
+        max_text_w = 60
+        for _nm, _fl in self._options:
+            _fl_int = int(_fl)
+            max_text_w = max(max_text_w, fm_name_check.horizontalAdvance(_nm))
+            if _fl_int != -1:
+                max_text_w = max(max_text_w, fm_flips_check.horizontalAdvance(f"{_fl_int} flips"))
+        box_w = max_text_w + 2 * inner_pad
+
+        # Derive the canvas width from the measured box_w so every box fits.
+        total_spacing = spacing * (n - 1)
+        w = max(300, n * box_w + total_spacing + 2 * pad_lr)
         avail_w = w - 2 * pad_lr
 
-        # Title — same font sizing as ChallengeSelectOverlay title
+        # Measure title height with word-wrap before creating the image so the
+        # image can be sized to fit the content rather than using a fixed height.
         title = "Flip Challenge – Choose difficulty"
         title_font_pt = scaled_body_pt + 6
         flags_center_wrap = int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap)
-        fm_title = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
-        t_h = fm_title.boundingRect(QRect(0, 0, avail_w, 10000), flags_center_wrap, title).height()
+        _fm_title_pre = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
+        t_h = _fm_title_pre.boundingRect(QRect(0, 0, avail_w, 10000), flags_center_wrap, title).height()
 
-        # Hint line height
-        fm_hint_pre = QFontMetrics(QFont(font_family, hint_pt))
-        hint_line_h = fm_hint_pre.height()
-
-        # Horizontal layout: 5 boxes side by side
-        n = max(1, len(self._options))
-        box_gap = max(4, int(round(8 * factor)))
-        total_spacing = box_gap * (n - 1)
-        box_w = max(40, (w - 2 * pad_lr - total_spacing) // n)
-
-        # Boxes are equal squares: height equals width
-        box_h = box_w
-        boxes_y = top_pad + t_h + gap_title_desc
-        # Height is determined dynamically to fit title + squares + hint
-        h = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
-
-        # Font for names: constrained by box_w (longest label is "Difficult"/"← Back")
-        inner_margin = max(2, int(round(3 * factor)))
-        box_name_pt = max(7, int(round(box_w / 9)))
-        flip_pt = max(6, box_name_pt - 2)  # flip count rendered 2pt smaller than the name
+        # box_h is also used when rendering the individual difficulty boxes below.
+        box_h = max(50, int(round(100 * factor)))
+        h_needed = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
+        h = max(130, max(int(round(240 * factor)), h_needed))
 
         img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)
@@ -854,54 +861,66 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
             p.setFont(QFont(font_family, title_font_pt, QFont.Weight.Bold))
             p.drawText(QRect(pad_lr, top_pad, avail_w, t_h), flags_center_wrap, title)
 
-            def draw_option(ix: int, name: str, flips: int, selected: bool):
-                box_x = pad_lr + ix * (box_w + box_gap)
-                rect = QRect(box_x, boxes_y, box_w, box_h)
+            y0 = top_pad + t_h + gap_title_desc
 
-                # Snap pulse: brief flash on selection change; fade-out on prev selection
+            def draw_option(ix: int, name: str, flips: int, selected: bool):
+                x = pad_lr + ix * (box_w + spacing)
+                rect = QRect(x, y0, box_w, box_h)
+
+                # Snap pulse: brief scale + flash on selection change; fade-out on prev selection
+                snap_scale = 1.0
                 snap_flash_alpha = 0
                 prev_fade_alpha = 0
                 if self._is_fx_enabled("fx_challenge_snap_scale") and self._snap.is_active():
+                    snap_scale = self._snap.get_scale(selected)
                     snap_flash_alpha = self._snap.get_flash_alpha(selected)
                     prev_fade_alpha = self._snap.get_prev_fade_alpha(ix)
+
+                if snap_scale != 1.0:
+                    expand = int((snap_scale - 1.0) * box_w / 2)
+                    draw_rect = rect.adjusted(-expand, -expand, expand, expand)
+                else:
+                    draw_rect = rect
 
                 if selected:
                     amp = self._breathing_pulse.get_amp()
                     alpha = 40 + int(60 * amp)
                     _ac = QColor(get_theme_color(self.parent_gui.cfg, "accent"))
-                    p.fillRect(rect.adjusted(-2, -1, 2, 1), QColor(_ac.red(), _ac.green(), _ac.blue(), alpha))
+                    p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(_ac.red(), _ac.green(), _ac.blue(), alpha))
                     p.setPen(QPen(QColor(get_theme_color(self.parent_gui.cfg, "primary")), 2))
                     if snap_flash_alpha > 0:
-                        p.fillRect(rect, QColor(255, 255, 255, snap_flash_alpha))
+                        p.fillRect(draw_rect, QColor(255, 255, 255, snap_flash_alpha))
                 else:
                     p.setPen(QPen(QColor(255, 255, 255, 80), 1))
                     _pc = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
                     if prev_fade_alpha > 0:
-                        p.fillRect(rect.adjusted(-2, -1, 2, 1), QColor(_pc.red(), _pc.green(), _pc.blue(), prev_fade_alpha))
+                        p.fillRect(draw_rect.adjusted(-4, -4, 4, 4), QColor(_pc.red(), _pc.green(), _pc.blue(), prev_fade_alpha))
 
                 p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawRoundedRect(rect, 6, 6)
+                p.drawRoundedRect(draw_rect, 10, 10)
 
-                name_color = QColor(get_theme_color(self.parent_gui.cfg, "accent")) if selected else QColor("#FFFFFF")
-                p.setPen(name_color)
-
+                # Shrink the name font until it fits within the box width.
+                name_pt = scaled_body_pt + (2 if selected else 0)
+                fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
+                while fm_n.horizontalAdvance(name) > box_w - 4 and name_pt > 10:
+                    name_pt -= 1
+                    fm_n = QFontMetrics(QFont(font_family, name_pt, QFont.Weight.Bold))
+                name_h = fm_n.height()
+                p.setPen(QColor(get_theme_color(self.parent_gui.cfg, "accent")) if selected else QColor("#FFFFFF"))
+                p.setFont(QFont(font_family, name_pt, QFont.Weight.Bold))
                 if int(flips) == -1:
-                    # Back option: name centered in full box
-                    p.setFont(QFont(font_family, box_name_pt, QFont.Weight.Bold))
-                    p.drawText(rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
+                    name_y = y0 + inner_pad + (box_h - name_h) // 2
                 else:
-                    # Name in top half, flip count in bottom half
-                    half_h = box_h // 2
-                    name_rect = QRect(box_x + inner_margin, boxes_y + inner_margin,
-                                      box_w - 2 * inner_margin, half_h - inner_margin)
-                    flip_rect = QRect(box_x + inner_margin, boxes_y + half_h,
-                                      box_w - 2 * inner_margin, half_h - inner_margin)
-                    p.setFont(QFont(font_family, box_name_pt, QFont.Weight.Bold))
-                    p.drawText(name_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
-                    p.setPen(QColor("#CCCCCC") if not selected else name_color)
-                    p.setFont(QFont(font_family, flip_pt))
-                    p.drawText(flip_rect, int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter),
-                               f"{int(flips)}")
+                    name_y = y0 + inner_pad
+                p.drawText(QRect(x, name_y, box_w, name_h),
+                           int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), name)
+
+                if int(flips) != -1:
+                    flips_pt = scaled_body_pt
+                    p.setFont(QFont(font_family, flips_pt))
+                    fm_f = QFontMetrics(QFont(font_family, flips_pt))
+                    p.drawText(QRect(x, y0 + inner_pad + name_h + max(4, int(round(6 * factor))), box_w, fm_f.height()),
+                               int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), f"{int(flips)} flips")
 
             for i, (nm, fl) in enumerate(self._options):
                 draw_option(i, nm, fl, i == self._selected)
@@ -1236,137 +1255,3 @@ class HeatBarometerOverlay(_OverlayFxMixin, QWidget):
             p = QPainter(self)
             p.drawPixmap(0, 0, self._pix)
             p.end()
-
-
-class ChallengeStartCountdown(_OverlayFxMixin, QWidget):
-    """Full-screen transparent countdown overlay: 3…2…1…GO!
-
-    Each number scales from 2.0x → 1.0x with Ease-Out over 800ms.
-    After '1', a brief 'GO!' text appears in orange with scale 1.0 → 1.5 + fade-out.
-    Total duration: ~3.5 s.  Emits `finished` when the animation ends and auto-closes.
-    """
-
-    finished = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(parent, Qt.WindowType.FramelessWindowHint |
-                         Qt.WindowType.WindowStaysOnTopHint |
-                         Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-
-        # Cover the primary screen
-        screen = QApplication.primaryScreen()
-        geo = screen.geometry() if screen else QRect(0, 0, 1280, 720)
-        self.setGeometry(geo)
-
-        _primary = '#00E5FF'
-        _accent = '#FF7F00'
-        try:
-            self.parent_gui = parent
-            _primary = get_theme_color(parent.cfg, "primary")
-            _accent = get_theme_color(parent.cfg, "accent")
-        except Exception:
-            self.parent_gui = None
-
-        # Countdown sequence: ('3', primary), ('2', primary), ('1', primary), ('GO!', accent)
-        self._steps = [
-            ('3',   QColor(_primary), 800, False),
-            ('2',   QColor(_primary), 800, False),
-            ('1',   QColor(_primary), 800, False),
-            ('GO!', QColor(_accent), 500, True),   # last step fades out
-        ]
-        self._step_idx = 0
-        self._step_elapsed = 0.0
-
-        self._timer = QTimer(self)
-        self._timer.setInterval(16)
-        self._timer.timeout.connect(self._tick)
-
-        _start_topmost_timer(self)
-
-    def start(self):
-        self.show()
-        self.raise_()
-        self._timer.start()
-
-    def _tick(self):
-        if self._step_idx >= len(self._steps):
-            self._timer.stop()
-            self.finished.emit()
-            self.close()
-            return
-        self._step_elapsed += float(self._timer.interval())
-        _, _, duration, _ = self._steps[self._step_idx]
-        if self._step_elapsed >= duration:
-            self._step_elapsed = 0.0
-            self._step_idx += 1
-            if self._step_idx >= len(self._steps):
-                self._timer.stop()
-                self.finished.emit()
-                self.close()
-                return
-        self.update()
-
-    def paintEvent(self, event):
-        if self._step_idx >= len(self._steps):
-            return
-        label, color, duration, is_go = self._steps[self._step_idx]
-        t = min(1.0, self._step_elapsed / max(1.0, duration))
-        eased = _ease_out_cubic(t)
-
-        W, H = self.width(), self.height()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        try:
-            fx_enabled = self._is_fx_enabled("fx_timer_321go")
-            if not fx_enabled:
-                scale = 1.0
-                p.setOpacity(1.0)
-            elif is_go:
-                # GO! fades out while scaling 1.0 → 1.5
-                scale = 1.0 + 0.5 * eased
-                opacity = max(0.0, 1.0 - eased)
-                p.setOpacity(opacity)
-            else:
-                # Numbers scale 2.0 → 1.0 and spin 360° → 0°
-                scale = 2.0 - eased
-                p.setOpacity(1.0)
-
-            font_size = int(80 * scale)
-            font = QFont("Segoe UI", max(12, font_size), QFont.Weight.Bold)
-            p.setFont(font)
-
-            if fx_enabled and not is_go:
-                # Spin animation: rotate from 360° → 0° as eased goes 0→1
-                angle = 360.0 * (1.0 - eased)
-                p.save()
-                p.translate(W / 2, H / 2)
-                p.rotate(angle)
-                p.translate(-W / 2, -H / 2)
-
-            if fx_enabled:
-                # Glow effect
-                glow_col = QColor(color.red(), color.green(), color.blue(), 60)
-                for r in range(4, 0, -1):
-                    gp = QPen(glow_col)
-                    gp.setWidth(r * 3)
-                    p.setPen(gp)
-                    p.drawText(QRect(0, 0, W, H),
-                               Qt.AlignmentFlag.AlignCenter, label)
-
-            # Main text
-            p.setPen(QPen(color))
-            p.drawText(QRect(0, 0, W, H),
-                       Qt.AlignmentFlag.AlignCenter, label)
-
-            if fx_enabled and not is_go:
-                p.restore()
-        finally:
-            try:
-                p.end()
-            except Exception:
-                pass

@@ -1684,5 +1684,4 @@ from ui.overlay_challenges import (
     ChallengeSelectOverlay,
     FlipDifficultyOverlay,
     HeatBarometerOverlay,
-    ChallengeStartCountdown,
 )

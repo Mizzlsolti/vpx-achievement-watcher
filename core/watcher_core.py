@@ -1894,34 +1894,15 @@ class Watcher:
             log(self.cfg, f"[CHALLENGE] _kill_vpx_process failed: {e}", "WARN")
 
 
-    def _stop_active_challenge_if_different_kind(self, target_kind: str):
-        """Stop any currently active challenge of a different kind before starting a new one."""
-        ch = getattr(self, "challenge", {}) or {}
-        if not ch.get("active"):
-            return
-        old_kind = ch.get("kind")
-        if old_kind == target_kind:
-            return
-        if old_kind == "flip":
-            self.stop_flip_challenge()
-        elif old_kind == "heat":
-            self.stop_heat_challenge()
-        elif old_kind == "timed":
-            self.stop_timed_challenge()
-        self.challenge = {}
-
     def start_timed_challenge(self, total_seconds: int = 190):
         try:
-            if (not self.game_active and not self._vp_player_visible()) or not self.current_rom:
+            if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] timed: ignored (no active game)", "WARN")
                 return
             if getattr(self, "duel_active_for_current_table", False):
                 log(self.cfg, "[CHALLENGE] timed: blocked — duel active for current table", "WARN")
                 return
             ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active") and ch.get("kind") != "timed":
-                self._stop_active_challenge_if_different_kind("timed")
-                ch = {}
             if ch.get("active") and ch.get("kind") == "timed":
                 log(self.cfg, "[CHALLENGE] timed already active – ignored duplicate")
                 return
@@ -2118,9 +2099,6 @@ class Watcher:
                 return
 
             ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active") and ch.get("kind") != "flip":
-                self._stop_active_challenge_if_different_kind("flip")
-                ch = {}
             if ch.get("active"):
                 log(self.cfg, "[CHALLENGE] flip: another challenge already active – ignored", "WARN")
                 return
@@ -2203,7 +2181,7 @@ class Watcher:
 
     def start_heat_challenge(self):
         try:
-            if (not self.game_active and not self._vp_player_visible()) or not self.current_rom:
+            if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] heat: ignored (no active game)", "WARN")
                 return
             if getattr(self, "duel_active_for_current_table", False):
@@ -2211,9 +2189,6 @@ class Watcher:
                 return
 
             ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active") and ch.get("kind") != "heat":
-                self._stop_active_challenge_if_different_kind("heat")
-                ch = {}
             if ch.get("active"):
                 log(self.cfg, "[CHALLENGE] heat: another challenge already active – ignored", "WARN")
                 return
@@ -4332,7 +4307,6 @@ class Watcher:
         self.start_time = time.time()
         self._custom_events_session_start = self.start_time
         self.game_active = True
-        self.challenge = {}  # clear any stale challenge state from a previous session
         self.duel_active_for_current_table = False  # UI will set True if an active duel matches
         self.last_session_score = 0
         self.players.clear()
@@ -4372,8 +4346,6 @@ class Watcher:
     def on_session_end(self):
         if not self.game_active:
             return
-        # Mark inactive immediately so a second call (e.g. from stop() with join timeout) returns early.
-        self.game_active = False
 
         ch = getattr(self, "challenge", {}) or {}
         is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")
