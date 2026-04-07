@@ -684,18 +684,18 @@ class DuelsMixin:
         )
         # Detect duplicate clean names and add author suffix to disambiguate.
         from collections import Counter as _Counter
-        def _clean_base(title: str) -> str:
+        def _strip_table_metadata(title: str) -> str:
             s = _strip_version_from_name(title)
             if "(" in s:
                 s = s[:s.index("(")].strip()
             return s
         base_name_counts = _Counter(
-            _clean_base(e.get("title") or e.get("rom", "")) for e in entries
+            _strip_table_metadata(e.get("title") or e.get("rom", "")) for e in entries
         )
         for entry in entries:
             title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
-            clean_title = _clean_base(title)
+            clean_title = _strip_table_metadata(title)
             if base_name_counts[clean_title] > 1:
                 raw = entry.get("title") or ""
                 author = ""
@@ -1448,12 +1448,11 @@ class DuelsMixin:
             if new_duels:
                 # If automatch widget is searching, stop it (received invitation = match found by other side).
                 try:
-                    from PyQt6.QtCore import QMetaObject, Qt as _Qt
                     aw = getattr(self, "_automatch_widget", None)
                     if aw is not None and getattr(aw, "_searching", False):
                         QMetaObject.invokeMethod(
                             aw, "_on_stop_clicked",
-                            _Qt.ConnectionType.QueuedConnection,
+                            Qt.ConnectionType.QueuedConnection,
                         )
                 except Exception:
                     pass
@@ -1946,11 +1945,7 @@ class DuelsMixin:
 
         def _show_duel_start_notify():
             try:
-                w = getattr(self, "watcher", None)
-                if w:
-                    w.bridge.duel_info_show.emit(msg, 6, "#FF7F00")
-                else:
-                    self._get_mini_overlay().show_info(msg, seconds=6, color_hex="#FF7F00")
+                self.bridge.duel_info_show.emit(msg, 6, "#FF7F00")
             except Exception:
                 pass
 
