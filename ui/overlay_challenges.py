@@ -907,10 +907,14 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
 
                 if int(flips) != -1:
                     flips_pt = scaled_body_pt
-                    p.setFont(QFont(font_family, flips_pt))
+                    flips_text = f"{int(flips)} flips"
                     fm_f = QFontMetrics(QFont(font_family, flips_pt))
+                    while fm_f.horizontalAdvance(flips_text) > box_w - 4 and flips_pt > 8:
+                        flips_pt -= 1
+                        fm_f = QFontMetrics(QFont(font_family, flips_pt))
+                    p.setFont(QFont(font_family, flips_pt))
                     p.drawText(QRect(x, y0 + inner_pad + name_h + max(4, int(round(6 * factor))), box_w, fm_f.height()),
-                               int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), f"{int(flips)} flips")
+                               int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), flips_text)
 
             for i, (nm, fl) in enumerate(self._options):
                 draw_option(i, nm, fl, i == self._selected)
