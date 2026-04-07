@@ -318,17 +318,6 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
-        if not self._player_is_visible():
-            try:
-                self.bridge.challenge_info_show.emit(
-                    "Challenges disabled: No active VPX Player detected.",
-                    4,
-                    "#FF3B30"
-                )
-            except Exception:
-                pass
-            return
-
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not current_rom or not self.watcher._has_any_map(current_rom):
@@ -677,43 +666,6 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        if not self._player_is_visible():
-            # If a duel invite notification is showing in the mini overlay, ignore
-            # the hotkey — Left/Right handle accept/decline directly.
-            try:
-                if getattr(self, "_duel_invite_notify_state", None) is not None:
-                    return  # ignore hotkey while duel invite notification is showing
-            except Exception:
-                pass
-            # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
-            try:
-                overlay = getattr(self, "_duel_invite_overlay", None)
-                if overlay is not None and overlay.isVisible():
-                    overlay.confirm_focused()
-                    return
-            except Exception:
-                pass
-            # If the in-tab duel alert bar is visible, click the focused button.
-            # (alert bar removed — this block is kept as no-op for compatibility)
-            try:
-                pass
-            except Exception:
-                pass
-            try:
-                self._close_challenge_select_overlay()
-                self._close_flip_difficulty_overlay()
-            except Exception:
-                pass
-            try:
-                self.bridge.challenge_info_show.emit(
-                    "Challenges disabled: No active VPX Player detected.",
-                    4,
-                    "#FF3B30"
-                )
-            except Exception:
-                pass
-            return
-
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             _has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
@@ -847,13 +799,6 @@ class ChallengesMixin:
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
-        if not self._player_is_visible():
-            try:
-                self._close_challenge_select_overlay()
-                self._close_flip_difficulty_overlay()
-            except Exception:
-                pass
-            return
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
@@ -951,13 +896,6 @@ class ChallengesMixin:
             pass
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
-            return
-        if not self._player_is_visible():
-            try:
-                self._close_challenge_select_overlay()
-                self._close_flip_difficulty_overlay()
-            except Exception:
-                pass
             return
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
