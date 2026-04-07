@@ -247,16 +247,8 @@ def _migrate_anim_to_fx(ov: dict) -> None:
     ]:
         ov.setdefault(key, anim_toast)
 
-    # Challenge / Timer / Heat / Flip
-    for key in [
-    ]:
     ov["_fx_migrated"] = True
 
-# Windows virtual key codes for flipper buttons used in Heat Challenge
-VK_LSHIFT = 0xA0
-VK_RSHIFT = 0xA1
-
-# Heat Challenge rate constants (units per second unless noted)
 EXCLUDED_FIELDS = {
     "Last Game Start", "Last Printout", "Last Replay", "Champion Reset", "Clock Last Set", "Coins Cleared",
     "Factory Setting", "Recent Paid Cred", "Recent Serv. Cred", "Burn-in Time", "Totals Cleared", "Audits Cleared",

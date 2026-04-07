@@ -805,12 +805,6 @@ class MascotMemorySystem:
 
     def get_streak_comment(self) -> Optional[str]:
         """Return a streak-related comment, or ``None`` if nothing notable."""
-        # Challenge streaks
-        if self._mem:
-        else:
-            wins_total = losses_total = 0
-
-
         # Daily streak milestone
         streak = self.current_daily_streak
         if streak in (3, 7, 14, 30, 60, 100):

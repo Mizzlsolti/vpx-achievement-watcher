@@ -14,7 +14,6 @@ from ui.overlay_base import _BasePositionPicker
 
 
 # ---------------------------------------------------------------------------
-# 1. FlipCounterPositionPicker
 # ---------------------------------------------------------------------------
 
 class ToastPositionPicker(_BasePositionPicker):
@@ -72,7 +71,6 @@ class ToastPositionPicker(_BasePositionPicker):
 
 
 # ---------------------------------------------------------------------------
-# 4. ChallengeOVPositionPicker
 # ---------------------------------------------------------------------------
 
 class MiniInfoPositionPicker(_BasePositionPicker):
@@ -318,4 +316,3 @@ class OverlayPositionPicker(_BasePositionPicker):
 
 
 # ---------------------------------------------------------------------------
-# 8. HeatBarPositionPicker

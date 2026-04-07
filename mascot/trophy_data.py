@@ -761,8 +761,6 @@ class _TrophieMemory:
         self.session_durations: list = []
         self.achievement_sessions: int = 0
         self.no_achievement_sessions: int = 0
-        self.challenge_wins: int = 0
-        self.challenge_losses: int = 0
         self.heat_100_count: int = 0
         self.rom_play_counts: dict = {}
         self.dismiss_speed: list = []
@@ -784,8 +782,6 @@ class _TrophieMemory:
             self.session_durations = d.get("session_durations", [])
             self.achievement_sessions = int(d.get("achievement_sessions", 0))
             self.no_achievement_sessions = int(d.get("no_achievement_sessions", 0))
-            self.challenge_wins = int(d.get("challenge_wins", 0))
-            self.challenge_losses = int(d.get("challenge_losses", 0))
             self.heat_100_count = int(d.get("heat_100_count", 0))
             self.rom_play_counts = d.get("rom_play_counts", {})
             self.dismiss_speed = d.get("dismiss_speed", [])
@@ -804,8 +800,6 @@ class _TrophieMemory:
                 "session_durations": self.session_durations[-200:],
                 "achievement_sessions": self.achievement_sessions,
                 "no_achievement_sessions": self.no_achievement_sessions,
-                "challenge_wins": self.challenge_wins,
-                "challenge_losses": self.challenge_losses,
                 "heat_100_count": self.heat_100_count,
                 "rom_play_counts": self.rom_play_counts,
                 "dismiss_speed": self.dismiss_speed[-200:],
@@ -834,7 +828,7 @@ class _TrophieMemory:
         return sum(self.session_durations) / len(self.session_durations)
 
     def is_challenge_fan(self) -> bool:
-        return (self.challenge_wins + self.challenge_losses) > 10
+        return False
 
     def dismisses_quickly(self) -> bool:
         if len(self.dismiss_speed) < 5:
