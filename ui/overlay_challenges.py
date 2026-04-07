@@ -825,7 +825,7 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
 
         # Measure title height with word-wrap for layout calculations.
         title = "Flip Challenge – Choose difficulty"
-        title_font_pt = scaled_body_pt + 6
+        title_font_pt = scaled_body_pt - 2
         flags_center_wrap = int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap)
         _fm_title_pre = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
         t_h = _fm_title_pre.boundingRect(QRect(0, 0, avail_w, 10000), flags_center_wrap, title).height()
