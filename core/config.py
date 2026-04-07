@@ -485,6 +485,7 @@ class AppConfig:
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
+    DISCORD_WEBHOOK_URL: str = ""
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
@@ -519,6 +520,7 @@ class AppConfig:
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
+            DISCORD_WEBHOOK_URL=str(data.get("DISCORD_WEBHOOK_URL", "")),
         )
 
     @staticmethod

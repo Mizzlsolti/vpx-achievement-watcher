@@ -12,6 +12,7 @@ import random
 import sys
 import threading
 import time
+import urllib.request
 import uuid
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Union
@@ -580,6 +581,67 @@ class DuelEngine:
             sound.play("duel_won" if result == DuelStatus.WON else "duel_lost")
         except Exception:
             pass
+
+        webhook_url = getattr(self._cfg, "DISCORD_WEBHOOK_URL", "")
+        if webhook_url:
+            _duel_snapshot = duel
+            _cfg_snapshot = self._cfg
+
+            def _send_discord_notification():
+                try:
+                    if _duel_snapshot.challenger_score > _duel_snapshot.opponent_score:
+                        winner_name = _duel_snapshot.challenger_name
+                    elif _duel_snapshot.opponent_score > _duel_snapshot.challenger_score:
+                        winner_name = _duel_snapshot.opponent_name
+                    else:
+                        # Tie — challenger wins by home-field advantage rule.
+                        winner_name = _duel_snapshot.challenger_name
+
+                    payload = {
+                        "embeds": [{
+                            "title": "⚔️ Auto-Match / Duel Completed!",
+                            "description": f"A duel on **{_duel_snapshot.table_name}** has finished.",
+                            "color": 15258703,
+                            "fields": [
+                                {
+                                    "name": _duel_snapshot.challenger_name,
+                                    "value": f"{_duel_snapshot.challenger_score:,}",
+                                    "inline": True,
+                                },
+                                {
+                                    "name": "vs.",
+                                    "value": "⚔️",
+                                    "inline": True,
+                                },
+                                {
+                                    "name": _duel_snapshot.opponent_name,
+                                    "value": f"{_duel_snapshot.opponent_score:,}",
+                                    "inline": True,
+                                },
+                                {
+                                    "name": "🏆 Winner",
+                                    "value": winner_name,
+                                    "inline": False,
+                                },
+                            ],
+                        }]
+                    }
+
+                    body = json.dumps(payload).encode("utf-8")
+                    req = urllib.request.Request(
+                        webhook_url,
+                        data=body,
+                        headers={"Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        status = resp.status
+                    if status not in (200, 204):
+                        log(_cfg_snapshot, f"[DUEL] Discord webhook returned unexpected status {status}.", "WARN")
+                except Exception as exc:
+                    log(_cfg_snapshot, f"[DUEL] Discord webhook error: {exc}", "WARN")
+
+            threading.Thread(target=_send_discord_notification, daemon=True).start()
 
         return result
 
