@@ -2485,12 +2485,20 @@ class Watcher:
     def _challenge_best_final_score(self, end_audits: dict, pid: int = 1) -> int:
         # Single-player only
         try:
-            v = int((end_audits or {}).get("P1 Score", 0) or 0)
+            v = self._find_score_from_audits(end_audits, pid=pid)
             if v > 0:
                 return v
 
+            # Check prekill_end snapshot captured before VPX was killed
+            ch = getattr(self, "challenge", {}) or {}
+            pre = ch.get("prekill_end")
+            if isinstance(pre, dict):
+                pv = self._find_score_from_audits(pre, pid=pid)
+                if pv > 0:
+                    return pv
+
             cache = getattr(self, "_last_audits_global", {}) or {}
-            cv = int(cache.get("P1 Score", 0) or 0)
+            cv = self._find_score_from_audits(cache, pid=pid)
             if cv > 0:
                 return cv
 
