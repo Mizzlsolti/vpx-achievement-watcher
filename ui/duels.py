@@ -684,18 +684,18 @@ class DuelsMixin:
         )
         # Detect duplicate clean names and add author suffix to disambiguate.
         from collections import Counter as _Counter
-        def _strip_table_metadata(title: str) -> str:
+        def _strip_version_and_parenthetical(title: str) -> str:
             s = _strip_version_from_name(title)
             if "(" in s:
                 s = s[:s.index("(")].strip()
             return s
         base_name_counts = _Counter(
-            _strip_table_metadata(e.get("title") or e.get("rom", "")) for e in entries
+            _strip_version_and_parenthetical(e.get("title") or e.get("rom", "")) for e in entries
         )
         for entry in entries:
             title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
-            clean_title = _strip_table_metadata(title)
+            clean_title = _strip_version_and_parenthetical(title)
             if base_name_counts[clean_title] > 1:
                 raw = entry.get("title") or ""
                 author = ""
@@ -855,22 +855,22 @@ class DuelsMixin:
                             names_map[pid] = raw.get("name", "")
                         else:
                             names_map[pid] = ""
+                # Build fallback name map from active duel records (once, O(N+M)).
+                duel_name_map: dict[str, str] = {}
+                try:
+                    active_duels = self._duel_engine.get_active_duels()
+                    for d in active_duels:
+                        if d.challenger and d.challenger_name and d.challenger not in duel_name_map:
+                            duel_name_map[d.challenger] = d.challenger_name
+                        if d.opponent and d.opponent_name and d.opponent not in duel_name_map:
+                            duel_name_map[d.opponent] = d.opponent_name
+                except Exception:
+                    pass
                 players = []
                 for pid in other_ids:
                     name = names_map.get(pid, "").strip()
                     if not name:
-                        # Fallback: search active duel records for this player's name.
-                        try:
-                            active_duels = self._duel_engine.get_active_duels()
-                            for d in active_duels:
-                                if d.challenger == pid and d.challenger_name:
-                                    name = d.challenger_name
-                                    break
-                                elif d.opponent == pid and d.opponent_name:
-                                    name = d.opponent_name
-                                    break
-                        except Exception:
-                            pass
+                        name = duel_name_map.get(pid, "").strip()
                     if name and name != "Player":
                         players.append((name, pid))
                 players.sort(key=lambda x: x[0].lower())
@@ -1525,19 +1525,25 @@ class DuelsMixin:
 
     @pyqtSlot()
     def _periodic_duel_refresh(self) -> None:
-        """Periodically refresh inbox, active duels, history, and global feed tables (every 5 seconds)."""
+        """Periodically refresh inbox, active duels, and history tables (every 5 seconds).
+        The global feed (cloud call) is refreshed every 6th tick (~30 seconds).
+        """
         try:
             self._refresh_invitation_inbox()
             self._refresh_active_duels()
             self._refresh_duel_history()
         except Exception:
             pass
-        try:
-            feed = getattr(self, "_global_feed_widget", None)
-            if feed is not None:
-                feed.refresh()
-        except Exception:
-            pass
+        # Refresh global feed every ~30 seconds (every 6th call) to avoid excessive cloud polls.
+        tick = getattr(self, "_duel_refresh_tick", 0) + 1
+        self._duel_refresh_tick = tick
+        if tick % 6 == 0:
+            try:
+                feed = getattr(self, "_global_feed_widget", None)
+                if feed is not None:
+                    feed.refresh()
+            except Exception:
+                pass
 
     def _check_duel_expiry(self) -> None:
         """Check for expired duels via the engine and refresh both tables.
