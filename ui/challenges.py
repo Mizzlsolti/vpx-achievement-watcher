@@ -318,6 +318,8 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
+        if self._close_overlays_if_player_hidden():
+            return
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not current_rom or not self.watcher._has_any_map(current_rom):
@@ -372,6 +374,21 @@ class ChallengesMixin:
         except Exception:
             pass
 
+    def _close_overlays_if_player_hidden(self) -> bool:
+        """Close challenge overlays and return True if the VPX Player is not visible.
+
+        Callers should ``return`` immediately when this method returns True so that
+        challenge UI interactions are silently blocked when only the editor is open.
+        """
+        if self._player_is_visible():
+            return False
+        try:
+            self._close_challenge_select_overlay()
+            self._close_flip_difficulty_overlay()
+        except Exception:
+            pass
+        return True
+
     def _close_secondary_overlays(self):
         """Close all secondary overlay windows (NOT the main overlay) when VPX exits."""
         for attr in ('_challenge_timer', '_challenge_select', '_flip_diff_select',
@@ -391,6 +408,8 @@ class ChallengesMixin:
             except Exception:
                 pass
             self._status_overlay = None
+        # Reset challenge selection so the next session always starts from the first option.
+        self._ch_ov_selected_idx = 0
         # NOTE: _ach_toast_mgr and _mini_overlay are intentionally NOT cleared here.
         # Both are post-game notifications that must survive VPX exit:
         # - _ach_toast_mgr: achievement toasts fired by _persist_and_toast_achievements()
@@ -688,6 +707,9 @@ class ChallengesMixin:
                 pass
             return
 
+        if self._close_overlays_if_player_hidden():
+            return
+
         if getattr(self, "_ch_pick_flip_diff", False) and getattr(self, "_flip_diff_select", None):
             try:
                 name, flips = self._flip_diff_select.selected_option()
@@ -799,6 +821,8 @@ class ChallengesMixin:
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
             return
+        if self._close_overlays_if_player_hidden():
+            return
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
             if not (current_rom and self.watcher._has_any_map(current_rom)):
@@ -896,6 +920,8 @@ class ChallengesMixin:
             pass
         # Challenge left/right no longer navigates overlay pages
         if self._challenge_is_active():
+            return
+        if self._close_overlays_if_player_hidden():
             return
         try:
             current_rom = getattr(self.watcher, "current_rom", None)
