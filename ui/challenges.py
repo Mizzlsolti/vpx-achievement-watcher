@@ -317,7 +317,7 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
-        if not self._player_is_visible():
+        if not self._in_game_now():
             try:
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
@@ -676,7 +676,7 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        if not self._player_is_visible():
+        if not self._in_game_now():
             # If a duel invite notification is showing in the mini overlay, ignore
             # the hotkey — Left/Right handle accept/decline directly.
             try:
