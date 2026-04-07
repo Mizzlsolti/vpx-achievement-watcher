@@ -1191,6 +1191,22 @@ class Watcher:
                         "mask": self._to_int(sc.get("mask", 0), 0),
                         "value_offset": self._to_int(sc.get("value_offset", sc.get("offset", 0)), 0)
                     })
+                elif isinstance(sc, dict) and isinstance(sc.get("offsets"), list) and sc.get("offsets"):
+                    raw_offsets = [self._to_int(o, 0) for o in sc.get("offsets", [])]
+                    if raw_offsets:
+                        fields.append({
+                            "name": "P1 Score",
+                            "label": "P1 Score",
+                            "offset": min(raw_offsets),
+                            "size": len(raw_offsets),
+                            "offsets": raw_offsets,
+                            "encoding": sc.get("encoding") or "bcd",
+                            "endian": sc.get("endian") or None,
+                            "scale": float(sc.get("scale") or 1.0),
+                            "signed": bool(sc.get("signed", False)),
+                            "mask": self._to_int(sc.get("mask", 0), 0),
+                            "value_offset": self._to_int(sc.get("value_offset", 0), 0)
+                        })
 
             def add_gs(name_in: str, label_out: str | None = None):
                 ent = gs.get(name_in)
@@ -1450,9 +1466,22 @@ class Watcher:
         endian = fld.get("endian") or "be"
         signed = bool(fld.get("signed", False))
         scale = float(fld.get("scale", 1.0))
-        if offset < 0 or offset + size > len(raw):
-            return None
-        window = raw[offset: offset + size]
+        scatter_offsets = fld.get("offsets")
+        if scatter_offsets:
+            try:
+                # If the first offset is out-of-order (not the minimum), it is likely a
+                # special byte (digit count, high nibble) – skip it for score decoding
+                min_offset = min(scatter_offsets)
+                data_offsets = scatter_offsets[1:] if len(scatter_offsets) > 1 and scatter_offsets[0] != min_offset else scatter_offsets
+                window = bytes(raw[o] for o in data_offsets if 0 <= o < len(raw))
+                if not window:
+                    return None
+            except Exception:
+                return None
+        else:
+            if offset < 0 or offset + size > len(raw):
+                return None
+            window = raw[offset: offset + size]
         
         if enc in ("ch", "ascii", "string"):
             return "".join(chr(b) for b in window if 32 <= b <= 126).strip()
@@ -1948,6 +1977,8 @@ class Watcher:
         self._flip["vk_right"] = int(binds.get("vk_right", 0) or 0)
         self._flip["joy_left"] = int(binds.get("joy_left", 0) or 0)
         self._flip["joy_right"] = int(binds.get("joy_right", 0) or 0)
+        if not self._flip["vk_left"] and not self._flip["vk_right"]:
+            log(self.cfg, "[FLIP] Warning: no keyboard flipper bindings found (VK left=0, right=0) – keyboard hook skipped, joystick only", "WARN")
         try:
             kbs = []
             if self._flip["vk_left"]:
@@ -2090,6 +2121,7 @@ class Watcher:
             self._flip_stop_inputs()
 
     def start_flip_challenge(self, threshold: int = 500):
+        log(self.cfg, f"[CHALLENGE] flip start requested (threshold={threshold})")
         try:
             if not self.game_active or not self.current_rom:
                 log(self.cfg, "[CHALLENGE] flip: ignored (no active game)", "WARN")
@@ -2463,6 +2495,7 @@ class Watcher:
 
                         ch["active"] = False
                         ch["pending_kill_at"] = None
+                        ch["completed"] = True
                         ch["heat_failed"] = True
                         self.challenge = ch
 
@@ -2611,9 +2644,12 @@ class Watcher:
                 score_txt = f"{int(score):,d}".replace(",", ".")
                 if str(kind or "").lower() == "timed":
                     title = "TIME'S UP!"
+                elif str(kind or "").lower() == "heat" and ch.get("heat_failed"):
+                    title = "OVERHEATED!"
                 else:
                     title = "CHALLENGE COMPLETE!"
-                self.bridge.challenge_info_show.emit(f"{title}<br>Score: {score_txt}", 8, "#FFFFFF")
+                color = "#FF3B30" if ch.get("heat_failed") else "#FFFFFF"
+                self.bridge.challenge_info_show.emit(f"{title}<br>Score: {score_txt}", 8, color)
             except Exception as e:
                 log(self.cfg, f"[CHALLENGE] score overlay emit failed: {e}", "WARN")
 
@@ -2666,7 +2702,20 @@ class Watcher:
             return int(val)
 
         val = (audits or {}).get("Score")
-        return int(val) if _is_num(val) else 0
+        if _is_num(val):
+            return int(val)
+
+        # Fuzzy: case-insensitive search for player-1 score labels
+        for key, v in (audits or {}).items():
+            kl = str(key).strip().lower()
+            if _is_num(v) and (
+                kl in {"player 1", "player1", "player 1 score", "player1 score", "p1score"} or
+                ("player 1" in kl and "score" in kl) or
+                ("player1" in kl and "score" in kl)
+            ):
+                return int(v)
+
+        return 0
 
     def _build_events_from_deltas(self, deltas: dict) -> dict:
         events = {k: 0 for k in self.HIGHLIGHT_RULES.keys()}
@@ -4372,7 +4421,9 @@ class Watcher:
             except Exception:
                 pass
             try:
-                self.bridge.challenge_won.emit(0.0)  # margin_pct=0.0 (no goal score to compute actual margin)
+                # Overheat is a valid end (score recorded), but not a "win" – skip the won animation
+                if not (str(ch.get("kind", "")).lower() == "heat" and ch.get("heat_failed")):
+                    self.bridge.challenge_won.emit(0.0)  # margin_pct=0.0 (no goal score to compute actual margin)
             except Exception: pass
 
         try:
