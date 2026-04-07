@@ -53,46 +53,9 @@ DEFAULT_OVERLAY = {
     "ach_toast_y_portrait": 100,
     "ach_toast_portrait": False,
     "ach_toast_rotate_ccw": False,
-    "ch_timer_custom": False,                
-    "ch_timer_saved": False,                 
-    "ch_timer_x_landscape": 100,
-    "ch_timer_y_landscape": 100,
-    "ch_timer_x_portrait": 100,
-    "ch_timer_y_portrait": 100,
-    "ch_timer_portrait": False,               
-    "ch_timer_rotate_ccw": False,  
-    "ch_ov_custom": False,
-    "ch_ov_saved": False,
-    "ch_ov_x_landscape": 100,
-    "ch_ov_y_landscape": 100,
-    "ch_ov_x_portrait": 100,
-    "ch_ov_y_portrait": 100,
-    "ch_ov_portrait": False,
-    "ch_ov_rotate_ccw": False,
     "overlay_auto_close": False,
     "automatic_creation": True,
-    "heat_bar_custom": False,
-    "heat_bar_saved": False,
-    "heat_bar_x_landscape": 20,
-    "heat_bar_y_landscape": 100,
-    "heat_bar_x_portrait": 20,
-    "heat_bar_y_portrait": 100,
-    "heat_bar_portrait": False,
-    "heat_bar_rotate_ccw": False,
 }
-DEFAULT_OVERLAY.update({
-    "challenge_hotkey_input_source": "keyboard",
-    "challenge_hotkey_vk": 0x7A,   
-    "challenge_hotkey_joy_button": 3,
-    "challenge_left_input_source": "keyboard",
-    "challenge_left_vk": 0x25,
-    "challenge_left_joy_button": 4,
-    "challenge_right_input_source": "keyboard",
-    "challenge_right_vk": 0x27,
-    "challenge_right_joy_button": 5,
-})
-DEFAULT_OVERLAY.setdefault("ch_hotkey_debounce_ms", 120)
-DEFAULT_OVERLAY.setdefault("ch_finalize_delay_ms", 2000)
 DEFAULT_OVERLAY.setdefault("low_performance_mode", False)
 DEFAULT_OVERLAY.setdefault("anim_main_transitions", True)
 DEFAULT_OVERLAY.setdefault("anim_main_glow", True)
@@ -100,7 +63,6 @@ DEFAULT_OVERLAY.setdefault("anim_main_score_progress", True)
 DEFAULT_OVERLAY.setdefault("anim_main_highlights", True)
 DEFAULT_OVERLAY.setdefault("anim_toast", True)
 DEFAULT_OVERLAY.setdefault("anim_status", True)
-DEFAULT_OVERLAY.setdefault("anim_challenge", True)
 
 # ---------------------------------------------------------------------------
 # Granular fx_* effect keys (replaces coarse anim_* toggles)
@@ -140,65 +102,6 @@ DEFAULT_OVERLAY.setdefault("fx_toast_hologram_flicker", True)
 DEFAULT_OVERLAY.setdefault("fx_toast_shockwave", True)
 DEFAULT_OVERLAY.setdefault("fx_toast_shockwave_intensity", 80)
 
-# Challenge Select
-DEFAULT_OVERLAY.setdefault("fx_challenge_carousel", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_selection_glow", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_arrow_wobble", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_glow_border", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_snap_scale", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_electric_arc", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_electric_arc_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_challenge_hover_shimmer", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_plasma_noise", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_holo_sweep", True)
-DEFAULT_OVERLAY.setdefault("fx_challenge_color_pulse", True)
-
-# Timer / Countdown
-DEFAULT_OVERLAY.setdefault("fx_timer_321go", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_number_spin", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_radial_pulse", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_glow_border", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_urgency_shake", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_urgency_shake_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_timer_warp_distortion", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_warp_distortion_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_timer_trail_afterimage", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_final_explosion", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_final_explosion_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_timer_pulse_ring", True)
-DEFAULT_OVERLAY.setdefault("fx_timer_glitch_numbers", True)
-
-# Heat Barometer
-DEFAULT_OVERLAY.setdefault("fx_heat_warning_pulse", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_critical_pulse", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_glow_border", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_gradient_anim", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_flame_particles", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_flame_particles_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_heat_shimmer", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_shimmer_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_heat_smoke_wisps", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_smoke_wisps_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_heat_lava_glow", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_lava_glow_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_heat_number_throb", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_meltdown_shake", True)
-DEFAULT_OVERLAY.setdefault("fx_heat_meltdown_shake_intensity", 80)
-
-# Flip Counter
-DEFAULT_OVERLAY.setdefault("fx_flip_breathing_glow", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_counter_spin", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_glow_border", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_progress_arc", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_impact_pulse", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_number_cascade", False)
-DEFAULT_OVERLAY.setdefault("fx_flip_milestone_burst", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_milestone_burst_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_flip_electric_spark", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_electric_spark_intensity", 80)
-DEFAULT_OVERLAY.setdefault("fx_flip_goal_glow", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework", True)
-DEFAULT_OVERLAY.setdefault("fx_flip_completion_firework_intensity", 80)
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
@@ -240,7 +143,6 @@ DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
 # Per-overlay post-processing toggles
 DEFAULT_OVERLAY.setdefault("pp_overlay_main", True)
 DEFAULT_OVERLAY.setdefault("pp_overlay_toast", True)
-DEFAULT_OVERLAY.setdefault("pp_overlay_challenge", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_timer", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_heat", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_flip", False)
@@ -254,24 +156,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "base_body_size", "base_title_size", "base_hint_size",
     
     "toggle_input_source", "toggle_vk", "toggle_joy_button", "toggle_mods",
-    "challenge_hotkey_input_source", "challenge_hotkey_vk", "challenge_hotkey_joy_button", "challenge_hotkey_mods",
-    "challenge_left_input_source", "challenge_left_vk", "challenge_left_joy_button", "challenge_left_mods",
-    "challenge_right_input_source", "challenge_right_vk", "challenge_right_joy_button", "challenge_right_mods",
-    
     "ach_toast_custom", "ach_toast_saved", "ach_toast_x_landscape", "ach_toast_y_landscape", 
     "ach_toast_x_portrait", "ach_toast_y_portrait", "ach_toast_portrait", "ach_toast_rotate_ccw",
-    
-    "ch_timer_custom", "ch_timer_saved", "ch_timer_x_landscape", "ch_timer_y_landscape", 
-    "ch_timer_x_portrait", "ch_timer_y_portrait", "ch_timer_portrait", "ch_timer_rotate_ccw",
-    
-    "ch_ov_custom", "ch_ov_saved", "ch_ov_x_landscape", "ch_ov_y_landscape", 
-    "ch_ov_x_portrait", "ch_ov_y_portrait", "ch_ov_portrait", "ch_ov_rotate_ccw",
-    
-    "flip_counter_custom", "flip_counter_saved", "flip_counter_x_landscape", "flip_counter_y_landscape", 
-    "flip_counter_x_portrait", "flip_counter_y_portrait", "flip_counter_portrait", "flip_counter_rotate_ccw",
-    
-    "heat_bar_custom", "heat_bar_saved", "heat_bar_x_landscape", "heat_bar_y_landscape",
-    "heat_bar_x_portrait", "heat_bar_y_portrait", "heat_bar_portrait", "heat_bar_rotate_ccw",
     
     "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
     "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
@@ -280,11 +166,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
     "status_overlay_x_portrait", "status_overlay_y_portrait",
     
-    "player_name", "player_id", "flip_counter_goal_total", 
-    "challenges_voice_volume", "challenges_voice_mute",
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
-    "anim_main_highlights", "anim_toast", "anim_status", "anim_challenge",
     "overlay_page2_enabled", "overlay_page3_enabled",
     "overlay_page4_enabled", "overlay_page5_enabled", "overlay_page6_enabled",
     "sound_enabled", "sound_volume", "sound_pack", "sound_events",
@@ -311,46 +194,6 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_toast_confetti", "fx_toast_confetti_intensity",
     "fx_toast_hologram_flicker",
     "fx_toast_shockwave", "fx_toast_shockwave_intensity",
-    "fx_challenge_carousel",
-    "fx_challenge_selection_glow",
-    "fx_challenge_arrow_wobble",
-    "fx_challenge_glow_border",
-    "fx_challenge_snap_scale",
-    "fx_challenge_electric_arc", "fx_challenge_electric_arc_intensity",
-    "fx_challenge_hover_shimmer",
-    "fx_challenge_plasma_noise",
-    "fx_challenge_holo_sweep",
-    "fx_challenge_color_pulse",
-    "fx_timer_321go",
-    "fx_timer_number_spin",
-    "fx_timer_radial_pulse",
-    "fx_timer_glow_border",
-    "fx_timer_urgency_shake", "fx_timer_urgency_shake_intensity",
-    "fx_timer_warp_distortion", "fx_timer_warp_distortion_intensity",
-    "fx_timer_trail_afterimage",
-    "fx_timer_final_explosion", "fx_timer_final_explosion_intensity",
-    "fx_timer_pulse_ring",
-    "fx_timer_glitch_numbers",
-    "fx_heat_warning_pulse",
-    "fx_heat_critical_pulse",
-    "fx_heat_glow_border",
-    "fx_heat_gradient_anim",
-    "fx_heat_flame_particles", "fx_heat_flame_particles_intensity",
-    "fx_heat_shimmer", "fx_heat_shimmer_intensity",
-    "fx_heat_smoke_wisps", "fx_heat_smoke_wisps_intensity",
-    "fx_heat_lava_glow", "fx_heat_lava_glow_intensity",
-    "fx_heat_number_throb",
-    "fx_heat_meltdown_shake", "fx_heat_meltdown_shake_intensity",
-    "fx_flip_breathing_glow",
-    "fx_flip_counter_spin",
-    "fx_flip_glow_border",
-    "fx_flip_progress_arc",
-    "fx_flip_impact_pulse",
-    "fx_flip_number_cascade",
-    "fx_flip_milestone_burst", "fx_flip_milestone_burst_intensity",
-    "fx_flip_electric_spark", "fx_flip_electric_spark_intensity",
-    "fx_flip_goal_glow",
-    "fx_flip_completion_firework", "fx_flip_completion_firework_intensity",
     "trophie_gui_enabled", "trophie_overlay_enabled",
     "trophie_overlay_x", "trophie_overlay_y",
     "trophie_overlay_portrait", "trophie_overlay_rotate_ccw",
@@ -364,14 +207,9 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_post_film_grain", "fx_post_film_grain_intensity",
     "fx_post_scanlines", "fx_post_scanlines_intensity",
     # Per-overlay post-processing toggles
-    "pp_overlay_main", "pp_overlay_toast", "pp_overlay_challenge",
     "pp_overlay_timer", "pp_overlay_heat", "pp_overlay_flip",
     "duels_do_not_disturb",
-    "ch_hotkey_debounce_ms",
-    "ch_finalize_delay_ms",
 ]
-
-CHALLENGES_ENABLED = True
 
 
 def _migrate_anim_to_fx(ov: dict) -> None:
@@ -388,8 +226,6 @@ def _migrate_anim_to_fx(ov: dict) -> None:
     anim_main_score = bool(ov.get("anim_main_score_progress", True))
     anim_main_hi = bool(ov.get("anim_main_highlights", True))
     anim_toast = bool(ov.get("anim_toast", True))
-    anim_challenge = bool(ov.get("anim_challenge", True))
-
     # Main Overlay
     ov.setdefault("fx_main_page_transition", anim_main_transitions)
     ov.setdefault("fx_main_glitch_frame", anim_main_transitions)
@@ -413,25 +249,7 @@ def _migrate_anim_to_fx(ov: dict) -> None:
 
     # Challenge / Timer / Heat / Flip
     for key in [
-        "fx_challenge_carousel", "fx_challenge_selection_glow", "fx_challenge_arrow_wobble",
-        "fx_challenge_glow_border", "fx_challenge_snap_scale", "fx_challenge_electric_arc",
-        "fx_challenge_hover_shimmer", "fx_challenge_plasma_noise", "fx_challenge_holo_sweep",
-        "fx_challenge_color_pulse",
-        "fx_timer_321go", "fx_timer_number_spin", "fx_timer_radial_pulse",
-        "fx_timer_glow_border", "fx_timer_urgency_shake", "fx_timer_warp_distortion",
-        "fx_timer_trail_afterimage", "fx_timer_final_explosion", "fx_timer_pulse_ring",
-        "fx_timer_glitch_numbers",
-        "fx_heat_warning_pulse", "fx_heat_critical_pulse", "fx_heat_glow_border",
-        "fx_heat_gradient_anim", "fx_heat_flame_particles", "fx_heat_shimmer",
-        "fx_heat_smoke_wisps", "fx_heat_lava_glow", "fx_heat_number_throb",
-        "fx_heat_meltdown_shake",
-        "fx_flip_breathing_glow", "fx_flip_counter_spin", "fx_flip_glow_border",
-        "fx_flip_progress_arc", "fx_flip_impact_pulse", "fx_flip_number_cascade",
-        "fx_flip_milestone_burst", "fx_flip_electric_spark", "fx_flip_goal_glow",
-        "fx_flip_completion_firework",
     ]:
-        ov.setdefault(key, anim_challenge)
-
     ov["_fx_migrated"] = True
 
 # Windows virtual key codes for flipper buttons used in Heat Challenge
@@ -439,10 +257,6 @@ VK_LSHIFT = 0xA0
 VK_RSHIFT = 0xA1
 
 # Heat Challenge rate constants (units per second unless noted)
-HEAT_HOLD_RATE = 22.5      # heat gained per second while flipper is held
-HEAT_PRESS_BURST = 7.5     # instant heat added on initial flipper press
-HEAT_COOLDOWN_RATE = 10.0  # heat lost per second while flippers are released
-
 EXCLUDED_FIELDS = {
     "Last Game Start", "Last Printout", "Last Replay", "Champion Reset", "Clock Last Set", "Coins Cleared",
     "Factory Setting", "Recent Paid Cred", "Recent Serv. Cred", "Burn-in Time", "Totals Cleared", "Audits Cleared",
