@@ -145,7 +145,7 @@ class SystemMixin:
 
         self.chk_cloud_backup = QCheckBox("💾 Auto-Backup Progress to Cloud")
         self.chk_cloud_backup.setToolTip(
-            "When enabled, your achievement progress, challenge scores, and VPS mapping "
+            "When enabled, your achievement progress and VPS mapping "
             "are automatically uploaded to the cloud for backup purposes. "
             "Use 'Restore from Cloud' to recover your data on a new PC."
         )
@@ -503,63 +503,6 @@ class SystemMixin:
             )
             return
 
-        # Restore Challenge Scores from Cloud
-        scores_restored = False
-        try:
-            scores_data = CloudSync.fetch_node(self.cfg, f"players/{pid}/scores")
-            if scores_data and isinstance(scores_data, dict):
-                out_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
-                ensure_dir(out_dir)
-                for category, cat_entries in scores_data.items():
-                    if not isinstance(cat_entries, dict):
-                        continue
-                    for rom_key, entry in cat_entries.items():
-                        if not entry or not isinstance(entry, dict):
-                            continue
-                        try:
-                            # Extract base ROM by stripping known suffixes added by upload_score
-                            base_rom = rom_key
-                            if "target_flips" in entry:
-                                suffix = f"_f{entry['target_flips']}"
-                                if base_rom.endswith(suffix):
-                                    base_rom = base_rom[: -len(suffix)]
-                            elif "difficulty" in entry:
-                                clean_diff = str(entry["difficulty"]).replace(" ", "")
-                                suffix = f"_{clean_diff}"
-                                if base_rom.endswith(suffix):
-                                    base_rom = base_rom[: -len(suffix)]
-
-                            result = {
-                                "kind": category,
-                                "rom": base_rom,
-                                "score": int(entry.get("score", 0)),
-                                "ts": entry.get("ts", ""),
-                            }
-                            if "difficulty" in entry:
-                                result["difficulty"] = entry["difficulty"]
-                            if "target_flips" in entry:
-                                result["target_flips"] = entry["target_flips"]
-                            if "duration_sec" in entry:
-                                result["duration_sec"] = entry["duration_sec"]
-
-                            path = os.path.join(out_dir, f"{sanitize_filename(base_rom)}.json")
-                            hist = secure_load_json(path, {"results": []}) or {"results": []}
-                            hist.setdefault("results", [])
-                            dup_key = f"{base_rom}|{category}|{result['ts']}"
-                            existing_keys = {
-                                f"{r.get('rom')}|{r.get('kind')}|{r.get('ts')}"
-                                for r in hist["results"]
-                            }
-                            if dup_key not in existing_keys:
-                                hist["results"].append(result)
-                                secure_save_json(path, hist)
-                                scores_restored = True
-                        except Exception as _entry_err:
-                            log(self.cfg, f"[CLOUD] Restore: failed to process score entry {rom_key}: {_entry_err}", "WARN")
-                            continue
-        except Exception as _scores_err:
-            log(self.cfg, f"[CLOUD] Restore: challenge scores restore failed: {_scores_err}", "WARN")
-
         # Restore VPS ID Mapping from Cloud
         vps_mapping_restored = False
         try:
@@ -647,8 +590,6 @@ class SystemMixin:
             pass
 
         parts = ["Achievement data"]
-        if scores_restored:
-            parts.append("challenge scores")
         if vps_mapping_restored:
             parts.append("VPS ID mapping")
         if cat_progress_restored:

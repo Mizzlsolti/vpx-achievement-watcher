@@ -171,7 +171,7 @@ class OverlayPagesMixin:
     # ── Last-played helpers ───────────────────────────────────────────────────
 
     def _get_last_played_rom(self) -> str:
-        """Return the ROM key of the last played session (non-challenge or challenge)."""
+        """Return the ROM key of the last played session."""
         try:
             summary_path = os.path.join(
                 self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
@@ -196,74 +196,21 @@ class OverlayPagesMixin:
         return ""
 
     def _get_last_session_context(self) -> dict:
-        """Determine what was last played: non-challenge session or a challenge, and return metadata."""
-        from datetime import datetime
+        """Determine what was last played and return metadata."""
+        ctx = {"rom": "", "table_name": ""}
 
-        ctx = {"rom": "", "table_name": "", "is_challenge": False, "kind": "", "difficulty": ""}
-
-        # Last non-challenge session from summary
+        # Last session from summary
         summary_path = os.path.join(
             self.cfg.BASE, "session_stats", "Highlights", "session_latest.summary.json"
         )
-        last_normal_ts = None
-        normal_rom = ""
-        normal_table = ""
         try:
             if os.path.isfile(summary_path):
-                last_normal_ts = os.path.getmtime(summary_path)
                 with open(summary_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                normal_rom = str(data.get("rom", "") or "")
-                normal_table = str(data.get("table", "") or "")
+                ctx["rom"] = str(data.get("rom", "") or "")
+                ctx["table_name"] = str(data.get("table", "") or "")
         except Exception:
             pass
-
-        # Last challenge session from challenge history files
-        last_challenge_ts = None
-        challenge_rom = ""
-        challenge_kind = ""
-        challenge_difficulty = ""
-        hist_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
-        try:
-            if os.path.isdir(hist_dir):
-                latest_item = None
-                latest_dt = None
-                for fn in os.listdir(hist_dir):
-                    if not fn.lower().endswith(".json"):
-                        continue
-                    fpath = os.path.join(hist_dir, fn)
-                    data = secure_load_json(fpath, {"results": []}) or {"results": []}
-                    for it in (data.get("results") or []):
-                        try:
-                            ts = str(it.get("ts", "") or "")
-                            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                            if dt.tzinfo is not None:
-                                dt = dt.astimezone().replace(tzinfo=None)
-                            if latest_dt is None or dt > latest_dt:
-                                latest_dt = dt
-                                latest_item = it
-                        except Exception:
-                            continue
-                if latest_item and latest_dt:
-                    last_challenge_ts = latest_dt.timestamp()
-                    challenge_rom = str(latest_item.get("rom", "") or "")
-                    challenge_kind = str(latest_item.get("kind", "") or "").lower()
-                    challenge_difficulty = str(latest_item.get("difficulty", "") or "")
-        except Exception:
-            pass
-
-        # Pick the more recent context
-        if last_challenge_ts is not None and last_normal_ts is not None:
-            if last_challenge_ts >= last_normal_ts:
-                ctx.update({"rom": challenge_rom, "is_challenge": True,
-                            "kind": challenge_kind, "difficulty": challenge_difficulty})
-            else:
-                ctx.update({"rom": normal_rom, "table_name": normal_table})
-        elif last_challenge_ts is not None:
-            ctx.update({"rom": challenge_rom, "is_challenge": True,
-                        "kind": challenge_kind, "difficulty": challenge_difficulty})
-        elif last_normal_ts is not None:
-            ctx.update({"rom": normal_rom, "table_name": normal_table})
 
         # Resolve table name from ROMNAMES if not already set
         if ctx["rom"] and not ctx["table_name"]:
@@ -556,11 +503,8 @@ class OverlayPagesMixin:
         return css, header_html, rows
 
     def _overlay_page3_html(self) -> str:
-        """Generate HTML for Page 3: Local Challenge Leaderboard (mirrors the GUI view)."""
-        try:
-            return self._build_challenges_results_html()
-        except Exception:
-            return "<div style='color:#FF3B30;text-align:center;'>(Error loading challenge leaderboard)</div>"
+        """Page 3 placeholder (challenge leaderboard removed)."""
+        return "<div style='color:#888;text-align:center;'>(No local leaderboard available)</div>"
 
     def _overlay_page4_show(self):
         """Show Page 4: Cloud Leaderboard. Fetches data in the background."""
@@ -570,18 +514,10 @@ class OverlayPagesMixin:
         ctx = self._get_last_session_context()
 
         # Build dynamic header
-        is_challenge = ctx.get("is_challenge", False)
-        kind = ctx.get("kind", "")
-        difficulty = ctx.get("difficulty", "")
         table_name = ctx.get("table_name", "")
         rom = ctx.get("rom", "")
 
-        kind_labels = {"timed": "Timed Challenge", "flip": "Flip Challenge", "heat": "Heat Challenge"}
-        if is_challenge:
-            ch_label = kind_labels.get(kind, "Challenge")
-            header_title = f"{ch_label} – {difficulty}" if difficulty else ch_label
-        else:
-            header_title = table_name if table_name else (rom.upper() if rom else "Cloud Leaderboard")
+        header_title = table_name if table_name else (rom.upper() if rom else "Cloud Leaderboard")
 
         _tc_accent = get_theme_color(self.cfg, "accent")
         cloud_sync_msg = ""
@@ -621,44 +557,16 @@ class OverlayPagesMixin:
             try:
                 player_ids = CloudSync.fetch_player_ids(self.cfg)
                 data = []
-                if is_challenge:
-                    cat = kind if kind in ("timed", "flip", "heat") else "timed"
-                    if cat == "flip":
-                        paths = [f"players/{pid}/scores/flip" for pid in player_ids]
-                        batch = CloudSync.fetch_parallel(self.cfg, paths)
-                        for path, flip_node in batch.items():
-                            if flip_node and isinstance(flip_node, dict):
-                                for rom_key, entry in flip_node.items():
-                                    if rom_key == rom or rom_key.startswith(f"{rom}_"):
-                                        if entry and isinstance(entry, dict):
-                                            data.append(entry)
-                    else:
-                        paths = [f"players/{pid}/scores/{cat}/{rom}" for pid in player_ids]
-                        batch = CloudSync.fetch_parallel(self.cfg, paths)
-                        for path in paths:
-                            entry = batch.get(path)
-                            if entry and isinstance(entry, dict):
-                                data.append(entry)
-                    if data:
-                        if cat == "flip" and difficulty and difficulty != "All Difficulties":
-                            data = [
-                                r for r in data
-                                if str(r.get("difficulty", "")).strip().lower() == difficulty.lower()
-                            ]
-                        data.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
-                    selected_diff = difficulty if (is_challenge and kind == "flip") else None
-                    cat_for_html = cat
-                else:
-                    paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
-                    batch = CloudSync.fetch_parallel(self.cfg, paths)
-                    for path in paths:
-                        entry = batch.get(path)
-                        if entry and isinstance(entry, dict):
-                            data.append(entry)
-                    if data:
-                        data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
-                    selected_diff = None
-                    cat_for_html = "progress"
+                paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+                for path in paths:
+                    entry = batch.get(path)
+                    if entry and isinstance(entry, dict):
+                        data.append(entry)
+                if data:
+                    data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
+                selected_diff = None
+                cat_for_html = "progress"
 
                 if not data:
                     final_html = header_html + (

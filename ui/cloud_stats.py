@@ -42,146 +42,6 @@ class CloudStatsMixin:
     all related HTML-generation helpers, and the session/NVRAM read utilities.
     """
 
-    # ==========================================
-    # CHALLENGE RESULTS VIEW
-    # ==========================================
-
-    def _update_challenges_results_view(self):
-        try:
-            html = self._build_challenges_results_html()
-            self.ch_results_view.setHtml(html)
-        except Exception:
-            self.ch_results_view.setHtml("<div style='color:#FF3B30; text-align:center;'>(error while loading results)</div>")
-
-    def _build_challenges_results_html(self) -> str:
-        """Build and return the challenge leaderboard HTML (used by both the GUI and the overlay)."""
-        hist_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
-        if not os.path.isdir(hist_dir):
-            return "<div style='color:#888; text-align:center; margin-top:20px;'>(no results yet)</div>"
-
-        timed_items = []
-        flip_items = []
-        heat_items = []
-        for fn in os.listdir(hist_dir):
-            if not fn.lower().endswith(".json"):
-                continue
-            fpath = os.path.join(hist_dir, fn)
-            data = secure_load_json(fpath, {"results": []}) or {"results": []}
-            for it in (data.get("results") or []):
-                try:
-                    kind = str(it.get("kind", "") or "").lower()
-                    if kind not in ("timed", "flip", "heat"):
-                        continue
-                    rom = str(it.get("rom", "") or "")
-                    score = int(it.get("score", 0) or 0)
-                    dur_s = int(it.get("duration_sec", 0) or 0)
-                    ts = str(it.get("ts", "") or "")
-                    
-                    diff_str = it.get("difficulty", "")
-                    if not diff_str and kind == "flip":
-                        tf = int(it.get("target_flips", 0) or 0)
-                        if tf > 0:
-                            if tf <= 100: diff_str = "Pro"
-                            elif tf <= 200: diff_str = "Difficult"
-                            elif tf <= 300: diff_str = "Medium"
-                            elif tf <= 400: diff_str = "Easy"
-                            else: diff_str = f"{tf} Flips"
-                        else:
-                            diff_str = "-"
-
-                    try:
-                        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                        if dt.tzinfo is not None:
-                            dt = dt.astimezone().replace(tzinfo=None)
-                    except Exception:
-                        dt = datetime.min
-
-                    item = {
-                        "rom": rom, 
-                        "score": score, 
-                        "duration_sec": dur_s, 
-                        "_dt": dt, 
-                        "difficulty": diff_str,
-                    }
-                    
-                    if kind == "timed":
-                        timed_items.append(item)
-                    elif kind == "flip":
-                        flip_items.append(item)
-                    else:
-                        heat_items.append(item)
-                except Exception:
-                    continue
-
-        timed_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
-        flip_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
-        heat_items.sort(key=lambda x: x.get("_dt") or datetime.min, reverse=True)
-
-        LIMIT = 30
-        timed_items = timed_items[:LIMIT]
-        flip_items = flip_items[:LIMIT]
-        heat_items = heat_items[:LIMIT]
-
-        def fmt_score(n: int) -> str:
-            try:
-                return f"{int(n):,d}".replace(",", ".")
-            except Exception:
-                return str(n)
-
-        _tc_primary = get_theme_color(self.cfg, "primary")
-        _tc_accent = get_theme_color(self.cfg, "accent")
-        _tc_border = get_theme_color(self.cfg, "border")
-        css = f"""
-        <style>
-          table {{ border-collapse: collapse; margin-top: 5px; }}
-          th, td {{ padding: 8px 10px; border-bottom: 1px solid {_tc_border}44; white-space: nowrap; }}
-          th {{ background: #1A1A1A; font-weight: bold; color: {_tc_primary}; }}
-          td.left {{ color: #FFFFFF; font-weight: bold; }} 
-          td.val {{ color: {_tc_accent}; font-weight: bold; }} 
-          td.diff {{ color: #AAAAAA; font-style: italic; }} 
-          h4 {{ margin: 5px 0 10px 0; color: #FFFFFF; font-size: 1.4em; text-align: left; text-transform: uppercase; letter-spacing: 2px; }}
-        </style>
-        """
-
-        def tbl(title: str, items: list[dict], is_flip: bool) -> str:
-            if is_flip:
-                head = "<tr><th align='left'>ROM</th><th align='right'>Difficulty</th><th align='right'>Score</th><th align='right'>Duration</th></tr>"
-            else:
-                head = "<tr><th align='left'>ROM</th><th align='right'>Score</th><th align='right'>Duration</th></tr>"
-            
-            if not items:
-                cols = 4 if is_flip else 3
-                body = f"<tr><td colspan='{cols}' align='center' style='color:#888; border:none; padding-top:20px;'>(no results)</td></tr>"
-            else:
-                rows = []
-                romnames = getattr(self.watcher, "ROMNAMES", {}) or {}
-                for it in items:
-                    rom = it.get("rom", "")
-                    sc = fmt_score(it.get("score", 0))
-                    dur = self._fmt_hms(int(it.get("duration_sec", 0)))
-                    table_title = _html.escape(romnames.get(rom, ""))
-
-                    if is_flip:
-                        diff_label = it.get("difficulty", "-")
-                        rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='diff'>{diff_label}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
-                    else:
-                        rows.append(f"<tr><td align='left' class='left' title='{table_title}'>{rom}</td><td align='right' class='val'>{sc}</td><td align='right' class='val'>{dur}</td></tr>")
-                body = "".join(rows)
-            
-            return f"<h4>{title}</h4><table width='100%'>{head}{body}</table>"
-
-        html_timed = tbl("⏳ Timed", timed_items, False)
-        html_flip = tbl("🎯 Flip", flip_items, True)
-        html_heat = tbl("🔥 Heat", heat_items, False)
-        
-        return (
-            css +
-            "<table width='100%' style='border:none; margin-top:5px;'><tr>"
-            f"<td valign='top' style='padding-right:10px; width:33%; border:none;'>{html_timed}</td>"
-            f"<td valign='top' style='padding:0 10px; width:34%; border:none; border-left:1px solid {_tc_border};'>{html_flip}</td>"
-            f"<td valign='top' style='padding-left:10px; width:33%; border:none; border-left:1px solid {_tc_border};'>{html_heat}</td>"
-            "</tr></table>"
-        )
 
     # ==========================================
     # TAB 4: RECORDS & STATS
@@ -198,19 +58,9 @@ class CloudStatsMixin:
         self.stats_views[1] = QTextBrowser()
         self.stats_tabs.addTab(self.stats_views[1], "👤 Player Session Deltas")
 
-        ch_tab = QWidget()
-        ch_layout = QVBoxLayout(ch_tab)
-        self.ch_results_view = QTextBrowser()
-        ch_layout.addWidget(QLabel("<b>Latest Challenge Results</b>"))
-        ch_layout.addWidget(self.ch_results_view)
-        self.stats_tabs.addTab(ch_tab, "⚔️ Challenge Leaderboards")
-
         layout.addWidget(self.stats_tabs)
         self._add_tab_help_button(layout, "stats")
         self.main_tabs.addTab(tab, "📊 Records & Stats")
-        
-        try: self._update_challenges_results_view()
-        except Exception: pass
 
     # ==========================================
     # TAB 5: CLOUD LEADERBOARD

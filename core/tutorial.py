@@ -119,8 +119,7 @@ _STEPS = [
             "play. Configure them in the Overlay tab behind this window.\n\n"
             "Position — Each overlay has a \"Set Position\" button.\n"
             "Click it to drag the overlay where you want it on screen.\n"
-            "Examples: Stats Overlay, Achievement Toast, Challenge\n"
-            "Menu, Flip Counter, Heat Bar, and more.\n\n"
+            "Examples: Stats Overlay, Achievement Toast, and more.\n\n"
             "Page Controls — Enable or disable overlay pages (2–5)\n"
             "to choose which information is shown during gameplay.\n\n"
             "💡 Set positions now so overlays don't cover important\n"
@@ -136,7 +135,6 @@ _STEPS = [
             "for use during gameplay.\n\n"
             "  • Toggle overlay on/off while playing\n"
             "  • Cycle through overlay pages\n"
-            "  • Start/stop challenges\n"
             "  • Quick actions without leaving the table"
         ),
         "tab": 3,   # Controls
@@ -162,8 +160,7 @@ _STEPS = [
     {
         "title": "🔊 Sound Effects (optional)",
         "body": (
-            "Enable sound effects for achievement unlocks, challenges,\n"
-            "and other events.\n\n"
+            "Enable sound effects for achievement unlocks and other events.\n\n"
             "  • Toggle \"Enable Sound Effects\" to turn sounds on\n"
             "  • Adjust volume with the slider\n"
             "  • Choose a sound pack (Vex Machina, Zaptron, etc.)\n"
@@ -179,10 +176,8 @@ _STEPS = [
         "title": "✨ Visual Effects (optional)",
         "body": (
             "Customize every visual effect on every overlay individually.\n\n"
-            "Effects are grouped by overlay in a 2×3 grid:\n\n"
-            "  🖥️ Main Overlay      🏆 Achievement Toast\n"
-            "  ⚡ Challenge Select   ⏱️ Timer / Countdown\n"
-            "  🌡️ Heat Barometer    🔢 Flip Counter\n\n"
+            "Effects are grouped by overlay:\n\n"
+            "  🖥️ Main Overlay      🏆 Achievement Toast\n\n"
             "Each effect cell has two controls:\n"
             "  • Checkbox — enable or disable the effect\n"
             "  • Slider — adjust intensity from 0% to 100%\n\n"

@@ -289,7 +289,7 @@ class GUITrophie(QWidget):
             "score duels":      "tab_duels",
             "duels":            "tab_duels",
             "global feed":      "tab_duels_global",
-            "challenges":       "tab_challenges",
+            "challenges":       "tab_general",
         }
         for key_part, tip_cat in tab_map.items():
             if key_part in tab_name:
@@ -607,8 +607,6 @@ class OverlayTrophie(QWidget):
         self._session_ach_count = 0
         self._today_ach_count = 0
         self._today_session_count = 0
-        self._challenge_count_today = 0
-        self._challenge_losses_streak = 0
         self._no_ach_sessions_streak = 0
 
         # Random personality timer
@@ -848,57 +846,6 @@ class OverlayTrophie(QWidget):
     def on_level_up(self) -> None:
         self._draw.set_state(HAPPY)
         self._try_zank("level_up")
-
-    def on_challenge_start(self) -> None:
-        self._challenge_count_today += 1
-        self._last_game_ts = time.time()
-        self._draw.set_state(HAPPY)
-        self._draw.start_event_anim("nervous")
-        now = datetime.now()
-        if now.hour < 10:
-            self._show_comment_key("ov_ch_morning", "Morning challenge! Warm those fingers up!", HAPPY)
-        elif self._challenge_count_today >= 5:
-            self._show_comment_key("ov_ch_5today", "5 challenges today! Competitor of the year!", SURPRISED)
-        else:
-            self._show_comment_key("ov_ch_accepted", "Challenge accepted! Do not choke!", HAPPY)
-
-    def on_challenge_timer_tick(self, remaining_ms: int) -> None:
-        if remaining_ms <= 3000 and remaining_ms > 2500:
-            self._show_comment_key("ov_ch_clock", "Clock is ticking! FOCUS!", SURPRISED)
-        elif remaining_ms <= 10000 and remaining_ms > 9500:
-            self._show_comment_key("ov_ch_10s", "10 SECONDS! GIVE IT EVERYTHING!", SURPRISED)
-
-    def on_challenge_stop(self) -> None:
-        self._draw.set_state(IDLE)
-
-    def on_challenge_won(self, margin_pct: float = 50.0) -> None:
-        self._last_game_ts = time.time()
-        self._challenge_losses_streak = 0
-        self._draw.start_event_anim("victory_lap")
-        if self._try_zank("challenge_win"):
-            return
-        if margin_pct < 5.0:
-            self._show_comment_key("ov_ch_heartattack", "THAT WAS CLOSE! Heart attack!", SURPRISED)
-        elif margin_pct > 50.0:
-            self._show_comment_key("ov_ch_dominant", "Dominant performance!", HAPPY)
-            self._draw.start_event_anim("show_off")
-        else:
-            self._show_comment_key("ov_ch_win", "YOU WIN! I knew you could do it!", HAPPY)
-
-    def on_challenge_lost(self, attempts: int = 1, margin_pct: float = 10.0) -> None:
-        self._last_game_ts = time.time()
-        self._challenge_losses_streak += 1
-        self._draw.start_event_anim("drain_fall")
-        if self._try_zank("challenge_lose"):
-            return
-        if margin_pct < 2.0:
-            self._show_comment_key("ov_ch_1sec", "1 second away... I felt that", SAD)
-        elif attempts >= 3:
-            self._show_comment_key("ov_ch_third", "Third time is the charm... right?", SAD)
-        elif margin_pct < 10.0:
-            self._show_comment_key("ov_ch_close", "So close... Try again!", SAD)
-        else:
-            self._show_comment_key("ov_ch_notmyfault", "NOT MY FAULT!", SAD)
 
     def on_duel_received(self) -> None:
         """React when a duel invitation arrives."""
