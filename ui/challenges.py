@@ -1032,6 +1032,10 @@ class ChallengesMixin:
             except Exception:
                 self._ch_warmup_sec = 10
 
+            # Record start timestamp so _on_challenge_info_show can suppress
+            # stale "Challenge Aborted!" signals that arrive after this warmup fires.
+            self._last_challenge_start_ts = time.time()
+
             if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                 self._mini_overlay = MiniInfoOverlay(self)
             self._mini_overlay.show_info(str(message), max(1, int(seconds)), color_hex="#FF3B30")
@@ -1066,13 +1070,22 @@ class ChallengesMixin:
         try:
             msg_lower = str(message or "").lower()
             col = str(color_hex or "").upper()
+            # Record the start timestamp when a heat challenge arms itself so that
+            # the grace-period suppression below works symmetrically with timed.
+            if "heat challenge" in msg_lower and "overheat" in msg_lower:
+                self._last_challenge_start_ts = time.time()
             # Suppress stale "Challenge Aborted!" notifications that arrive while a
-            # new challenge is already active (e.g. from the previous session end
-            # being queued just before the new challenge start signals fired).
+            # new challenge is already active, or that arrive within a short grace
+            # window right after a challenge was initiated (race-condition guard for
+            # the case where self.challenge has already been cleared by the time
+            # the queued Qt signal is processed on the UI thread).
             if "aborted" in msg_lower:
                 try:
                     ch = getattr(self.watcher, "challenge", {}) or {}
                     if ch.get("active"):
+                        return
+                    last_start = getattr(self, "_last_challenge_start_ts", 0.0)
+                    if time.time() - last_start < 5.0:
                         return
                 except Exception:
                     pass

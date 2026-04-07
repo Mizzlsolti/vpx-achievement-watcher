@@ -1903,8 +1903,8 @@ class Watcher:
                 log(self.cfg, "[CHALLENGE] timed: blocked — duel active for current table", "WARN")
                 return
             ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active") and ch.get("kind") == "timed":
-                log(self.cfg, "[CHALLENGE] timed already active – ignored duplicate")
+            if ch.get("active"):
+                log(self.cfg, "[CHALLENGE] timed: another challenge already active – ignored", "WARN")
                 return
             warmup = 10
             total = max(1, int(total_seconds))
