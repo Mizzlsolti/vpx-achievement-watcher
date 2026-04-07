@@ -2463,7 +2463,7 @@ class Watcher:
 
                         ch["active"] = False
                         ch["pending_kill_at"] = None
-                        ch["completed"] = True
+                        ch["heat_failed"] = True
                         self.challenge = ch
 
                         try:
@@ -2474,7 +2474,7 @@ class Watcher:
                             self.bridge.heat_bar_hide.emit()
                         except Exception:
                             pass
-                        log(self.cfg, "[CHALLENGE] heat finished – VPX killed")
+                        log(self.cfg, "[CHALLENGE] heat finished – VPX killed (player overheated)")
                         return
                 except Exception as e:
                     log(self.cfg, f"[CHALLENGE] heat tick failed: {e}", "WARN")
@@ -4309,6 +4309,14 @@ class Watcher:
 
         ch = getattr(self, "challenge", {}) or {}
         is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")
+
+        # Heat challenge: game ending normally (without overheating) means the player WON.
+        # heat_failed is set when VPX was killed because heat reached 100 %.
+        if is_challenge and str(ch.get("kind", "")).lower() == "heat":
+            if not ch.get("heat_failed") and not ch.get("completed"):
+                ch["completed"] = True
+                self.challenge = ch
+
         ch_aborted = is_challenge and not ch.get("completed", False)
 
         if is_challenge:
@@ -4338,7 +4346,10 @@ class Watcher:
             
             if ch_aborted:
                 try:
-                    self.bridge.challenge_info_show.emit("Challenge Aborted!", 3, "#FF3B30")
+                    if str(ch.get("kind", "")).lower() == "heat" and ch.get("heat_failed"):
+                        self.bridge.challenge_info_show.emit("OVERHEATED! Challenge Failed!", 3, "#FF3B30")
+                    else:
+                        self.bridge.challenge_info_show.emit("Challenge Aborted!", 3, "#FF3B30")
                 except Exception: pass
                 try:
                     self.bridge.challenge_lost.emit(1, 0.0)  # attempts=1 (not tracked), margin_pct=0.0 (no goal score)
