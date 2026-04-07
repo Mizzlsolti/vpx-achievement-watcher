@@ -34,6 +34,16 @@ _DUEL_FAST_RECHECK_INTERVAL_MS = 12_000
 _DUEL_FAST_RECHECK_COOLDOWN_S = 12
 
 
+def _get_duel_table_display(duel, watcher=None) -> str:
+    """Get a clean display name for a duel's table (strips version + parenthetical)."""
+    romnames = getattr(watcher, "ROMNAMES", {}) or {}
+    raw_name = romnames.get(duel.table_rom) or duel.table_name or duel.table_rom
+    table_display = _strip_version_from_name(raw_name)
+    if "(" in table_display:
+        table_display = table_display[:table_display.index("(")].strip()
+    return table_display or duel.table_rom
+
+
 # ---------------------------------------------------------------------------
 # Floating duel invitation overlay (shown when GUI is minimized / in systray)
 # ---------------------------------------------------------------------------
@@ -514,9 +524,9 @@ class DuelsMixin:
             self._fetch_duel_opponents()
 
         # ── Polling timers ───────────────────────────────────────────────────
-        # Poll for incoming invitations every 15 seconds (cloud only).
+        # Poll for incoming invitations every 5 seconds (cloud only).
         self._duel_poll_timer = QTimer(self)
-        self._duel_poll_timer.setInterval(15_000)
+        self._duel_poll_timer.setInterval(5_000)
         self._duel_poll_timer.timeout.connect(self._poll_duel_invitations)
         dnd = bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False))
         if getattr(self.cfg, "CLOUD_ENABLED", False) and not dnd:
@@ -528,9 +538,9 @@ class DuelsMixin:
         self._duel_expiry_timer.timeout.connect(self._check_duel_expiry)
         self._duel_expiry_timer.start()
 
-        # Periodic refresh of inbox and active duels tables every 15 seconds.
+        # Periodic refresh of inbox and active duels tables every 5 seconds.
         self._duel_refresh_timer = QTimer(self)
-        self._duel_refresh_timer.setInterval(15_000)
+        self._duel_refresh_timer.setInterval(5_000)
         self._duel_refresh_timer.timeout.connect(self._periodic_duel_refresh)
         if getattr(self.cfg, "CLOUD_ENABLED", False):
             self._duel_refresh_timer.start()
@@ -538,9 +548,8 @@ class DuelsMixin:
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
         self._duel_recheck_cooldown: dict = {}
 
-        # Duel session tracking: start timestamp and baseline score.
+        # Duel session tracking: start timestamp.
         self._duel_session_start_ts: float = 0.0
-        self._duel_baseline_score: int = 0
 
         # Initial populate.
         self._refresh_invitation_inbox()
@@ -673,11 +682,28 @@ class DuelsMixin:
              and (e.get("has_map") or e.get("cat_enabled", False))),
             key=lambda e: e.get("title", e.get("rom", "")).lower(),
         )
+        # Detect duplicate clean names and add author suffix to disambiguate.
+        from collections import Counter as _Counter
+        def _clean_base(title: str) -> str:
+            s = _strip_version_from_name(title)
+            if "(" in s:
+                s = s[:s.index("(")].strip()
+            return s
+        base_name_counts = _Counter(
+            _clean_base(e.get("title") or e.get("rom", "")) for e in entries
+        )
         for entry in entries:
             title = entry.get("title") or entry.get("rom", "")
             rom = entry.get("rom", "")
-            clean_title = _strip_version_from_name(title)
-            display = clean_title
+            clean_title = _clean_base(title)
+            if base_name_counts[clean_title] > 1:
+                raw = entry.get("title") or ""
+                author = ""
+                if "(" in raw and ")" in raw:
+                    author = raw[raw.index("(") + 1:raw.rindex(")")].strip()
+                display = f"{clean_title} ({author})" if author else clean_title
+            else:
+                display = clean_title
             self._cmb_duel_table.addItem(display, rom)
         if not entries:
             # Fallback: use vps_id_mapping.json (always present if the user has
@@ -832,6 +858,19 @@ class DuelsMixin:
                 players = []
                 for pid in other_ids:
                     name = names_map.get(pid, "").strip()
+                    if not name:
+                        # Fallback: search active duel records for this player's name.
+                        try:
+                            active_duels = self._duel_engine.get_active_duels()
+                            for d in active_duels:
+                                if d.challenger == pid and d.challenger_name:
+                                    name = d.challenger_name
+                                    break
+                                elif d.opponent == pid and d.opponent_name:
+                                    name = d.opponent_name
+                                    break
+                        except Exception:
+                            pass
                     if name and name != "Player":
                         players.append((name, pid))
                 players.sort(key=lambda x: x[0].lower())
@@ -923,6 +962,21 @@ class DuelsMixin:
             self._lbl_duel_status.setText("⚠️ Cloud Sync is disabled. Enable it in System → General.")
             self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
             return
+
+        # Check that opponent has the same table installed (by VPS-ID).
+        try:
+            from core.cloud_sync import CloudSync as _CS
+            my_vps_id = _vps_mapping.get(table_rom.lower().strip(), "")
+            if my_vps_id:
+                opp_mapping = _CS.fetch_node(self.cfg, f"players/{opponent_id}/vps_mapping")
+                if isinstance(opp_mapping, dict):
+                    opp_vps_ids = set(opp_mapping.values())
+                    if my_vps_id not in opp_vps_ids:
+                        self._lbl_duel_status.setText("⚠️ Opponent does not have this table installed.")
+                        self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+                        return
+        except Exception:
+            pass
 
         duel_or_error = self._duel_engine.send_invitation(opponent_id, table_rom, table_name,
                                                            opponent_name=opponent_name,
@@ -1243,7 +1297,7 @@ class DuelsMixin:
         duel_id : str
             The duel that was completed.
         result : str
-            'won', 'lost', or 'expired'.
+            'won', 'lost', 'tie', or 'expired'.
         your_score : int
             Your final score.
         their_score : int
@@ -1277,6 +1331,9 @@ class DuelsMixin:
             elif result == "lost":
                 msg = f"💀 DUEL LOST. You: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#CC2200"
+            elif result == "tie":
+                msg = f"🤝 TIE! You: {your_score:,} vs Opponent: {their_score:,}"
+                color = "#FF7F00"
             else:
                 msg = "⏰ Duel expired \u2014 no response received."
                 color = "#888888"
@@ -1338,15 +1395,32 @@ class DuelsMixin:
         enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
         self.cfg.OVERLAY["duels_do_not_disturb"] = bool(enabled)
         self.cfg.save()
+        # Upload DND status to cloud so opponents know not to invite us.
+        try:
+            if getattr(self.cfg, "CLOUD_ENABLED", False):
+                from core.cloud_sync import CloudSync
+                my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+                if my_id:
+                    CloudSync.set_node(self.cfg, f"players/{my_id}/achievements/duels_dnd", bool(enabled))
+        except Exception:
+            pass
         if enabled:
             try:
                 self._duel_poll_timer.stop()
+            except Exception:
+                pass
+            try:
+                self._duel_refresh_timer.stop()
             except Exception:
                 pass
         else:
             if getattr(self.cfg, "CLOUD_ENABLED", False):
                 try:
                     self._duel_poll_timer.start()
+                except Exception:
+                    pass
+                try:
+                    self._duel_refresh_timer.start()
                 except Exception:
                     pass
 
@@ -1372,6 +1446,17 @@ class DuelsMixin:
             changed_duels = self._duel_engine.sync_active_duel_states()
             from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
             if new_duels:
+                # If automatch widget is searching, stop it (received invitation = match found by other side).
+                try:
+                    from PyQt6.QtCore import QMetaObject, Qt as _Qt
+                    aw = getattr(self, "_automatch_widget", None)
+                    if aw is not None and getattr(aw, "_searching", False):
+                        QMetaObject.invokeMethod(
+                            aw, "_on_stop_clicked",
+                            _Qt.ConnectionType.QueuedConnection,
+                        )
+                except Exception:
+                    pass
                 for duel in new_duels:
                     QMetaObject.invokeMethod(
                         self, "_on_duel_invitation_received",
@@ -1397,7 +1482,7 @@ class DuelsMixin:
                 )
                 has_history_change = any(
                     d.status in (DuelStatus.DECLINED, DuelStatus.EXPIRED, DuelStatus.CANCELLED,
-                                 DuelStatus.WON, DuelStatus.LOST)
+                                 DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE)
                     for d in changed_duels
                 )
                 if has_history_change:
@@ -1407,13 +1492,13 @@ class DuelsMixin:
                     )
                 for duel in changed_duels:
                     if duel.status == DuelStatus.ACCEPTED:
-                        msg = f"✅ '{duel.opponent_name or 'Opponent'}' accepted your duel on {duel.table_name or duel.table_rom}!"
+                        msg = f"✅ '{duel.opponent_name or 'Opponent'}' accepted your duel on {_get_duel_table_display(duel)}!"
                         color = "#00E500"
                     elif duel.status == DuelStatus.DECLINED:
-                        msg = f"❌ '{duel.opponent_name or 'Opponent'}' declined your duel on {duel.table_name or duel.table_rom}."
+                        msg = f"❌ '{duel.opponent_name or 'Opponent'}' declined your duel on {_get_duel_table_display(duel)}."
                         color = "#CC0000"
                     elif duel.status == DuelStatus.EXPIRED:
-                        msg = f"⏰ Your duel invitation on {duel.table_name or duel.table_rom} expired (not accepted)."
+                        msg = f"⏰ Your duel invitation on {_get_duel_table_display(duel)} expired (not accepted)."
                         color = "#888888"
                     elif duel.status == DuelStatus.CANCELLED:
                         # Reset duel-active flag on watcher regardless of game state so
@@ -1424,7 +1509,7 @@ class DuelsMixin:
                                 w.duel_active_for_current_table = False
                         except Exception:
                             pass
-                        msg = f"🚫 Your duel on {duel.table_name or duel.table_rom} was cancelled."
+                        msg = f"🚫 Your duel on {_get_duel_table_display(duel)} was cancelled."
                         color = "#888888"
                     else:
                         continue
@@ -1441,10 +1526,17 @@ class DuelsMixin:
 
     @pyqtSlot()
     def _periodic_duel_refresh(self) -> None:
-        """Periodically refresh inbox and active duels tables (every 15 seconds)."""
+        """Periodically refresh inbox, active duels, history, and global feed tables (every 5 seconds)."""
         try:
             self._refresh_invitation_inbox()
             self._refresh_active_duels()
+            self._refresh_duel_history()
+        except Exception:
+            pass
+        try:
+            feed = getattr(self, "_global_feed_widget", None)
+            if feed is not None:
+                feed.refresh()
         except Exception:
             pass
 
@@ -1531,7 +1623,7 @@ class DuelsMixin:
             tbl.setItem(row, 0, QTableWidgetItem(duel.challenger_name or duel.challenger))
 
             # Table column.
-            tbl.setItem(row, 1, QTableWidgetItem(duel.table_name or duel.table_rom))
+            tbl.setItem(row, 1, QTableWidgetItem(_get_duel_table_display(duel, getattr(self, "watcher", None))))
 
             # Received column (YYYY-MM-DD HH:MM).
             received = datetime.fromtimestamp(duel.created_at).strftime("%Y-%m-%d %H:%M") if duel.created_at else "—"
@@ -1608,7 +1700,7 @@ class DuelsMixin:
             tbl.setItem(row, 0, QTableWidgetItem(opp_name))
 
             # Table name column.
-            tbl.setItem(row, 1, QTableWidgetItem(duel.table_name or duel.table_rom))
+            tbl.setItem(row, 1, QTableWidgetItem(_get_duel_table_display(duel, getattr(self, "watcher", None))))
 
             # Status with colored indicator.
             status_map = {
@@ -1696,7 +1788,7 @@ class DuelsMixin:
             tbl.setItem(row, 0, QTableWidgetItem(opp_name))
 
             # Table name with optional ℹ️ info badge.
-            table_display = duel.table_name or duel.table_rom
+            table_display = _get_duel_table_display(duel, getattr(self, "watcher", None))
             try:
                 from .vps import _load_vps_mapping, CloudProgressVpsInfoDialog
                 vps_mapping = _load_vps_mapping(self.cfg)
@@ -1735,6 +1827,7 @@ class DuelsMixin:
             result_map = {
                 DuelStatus.WON:       ("🏆 Won",        "#00AA00"),
                 DuelStatus.LOST:      ("💀 Lost",        "#AA0000"),
+                DuelStatus.TIE:       ("🤝 Tie",         "#888888"),
                 DuelStatus.EXPIRED:   ("⏰ Expired",     "#666666"),
                 DuelStatus.DECLINED:  ("❌ Declined",    "#666666"),
                 DuelStatus.CANCELLED: ("🚫 Cancelled",   "#666666"),
@@ -1802,6 +1895,31 @@ class DuelsMixin:
         if not matching:
             return
 
+        # Track how many times each duel has been started; abort on restart.
+        if not hasattr(self, "_duel_games_played"):
+            self._duel_games_played = {}
+        for duel in list(matching):
+            count = self._duel_games_played.get(duel.duel_id, 0) + 1
+            self._duel_games_played[duel.duel_id] = count
+            if count > 1:
+                try:
+                    self._duel_engine.abort_duel(duel.duel_id, reason="multiple_restarts")
+                except Exception:
+                    pass
+                try:
+                    w = getattr(self, "watcher", None)
+                    if w:
+                        w.bridge.duel_info_show.emit(
+                            "⚠️ Duel aborted: VPX restarted during active duel. Only one attempt allowed!",
+                            8, "#FF3B30",
+                        )
+                except Exception:
+                    pass
+                matching = [d for d in matching if d.duel_id != duel.duel_id]
+
+        if not matching:
+            return
+
         # Flag the watcher so achievements/overlay are suppressed this session.
         try:
             w = getattr(self, "watcher", None)
@@ -1828,7 +1946,11 @@ class DuelsMixin:
 
         def _show_duel_start_notify():
             try:
-                self._get_mini_overlay().show_info(msg, seconds=6, color_hex="#FF7F00")
+                w = getattr(self, "watcher", None)
+                if w:
+                    w.bridge.duel_info_show.emit(msg, 6, "#FF7F00")
+                else:
+                    self._get_mini_overlay().show_info(msg, seconds=6, color_hex="#FF7F00")
             except Exception:
                 pass
 
@@ -1847,20 +1969,8 @@ class DuelsMixin:
 
             QTimer.singleShot(250, _retry)
 
-        # Capture session start timestamp and baseline NVRAM highscore.
+        # Capture session start timestamp.
         self._duel_session_start_ts = time.time()
-        try:
-            w = getattr(self, "watcher", None)
-            baseline = 0
-            if w:
-                baseline = int(getattr(w, "current_highscore", 0) or 0)
-                if baseline <= 0:
-                    baseline = int(getattr(w, "last_session_score", 0) or 0)
-            self._duel_baseline_score = baseline
-            from core.watcher_core import log as _log
-            _log(self.cfg, f"[DUEL] Baseline score captured for {rom}: {baseline}")
-        except Exception:
-            self._duel_baseline_score = 0
 
     # ── Session-ended hook: submit duel scores ─────────────────────────────────
 
@@ -1917,18 +2027,6 @@ class DuelsMixin:
                     score = int(getattr(w, "current_highscore", 0) or 0)
         except Exception:
             pass
-
-        baseline = getattr(self, "_duel_baseline_score", 0)
-        if score <= baseline:
-            for duel in matching:
-                try:
-                    self._duel_engine.abort_duel(duel.duel_id, reason="no_score_improvement")
-                except Exception:
-                    pass
-            self._duel_notify("⚠️ Duel aborted: No score improvement detected.", "#FFAA00", 8)
-            self._notify_trophies_duel_aborted()
-            self._refresh_active_duels()
-            return
 
         # ── Valid session → submit score ────────────────────────────────────
         for duel in matching:
@@ -2043,6 +2141,9 @@ class DuelsMixin:
                     if result == "won":
                         res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#00CC44"
+                    elif result == "tie":
+                        res_msg = f"🤝 TIE! You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_color = "#FF7F00"
                     else:
                         res_msg = f"💀 DUEL LOST. You: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#CC2200"

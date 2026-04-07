@@ -1094,6 +1094,11 @@ class OverlayPagesMixin:
         if "opponent_name" in result:
             # Match found → enter MATCH_FOUND state
             self._overlay_page6_stop_timers()
+            # Leave the matchmaking queue now that a match was found.
+            duel_engine = getattr(self, "_duel_engine", None)
+            if duel_engine is not None:
+                import threading as _threading
+                _threading.Thread(target=duel_engine.leave_matchmaking, daemon=True).start()
             self._p6_state         = "MATCH_FOUND"
             self._p6_opponent_name = result.get("opponent_name", "")
             raw_table              = result.get("table_name", "")

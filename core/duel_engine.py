@@ -29,6 +29,7 @@ class DuelStatus:
     ACTIVE    = "active"
     WON       = "won"
     LOST      = "lost"
+    TIE       = "tie"
     DRAW      = "draw"
     EXPIRED   = "expired"
     DECLINED  = "declined"
@@ -551,14 +552,12 @@ class DuelEngine:
             both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED
                               and duel.opponent_score != SCORE_NOT_SUBMITTED)
             if both_submitted:
-                # Challenger advantage on tie: challenger wins if scores are equal.
                 if duel.challenger_score > duel.opponent_score:
                     result = DuelStatus.WON if is_challenger else DuelStatus.LOST
                 elif duel.challenger_score < duel.opponent_score:
                     result = DuelStatus.LOST if is_challenger else DuelStatus.WON
                 else:
-                    # Tie: challenger gets the edge (home-field advantage rule).
-                    result = DuelStatus.WON if is_challenger else DuelStatus.LOST
+                    result = DuelStatus.TIE
             else:
                 # Score not yet available from the other side – mark ACTIVE and wait.
                 duel.status = DuelStatus.ACTIVE
@@ -577,7 +576,11 @@ class DuelEngine:
         log(self._cfg, f"[DUEL] Duel {duel_id} result: {result} (challenger={duel.challenger_score}, opponent={duel.opponent_score})")
 
         try:
-            sound.play("duel_won" if result == DuelStatus.WON else "duel_lost")
+            if result == DuelStatus.WON:
+                sound.play("duel_won")
+            elif result == DuelStatus.LOST:
+                sound.play("duel_lost")
+            # TIE: no specific sound
         except Exception:
             pass
 
@@ -729,11 +732,13 @@ class DuelEngine:
                     changed.append(duel)
                     log(self._cfg, f"[DUEL] Duel {duel.duel_id} {cloud_status} by '{duel.opponent_name or 'opponent'}'.")
 
-                elif cloud_status in (DuelStatus.WON, DuelStatus.LOST):
+                elif cloud_status in (DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE):
                     ch_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
                     op_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
                     is_challenger = (duel.challenger == my_id)
-                    if ch_score >= op_score:
+                    if ch_score == op_score:
+                        correct_status = DuelStatus.TIE
+                    elif ch_score > op_score:
                         correct_status = DuelStatus.WON if is_challenger else DuelStatus.LOST
                     else:
                         correct_status = DuelStatus.LOST if is_challenger else DuelStatus.WON

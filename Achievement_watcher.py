@@ -147,6 +147,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.session_ended.connect(self._on_session_ended_duels)
         self.bridge.session_started.connect(self._on_session_started_duels)
         self.bridge.duel_result.connect(self._on_duel_result)
+        self.bridge.duel_info_show.connect(self._on_duel_info_show)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -339,6 +340,22 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             return bool(w and (w.game_active or w._vp_player_visible()))
         except Exception:
             return False
+
+    @pyqtSlot(str, int, str)
+    def _on_duel_info_show(self, message: str, seconds: int = 6, color_hex: str = "#FF7F00") -> None:
+        """Show an in-game duel notification as a standalone overlay window over VPX."""
+        try:
+            if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
+                from ui.overlay import MiniInfoOverlay
+                self._mini_overlay = MiniInfoOverlay(self)
+            self._mini_overlay.show_info(message, seconds=seconds, color_hex=color_hex)
+            try:
+                from ui.overlay_base import _force_topmost
+                _force_topmost(self._mini_overlay)
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     def _player_is_visible(self) -> bool:
         """Strict check: True only when the VPX Player window is visible (not just the editor)."""

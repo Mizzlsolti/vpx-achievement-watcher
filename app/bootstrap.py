@@ -30,6 +30,7 @@ class Bridge(QObject):
     duel_accepted = pyqtSignal(str)              # (duel_id)
     duel_result = pyqtSignal(str, str, int, int) # (duel_id, result, your_score, their_score)
     duel_expired = pyqtSignal(str)               # (duel_id)
+    duel_info_show = pyqtSignal(str, int, str)   # (message, seconds, color_hex)
 
 
 def _authors_match(script_authors: list, vps_table: dict) -> bool:
