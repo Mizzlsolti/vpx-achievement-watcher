@@ -317,7 +317,7 @@ class ChallengesMixin:
     def _open_challenge_select_overlay(self):
         if self._challenge_is_active():
             return
-        if not self._in_game_now():
+        if not self._player_is_visible():
             try:
                 self.bridge.challenge_info_show.emit(
                     "Challenge can only be started in-game.",
@@ -676,7 +676,7 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        if not self._in_game_now():
+        if not self._player_is_visible():
             # If a duel invite notification is showing in the mini overlay, ignore
             # the hotkey — Left/Right handle accept/decline directly.
             try:
@@ -1066,6 +1066,16 @@ class ChallengesMixin:
         try:
             msg_lower = str(message or "").lower()
             col = str(color_hex or "").upper()
+            # Suppress stale "Challenge Aborted!" notifications that arrive while a
+            # new challenge is already active (e.g. from the previous session end
+            # being queued just before the new challenge start signals fired).
+            if "aborted" in msg_lower:
+                try:
+                    ch = getattr(self.watcher, "challenge", {}) or {}
+                    if ch.get("active"):
+                        return
+                except Exception:
+                    pass
             if "challenge complete" in msg_lower or "time's up" in msg_lower:
                 sound.play_sound(self.cfg, "challenge_complete")
             elif col == "#FF3B30" or "aborted" in msg_lower or "fail" in msg_lower:

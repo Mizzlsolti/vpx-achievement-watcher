@@ -810,38 +810,28 @@ class FlipDifficultyOverlay(_OverlayFxMixin, QWidget):
         hint_gap = max(4, int(round(8 * factor)))
         inner_pad = max(6, int(round(12 * factor)))
 
-        # Measure the actual text widths of every option (name + "N flips") so
-        # box_w is guaranteed to be wide enough to show all labels without clipping.
         n = max(1, len(self._options))
-        flips_pt = scaled_body_pt
-        name_pt_check = scaled_body_pt + 2  # selected boxes use the +2 variant
-        fm_name_check = QFontMetrics(QFont(font_family, name_pt_check, QFont.Weight.Bold))
-        fm_flips_check = QFontMetrics(QFont(font_family, flips_pt))
-        max_text_w = 60
-        for _nm, _fl in self._options:
-            _fl_int = int(_fl)
-            max_text_w = max(max_text_w, fm_name_check.horizontalAdvance(_nm))
-            if _fl_int != -1:
-                max_text_w = max(max_text_w, fm_flips_check.horizontalAdvance(f"{_fl_int} flips"))
-        box_w = max_text_w + 2 * inner_pad
 
-        # Derive the canvas width from the measured box_w so every box fits.
+        # Fix window size to exactly match ChallengeSelectOverlay so both menus
+        # appear at the same size on screen.
         total_spacing = spacing * (n - 1)
-        w = max(300, n * box_w + total_spacing + 2 * pad_lr)
+        w = max(280, int(round(520 * factor)))
+        h = max(110, int(round(200 * factor)))
         avail_w = w - 2 * pad_lr
 
-        # Measure title height with word-wrap before creating the image so the
-        # image can be sized to fit the content rather than using a fixed height.
+        # Derive box_w from the fixed available width so the boxes always fill
+        # the overlay dynamically regardless of how many options there are.
+        box_w = max(40, (avail_w - total_spacing) // n)
+
+        # Measure title height with word-wrap for layout calculations.
         title = "Flip Challenge – Choose difficulty"
         title_font_pt = scaled_body_pt + 6
         flags_center_wrap = int(Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextWordWrap)
         _fm_title_pre = QFontMetrics(QFont(font_family, title_font_pt, QFont.Weight.Bold))
         t_h = _fm_title_pre.boundingRect(QRect(0, 0, avail_w, 10000), flags_center_wrap, title).height()
 
-        # box_h is also used when rendering the individual difficulty boxes below.
-        box_h = max(50, int(round(100 * factor)))
-        h_needed = top_pad + t_h + gap_title_desc + box_h + hint_gap + hint_line_h + bottom_pad
-        h = max(130, max(int(round(240 * factor)), h_needed))
+        # box_h fills whatever vertical space remains after the title and hint rows.
+        box_h = max(40, h - top_pad - t_h - gap_title_desc - hint_gap - hint_line_h - bottom_pad)
 
         img = QImage(w, h, QImage.Format.Format_ARGB32_Premultiplied)
         img.fill(Qt.GlobalColor.transparent)

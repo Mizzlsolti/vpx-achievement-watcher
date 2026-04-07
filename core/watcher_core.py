@@ -4387,7 +4387,7 @@ class Watcher:
         # 2. DELAY NUR BEI ERFOLG (Verhindert langes Warten beim manuellen Abbruch)
         if is_challenge and not ch_aborted:
             try:
-                delay_ms = int((self.cfg.OVERLAY or {}).get("ch_finalize_delay_ms", 2000))
+                delay_ms = int((self.cfg.OVERLAY or {}).get("ch_finalize_delay_ms", 500))
                 if delay_ms > 0:
                     time.sleep(max(0.0, delay_ms / 1000.0))
             except Exception:
