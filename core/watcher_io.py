@@ -467,7 +467,6 @@ def _is_secure_path(path: str) -> bool:
 
     Protected categories:
     - Achievement state (achievements_state.json)
-    - Challenge result history (session_stats/challenges/history/*.json)
     - Session summary data (session_stats/Highlights/*.summary.json)
     - Active player session state (session_stats/Highlights/activePlayers/*.json)
     """
@@ -480,10 +479,6 @@ def _is_secure_path(path: str) -> bool:
 
     # Achievement state – the main persisted achievement/progress store
     if p.endswith("achievements_state.json"):
-        return True
-
-    # Challenge result history – local score/result records per ROM
-    if "/session_stats/challenges/history/" in p:
         return True
 
     # Session summary files – per-session result snapshots used for display and uploads

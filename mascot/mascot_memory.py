@@ -172,14 +172,6 @@ _STREAK_ACH_POSITIVE: list[str] = [
     "{count} achievements in a row without a dry session! HOT streak!",
     "Achievements in {count} straight sessions! You are on fire!",
 ]
-_STREAK_CHALLENGE_WIN: list[str] = [
-    "{wins} challenge wins in a row! Who CAN stop you?",
-    "{wins}-win challenge streak! They fear you now!",
-]
-_STREAK_CHALLENGE_LOSE: list[str] = [
-    "{losses} challenge losses in a row… the comeback story is being written!",
-    "Rough patch in challenges ({losses} losses), but you keep showing up!",
-]
 
 # -- Player-comparison -------------------------------------------------------
 _COMPARE_BETTER_THAN_AVG: list[str] = [
@@ -448,9 +440,6 @@ class MascotMemorySystem:
         # Achievement-session streak
         self.current_ach_streak: int = 0         # consecutive sessions with ≥1 ach
 
-        # Challenge streak (signed: positive = win streak, negative = loss streak)
-        self.challenge_streak: int = 0
-
         # Table completion data {rom: {"unlocked": int, "total": int}}
         self.table_completion: dict[str, dict[str, int]] = {}
 
@@ -497,7 +486,6 @@ class MascotMemorySystem:
             self.current_daily_streak    = int(d.get("current_daily_streak", 0))
             self.best_daily_streak       = int(d.get("best_daily_streak", 0))
             self.current_ach_streak      = int(d.get("current_ach_streak", 0))
-            self.challenge_streak        = int(d.get("challenge_streak", 0))
             self.table_completion        = d.get("table_completion", {})
             self.table_last_played       = d.get("table_last_played", {})
             self.cloud_rank              = int(d.get("cloud_rank", 0))
@@ -523,7 +511,6 @@ class MascotMemorySystem:
                 "current_daily_streak":    self.current_daily_streak,
                 "best_daily_streak":       self.best_daily_streak,
                 "current_ach_streak":      self.current_ach_streak,
-                "challenge_streak":        self.challenge_streak,
                 "table_completion":        self.table_completion,
                 "table_last_played":       self.table_last_played,
                 "cloud_rank":              self.cloud_rank,
@@ -818,37 +805,11 @@ class MascotMemorySystem:
 
     def get_streak_comment(self) -> Optional[str]:
         """Return a streak-related comment, or ``None`` if nothing notable."""
-        # Challenge streaks
-        if self._mem:
-            wins_total  = self._mem.challenge_wins
-            losses_total = self._mem.challenge_losses
-        else:
-            wins_total = losses_total = 0
-
-        if self.challenge_streak >= 3:
-            return _pick(_STREAK_CHALLENGE_WIN, wins=self.challenge_streak)
-        if self.challenge_streak <= -3:
-            return _pick(_STREAK_CHALLENGE_LOSE, losses=abs(self.challenge_streak))
-
         # Daily streak milestone
         streak = self.current_daily_streak
         if streak in (3, 7, 14, 30, 60, 100):
             return _pick(_STREAK_DAILY_POSITIVE, days=streak)
 
-        return None
-
-    def on_challenge_result(self, won: bool) -> Optional[str]:
-        """Update challenge streak and return a comment if notable."""
-        if won:
-            self.challenge_streak = max(0, self.challenge_streak) + 1
-        else:
-            self.challenge_streak = min(0, self.challenge_streak) - 1
-        self.save()
-
-        if won and self.challenge_streak in (3, 5, 10):
-            return _pick(_STREAK_CHALLENGE_WIN, wins=self.challenge_streak)
-        if not won and self.challenge_streak in (-3, -5, -10):
-            return _pick(_STREAK_CHALLENGE_LOSE, losses=abs(self.challenge_streak))
         return None
 
     # ── 6. Social / Leaderboard ────────────────────────────────────────────────

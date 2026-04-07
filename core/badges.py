@@ -222,59 +222,6 @@ def _gather_badge_stats(cfg: "AppConfig", state: dict, watcher=None, rarity_cach
     stats["mfr_roms"] = mfr_roms
     stats["num_manufacturers"] = len(mfr_roms)
 
-    # Challenge counts
-    try:
-        history_dir = os.path.join(cfg.BASE, "session_stats", "challenges", "history")
-        challenge_counts: dict = {}  # kind -> count
-        roms_with_challenges: dict = {}  # rom -> set of challenge kinds
-        total_challenges = 0
-        if os.path.isdir(history_dir):
-            for fname in os.listdir(history_dir):
-                if not fname.endswith(".json"):
-                    continue
-                fpath = os.path.join(history_dir, fname)
-                try:
-                    hist = secure_load_json(fpath, {}) or {}
-                    for entry in (hist.get("results") or []):
-                        kind = str(entry.get("kind") or "").lower()
-                        rom = str(entry.get("rom") or "")
-                        if kind:
-                            challenge_counts[kind] = challenge_counts.get(kind, 0) + 1
-                            total_challenges += 1
-                        if kind and rom:
-                            roms_with_challenges.setdefault(rom, set()).add(kind)
-                except Exception:
-                    continue
-        stats["challenge_counts"] = challenge_counts
-        stats["total_challenges"] = total_challenges
-        stats["roms_with_all_3_challenges"] = any(
-            len(kinds) >= 3 for kinds in roms_with_challenges.values()
-        )
-        # Check for Pro Flip (target_flips <= 100)
-        has_flip_pro = False
-        if os.path.isdir(history_dir):
-            for fname in os.listdir(history_dir):
-                if not fname.endswith(".json") or has_flip_pro:
-                    continue
-                fpath = os.path.join(history_dir, fname)
-                try:
-                    hist = secure_load_json(fpath, {}) or {}
-                    for entry in (hist.get("results") or []):
-                        if str(entry.get("kind") or "").lower() == "flip":
-                            tf = int(entry.get("target_flips") or 0)
-                            diff = str(entry.get("difficulty") or "").lower()
-                            if tf <= 100 and tf > 0 or diff == "pro":
-                                has_flip_pro = True
-                                break
-                except Exception:
-                    continue
-        stats["has_flip_pro"] = has_flip_pro
-    except Exception:
-        stats["challenge_counts"] = {}
-        stats["total_challenges"] = 0
-        stats["roms_with_all_3_challenges"] = False
-        stats["has_flip_pro"] = False
-
     # Playtime from session stats txt/json files
     try:
         playtime_sec = 0
@@ -411,12 +358,12 @@ BADGE_CHECKS = {
     "three_stars":      lambda s: s["prestige"] >= 3,
     "four_stars":       lambda s: s["prestige"] >= 4,
     "five_stars":       lambda s: s["fully_maxed"],
-    "challenger":       lambda s: s["total_challenges"] >= 1,
-    "timed_10":         lambda s: s["challenge_counts"].get("timed", 0) >= 10,
-    "flip_pro":         lambda s: s["has_flip_pro"],
-    "heat_10":          lambda s: s["challenge_counts"].get("heat", 0) >= 10,
-    "triple_threat":    lambda s: s["roms_with_all_3_challenges"],
-    "challenge_50":     lambda s: s["total_challenges"] >= 50,
+    "challenger":       lambda s: False,
+    "timed_10":         lambda s: False,
+    "flip_pro":         lambda s: False,
+    "heat_10":          lambda s: False,
+    "triple_threat":    lambda s: False,
+    "challenge_50":     lambda s: False,
     "explorer":         lambda s: len(s["roms_played"]) >= 10,
     "globetrotter":     lambda s: s["num_manufacturers"] >= 5,
     "bally_fan":        lambda s: len(s["mfr_roms"].get("Bally", set())) >= 5,

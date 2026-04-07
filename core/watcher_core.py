@@ -35,8 +35,7 @@ from .input_hook import (
 
 from .config import (
     AppConfig, DEFAULT_OVERLAY, DEFAULT_LOG_SUPPRESS,
-    CHALLENGES_ENABLED, VK_LSHIFT, VK_RSHIFT,
-    HEAT_HOLD_RATE, HEAT_PRESS_BURST, HEAT_COOLDOWN_RATE,
+    VK_LSHIFT, VK_RSHIFT,
     EXCLUDED_FIELDS, EXCLUDED_FIELDS_LC, is_excluded_field,
     p_maps, p_local_maps, p_session, p_highlights, p_achievements,
     p_rom_spec, f_global_ach, f_achievements_state, f_log, f_index,
@@ -199,7 +198,6 @@ class Watcher:
         # In-memory cache of the last overlay snapshot payload (avoids disk read race)
         self._overlay_snapshot_cache: Optional[dict] = None
 
-        self._flip_init_state()
         self._toasted_titles: set = set()
 
     def _map_fields_for_rom(self, rom: str) -> list[str]:
@@ -229,68 +227,6 @@ class Watcher:
             uniq.append(x)
         return uniq
 
-    def _flip_init_state(self):
-        self._flip = {
-            "active": False,
-            "threshold": 500,
-            "left": 0,
-            "right": 0,
-            "vk_left": 0,
-            "vk_right": 0,
-            "joy_left": 0,
-            "joy_right": 0,
-            "started_at": 0.0,
-        }
-        self._flip_inputs = {
-            "kbd": None,
-            "joy_running": False,
-            "joy_thread": None,
-            "joy_prev_masks": {},
-        }
-        self._heat_inputs = {
-            "joy_running": False,
-            "joy_thread": None,
-        }
-
-    def start_challenge_input_bindings(self) -> None:
-
-        if getattr(self, "_ch_inputs", None) and self._ch_inputs.get("running"):
-            return
-        debounce_ms = int((self.cfg.OVERLAY or {}).get("ch_hotkey_debounce_ms", 120))
-        self._ch_inputs = {
-            "running": True,
-            "active_source": None, 
-            "nav_enabled": False,
-            "last_press_ts": 0.0,
-            "debounce_s": max(0.01, debounce_ms / 1000.0),
-            "joy_running": False,
-            "joy_last": 0,
-            "kbd": None,
-            "joy_thread": None,
-        }
-        try:
-            hot_vk = int((self.cfg.OVERLAY or {}).get("challenge_hotkey_vk", 0x7A))
-            left_vk = int((self.cfg.OVERLAY or {}).get("challenge_left_vk", 0x25))
-            right_vk = int((self.cfg.OVERLAY or {}).get("challenge_right_vk", 0x27))
-            kb_bindings = [
-                {"get_vk": lambda hv=hot_vk: hv, "on_press": lambda: self._on_challenge_hotkey_press("keyboard")},
-                {"get_vk": lambda lv=left_vk: lv, "on_press": lambda: self._on_challenge_nav_left("keyboard")},
-                {"get_vk": lambda rv=right_vk: rv, "on_press": lambda: self._on_challenge_nav_right("keyboard")},
-            ]
-            self._ch_inputs["kbd"] = GlobalKeyHook(kb_bindings)
-            self._ch_inputs["kbd"].install()
-            log(self.cfg, "[CH-INPUT] Global keyboard hook installed for challenge controls")
-        except Exception as e:
-            log(self.cfg, f"[CH-INPUT] Keyboard hook install failed: {e}", "WARN")
-        try:
-            self._ch_inputs["joy_running"] = True
-            t = threading.Thread(target=self._joystick_poll_loop, daemon=True, name="ChallengeJoyPoll")
-            self._ch_inputs["joy_thread"] = t
-            t.start()
-            log(self.cfg, "[CH-INPUT] Joystick polling started for challenge controls")
-        except Exception as e:
-            log(self.cfg, f"[CH-INPUT] Joystick thread start failed: {e}", "WARN")
- 
     def _player_balls_count(self, pid: int) -> int:
         try:
             balls = self.ball_track.get("balls", []) or []
@@ -298,94 +234,6 @@ class Watcher:
         except Exception:
             return 0
             
-    def _alt_f4_visual_pinball_player(self, wait_ms: int = 3000) -> bool:
-        try:
-            import ctypes, time
-            from ctypes import wintypes
-            import win32gui, win32con, win32api
-            pids = set()
-            hwnds = []
-            def _cb(hwnd, _):
-                try:
-                    if not win32gui.IsWindowVisible(hwnd):
-                        return True
-                    title = (win32gui.GetWindowText(hwnd) or "").strip()
-                    if title.startswith("Visual Pinball Player"):
-                        hwnds.append(hwnd)
-                        pid = wintypes.DWORD(0)
-                        ctypes.windll.user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
-                        if pid.value:
-                            pids.add(int(pid.value))
-                except Exception:
-                    pass
-                return True
-            win32gui.EnumWindows(_cb, None)
-            if not hwnds:
-                return True  
-            VK_MENU = 0x12   
-            VK_F4 = 0x73
-            KEYEVENTF_KEYUP = 0x0002
-            for hwnd in hwnds:
-                try:
-                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                    time.sleep(0.05)
-                    try:
-                        win32gui.SetForegroundWindow(hwnd)
-                    except Exception:
-                        try:
-                            fg = win32gui.GetForegroundWindow()
-                            tid1 = ctypes.windll.user32.GetWindowThreadProcessId(fg, None)
-                            tid2 = ctypes.windll.user32.GetWindowThreadProcessId(hwnd, None)
-                            ctypes.windll.user32.AttachThreadInput(tid1, tid2, True)
-                            win32gui.SetForegroundWindow(hwnd)
-                            ctypes.windll.user32.AttachThreadInput(tid1, tid2, False)
-                        except Exception:
-                            pass
-                    time.sleep(0.05)
-                    win32api.keybd_event(VK_MENU, 0, 0, 0)
-                    time.sleep(0.01)
-                    win32api.keybd_event(VK_F4, 0, 0, 0)
-                    time.sleep(0.02)
-                    win32api.keybd_event(VK_F4, 0, KEYEVENTF_KEYUP, 0)
-                    time.sleep(0.01)
-                    win32api.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
-                    time.sleep(0.05)
-                except Exception:
-                    continue
-            k32 = ctypes.windll.kernel32
-            SYNCHRONIZE = 0x00100000
-            handles = []
-            for pid in pids:
-                try:
-                    h = k32.OpenProcess(SYNCHRONIZE, False, int(pid))
-                    if h:
-                        handles.append(h)
-                except Exception:
-                    pass
-            if handles:
-                arr_type = wintypes.HANDLE * len(handles)
-                arr = arr_type(*handles)
-                k32.WaitForMultipleObjects(len(handles), arr, True, int(wait_ms))
-                for h in handles:
-                    try:
-                        k32.CloseHandle(h)
-                    except Exception:
-                        pass
-            else:
-                time.sleep(min(1.0, wait_ms / 1000.0))
-            still = []
-            try:
-                out = subprocess.check_output(["tasklist"], creationflags=0x08000000).decode(errors="ignore").lower()
-                for pid in pids:
-                    if str(pid) in out:
-                        still.append(pid)
-            except Exception:
-                pass
-
-            return len(still) == 0
-        except Exception:
-            return False
- 
     def _base_map_exists(self, rom: str) -> bool:
 
         if not rom:
@@ -505,17 +353,13 @@ class Watcher:
                     except Exception:
                         return
                     if _vpx_window_visible():
-                        if getattr(self, "challenge", {}).get("suppress_big_overlay_once", False):
-                            return
-                        if getattr(self, "challenge", {}).get("active", False):
-                            return
                         if rom:
                             msg = f"No NVRAM map found for ROM '{identifier}'."
                         else:
                             msg = f"No NVRAM map for '{identifier}'. Use AWEditor for custom achievements."
                         dur = max(3, int(seconds))
                         try:
-                            self.bridge.challenge_info_show.emit(msg, dur, "#FF3B30")
+                            self.bridge.mini_info_show.emit(msg, dur)
                             shown.add(identifier)
                             self._mini_info_shown_for_rom = shown
                             log(self.cfg, f"[INFO] Mini overlay (no map) shown for {identifier!r}")
@@ -587,20 +431,11 @@ class Watcher:
                     # Don't abort on game_active=False – short sessions would never see the
                     # notification because game_active can become False before the VPX window
                     # is detected by the poll.  Only _stop (watcher shutdown) should abort.
-                    # Don't show while a challenge is active; the challenge start
-                    # message would appear before this notification otherwise.
-                    try:
-                        if getattr(self, "challenge", {}).get("suppress_big_overlay_once", False):
-                            return
-                        if getattr(self, "challenge", {}).get("active", False):
-                            return
-                    except Exception:
-                        pass
                     if _vpx_window_visible():
                         msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
                         dur = max(5, int(seconds))
                         try:
-                            self.bridge.challenge_info_show.emit(msg, dur, "#FF7F00")
+                            self.bridge.mini_info_show.emit(msg, dur)
                             shown.add(rom)
                             self._mini_info_vps_shown_for_rom = shown
                             log(self.cfg, f"[INFO] Mini overlay (no VPS-ID) shown for {rom}")
@@ -773,39 +608,7 @@ class Watcher:
                     "condition": cond,
                 })
 
-        # --- Challenge-based global achievements ---
-        CHALLENGE_ACHIEVEMENTS = [
-            # Timed challenges
-            {"title": "Complete Your First Timed Challenge",  "challenge_type": "timed", "min": 1},
-            {"title": "Complete 5 Timed Challenges",          "challenge_type": "timed", "min": 5},
-            {"title": "Complete 10 Timed Challenges",         "challenge_type": "timed", "min": 10},
-            {"title": "Complete 25 Timed Challenges",         "challenge_type": "timed", "min": 25},
-            {"title": "Complete 50 Timed Challenges",         "challenge_type": "timed", "min": 50},
-            # Flip challenges
-            {"title": "Complete Your First Flip Challenge",   "challenge_type": "flip",  "min": 1},
-            {"title": "Complete 5 Flip Challenges",           "challenge_type": "flip",  "min": 5},
-            {"title": "Complete 10 Flip Challenges",          "challenge_type": "flip",  "min": 10},
-            {"title": "Complete 25 Flip Challenges",          "challenge_type": "flip",  "min": 25},
-            {"title": "Complete 50 Flip Challenges",          "challenge_type": "flip",  "min": 50},
-            # Heat challenges
-            {"title": "Complete Your First Heat Challenge",   "challenge_type": "heat",  "min": 1},
-            {"title": "Complete 5 Heat Challenges",           "challenge_type": "heat",  "min": 5},
-            {"title": "Complete 10 Heat Challenges",          "challenge_type": "heat",  "min": 10},
-            {"title": "Complete 25 Heat Challenges",          "challenge_type": "heat",  "min": 25},
-            {"title": "Complete 50 Heat Challenges",          "challenge_type": "heat",  "min": 50},
-        ]
-        for ach in CHALLENGE_ACHIEVEMENTS:
-            rules.append({
-                "title": ach["title"],
-                "scope": "global",
-                "condition": {
-                    "type": "challenge_count",
-                    "challenge_type": ach["challenge_type"],
-                    "min": ach["min"],
-                },
-            })
-
-        return rules        
+        return rules
             
     def _ensure_rom_specific(self, rom: str, audits: dict):
         if not rom or not audits:
@@ -1768,865 +1571,6 @@ class Watcher:
             return rect["x"], rect["y"], rect["w"], rect["h"]
         return None
 
-    def _graceful_close_visual_pinball_player(self, wait_ms: int = 2500) -> bool:   
-        try:
-            import ctypes
-            from ctypes import wintypes
-            WM_CLOSE = 0x0010
-            try:
-                import win32gui
-            except Exception:
-                win32gui = None
-
-            if not win32gui:
-                return False
-            pids = set()
-
-            def _cb(hwnd, _):
-                try:
-                    if not win32gui.IsWindowVisible(hwnd):
-                        return True
-                    title = win32gui.GetWindowText(hwnd) or ""
-                    if title.startswith("Visual Pinball Player"):
-                        try:
-                            ctypes.windll.user32.PostMessageW(wintypes.HWND(hwnd), WM_CLOSE, 0, 0)
-                        except Exception:
-                            pass
-                        pid = wintypes.DWORD(0)
-                        ctypes.windll.user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
-                        if pid.value:
-                            pids.add(int(pid.value))
-                except Exception:
-                    pass
-                return True
-            win32gui.EnumWindows(_cb, None)
-            if not pids:
-                return True 
-            k32 = ctypes.windll.kernel32
-            SYNCHRONIZE = 0x00100000
-            handles = []
-            for pid in pids:
-                try:
-                    h = k32.OpenProcess(SYNCHRONIZE, False, int(pid))
-                    if h:
-                        handles.append(h)
-                except Exception:
-                    pass
-            if not handles:
-                import time as _time
-                _time.sleep(min(1.0, wait_ms / 1000.0))
-            else:
-                arr_type = wintypes.HANDLE * len(handles)
-                arr = arr_type(*handles)
-                k32.WaitForMultipleObjects(len(handles), arr, True, int(wait_ms))
-                for h in handles:
-                    try:
-                        k32.CloseHandle(h)
-                    except Exception:
-                        pass
-            try:
-                still = []
-                out = subprocess.check_output(
-                    ["tasklist"], creationflags=0x08000000
-                ).decode(errors="ignore").lower()
-                for pid in pids:
-                    if str(pid) in out:
-                        still.append(pid)
-                return len(still) == 0
-            except Exception:
-                return False
-        except Exception:
-            return False
-            
-    def _kill_vpx_process(self):
-        try:
-            import ctypes, subprocess, time
-            from ctypes import wintypes
-            try:
-                self._alt_f4_visual_pinball_player(wait_ms=800)
-            except Exception as e:
-                log(self.cfg, f"[CHALLENGE] Alt+F4 path failed: {e}", "WARN")
-
-            try:
-                import win32gui, win32con
-                def _cb(hwnd, _):
-                    try:
-                        if not win32gui.IsWindowVisible(hwnd):
-                            return True
-                        title = (win32gui.GetWindowText(hwnd) or "").strip()
-                        if title.startswith("Visual Pinball Player") or title.startswith("Visual Pinball - ["):
-                            try:
-                                win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-                    return True
-                win32gui.EnumWindows(_cb, None)
-            except Exception:
-                pass
-
-            try:
-                deadline = time.time() + 1.8
-                while time.time() < deadline:
-                    out = subprocess.check_output(["tasklist"], creationflags=0x08000000).decode(errors="ignore").lower()
-                    if "vpinball" not in out:
-                        log(self.cfg, "[CHALLENGE] VPX closed via Alt+F4 + WM_CLOSE")
-                        return
-                    time.sleep(0.15)
-            except Exception:
-                pass
-
-            try:
-                for img in ("VPinballX64.exe", "VPinballX.exe", "VPinballX_GL.exe", "VPinball.exe", "B2SBackglassServerEXE.exe"):
-                    try:
-                        subprocess.run(
-                            ["taskkill", "/IM", img, "/T", "/F"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            creationflags=0x08000000
-                        )
-                    except Exception:
-                        continue
-            except Exception:
-                pass
-            log(self.cfg, "[CHALLENGE] WARNING: fallback hard kill executed", "WARN")
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] _kill_vpx_process failed: {e}", "WARN")
-
-
-    def start_timed_challenge(self, total_seconds: int = 190):
-        try:
-            if not self.game_active or not self.current_rom:
-                log(self.cfg, "[CHALLENGE] timed: ignored (no active game)", "WARN")
-                return
-            if getattr(self, "duel_active_for_current_table", False):
-                log(self.cfg, "[CHALLENGE] timed: blocked — duel active for current table", "WARN")
-                return
-            ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active"):
-                log(self.cfg, "[CHALLENGE] timed: another challenge already active – ignored", "WARN")
-                return
-            warmup = 10
-            total = max(1, int(total_seconds))
-            countdown = max(1, total - warmup)
-            ch.clear()
-            ch.update({
-                "active": True,
-                "kind": "timed",
-                "rom": self.current_rom,
-                "table": self.current_table,
-                "started_at": time.time(),
-                "end_at": time.time() + total,
-                "pending_kill_at": None,
-                "suppress_big_overlay_once": True,
-            })
-            self.challenge = ch
-            try:
-                self.bridge.challenge_warmup_show.emit(warmup, "Timed challenge – warm-up")
-                self.bridge.challenge_timer_start.emit(total)
-            except Exception:
-                pass
-            log(self.cfg, f"[CHALLENGE] timed armed – warmup={warmup}s, countdown={countdown}s (total={total}s)")
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] timed start failed: {e}", "WARN")
-
-    def stop_timed_challenge(self):      
-        ch = getattr(self, "challenge", {})
-        if ch.get("kind") == "timed":
-            ch["active"] = False
-            self.challenge = ch
-            try:
-                self.bridge.challenge_timer_stop.emit()
-            except Exception:
-                pass
-            log(self.cfg, "[CHALLENGE] timed stopped")
-
-    def _flip_start_inputs(self):
-        ini = get_vpx_ini_path_for_current_user()
-        binds = parse_vpx_flipper_bindings(ini or "")
-        self._flip["vk_left"] = int(binds.get("vk_left", 0) or 0)
-        self._flip["vk_right"] = int(binds.get("vk_right", 0) or 0)
-        self._flip["joy_left"] = int(binds.get("joy_left", 0) or 0)
-        self._flip["joy_right"] = int(binds.get("joy_right", 0) or 0)
-        try:
-            kbs = []
-            if self._flip["vk_left"]:
-                kbs.append({"get_vk": lambda: self._flip["vk_left"], "on_press": lambda: self._flip_on_kbd_press("L")})
-            if self._flip["vk_right"]:
-                kbs.append({"get_vk": lambda: self._flip["vk_right"], "on_press": lambda: self._flip_on_kbd_press("R")})
-            if kbs:
-                self._flip_inputs["kbd"] = GlobalKeyHook(kbs)
-                self._flip_inputs["kbd"].install()
-                log(self.cfg, "[FLIP] Keyboard hook installed for flipper keys")
-        except Exception as e:
-            log(self.cfg, f"[FLIP] Keyboard hook failed: {e}", "WARN")
-        try:
-            self._flip_inputs["joy_running"] = True
-            t = threading.Thread(target=self._flip_joy_poll_loop, daemon=True, name="FlipJoyPoll")
-            self._flip_inputs["joy_thread"] = t
-            t.start()
-            log(self.cfg, "[FLIP] Joystick polling started for flipper buttons")
-        except Exception as e:
-            log(self.cfg, f"[FLIP] Joystick thread start failed: {e}", "WARN")
-
-    def _flip_stop_inputs(self):
-        try:
-            self._flip_inputs["joy_running"] = False
-        except Exception:
-            pass
-        try:
-            t = self._flip_inputs.get("joy_thread")
-            if t is not None and t.is_alive():
-                t.join(timeout=0.5)
-        except Exception:
-            pass
-        try:
-            if self._flip_inputs.get("kbd"):
-                self._flip_inputs["kbd"].uninstall()
-        except Exception:
-            pass
-        self._flip_inputs["kbd"] = None
-        self._flip_inputs["joy_thread"] = None
-        self._flip_inputs["joy_prev_masks"] = {}
-
-    def _flip_on_kbd_press(self, side: str):
-        try:
-            self._flip_inc(side)
-        except Exception:
-            pass
-
-    def _flip_joy_poll_loop(self):
-        want_left = int(self._flip.get("joy_left", 0) or 0)
-        want_right = int(self._flip.get("joy_right", 0) or 0)
-
-        def bit_for(btn: int) -> int:
-            return (1 << (int(btn) - 1)) if int(btn) > 0 else 0
-
-        bit_left = bit_for(want_left)
-        bit_right = bit_for(want_right)
-        jix = JOYINFOEX()
-        jix.dwSize = ctypes.sizeof(JOYINFOEX)
-        jix.dwFlags = JOY_RETURNALL
-        prev = self._flip_inputs.get("joy_prev_masks", {}) or {}
-        while bool(self._flip_inputs.get("joy_running", False)):
-            mask_all = 0
-            for jid in range(16):
-                try:
-                    if _joyGetPosEx(jid, ctypes.byref(jix)) == JOYERR_NOERROR:
-                        cur = int(jix.dwButtons)
-                        old = int(prev.get(jid, 0))
-                        newly = cur & ~old
-                        prev[jid] = cur
-                        if newly:
-                            if bit_left and (newly & bit_left):
-                                self._flip_inc("L")
-                            if bit_right and (newly & bit_right):
-                                self._flip_inc("R")
-                except Exception:
-                    continue
-            self._flip_inputs["joy_prev_masks"] = prev
-            time.sleep(0.04)
-            
-    def _flip_inc(self, side: str):
-        if not self._flip.get("active"):
-            return
-
-        if side == "L":
-            self._flip["left"] = int(self._flip.get("left", 0)) + 1
-        elif side == "R":
-            self._flip["right"] = int(self._flip.get("right", 0)) + 1
-        left = int(self._flip.get("left", 0))
-        right = int(self._flip.get("right", 0))
-        total = left + right
-        goal_total = int(self._flip.get("threshold", (self.cfg.OVERLAY or {}).get("flip_counter_goal_total", 400)))
-        remaining = max(0, int(goal_total) - int(total))
-        try:
-            self.bridge.flip_counter_total_update.emit(int(total), int(remaining), int(goal_total))
-        except Exception:
-            pass
-        if total >= int(goal_total):
-            self._flip_check()
-
-    def _flip_check(self):
-        if not self._flip.get("active"):
-            return
-        try:
-            audits_now = None
-            try:
-                audits_now, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
-            except Exception:
-                audits_now = None
-            if audits_now:
-                try:
-                    self._last_audits_global = dict(audits_now)
-                except Exception:
-                    pass
-                try:
-                    duration_now = int(time.time() - (self.start_time or time.time()))
-                    self.export_overlay_snapshot(audits_now, duration_now, on_demand=True)
-                except Exception:
-                    pass
-                ch = getattr(self, "challenge", {}) or {}
-                ch["prekill_end"] = dict(audits_now)
-                self.challenge = ch
-            try:
-                self._kill_vpx_process()
-            except Exception:
-                pass
-
-            ch = getattr(self, "challenge", {}) or {}
-            ch["active"] = False
-            ch["pending_kill_at"] = None
-            ch["completed"] = True 
-            self.challenge = ch
-            log(self.cfg, "[CHALLENGE] flip finished – Alt+F4 + WM_CLOSE executed")
-        except Exception as e:
-            log(self.cfg, f"[FLIP] finalize failed: {e}", "WARN")
-        finally:
-            try:
-                self.bridge.flip_counter_total_hide.emit()
-            except Exception:
-                pass
-            self._flip_stop_inputs()
-
-    def start_flip_challenge(self, threshold: int = 500):
-        try:
-            if not self.game_active or not self.current_rom:
-                log(self.cfg, "[CHALLENGE] flip: ignored (no active game)", "WARN")
-                return
-            if getattr(self, "duel_active_for_current_table", False):
-                log(self.cfg, "[CHALLENGE] flip: blocked — duel active for current table", "WARN")
-                return
-
-            ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active"):
-                log(self.cfg, "[CHALLENGE] flip: another challenge already active – ignored", "WARN")
-                return
-
-            goal_total = int(threshold or (self.cfg.OVERLAY or {}).get("flip_counter_goal_total", 400))
-            self._flip["active"] = True
-            self._flip["threshold"] = max(1, int(goal_total))
-            self._flip["left"] = 0
-            self._flip["right"] = 0
-            self._flip["started_at"] = time.time()
-
-            # Single-player enforced
-            try:
-                if self.snapshot_mode:
-                    self.snap_players_in_game = 1
-                    self.snap_players_locked = True
-                    self.current_player = 1
-                    self._cp_rotate_lock_until = time.time() + 36000.0
-            except Exception:
-                pass
-
-            ch.clear()
-            ch.update({
-                "active": True,
-                "kind": "flip",
-                "rom": self.current_rom,
-                "table": self.current_table,
-                "started_at": time.time(),
-                "end_at": None,
-                "pending_kill_at": None,
-                "suppress_big_overlay_once": True,
-                "threshold": int(goal_total), 
-            })
-            self.challenge = ch
-
-            try:
-                self.bridge.challenge_info_show.emit(
-                    f"Flip Challenge – Total Goal: {int(goal_total)}", 4, "#FFFFFF"
-                )
-                self.bridge.challenge_speak.emit("Flip challenge armed")
-            except Exception:
-                pass
-
-            try:
-                self.bridge.flip_counter_total_show.emit(0, int(goal_total), int(goal_total))
-            except Exception:
-                pass
-
-            self._flip_start_inputs()
-            log(self.cfg, f"[CHALLENGE] flip armed – total goal={int(goal_total)} (single-player enforced)")
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] flip start failed: {e}", "WARN")
-
-    def stop_flip_challenge(self):
-        try:
-            self._flip_stop_inputs()
-        except Exception:
-            pass
-        try:
-            self._flip["active"] = False
-        except Exception:
-            pass
-        try:
-            self.bridge.flip_counter_total_hide.emit()
-        except Exception:
-            pass
-
-        ch = getattr(self, "challenge", {}) or {}
-        if ch.get("kind") == "flip":
-            ch["active"] = False
-            ch["pending_kill_at"] = None
-            self.challenge = ch
-            log(self.cfg, "[CHALLENGE] flip stopped")
-
-    def start_heat_challenge(self):
-        try:
-            if not self.game_active or not self.current_rom:
-                log(self.cfg, "[CHALLENGE] heat: ignored (no active game)", "WARN")
-                return
-            if getattr(self, "duel_active_for_current_table", False):
-                log(self.cfg, "[CHALLENGE] heat: blocked — duel active for current table", "WARN")
-                return
-
-            ch = getattr(self, "challenge", {}) or {}
-            if ch.get("active"):
-                log(self.cfg, "[CHALLENGE] heat: another challenge already active – ignored", "WARN")
-                return
-
-            # Single-player enforced
-            try:
-                if self.snapshot_mode:
-                    self.snap_players_in_game = 1
-                    self.snap_players_locked = True
-                    self.current_player = 1
-                    self._cp_rotate_lock_until = time.time() + 36000.0
-            except Exception:
-                pass
-
-            ini = get_vpx_ini_path_for_current_user()
-            binds = parse_vpx_flipper_bindings(ini or "")
-            vk_left = int(binds.get("vk_left", 0) or 0) or VK_LSHIFT
-            vk_right = int(binds.get("vk_right", 0) or 0) or VK_RSHIFT
-            joy_left = int(binds.get("joy_left", 0) or 0)
-            joy_right = int(binds.get("joy_right", 0) or 0)
-
-            ch.clear()
-            ch.update({
-                "active": True,
-                "kind": "heat",
-                "rom": self.current_rom,
-                "table": self.current_table,
-                "started_at": time.time(),
-                "end_at": None,
-                "pending_kill_at": None,
-                "suppress_big_overlay_once": True,
-                "heat": 0.0,
-                "heat_last_time": time.time(),
-                "heat_prev_pressed": False,
-                "vk_left": vk_left,
-                "vk_right": vk_right,
-                "joy_left": joy_left,
-                "joy_right": joy_right,
-                "joy_pressed": False,
-            })
-            self.challenge = ch
-
-            try:
-                self._heat_inputs["joy_running"] = True
-                t = threading.Thread(target=self._heat_joy_poll_loop, daemon=True, name="HeatJoyPoll")
-                self._heat_inputs["joy_thread"] = t
-                t.start()
-                log(self.cfg, "[HEAT] Joystick polling started for flipper held-state")
-            except Exception as e:
-                log(self.cfg, f"[HEAT] Joystick thread start failed: {e}", "WARN")
-
-            try:
-                self.bridge.challenge_info_show.emit("Heat Challenge – Don't overheat!", 4, "#FF7F00")
-                self.bridge.challenge_speak.emit("Heat challenge armed")
-            except Exception:
-                pass
-
-            try:
-                self.bridge.heat_bar_show.emit()
-            except Exception:
-                pass
-
-            log(self.cfg, "[CHALLENGE] heat armed – keep flippers cool!")
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] heat start failed: {e}", "WARN")
-
-    def stop_heat_challenge(self):
-        try:
-            self._heat_inputs["joy_running"] = False
-        except Exception:
-            pass
-        try:
-            t = self._heat_inputs.get("joy_thread")
-            if t and t.is_alive():
-                t.join(timeout=0.5)
-        except Exception:
-            pass
-        self._heat_inputs["joy_thread"] = None
-        ch = getattr(self, "challenge", {})
-        if ch.get("kind") == "heat":
-            ch["active"] = False
-            self.challenge = ch
-            try:
-                self.bridge.heat_bar_hide.emit()
-            except Exception:
-                pass
-            log(self.cfg, "[CHALLENGE] heat stopped")
-
-    def _heat_joy_poll_loop(self):
-        """Background thread: poll joystick held-state for the Heat Challenge."""
-        try:
-            ch = getattr(self, "challenge", {}) or {}
-            want_left = int(ch.get("joy_left", 0) or 0)
-            want_right = int(ch.get("joy_right", 0) or 0)
-
-            def bit_for(btn: int) -> int:
-                return (1 << (int(btn) - 1)) if int(btn) > 0 else 0
-
-            bit_left = bit_for(want_left)
-            bit_right = bit_for(want_right)
-
-            if not bit_left and not bit_right:
-                return  # no joystick bindings – nothing to poll
-
-            jix = JOYINFOEX()
-            jix.dwSize = ctypes.sizeof(JOYINFOEX)
-            jix.dwFlags = JOY_RETURNALL
-
-            while bool(self._heat_inputs.get("joy_running", False)):
-                held = False
-                for jid in range(16):
-                    try:
-                        if _joyGetPosEx(jid, ctypes.byref(jix)) == JOYERR_NOERROR:
-                            cur = int(jix.dwButtons)
-                            if (bit_left and (cur & bit_left)) or (bit_right and (cur & bit_right)):
-                                held = True
-                                break
-                    except Exception:
-                        continue
-                ch = getattr(self, "challenge", {}) or {}
-                if ch.get("kind") == "heat" and ch.get("active"):
-                    ch["joy_pressed"] = held
-                    self.challenge = ch
-                else:
-                    break
-                time.sleep(0.1)
-        except Exception as e:
-            log(self.cfg, f"[HEAT] joy poll loop failed: {e}", "WARN")
-
-    def _challenge_tick(self, audits: dict):
-        try:
-            ch = getattr(self, "challenge", {}) or {}
-            if not ch or not ch.get("active"):
-                return
-            now = time.time()
-
-            if not self._vp_player_visible():
-                # Grace Period: erst nach 3s Unsichtbarkeit abbrechen
-                grace_start = float(ch.get("_vpx_gone_since", 0.0))
-                if grace_start == 0.0:
-                    ch["_vpx_gone_since"] = now
-                    self.challenge = ch
-                    return  # noch NICHT abbrechen
-                elif (now - grace_start) < 3.0:
-                    return  # noch innerhalb Grace Period
-                # Ab hier: VPX war > 3s nicht sichtbar → jetzt abbrechen
-                log(self.cfg, "[CHALLENGE] VPX Player window gone for >3s. Aborting challenge.")
-                kind = str(ch.get("kind", "")).lower()
-                
-                if kind == "timed":
-                    self.stop_timed_challenge()
-                elif kind == "flip":
-                    self.stop_flip_challenge()
-                elif kind == "heat":
-                    self.stop_heat_challenge()
-                else:
-                    try:
-                        self.bridge.challenge_timer_stop.emit()
-                        self.bridge.flip_counter_total_hide.emit()
-                    except Exception:
-                        pass
-                    
-                ch["active"] = False
-                ch["pending_kill_at"] = None
-                ch.pop("_vpx_gone_since", None)
-                self.challenge = ch
-                return
-            else:
-                # VPX ist sichtbar → Grace-Timer zurücksetzen
-                if ch.get("_vpx_gone_since"):
-                    ch.pop("_vpx_gone_since", None)
-                    self.challenge = ch
-
-            if ch.get("kind") == "timed":
-                end_at = float(ch.get("end_at", 0.0) or 0.0)
-                if now >= end_at:
-                    try:
-                        time.sleep(0.15)
-                    except Exception:
-                        pass
-                    audits_now = audits
-                    try:
-                        audits_now2, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
-                        if audits_now2:
-                            audits_now = audits_now2
-                    except Exception:
-                        pass
-                    if audits_now:
-                        try:
-                            self._last_audits_global = dict(audits_now)
-                        except Exception:
-                            pass
-                        try:
-                            duration_now = int(now - (self.start_time or now))
-                            self.export_overlay_snapshot(audits_now, duration_now, on_demand=True)
-                        except Exception:
-                            pass
-                        ch["prekill_end"] = dict(audits_now)
-                        self.challenge = ch
-
-                    # 3) VPX schließen
-                    try:
-                        self._kill_vpx_process()
-                    except Exception:
-                        pass
-
-                    ch["active"] = False
-                    ch["pending_kill_at"] = None
-                    ch["completed"] = True 
-                    self.challenge = ch
-                    log(self.cfg, "[CHALLENGE] timed finished – Alt+F4 + WM_CLOSE executed")
-                    return
-
-            if ch.get("kind") == "heat":
-                try:
-                    now_t = time.time()
-                    last_t = float(ch.get("heat_last_time", now_t) or now_t)
-                    delta = min(now_t - last_t, 1.5)
-                    ch["heat_last_time"] = now_t
-
-                    vk_l = int(ch.get("vk_left", 0) or 0) or VK_LSHIFT
-                    vk_r = int(ch.get("vk_right", 0) or 0) or VK_RSHIFT
-                    try:
-                        import ctypes as _ctypes
-                        lshift = bool(_ctypes.windll.user32.GetAsyncKeyState(vk_l) & 0x8000)
-                        rshift = bool(_ctypes.windll.user32.GetAsyncKeyState(vk_r) & 0x8000)
-                    except Exception:
-                        lshift = False
-                        rshift = False
-
-                    joy_held = bool(ch.get("joy_pressed", False))
-                    pressed = lshift or rshift or joy_held
-                    prev_pressed = bool(ch.get("heat_prev_pressed", False))
-                    heat = float(ch.get("heat", 0.0) or 0.0)
-
-                    if pressed:
-                        heat += HEAT_HOLD_RATE * delta
-                        if pressed and not prev_pressed:
-                            heat += HEAT_PRESS_BURST
-                    else:
-                        heat -= HEAT_COOLDOWN_RATE * delta
-
-                    heat = max(0.0, min(100.0, heat))
-                    ch["heat"] = heat
-                    ch["heat_prev_pressed"] = pressed
-                    self.challenge = ch
-
-                    try:
-                        self.bridge.heat_bar_update.emit(int(heat))
-                    except Exception:
-                        pass
-
-                    if heat >= 100.0:
-                        log(self.cfg, "[CHALLENGE] heat reached 100% – killing VPX")
-                        audits_now = audits
-                        try:
-                            audits_now2, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
-                            if audits_now2:
-                                audits_now = audits_now2
-                        except Exception:
-                            pass
-                        if audits_now:
-                            try:
-                                self._last_audits_global = dict(audits_now)
-                            except Exception:
-                                pass
-                            try:
-                                duration_now = int(now - (self.start_time or now))
-                                self.export_overlay_snapshot(audits_now, duration_now, on_demand=True)
-                            except Exception:
-                                pass
-                            ch["prekill_end"] = dict(audits_now)
-
-                        try:
-                            self._kill_vpx_process()
-                        except Exception:
-                            pass
-
-                        ch["active"] = False
-                        ch["pending_kill_at"] = None
-                        ch["heat_failed"] = True
-                        self.challenge = ch
-
-                        try:
-                            self._heat_inputs["joy_running"] = False
-                        except Exception:
-                            pass
-                        try:
-                            self.bridge.heat_bar_hide.emit()
-                        except Exception:
-                            pass
-                        log(self.cfg, "[CHALLENGE] heat finished – VPX killed (player overheated)")
-                        return
-                except Exception as e:
-                    log(self.cfg, f"[CHALLENGE] heat tick failed: {e}", "WARN")
-
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] tick failed: {e}", "WARN")
- 
-    def _challenge_best_final_score(self, end_audits: dict, pid: int = 1) -> int:
-        # Single-player only
-        try:
-            v = self._find_score_from_audits(end_audits, pid=pid)
-            if v > 0:
-                return v
-
-            # Check prekill_end snapshot captured before VPX was killed
-            ch = getattr(self, "challenge", {}) or {}
-            pre = ch.get("prekill_end")
-            if isinstance(pre, dict):
-                pv = self._find_score_from_audits(pre, pid=pid)
-                if pv > 0:
-                    return pv
-
-            cache = getattr(self, "_last_audits_global", {}) or {}
-            cv = self._find_score_from_audits(cache, pid=pid)
-            if cv > 0:
-                return cv
-
-            balls = (self.ball_track or {}).get("balls", []) or []
-            if balls:
-                best_ball = max(balls, key=lambda b: (int(b.get("score", 0)), int(b.get("duration", 0))))
-                bv = int(best_ball.get("score", 0) or 0)
-                if bv > 0:
-                    return bv
-        except Exception:
-            pass
-        return 0
-
-    def _inject_best_score_for_timed(self, end_audits: dict) -> dict:
-        try:
-            ch = getattr(self, "challenge", {}) or {}
-            if str(ch.get("kind", "")).lower() != "timed":
-                return dict(end_audits or {})
-
-            ea = dict(end_audits or {})
-            best = self._challenge_best_final_score(ea, pid=1)
-            if best > 0:
-                ea["P1 Score"] = best
-                log(self.cfg, f"[CHALLENGE] timed: injected best P1 Score={best}")
-            return ea
-        except Exception:
-            return dict(end_audits or {})
-            
-    def _challenge_record_result(self, kind: str, end_audits: dict, duration_sec: int):
-        try:
-            ch = getattr(self, "challenge", {}) or {}
-
-            if not ch.get("completed", False):
-                log(self.cfg, f"[CHALLENGE] Aborted early by player. Score NOT recorded/uploaded.")
-                return
-
-            now = time.time()
-            started_at = float(ch.get("started_at", now))
-            if (now - started_at) < 2.0:
-                return
-
-            if ch.get("result_recorded"):
-                return
-
-            rom = ch.get("rom") or self.current_rom or ""
-            key = f"{rom}|{str(kind or '').lower()}"
-
-            last = getattr(self, "_ch_result_recent", {"k": "", "ts": 0.0})
-            if last.get("k") == key and (now - float(last.get("ts", 0.0))) < 5.0:
-                return
-            self._ch_result_recent = {"k": key, "ts": now}
-
-            if not rom:
-                return
-
-            table = ch.get("table") or self.current_table or ""
-            try:
-                score = int(self._challenge_best_final_score(end_audits, pid=1) or 0)
-            except Exception:
-                score = 0
-
-            payload = {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "kind": str(kind or ""),
-                "rom": rom,
-                "table": table,
-                "duration_sec": int(duration_sec or 0),
-                "score": int(score)
-            }
-
-            extra = {}
-            if str(kind or "").lower() == "flip":
-                tf = int(ch.get("threshold", 0))
-                payload["target_flips"] = tf
-                
-                if tf <= 100: diff_name = "Pro"
-                elif tf <= 200: diff_name = "Difficult"
-                elif tf <= 300: diff_name = "Medium"
-                elif tf <= 400: diff_name = "Easy"
-                else: diff_name = f"{tf} Flips"
-                
-                payload["difficulty"] = diff_name
-                extra = {"target_flips": tf, "difficulty": diff_name}
-
-            out_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
-            ensure_dir(out_dir)
-            path = os.path.join(out_dir, f"{sanitize_filename(rom)}.json")
-            hist = secure_load_json(path, {"results": []}) or {"results": []}
-            hist.setdefault("results", []).append(payload)
-            secure_save_json(path, hist)
-
-            # Re-evaluate challenge_count achievements immediately after recording
-            try:
-                self._evaluate_challenge_count_achievements()
-            except Exception:
-                pass
-
-            from .cloud_sync import CloudSync
-            CloudSync.upload_score(self.cfg, kind, rom, int(score), extra, bridge=self.bridge)
-            
-            ch["result_recorded"] = True
-            self.challenge = ch
-
-            try:
-                phrase = f"{str(kind or '').capitalize()} challenge finished."
-                self.bridge.challenge_speak.emit(phrase)
-            except Exception:
-                pass
-            try:
-                score_txt = f"{int(score):,d}".replace(",", ".")
-                if str(kind or "").lower() == "timed":
-                    title = "TIME'S UP!"
-                else:
-                    title = "CHALLENGE COMPLETE!"
-                self.bridge.challenge_info_show.emit(f"{title}<br>Score: {score_txt}", 8, "#FFFFFF")
-            except Exception as e:
-                log(self.cfg, f"[CHALLENGE] score overlay emit failed: {e}", "WARN")
-
-            try:
-                deadline = time.time() + 3.0
-                while self._vp_player_visible() and time.time() < deadline:
-                    time.sleep(0.1)
-            except Exception:
-                pass
-
-        except Exception as e:
-            log(self.cfg, f"[CHALLENGE] record result failed: {e}", "WARN")
-                
     @staticmethod
     def _is_number(x):
         try:
@@ -3586,30 +2530,6 @@ class Watcher:
                             awarded_meta.append({"title": title, "origin": origin})
                             log(self.cfg, f"[GLOBAL_ACH] rom_multi_brand triggered: '{title}' ({progress}/{need} brands played)")
 
-                elif rtype == "challenge_count":
-                    state = _rom_state()
-                    already_global = {
-                        str(e.get("title", "")).strip()
-                        for entries in state.get("global", {}).values()
-                        for e in entries
-                    }
-                    challenge_type = str(cond.get("challenge_type") or "").lower()
-                    need = int(cond.get("min", 1))
-                    count = self._count_completed_challenges(challenge_type)
-                    # Update tally for progress display (batched save at end)
-                    state.setdefault("global_tally", {})[title] = {"progress": count}
-                    _rom_state_dirty = True
-                    if count >= need:
-                        if title in already_global:
-                            if title not in seen_rt:
-                                retriggered_meta.append({"title": title, "origin": origin})
-                                seen_rt.add(title)
-                        elif title not in seen_aw:
-                            awarded.append(title)
-                            seen_aw.add(title)
-                            awarded_meta.append({"title": title, "origin": origin})
-                            log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
-
             except Exception:
                 continue
 
@@ -3622,70 +2542,6 @@ class Watcher:
 
         return awarded, all_titles, awarded_meta, retriggered_meta
         
-    def _count_completed_challenges(self, challenge_type: str) -> int:
-        """Count completed challenges of a given type from the challenge history folder."""
-        count = 0
-        history_dir = os.path.join(self.cfg.BASE, "session_stats", "challenges", "history")
-        if not os.path.isdir(history_dir):
-            return 0
-        try:
-            for fname in os.listdir(history_dir):
-                if not fname.endswith(".json"):
-                    continue
-                fpath = os.path.join(history_dir, fname)
-                try:
-                    hist = secure_load_json(fpath, {}) or {}
-                    for entry in (hist.get("results") or []):
-                        if str(entry.get("kind") or "").lower() == challenge_type:
-                            count += 1
-                except Exception:
-                    continue
-        except Exception:
-            pass
-        return count
-
-    def _evaluate_challenge_count_achievements(self):
-        """Evaluate challenge_count global achievements and award any newly reached ones."""
-        try:
-            gp = f_global_ach(self.cfg)
-            if not os.path.exists(gp):
-                return
-            data = load_json(gp, {}) or {}
-            rules = [r for r in (data.get("rules") or []) if isinstance(r, dict)]
-            state = self._ach_state_load()
-            already_global = {
-                str(e.get("title", "")).strip()
-                for entries in state.get("global", {}).values()
-                for e in entries
-            }
-            awarded_meta = []
-            for rule in rules:
-                cond = (rule.get("condition") or {}) if isinstance(rule, dict) else {}
-                if str(cond.get("type") or "").lower() != "challenge_count":
-                    continue
-                title = (rule.get("title") or "").strip()
-                if not title or title in already_global:
-                    continue
-                challenge_type = str(cond.get("challenge_type") or "").lower()
-                need = int(cond.get("min", 1))
-                count = self._count_completed_challenges(challenge_type)
-                # Update tally for progress display
-                state.setdefault("global_tally", {})[title] = {"progress": count}
-                if count >= need:
-                    awarded_meta.append({"title": title, "origin": "global_achievements"})
-                    log(self.cfg, f"[GLOBAL_ACH] challenge_count triggered: '{title}' ({count}/{need} {challenge_type} challenges)")
-            if awarded_meta:
-                self._ach_record_unlocks("global", self.current_rom or "__challenge__", awarded_meta)
-                self._ach_state_save(state)
-                try:
-                    self._emit_achievement_toasts(awarded_meta, seconds=5)
-                except Exception:
-                    pass
-            else:
-                self._ach_state_save(state)
-        except Exception as e:
-            log(self.cfg, f"[GLOBAL_ACH] challenge_count eval failed: {e}", "WARN")
-
     def _collect_global_rules_for_rom(self, rom: str) -> list[dict]:
         rules_out = []
         seen_titles = set()
@@ -4315,92 +3171,19 @@ class Watcher:
         if not self.game_active:
             return
 
-        ch = getattr(self, "challenge", {}) or {}
-        is_challenge = str(ch.get("kind", "")).lower() in ("timed", "oneball", "flip", "heat")
-
-        # Heat challenge: game ending normally (without overheating) means the player WON.
-        # heat_failed is set when VPX was killed because heat reached 100 %.
-        if is_challenge and str(ch.get("kind", "")).lower() == "heat":
-            if not ch.get("heat_failed") and not ch.get("completed"):
-                ch["completed"] = True
-                self.challenge = ch
-
-        ch_aborted = is_challenge and not ch.get("completed", False)
-
-        if is_challenge:
-            try:
-                if hasattr(self.bridge, "flip_counter_total_hide"):
-                    self.bridge.flip_counter_total_hide.emit()
-            except Exception: pass
-            
-            try:
-                if hasattr(self.bridge, "challenge_timer_stop"):
-                    self.bridge.challenge_timer_stop.emit() 
-            except Exception: pass
-            
-            try:
-                if hasattr(self, "_flip_stop_inputs"):
-                    self._flip_stop_inputs()
-            except Exception: pass
-
-            try:
-                self._heat_inputs["joy_running"] = False
-            except Exception: pass
-
-            try:
-                if hasattr(self.bridge, "heat_bar_hide"):
-                    self.bridge.heat_bar_hide.emit()
-            except Exception: pass
-            
-            if ch_aborted:
-                try:
-                    if str(ch.get("kind", "")).lower() == "heat" and ch.get("heat_failed"):
-                        self.bridge.challenge_info_show.emit("OVERHEATED! Challenge Failed!", 3, "#FF3B30")
-                    else:
-                        self.bridge.challenge_info_show.emit("Challenge Aborted!", 3, "#FF3B30")
-                except Exception: pass
-                try:
-                    self.bridge.challenge_lost.emit(1, 0.0)  # attempts=1 (not tracked), margin_pct=0.0 (no goal score)
-                except Exception: pass
-
-        # 2. DELAY NUR BEI ERFOLG (Verhindert langes Warten beim manuellen Abbruch)
-        if is_challenge and not ch_aborted:
-            try:
-                delay_ms = int((self.cfg.OVERLAY or {}).get("ch_finalize_delay_ms", 500))
-                if delay_ms > 0:
-                    time.sleep(max(0.0, delay_ms / 1000.0))
-            except Exception:
-                pass
-            try:
-                self.bridge.challenge_won.emit(0.0)  # margin_pct=0.0 (no goal score to compute actual margin)
-            except Exception: pass
-
         try:
             end_ts = time.time()
             duration_sec = int(end_ts - (self.start_time or end_ts))
             duration_str = str(timedelta(seconds=duration_sec))
-            pre = ch.get("prekill_end") if isinstance(ch.get("prekill_end", None), dict) else None
             self._session_rom_for_notif = self.current_rom
 
-            if is_challenge:
-                try:
-                    end_audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
-                except Exception as e:
-                    log(self.cfg, f"[END] read end audits (challenge) failed: {e}", "WARN")
-                    end_audits = {}
+            try:
+                end_audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
                 if not end_audits:
-                    end_audits = dict(pre) if pre else dict(self._last_audits_global)
-            else:
-                if pre:
-                    end_audits = dict(pre)
-                else:
-                    try:
-                        end_audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
-                        if not end_audits:
-                            raise RuntimeError("Empty end_audits")
-                    except Exception as e:
-                        log(self.cfg, f"[END] read end audits failed, using last known: {e}", "WARN")
-                        end_audits = dict(self._last_audits_global)
+                    raise RuntimeError("Empty end_audits")
+            except Exception as e:
+                log(self.cfg, f"[END] read end audits failed, using last known: {e}", "WARN")
+                end_audits = dict(self._last_audits_global)
 
             nplayers = 1
             seg_deltas = {1: self._compute_session_deltas(self.start_audits, end_audits)}
@@ -4418,119 +3201,109 @@ class Watcher:
                 int(duration_sec)
             )
 
-            if is_challenge:
-                log(self.cfg, f"[SESSION END] Challenge finished: rom={self.current_rom}, duration={duration_str}. Skipping NVRAM dumps and regular achievements.")
-                try:
-                    if str(ch.get("kind", "")).lower() == "timed":
-                        end_audits = self._inject_best_score_for_timed(end_audits)
-                    if not ch.get("result_recorded", False):
-                        self._challenge_record_result(str(ch.get("kind")), end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[CHALLENGE] result finalize failed: {e}", "WARN")
+            log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
+
+            # Save the session score so the duel handler can submit it.
+            try:
+                self.last_session_score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
+            except Exception:
+                self.last_session_score = 0
+
+            # When a duel is active for this table, skip achievements, toasts, main
+            # overlay, and cloud uploads — only the duel score submission matters.
+            _duel_active = getattr(self, "duel_active_for_current_table", False)
+            if _duel_active:
+                log(self.cfg, f"[DUEL] Active duel for {self.current_rom} — skipping achievements, main overlay and cloud upload")
             else:
-                log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
-
-                # Save the session score so the duel handler can submit it.
                 try:
-                    self.last_session_score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
-                except Exception:
-                    self.last_session_score = 0
+                    self._export_summary(end_audits, duration_sec)
+                except Exception as e:
+                    log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
 
-                # When a duel is active for this table, skip achievements, toasts, main
-                # overlay, and cloud uploads — only the duel score submission matters.
-                _duel_active = getattr(self, "duel_active_for_current_table", False)
-                if _duel_active:
-                    log(self.cfg, f"[DUEL] Active duel for {self.current_rom} — skipping achievements, main overlay and cloud upload")
-                else:
-                    try:
-                        self._export_summary(end_audits, duration_sec)
-                    except Exception as e:
-                        log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
+                try:
+                    self.export_overlay_snapshot(end_audits, duration_sec)
+                except Exception as e:
+                    log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
 
-                    try:
-                        self.export_overlay_snapshot(end_audits, duration_sec)
-                    except Exception as e:
-                        log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
-
-                    # Fire the overlay signal immediately after the snapshot data is ready,
-                    # before slow achievement persistence and cloud uploads.
-                    try:
-                        if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
-                            if self.current_rom and self._has_any_map(self.current_rom):
+                # Fire the overlay signal immediately after the snapshot data is ready,
+                # before slow achievement persistence and cloud uploads.
+                try:
+                    if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
+                        if self.current_rom and self._has_any_map(self.current_rom):
+                            self.bridge.overlay_show.emit()
+                        elif not self.current_rom and self.current_table:
+                            # No-ROM table: show overlay if custom events are configured
+                            _custom_json = os.path.join(
+                                p_aweditor(self.cfg), f"{self.current_table}.custom.json"
+                            )
+                            if os.path.isfile(_custom_json):
                                 self.bridge.overlay_show.emit()
-                            elif not self.current_rom and self.current_table:
-                                # No-ROM table: show overlay if custom events are configured
-                                _custom_json = os.path.join(
-                                    p_aweditor(self.cfg), f"{self.current_table}.custom.json"
-                                )
-                                if os.path.isfile(_custom_json):
-                                    self.bridge.overlay_show.emit()
-                                else:
-                                    log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
                             else:
-                                log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
-                    except Exception as e:
-                        log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
+                                log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
+                        else:
+                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
+                except Exception as e:
+                    log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
+                try:
+                    self._persist_and_toast_achievements(end_audits, duration_sec)
+                except Exception as e:
+                    log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
+
+                if self.current_rom and self._has_any_map(self.current_rom):
                     try:
-                        self._persist_and_toast_achievements(end_audits, duration_sec)
-                    except Exception as e:
-                        log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
-
-                    if self.current_rom and self._has_any_map(self.current_rom):
-                        try:
-                            s_rules = self._collect_player_rules_for_rom(self.current_rom)
+                        s_rules = self._collect_player_rules_for_rom(self.current_rom)
+                        
+                        unique_achs = set()
+                        for r in s_rules:
+                            if isinstance(r, dict) and r.get("title"):
+                                unique_achs.add(str(r.get("title")).strip())
+                        total_achs = len(unique_achs)
+                        
+                        if total_achs > 0:
+                            state = self._ach_state_load()
                             
-                            unique_achs = set()
-                            for r in s_rules:
-                                if isinstance(r, dict) and r.get("title"):
-                                    unique_achs.add(str(r.get("title")).strip())
-                            total_achs = len(unique_achs)
-                            
-                            if total_achs > 0:
-                                state = self._ach_state_load()
+                            unlocked_titles = set()
+                            for e in state.get("session", {}).get(self.current_rom, []):
+                                t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
+                                if t: unlocked_titles.add(t)
                                 
-                                unlocked_titles = set()
-                                for e in state.get("session", {}).get(self.current_rom, []):
-                                    t = str(e.get("title")).strip() if isinstance(e, dict) else str(e).strip()
-                                    if t: unlocked_titles.add(t)
-                                    
-                                unlocked_total = len(unlocked_titles)
-                                _rom = self.current_rom
-                                _cfg = self.cfg
-                                _br = self.bridge
-                                from .cloud_sync import CloudSync
-                                threading.Thread(
-                                    target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br, _CS=CloudSync:
-                                        _CS.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
-                                    daemon=True,
-                                ).start()
-                                # Retroactive upload: if this ROM now has a VPS-ID but was previously
-                                # blocked (progress_upload_log has no entry or a different vps_id),
-                                # the upload above will succeed this time. Record the vps_id used.
-                                try:
-                                    from ui.vps import _load_vps_mapping
-                                    _vps_mapping = _load_vps_mapping(self.cfg)
-                                    _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
-                                    if _vps_id:
-                                        _upload_log = _load_progress_upload_log(self.cfg)
-                                        _prev_vps_id = _upload_log.get(self.current_rom, "")
-                                        if _prev_vps_id != _vps_id:
-                                            _upload_log[self.current_rom] = _vps_id
-                                            _save_progress_upload_log(self.cfg, _upload_log)
-                                            log(self.cfg, f"[CLOUD] Progress upload log updated for {self.current_rom} -> vps_id={_vps_id}")
-                                except Exception as e:
-                                    log(self.cfg, f"[CLOUD] Progress upload log update failed: {e}", "WARN")
-                        except Exception as e:
-                            log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
+                            unlocked_total = len(unlocked_titles)
+                            _rom = self.current_rom
+                            _cfg = self.cfg
+                            _br = self.bridge
+                            from .cloud_sync import CloudSync
+                            threading.Thread(
+                                target=lambda _c=_cfg, _r=_rom, _ut=unlocked_total, _ta=total_achs, _b=_br, _CS=CloudSync:
+                                    _CS.upload_achievement_progress(_c, _r, _ut, _ta, bridge=_b),
+                                daemon=True,
+                            ).start()
+                            # Retroactive upload: if this ROM now has a VPS-ID but was previously
+                            # blocked (progress_upload_log has no entry or a different vps_id),
+                            # the upload above will succeed this time. Record the vps_id used.
+                            try:
+                                from ui.vps import _load_vps_mapping
+                                _vps_mapping = _load_vps_mapping(self.cfg)
+                                _vps_id = (_vps_mapping.get(self.current_rom) or "").strip()
+                                if _vps_id:
+                                    _upload_log = _load_progress_upload_log(self.cfg)
+                                    _prev_vps_id = _upload_log.get(self.current_rom, "")
+                                    if _prev_vps_id != _vps_id:
+                                        _upload_log[self.current_rom] = _vps_id
+                                        _save_progress_upload_log(self.cfg, _upload_log)
+                                        log(self.cfg, f"[CLOUD] Progress upload log updated for {self.current_rom} -> vps_id={_vps_id}")
+                            except Exception as e:
+                                log(self.cfg, f"[CLOUD] Progress upload log update failed: {e}", "WARN")
+                    except Exception as e:
+                        log(self.cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
 
-                    # CAT upload: custom tables have no ROM; upload via cat_registry if approved
-                    if not self.current_rom and self.current_table:
-                        try:
-                            from .cat_registry import upload_cat_progress
-                            upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)
-                        except Exception as e:
-                            log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
+                # CAT upload: custom tables have no ROM; upload via cat_registry if approved
+                if not self.current_rom and self.current_table:
+                    try:
+                        from .cat_registry import upload_cat_progress
+                        upload_cat_progress(self.cfg, self.current_table, bridge=self.bridge)
+                    except Exception as e:
+                        log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
 
         finally:
             self.current_table = None
@@ -4539,7 +3312,6 @@ class Watcher:
             self.game_active = False
             self.duel_active_for_current_table = False
             self.start_audits = {}
-            self.challenge = {} 
             self.players.clear()
             self.ball_track.update({"active": False, "index": 0, "start_time": None, "score_base": 0, "last_balls_played": None, "balls": []})
             self._last_audits_global = {}
@@ -4849,15 +3621,11 @@ class Watcher:
                     audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
                     audits_ctl = audits 
 
-                    ch = getattr(self, "challenge", {}) or {}
-                    is_chal_active = ch.get("active", False)
-
                     try:
                         now2 = time.time()
                         if self.current_rom and self.cfg.OVERLAY.get("live_updates", False) and (now2 - self._last_live_export_ts >= 2.0):
-                            if not is_chal_active:
-                                duration_sec = int(now2 - (self.start_time or now2))
-                                self.export_overlay_snapshot(audits, duration_sec, on_demand=True)
+                            duration_sec = int(now2 - (self.start_time or now2))
+                            self.export_overlay_snapshot(audits, duration_sec, on_demand=True)
                             self._last_live_export_ts = now2
                     except Exception as e:
                         log(self.cfg, f"[EXPORT] live export failed: {e}", "WARN")
@@ -4873,7 +3641,7 @@ class Watcher:
 
                     try:
                         changed = bool(self._attribute_events(audits_ctl))
-                        if changed and self.cfg.OVERLAY.get("live_updates", False) and not is_chal_active:
+                        if changed and self.cfg.OVERLAY.get("live_updates", False):
                             duration_now = int(time.time() - (self.start_time or time.time()))
                             self.export_overlay_snapshot(audits, duration_now, on_demand=True)
                             self._last_live_export_ts = time.time()
@@ -4891,11 +3659,6 @@ class Watcher:
                     p1_audits = self._player_field_filter(audits, 1)
                     if p1_audits:
                         self.players[1]["last_audits"].update(p1_audits)
-
-                    try:
-                        self._challenge_tick(audits_ctl)
-                    except Exception as e:
-                        log(self.cfg, f"[CHALLENGE] tick failed in loop: {e}", "WARN")
 
                     if self.snapshot_mode:
                         try:

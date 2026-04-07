@@ -55,10 +55,7 @@ _ZANK_PAIRS: list[tuple[str, str, str]] = [
     # (trigger_key, gui_key, overlay_key)
     ("achievement", "zank_gui_predicted",    "zank_ov_saw_it"),
     ("game_over",   "zank_gui_no_talk",      "zank_ov_happens"),
-    ("challenge_win", "zank_gui_training",   "zank_ov_cheering"),
-    ("challenge_lose", "zank_gui_stats",     "zank_ov_not_my_fault"),
     ("idle_30m",    "zank_gui_come_back",    "zank_ov_left_us"),
-    ("heat_100",    "zank_gui_calculated",   "zank_ov_told_them"),
     ("level_up",    "zank_gui_guidance",     "zank_ov_witnessed"),
     ("session_5h",  "zank_gui_hydration",    "zank_ov_legend"),
     ("christmas",   "zank_gui_family",       "zank_ov_xmas"),
@@ -398,7 +395,6 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("rec_compare",   "Compare your scores with other players — pinball is always better together!"),
         ("rec_session",   "Session delta records show your improvement over time — progress is real!"),
         ("rec_personal",  "Personal records are the benchmarks you set for yourself. Smash them!"),
-        ("rec_challenge", "Challenge leaderboards are where pinball legends are made!"),
         ("rec_rank",      "Your current global rank is just the beginning of the climb!"),
         ("rec_history",   "Historical records prove that every session made you a better player!"),
     ],
@@ -436,22 +432,12 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
         ("duels_cloud",    "Duels require Cloud Sync to communicate with other players!"),
         ("duels_table",    "Pick a table you know well for duels — home advantage matters!"),
         ("duels_rematch",  "Lost a duel? Challenge them again — revenge is sweet!"),
-        ("duels_hotkey",   "Use your Challenge Left/Right hotkeys to navigate duel invitations!"),
+        ("duels_hotkey",   "Use your hotkeys to navigate duel invitations!"),
     ],
     "tab_duels_global": [
         ("tab_global_1",   "Let's see who's been dueling!"),
         ("tab_global_2",   "The arena never sleeps!"),
         ("tab_global_3",   "Scouting the competition, smart move!"),
-    ],
-    "tab_challenges": [
-        ("ch_intro",       "Challenges test your skill against the clock — beat the target score!"),
-        ("ch_select",      "Use Left/Right to browse available challenges, then press Action to start!"),
-        ("ch_timer",       "Keep an eye on the countdown — every second counts in a challenge!"),
-        ("ch_retry",       "Failed a challenge? Try again! Practice makes perfect!"),
-        ("ch_streak",      "Build a winning streak to climb the challenge leaderboard!"),
-        ("ch_score",       "Beat the target score before time runs out to win the challenge!"),
-        ("ch_hotkey",      "Bind your Challenge hotkeys in the Controls tab for quick access!"),
-        ("ch_ingame",      "Challenges can only be started while a game is running in VPX!"),
     ],
 }
 
@@ -597,41 +583,6 @@ _OV_SESSION_END: list[tuple[str, str]] = [
     ("ov_midnight",    "Midnight finish! Legendary!"),
 ]
 
-_OV_CHALLENGE: list[tuple[str, str]] = [
-    ("ov_ch_accepted",   "Challenge accepted! Do not choke!"),
-    ("ov_ch_clock",      "Clock is ticking! FOCUS!"),
-    ("ov_ch_10s",        "10 SECONDS! GIVE IT EVERYTHING!"),
-    ("ov_ch_win",        "YOU WIN! I knew you could do it!"),
-    ("ov_ch_close",      "So close... Try again!"),
-    ("ov_ch_heartattack","THAT WAS CLOSE! Heart attack!"),
-    ("ov_ch_dominant",   "Dominant performance!"),
-    ("ov_ch_third",      "Third time is the charm... right?"),
-    ("ov_ch_notmyfault", "NOT MY FAULT!"),
-    ("ov_ch_record",     "NEW CHALLENGE RECORD! History made!"),
-    ("ov_ch_back",       "Back in the challenge ring!"),
-    ("ov_ch_5today",     "5 challenges today! Competitor of the year!"),
-    ("ov_ch_morning",    "Morning challenge! Warm those fingers up!"),
-    ("ov_ch_1sec",       "1 second away... I felt that"),
-]
-
-_OV_HEAT: list[tuple[str, str]] = [
-    ("ov_heat_65",    "Getting warm! Ease up a little!"),
-    ("ov_heat_85",    "CRITICAL HEAT! Your flippers are burning!"),
-    ("ov_heat_100",   "TOO HOT! Give those flippers a rest!"),
-    ("ov_heat_cool",  "Cooling down... smart move!"),
-    ("ov_heat_zone",  "Steady pace! You are in the zone!"),
-]
-
-_OV_FLIP: list[tuple[str, str]] = [
-    ("ov_flip_start",  "Flip counter active! Every flip counts!"),
-    ("ov_flip_25",     "Quarter way there! Warm up done!"),
-    ("ov_flip_50",     "Halfway there! Keep flipping!"),
-    ("ov_flip_75",     "75%! Almost there! Do not slow down!"),
-    ("ov_flip_90",     "Almost at your goal! Do not stop now!"),
-    ("ov_flip_over",   "You SMASHED your goal! Overachiever!"),
-    ("ov_flip_goal",   "GOAL! You hit your flip target!"),
-]
-
 _OV_IDLE: list[tuple[str, str]] = [
     ("ov_idle_5m",   "Still here... waiting..."),
     ("ov_idle_10m",  "Psst. VPX won't start itself!"),
@@ -773,9 +724,6 @@ class _TrophieMemory:
         self.session_durations: list = []
         self.achievement_sessions: int = 0
         self.no_achievement_sessions: int = 0
-        self.challenge_wins: int = 0
-        self.challenge_losses: int = 0
-        self.heat_100_count: int = 0
         self.rom_play_counts: dict = {}
         self.dismiss_speed: list = []
         self.comments_shown: int = 0
@@ -796,9 +744,6 @@ class _TrophieMemory:
             self.session_durations = d.get("session_durations", [])
             self.achievement_sessions = int(d.get("achievement_sessions", 0))
             self.no_achievement_sessions = int(d.get("no_achievement_sessions", 0))
-            self.challenge_wins = int(d.get("challenge_wins", 0))
-            self.challenge_losses = int(d.get("challenge_losses", 0))
-            self.heat_100_count = int(d.get("heat_100_count", 0))
             self.rom_play_counts = d.get("rom_play_counts", {})
             self.dismiss_speed = d.get("dismiss_speed", [])
             self.comments_shown = int(d.get("comments_shown", 0))
@@ -816,9 +761,6 @@ class _TrophieMemory:
                 "session_durations": self.session_durations[-200:],
                 "achievement_sessions": self.achievement_sessions,
                 "no_achievement_sessions": self.no_achievement_sessions,
-                "challenge_wins": self.challenge_wins,
-                "challenge_losses": self.challenge_losses,
-                "heat_100_count": self.heat_100_count,
                 "rom_play_counts": self.rom_play_counts,
                 "dismiss_speed": self.dismiss_speed[-200:],
                 "comments_shown": self.comments_shown,
@@ -846,7 +788,7 @@ class _TrophieMemory:
         return sum(self.session_durations) / len(self.session_durations)
 
     def is_challenge_fan(self) -> bool:
-        return (self.challenge_wins + self.challenge_losses) > 10
+        return False
 
     def dismisses_quickly(self) -> bool:
         if len(self.dismiss_speed) < 5:

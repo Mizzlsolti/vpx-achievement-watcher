@@ -26,9 +26,6 @@ from mascot.trophy_data import (
     _GUI_DUEL,
     _OV_ROM_START,
     _OV_SESSION_END,
-    _OV_CHALLENGE,
-    _OV_HEAT,
-    _OV_FLIP,
     _OV_IDLE,
     _OV_DAYTIME,
     _OV_RANDOM,
@@ -289,7 +286,7 @@ class GUITrophie(QWidget):
             "score duels":      "tab_duels",
             "duels":            "tab_duels",
             "global feed":      "tab_duels_global",
-            "challenges":       "tab_challenges",
+            "challenges":       "tab_general",
         }
         for key_part, tip_cat in tab_map.items():
             if key_part in tab_name:
@@ -590,25 +587,12 @@ class OverlayTrophie(QWidget):
         self._last_game_ts = time.time()
         self._idle_shown: dict = {}
 
-        # Heat tracking
-        self._last_heat = 0
-        self._heat_notified_65 = False
-        self._heat_notified_85 = False
-        self._heat_notified_100 = False
-        self._heat_zone_timer_ms = 0
-
-        # Flip tracking
-        self._flip_prev_pct = 0.0
-        self._flip_notified: dict = {}
-
         # Session tracking
         self._session_start: Optional[float] = None
         self._session_rom: Optional[str] = None
         self._session_ach_count = 0
         self._today_ach_count = 0
         self._today_session_count = 0
-        self._challenge_count_today = 0
-        self._challenge_losses_streak = 0
         self._no_ach_sessions_streak = 0
 
         # Random personality timer
@@ -849,57 +833,6 @@ class OverlayTrophie(QWidget):
         self._draw.set_state(HAPPY)
         self._try_zank("level_up")
 
-    def on_challenge_start(self) -> None:
-        self._challenge_count_today += 1
-        self._last_game_ts = time.time()
-        self._draw.set_state(HAPPY)
-        self._draw.start_event_anim("nervous")
-        now = datetime.now()
-        if now.hour < 10:
-            self._show_comment_key("ov_ch_morning", "Morning challenge! Warm those fingers up!", HAPPY)
-        elif self._challenge_count_today >= 5:
-            self._show_comment_key("ov_ch_5today", "5 challenges today! Competitor of the year!", SURPRISED)
-        else:
-            self._show_comment_key("ov_ch_accepted", "Challenge accepted! Do not choke!", HAPPY)
-
-    def on_challenge_timer_tick(self, remaining_ms: int) -> None:
-        if remaining_ms <= 3000 and remaining_ms > 2500:
-            self._show_comment_key("ov_ch_clock", "Clock is ticking! FOCUS!", SURPRISED)
-        elif remaining_ms <= 10000 and remaining_ms > 9500:
-            self._show_comment_key("ov_ch_10s", "10 SECONDS! GIVE IT EVERYTHING!", SURPRISED)
-
-    def on_challenge_stop(self) -> None:
-        self._draw.set_state(IDLE)
-
-    def on_challenge_won(self, margin_pct: float = 50.0) -> None:
-        self._last_game_ts = time.time()
-        self._challenge_losses_streak = 0
-        self._draw.start_event_anim("victory_lap")
-        if self._try_zank("challenge_win"):
-            return
-        if margin_pct < 5.0:
-            self._show_comment_key("ov_ch_heartattack", "THAT WAS CLOSE! Heart attack!", SURPRISED)
-        elif margin_pct > 50.0:
-            self._show_comment_key("ov_ch_dominant", "Dominant performance!", HAPPY)
-            self._draw.start_event_anim("show_off")
-        else:
-            self._show_comment_key("ov_ch_win", "YOU WIN! I knew you could do it!", HAPPY)
-
-    def on_challenge_lost(self, attempts: int = 1, margin_pct: float = 10.0) -> None:
-        self._last_game_ts = time.time()
-        self._challenge_losses_streak += 1
-        self._draw.start_event_anim("drain_fall")
-        if self._try_zank("challenge_lose"):
-            return
-        if margin_pct < 2.0:
-            self._show_comment_key("ov_ch_1sec", "1 second away... I felt that", SAD)
-        elif attempts >= 3:
-            self._show_comment_key("ov_ch_third", "Third time is the charm... right?", SAD)
-        elif margin_pct < 10.0:
-            self._show_comment_key("ov_ch_close", "So close... Try again!", SAD)
-        else:
-            self._show_comment_key("ov_ch_notmyfault", "NOT MY FAULT!", SAD)
-
     def on_duel_received(self) -> None:
         """React when a duel invitation arrives."""
         self._draw.set_state(SURPRISED)
@@ -969,45 +902,6 @@ class OverlayTrophie(QWidget):
         options = _OV_DUEL.get("ov_duel_aborted", [])
         if options:
             self._show_comment_key("ov_duel_aborted", random.choice(options), SAD)
-
-    def on_heat_changed(self, heat_pct: int) -> None:
-        self._last_game_ts = time.time()
-        if heat_pct >= 100 and not self._heat_notified_100:
-            self._heat_notified_100 = True
-            self._draw.start_event_anim("overheat")
-            self._try_zank("heat_100") or self._show_comment_key("ov_heat_100", "TOO HOT! Give those flippers a rest!", SURPRISED)
-        elif heat_pct >= 85 and not self._heat_notified_85:
-            self._heat_notified_85 = True
-            self._show_comment_key("ov_heat_85", "CRITICAL HEAT! Your flippers are burning!", SURPRISED)
-        elif heat_pct >= 65 and not self._heat_notified_65:
-            self._heat_notified_65 = True
-            self._show_comment_key("ov_heat_65", "Getting warm! Ease up a little!", IDLE)
-        elif heat_pct < 80 and self._heat_notified_100:
-            self._heat_notified_100 = False
-            self._heat_notified_85 = False
-            self._show_comment_key("ov_heat_cool", "Cooling down... smart move!", HAPPY)
-        if heat_pct < 50:
-            self._heat_notified_65 = False
-
-    def on_flip_progress(self, current: int, goal: int) -> None:
-        if goal <= 0:
-            return
-        pct = current / goal
-        prev = self._flip_prev_pct
-        self._flip_prev_pct = pct
-
-        milestones = [(0.01, "ov_flip_start", "Flip counter active! Every flip counts!", IDLE),
-                      (0.25,  "ov_flip_25",    "Quarter way there! Warm up done!", IDLE),
-                      (0.50,  "ov_flip_50",    "Halfway there! Keep flipping!", IDLE),
-                      (0.75,  "ov_flip_75",    "75%! Almost there! Do not slow down!", HAPPY),
-                      (0.90,  "ov_flip_90",    "Almost at your goal! Do not stop now!", HAPPY),
-                      (1.00,  "ov_flip_goal",  "GOAL! You hit your flip target!", HAPPY),
-                      (1.01,  "ov_flip_over",  "You SMASHED your goal! Overachiever!", SURPRISED)]
-        for threshold, key, text, state in milestones:
-            if prev < threshold <= pct and key not in self._flip_notified:
-                self._flip_notified[key] = True
-                self._show_comment_key(key, text, state)
-                break
 
     # ── Idle handling ─────────────────────────────────────────────────────────
 

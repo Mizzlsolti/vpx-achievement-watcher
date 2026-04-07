@@ -1842,69 +1842,6 @@ class HoloSweep:
 
 
 
-class DifficultyColorPulse:
-    """Colour pulse that matches the challenge difficulty level."""
-
-    def __init__(self, intensity: float = 1.0, color: QColor = None):
-        self.intensity = _clamp(intensity, 0.0, 1.0)
-        self._color = color or QColor("#FF7F00")
-        self._t = 0.0
-        self._active = False
-
-    def start(self):
-        self._t = 0.0
-        self._active = True
-
-    def tick(self, dt_ms: float):
-        if not self._active:
-            return
-        self._t += dt_ms / 1000.0
-
-    def set_color(self, color: QColor):
-        self._color = color
-
-    def draw(self, painter: QPainter, rect: QRect):
-        if not self._active:
-            return
-        if _HAS_OPENGL:
-            try:
-                self._draw_gl(rect)
-                return
-            except Exception:
-                pass
-        amp = 0.5 + 0.5 * math.sin(self._t * 4.0)
-        alpha = _clamp(int(150 * amp * self.intensity), 0, 200)
-        c = self._color
-        painter.save()
-        painter.setBrush(QBrush(QColor(c.red(), c.green(), c.blue(), alpha)))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(rect)
-        painter.restore()
-
-    def is_active(self) -> bool:
-        return self._active
-
-    def _draw_gl(self, rect: QRect):
-        amp = 0.5 + 0.5 * math.sin(self._t * 4.0)
-        alpha = _clamp(150 * amp * self.intensity / 255.0, 0.0, 1.0)
-        c = self._color
-        r, g, b = c.red() / 255.0, c.green() / 255.0, c.blue() / 255.0
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glDisable(GL_DEPTH_TEST)
-        glBegin(GL_TRIANGLE_FAN)
-        glColor4f(r, g, b, alpha)
-        glVertex2f(float(rect.left()), float(rect.top()))
-        glVertex2f(float(rect.right()), float(rect.top()))
-        glVertex2f(float(rect.right()), float(rect.bottom()))
-        glVertex2f(float(rect.left()), float(rect.bottom()))
-        glEnd()
-
-
-    def stop(self):
-        self._active = False
-
-
 class ArrowWobblePulse:
     """Sinusoidal wobble applied to navigation arrows, emphasising the
     current selection direction."""

@@ -415,10 +415,6 @@ class ProgressMixin:
             elif rtype == "rom_multi_brand":
                 mfrs = cond.get("manufacturers", [])
                 return f"{prefix}Play at least one table from each: {', '.join(mfrs)}"
-            elif rtype == "challenge_count":
-                ct = cond.get("challenge_type", "")
-                need = int(cond.get("min", 1))
-                return f"{prefix}Complete {need} {ct} challenge{'s' if need != 1 else ''}"
             return prefix + "Achievement"
 
         unlocked_count = 0
@@ -452,8 +448,8 @@ class ProgressMixin:
                 cond = r.get("condition", {}) or {}
                 rtype_display = str(cond.get("type", "")).lower()
                 tooltip = _tooltip_for_rule(r, unlocked=False).replace("'", "&#39;")
-                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand", "challenge_count"):
-                    if rtype_display in ("nvram_tally", "challenge_count"):
+                if rom == "Global" and rtype_display in ("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand"):
+                    if rtype_display in ("nvram_tally",):
                         need = int(cond.get("min", 1))
                         tally = global_tally.get(title, {})
                         cached_progress = int(tally.get("progress", 0))
