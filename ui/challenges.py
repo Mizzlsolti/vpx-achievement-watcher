@@ -685,28 +685,6 @@ class ChallengesMixin:
         except Exception:
             pass
 
-        try:
-            current_rom = getattr(self.watcher, "current_rom", None)
-            _has_map = bool(current_rom and self.watcher._has_any_map(current_rom))
-        except Exception:
-            _has_map = True
-
-        if not _has_map:
-            try:
-                self._close_challenge_select_overlay()
-                self._close_flip_difficulty_overlay()
-            except Exception:
-                pass
-            try:
-                self.bridge.challenge_info_show.emit(
-                    "No NVRAM map available. Challenges require a map for score.",
-                    3,
-                    "#FF3B30"
-                )
-            except Exception:
-                pass
-            return
-
         if self._close_overlays_if_player_hidden():
             return
 
