@@ -101,7 +101,6 @@ from ui.overlay import (
     FlipDifficultyOverlay,
     HeatBarometerOverlay,
     HeatBarPositionPicker,
-    ChallengeStartCountdown,
 )
 
 from app.bootstrap import Bridge, main, _authors_match, _parse_version
