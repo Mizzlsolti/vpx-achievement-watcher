@@ -1975,6 +1975,12 @@ class Watcher:
         except Exception:
             pass
         try:
+            t = self._flip_inputs.get("joy_thread")
+            if t is not None and t.is_alive():
+                t.join(timeout=0.5)
+        except Exception:
+            pass
+        try:
             if self._flip_inputs.get("kbd"):
                 self._flip_inputs["kbd"].uninstall()
         except Exception:
@@ -2037,10 +2043,7 @@ class Watcher:
         try:
             self.bridge.flip_counter_total_update.emit(int(total), int(remaining), int(goal_total))
         except Exception:
-            try:
-                self.bridge.flip_counter_update.emit(int(left), int(right), int(goal_total), 0)
-            except Exception:
-                pass
+            pass
         if total >= int(goal_total):
             self._flip_check()
 
@@ -2083,10 +2086,7 @@ class Watcher:
             try:
                 self.bridge.flip_counter_total_hide.emit()
             except Exception:
-                try:
-                    self.bridge.flip_counter_hide.emit()
-                except Exception:
-                    pass
+                pass
             self._flip_stop_inputs()
 
     def start_flip_challenge(self, threshold: int = 500):
@@ -2145,10 +2145,7 @@ class Watcher:
             try:
                 self.bridge.flip_counter_total_show.emit(0, int(goal_total), int(goal_total))
             except Exception:
-                try:
-                    self.bridge.flip_counter_show.emit(0, 0, int(goal_total), 0)
-                except Exception:
-                    pass
+                pass
 
             self._flip_start_inputs()
             log(self.cfg, f"[CHALLENGE] flip armed – total goal={int(goal_total)} (single-player enforced)")
@@ -2167,10 +2164,7 @@ class Watcher:
         try:
             self.bridge.flip_counter_total_hide.emit()
         except Exception:
-            try:
-                self.bridge.flip_counter_hide.emit()
-            except Exception:
-                pass
+            pass
 
         ch = getattr(self, "challenge", {}) or {}
         if ch.get("kind") == "flip":
@@ -2317,40 +2311,6 @@ class Watcher:
                 time.sleep(0.1)
         except Exception as e:
             log(self.cfg, f"[HEAT] joy poll loop failed: {e}", "WARN")
-
-    def _clear_challenge_state(self):
-        try:
-            self.bridge.flip_counter_total_hide.emit()
-        except Exception:
-            pass
-        try:
-            self.bridge.challenge_timer_stop.emit()
-        except Exception:
-            pass
-        try:
-            self.bridge.heat_bar_hide.emit()
-        except Exception:
-            pass
-        try:
-            self._flip_stop_inputs()
-        except Exception:
-            pass
-        try:
-            self._heat_inputs["joy_running"] = False
-        except Exception:
-            pass
-            
-        try:
-            ch = getattr(self, "challenge", {})
-            if isinstance(ch, dict):
-                ch["active"] = False
-                ch["pending_kill_at"] = None
-        except Exception:
-            pass
-        try:
-            self.challenge = {}
-        except Exception:
-            pass
 
     def _challenge_tick(self, audits: dict):
         try:
