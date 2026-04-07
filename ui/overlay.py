@@ -29,7 +29,7 @@ from effects.gl_effects_opengl import (
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
     GodRayBurst, ConfettiShower, HologramFlicker, ShockwaveRipple,
-    ElectricArc, HoverShimmer, PlasmaNoise, HoloSweep, DifficultyColorPulse,
+    ElectricArc, HoverShimmer, PlasmaNoise, HoloSweep,
     # Timer / Countdown effects
     CountdownScaleGlow, RadialPulseBackground, UrgencyShake, TimeWarpDistortion,
     TrailAfterimage, FinalExplosion, PulseRingCountdown, GlitchNumbers,
@@ -61,20 +61,16 @@ from ui.overlay_base import (
     _OverlayFxMixin,
 )
 from ui.overlay_pickers import (
-    FlipCounterPositionPicker,
-    TimerPositionPicker,
     ToastPositionPicker,
-    ChallengeOVPositionPicker,
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
     OverlayPositionPicker,
-    HeatBarPositionPicker,
 )
 from ui.overlay_toast import AchToastWindow, AchToastManager, read_active_players
 
 
 
-from ui.overlay_info import MiniInfoOverlay, StatusOverlay, OverlayNavArrows, FlipCounterOverlay
+from ui.overlay_info import MiniInfoOverlay, StatusOverlay, OverlayNavArrows
 
 # Per-page accent colours for the main overlay – kept only as a last-resort
 # emergency fallback.  All themes now define their own ``page_accents`` list
@@ -1679,9 +1675,4 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
 
 
 
-from ui.overlay_challenges import (
-    ChallengeCountdownOverlay,
-    ChallengeSelectOverlay,
-    FlipDifficultyOverlay,
-    HeatBarometerOverlay,
-)
+

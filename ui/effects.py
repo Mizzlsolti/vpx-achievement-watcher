@@ -46,66 +46,11 @@ _TOAST_EFFECTS = [
     ("fx_toast_shockwave",          "Shockwave Ripple ✨"),
 ]
 
-_CHALLENGE_EFFECTS = [
-    ("fx_challenge_carousel",       "Carousel Slide Animation"),
-    ("fx_challenge_selection_glow", "Pulsating Selection Glow"),
-    ("fx_challenge_arrow_wobble",   "Arrow Wobble Pulse"),
-    ("fx_challenge_glow_border",    "Glow Border Breathing"),
-    ("fx_challenge_snap_scale",     "Selection Snap Scale"),
-    ("fx_challenge_electric_arc",   "Electric Arc Between Options ✨"),
-    ("fx_challenge_hover_shimmer",  "Option Hover Shimmer ✨"),
-    ("fx_challenge_plasma_noise",   "Background Plasma Noise ✨"),
-    ("fx_challenge_holo_sweep",     "Title Holographic Sweep ✨"),
-    ("fx_challenge_color_pulse",    "Difficulty Color Pulse ✨"),
-]
-
-_TIMER_EFFECTS = [
-    ("fx_timer_321go",              "3-2-1-GO Scale + Glow"),
-    ("fx_timer_number_spin",        "Countdown Number Spin"),
-    ("fx_timer_radial_pulse",       "Background Radial Pulse"),
-    ("fx_timer_glow_border",        "Timer Glow Border"),
-    ("fx_timer_urgency_shake",      "Urgency Shake (last 5 s) ✨"),
-    ("fx_timer_warp_distortion",    "Time Warp Distortion ✨"),
-    ("fx_timer_trail_afterimage",   "Countdown Trail Afterimage ✨"),
-    ("fx_timer_final_explosion",    "Final Second Explosion ✨"),
-    ("fx_timer_pulse_ring",         "Pulse Ring Countdown ✨"),
-    ("fx_timer_glitch_numbers",     "Digital Glitch Numbers ✨"),
-]
-
-_HEAT_EFFECTS = [
-    ("fx_heat_warning_pulse",       "Warning Pulse (65 %+)"),
-    ("fx_heat_critical_pulse",      "Critical Pulse (85 %+)"),
-    ("fx_heat_glow_border",         "Glow Border Breathing"),
-    ("fx_heat_gradient_anim",       "Heat Bar Gradient Animation"),
-    ("fx_heat_flame_particles",     "Flame Particle Emission ✨"),
-    ("fx_heat_shimmer",             "Heat Shimmer / Distortion ✨"),
-    ("fx_heat_smoke_wisps",         "Smoke Wisp Particles ✨"),
-    ("fx_heat_lava_glow",           "Lava Glow Edge ✨"),
-    ("fx_heat_number_throb",        "Temperature Number Throb ✨"),
-    ("fx_heat_meltdown_shake",      "Meltdown Screen Shake ✨"),
-]
-
-_FLIP_EFFECTS = [
-    ("fx_flip_breathing_glow",      "Breathing Glow Ring"),
-    ("fx_flip_counter_spin",        "Counter Spin Animation"),
-    ("fx_flip_glow_border",         "Glow Border"),
-    ("fx_flip_progress_arc",        "Progress Arc Animation"),
-    ("fx_flip_impact_pulse",        "Flip Impact Pulse ✨"),
-    ("fx_flip_number_cascade",      "Number Cascade Roll ✨"),
-    ("fx_flip_milestone_burst",     "Milestone Burst ✨"),
-    ("fx_flip_electric_spark",      "Electric Counter Spark ✨"),
-    ("fx_flip_goal_glow",           "Goal Proximity Glow Intensify ✨"),
-    ("fx_flip_completion_firework", "Completion Firework ✨"),
-]
 
 # Ordered list of (title, overlay_type, effects_list) for the 2×3 grid
 _OVERLAY_GROUPS = [
     ("🖥️ Main Overlay",         "main",      _MAIN_EFFECTS),
     ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
-    ("⚡ Challenge Select",      "challenge", _CHALLENGE_EFFECTS),
-    ("⏱️ Timer / Countdown",     "timer",     _TIMER_EFFECTS),
-    ("🌡️ Heat Barometer",        "heat",      _HEAT_EFFECTS),
-    ("🔢 Flip Counter",          "flip",      _FLIP_EFFECTS),
 ]
 
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
@@ -129,37 +74,9 @@ _NO_SLIDER_EFFECTS: frozenset[str] = frozenset({
     "fx_toast_energy_flash",
     "fx_toast_hologram_flicker",
     # Challenge Select — easing/alpha-only effects
-    "fx_challenge_carousel",
-    "fx_challenge_selection_glow",
-    "fx_challenge_arrow_wobble",
-    "fx_challenge_glow_border",
-    "fx_challenge_snap_scale",
-    "fx_challenge_hover_shimmer",
-    "fx_challenge_plasma_noise",
-    "fx_challenge_holo_sweep",
-    "fx_challenge_color_pulse",
     # Timer — subtle/alpha-only effects
-    "fx_timer_321go",
-    "fx_timer_number_spin",
-    "fx_timer_radial_pulse",
-    "fx_timer_glow_border",
-    "fx_timer_trail_afterimage",
-    "fx_timer_pulse_ring",
-    "fx_timer_glitch_numbers",
     # Heat Barometer — threshold-based or alpha-only
-    "fx_heat_warning_pulse",
-    "fx_heat_critical_pulse",
-    "fx_heat_glow_border",
-    "fx_heat_gradient_anim",
-    "fx_heat_number_throb",
     # Flip Counter — fixed speed/alpha/non-OpenGL effects
-    "fx_flip_breathing_glow",
-    "fx_flip_counter_spin",
-    "fx_flip_glow_border",
-    "fx_flip_progress_arc",
-    "fx_flip_impact_pulse",
-    "fx_flip_number_cascade",
-    "fx_flip_goal_glow",
 })
 
 
@@ -412,10 +329,6 @@ class EffectsMixin:
         _OVERLAY_TOGGLES = [
             ("pp_overlay_main",      "🖥️ Main",      True),
             ("pp_overlay_toast",     "🏆 Toast",     True),
-            ("pp_overlay_challenge", "⚡ Challenge", False),
-            ("pp_overlay_timer",     "⏱️ Timer",     False),
-            ("pp_overlay_heat",      "🌡️ Heat",      False),
-            ("pp_overlay_flip",      "🔢 Flip",      False),
         ]
         _style_on = (
             "QPushButton { background-color: #1a1a1a; color: #FF7F00;"
@@ -573,15 +486,14 @@ class EffectsMixin:
 
     def _preview_all_overlays(self):
         """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
-        for overlay_type in ("main", "toast", "challenge", "timer", "heat", "flip"):
+        for overlay_type in ("main", "toast"):
             self._open_demo_overlay(overlay_type, duration_ms=6000)
 
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
         """Open an overlay in demo mode with simulated triggers."""
         # Lazy import avoids module-level circular dependency
         from .overlay import (
-            AchToastWindow, ChallengeSelectOverlay, ChallengeCountdownOverlay,
-            HeatBarometerOverlay, FlipCounterOverlay,
+            AchToastWindow,
         )
 
         # Open the appropriate overlay and wire simulated triggers
@@ -598,35 +510,6 @@ class EffectsMixin:
         try:
             if overlay_type == "toast":
                 win = AchToastWindow(self, "🏆 Preview Effect", "__levelup__", seconds=5)
-
-            elif overlay_type == "challenge":
-                win = ChallengeSelectOverlay(self, selected_idx=0)
-                for i, delay in enumerate([1500, 3000, 4500], start=1):
-                    _add_shot(delay, lambda _=False, idx=i % 4: (
-                        win.set_selected(idx) if win and not win.isHidden() else None
-                    ))
-
-            elif overlay_type == "timer":
-                win = ChallengeCountdownOverlay(self, total_seconds=6)
-                duration_ms = 9000  # Long enough to see full countdown + final explosion
-
-            elif overlay_type == "heat":
-                win = HeatBarometerOverlay(self)
-                win.set_heat(50)
-                for heat, delay in [(65, 1500), (80, 2500), (90, 3500), (100, 4500), (60, 5500)]:
-                    _add_shot(delay, lambda _=False, h=heat: (
-                        win.set_heat(h) if win and not win.isHidden() else None
-                    ))
-
-            elif overlay_type == "flip":
-                win = FlipCounterOverlay(self, total=0, remaining=100, goal=100)
-                for flips, delay in [(8, 500), (16, 1000), (25, 1500),
-                                     (33, 2000), (50, 2500), (66, 3500),
-                                     (75, 4000), (84, 4500), (100, 5500)]:
-                    _add_shot(delay, lambda _=False, f=flips: (
-                        win.update_counts(f, max(0, 100 - f), 100)
-                        if win and not win.isHidden() else None
-                    ))
 
             elif overlay_type == "main":
                 # Main overlay: show the existing overlay window with demo triggers

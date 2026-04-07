@@ -16,10 +16,6 @@ import core.sound as sound
 from .overlay import (
     ToastPositionPicker,
     OverlayPositionPicker,
-    ChallengeOVPositionPicker,
-    TimerPositionPicker,
-    FlipCounterPositionPicker,
-    HeatBarPositionPicker,
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
 )
@@ -37,109 +33,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self._add_tab_help_button(layout, key)  – adds the Help button to a tab layout
         self._style(widget, css)  – applies inline CSS to a widget
     """
-
-    def _on_heat_bar_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["heat_bar_portrait"] = bool(is_checked)
-        self.cfg.save()
-        try:
-            if isinstance(self._heat_bar_picker, HeatBarPositionPicker):
-                self._heat_bar_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        self._update_switch_all_button_label()
-
-    def _on_heat_bar_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["heat_bar_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-        try:
-            if isinstance(self._heat_bar_picker, HeatBarPositionPicker):
-                self._heat_bar_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-
-    def _on_heat_bar_place_clicked(self):
-        picker = getattr(self, "_heat_bar_picker", None)
-        if picker:
-            try:
-                x, y = picker.current_top_left()
-            except Exception:
-                g = picker.geometry()
-                x, y = g.x(), g.y()
-
-            ov = self.cfg.OVERLAY or {}
-            portrait = bool(ov.get("heat_bar_portrait", ov.get("portrait_mode", False)))
-            if portrait:
-                self.cfg.OVERLAY["heat_bar_x_portrait"] = int(x)
-                self.cfg.OVERLAY["heat_bar_y_portrait"] = int(y)
-            else:
-                self.cfg.OVERLAY["heat_bar_x_landscape"] = int(x)
-                self.cfg.OVERLAY["heat_bar_y_landscape"] = int(y)
-            self.cfg.OVERLAY["heat_bar_saved"] = True
-            self.cfg.OVERLAY["heat_bar_custom"] = True
-            self.cfg.save()
-            try:
-                picker.close()
-                picker.deleteLater()
-            except Exception:
-                pass
-            self._heat_bar_picker = None
-            self.btn_heat_bar_place.setText("Place / Save Heat Bar position")
-            return
-        self._heat_bar_picker = HeatBarPositionPicker(self)
-        self.btn_heat_bar_place.setText("Save Heat Bar position")
-
-    def _on_flip_counter_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["flip_counter_portrait"] = bool(is_checked)
-        self.cfg.save()
-        try:
-            if isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
-                self._flip_counter_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-            
-    def _on_flip_counter_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["flip_counter_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-        try:
-            if isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
-                self._flip_counter_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass            
-            
-    def _on_flip_counter_place_clicked(self):
-        picker = getattr(self, "_flip_counter_picker", None)
-        if picker:
-            try:
-                x, y = picker.current_top_left()
-            except Exception:
-                g = picker.geometry()
-                x, y = g.x(), g.y()
-
-            ov = self.cfg.OVERLAY or {}
-            portrait = bool(ov.get("flip_counter_portrait", ov.get("portrait_mode", True)))
-            if portrait:
-                self.cfg.OVERLAY["flip_counter_x_portrait"] = int(x)
-                self.cfg.OVERLAY["flip_counter_y_portrait"] = int(y)
-            else:
-                self.cfg.OVERLAY["flip_counter_x_landscape"] = int(x)
-                self.cfg.OVERLAY["flip_counter_y_landscape"] = int(y)
-            self.cfg.OVERLAY["flip_counter_saved"] = True
-            self.cfg.OVERLAY["flip_counter_custom"] = True
-            self.cfg.save()
-            try:
-                picker.close()
-                picker.deleteLater()
-            except Exception:
-                pass
-            self._flip_counter_picker = None
-            self.btn_flip_counter_place.setText("Place / Save Flip-Counter position")
-            return
-        self._flip_counter_picker = FlipCounterPositionPicker(self)
-        self.btn_flip_counter_place.setText("Save Flip-Counter position")
 
     def _on_overlay_auto_close_toggle(self, state: int):
         enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -161,60 +54,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         except Exception:
             pass
             
-    def _on_ch_ov_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["ch_ov_portrait"] = bool(is_checked)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_ch_ov_picker") and isinstance(self._ch_ov_picker, ChallengeOVPositionPicker):
-                self._ch_ov_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        self._refresh_challenge_select_overlay()
-        self._update_switch_all_button_label()
-
-    def _on_ch_ov_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["ch_ov_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_ch_ov_picker") and isinstance(self._ch_ov_picker, ChallengeOVPositionPicker):
-                self._ch_ov_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        self._refresh_challenge_select_overlay()
-
-    def _on_ch_ov_place_clicked(self):
-        picker = getattr(self, "_ch_ov_picker", None)
-        if picker and isinstance(picker, ChallengeOVPositionPicker):
-            try:
-                x, y = picker.current_top_left()
-            except Exception:
-                g = picker.geometry()
-                x, y = g.x(), g.y()
-            ov = self.cfg.OVERLAY or {}
-            portrait = bool(ov.get("ch_ov_portrait", ov.get("portrait_mode", True)))
-            if portrait:
-                self.cfg.OVERLAY["ch_ov_x_portrait"] = int(x)
-                self.cfg.OVERLAY["ch_ov_y_portrait"] = int(y)
-            else:
-                self.cfg.OVERLAY["ch_ov_x_landscape"] = int(x)
-                self.cfg.OVERLAY["ch_ov_y_landscape"] = int(y)
-            self.cfg.OVERLAY["ch_ov_saved"] = True
-            self.cfg.OVERLAY["ch_ov_custom"] = True
-            self.cfg.save()
-            try:
-                picker.close()
-                picker.deleteLater()
-            except Exception:
-                pass
-            self._ch_ov_picker = None
-            self.btn_ch_ov_place.setText("Place / Save ChallengeOV position")
-            self._refresh_challenge_select_overlay()
-            return
-        self._ch_ov_picker = ChallengeOVPositionPicker(self)
-        self.btn_ch_ov_place.setText("Save ChallengeOV position")
-
     def _on_ach_toast_portrait_toggle(self, state: int):
         is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
         self.cfg.OVERLAY["ach_toast_portrait"] = bool(is_checked)
@@ -373,69 +212,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self._status_overlay_picker = StatusOverlayPositionPicker(self)
         self.btn_status_overlay_place.setText("Save position")
 
-    def _on_ch_timer_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["ch_timer_portrait"] = bool(is_checked)
-        self.cfg.OVERLAY["flip_counter_portrait"] = bool(is_checked)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_ch_timer_picker") and isinstance(self._ch_timer_picker, TimerPositionPicker):
-                self._ch_timer_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "_flip_counter_picker") and isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
-                self._flip_counter_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        self._update_switch_all_button_label()
-
-    def _on_ch_timer_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["ch_timer_rotate_ccw"] = bool(is_ccw)
-        self.cfg.OVERLAY["flip_counter_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_ch_timer_picker") and isinstance(self._ch_timer_picker, TimerPositionPicker):
-                self._ch_timer_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "_flip_counter_picker") and isinstance(self._flip_counter_picker, FlipCounterPositionPicker):
-                self._flip_counter_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-
-    def _on_ch_timer_place_clicked(self):
-        picker = getattr(self, "_ch_timer_picker", None)
-        if picker and isinstance(picker, TimerPositionPicker):
-            try:
-                x, y = picker.current_top_left()
-            except Exception:
-                g = picker.geometry()
-                x, y = g.x(), g.y()
-            ov = self.cfg.OVERLAY or {}
-            portrait = bool(ov.get("ch_timer_portrait", ov.get("portrait_mode", True)))
-            if portrait:
-                self.cfg.OVERLAY["ch_timer_x_portrait"] = int(x)
-                self.cfg.OVERLAY["ch_timer_y_portrait"] = int(y)
-            else:
-                self.cfg.OVERLAY["ch_timer_x_landscape"] = int(x)
-                self.cfg.OVERLAY["ch_timer_y_landscape"] = int(y)
-            self.cfg.OVERLAY["ch_timer_saved"] = True
-            self.cfg.OVERLAY["ch_timer_custom"] = True
-            self.cfg.save()
-            try:
-                picker.close()
-                picker.deleteLater()
-            except Exception:
-                pass
-            self._ch_timer_picker = None
-            self.btn_ch_timer_place.setText("Place / Save timer position")
-            return
-        self._ch_timer_picker = TimerPositionPicker(self)
-        self.btn_ch_timer_place.setText("Save timer position")
-
     def _on_overlay_place_clicked(self):
         picker = getattr(self, "_overlay_picker", None)
         if picker and isinstance(picker, OverlayPositionPicker):
@@ -531,11 +307,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             pass
 
     def _on_theme_timer_test(self):
-        try:
-            sound.play_sound(self.cfg, "challenge_start")
-        except Exception:
-            pass
-        self._on_ch_timer_test()
+        pass
 
     def _build_tab_appearance(self):
         tab = QWidget()
@@ -635,38 +407,14 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         box_toast = create_overlay_box("Achievement Toasts", self.chk_ach_toast_portrait, self.chk_ach_toast_ccw, self.btn_ach_toast_place, self.btn_test_toast)
 
         # 3) Challenge Menu
-        self.chk_ch_ov_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_ch_ov_portrait.setChecked(bool(self.cfg.OVERLAY.get("ch_ov_portrait", True))); self.chk_ch_ov_portrait.stateChanged.connect(self._on_ch_ov_portrait_toggle)
-        self.chk_ch_ov_ccw = QCheckBox("Rotate CCW"); self.chk_ch_ov_ccw.setChecked(bool(self.cfg.OVERLAY.get("ch_ov_rotate_ccw", True))); self.chk_ch_ov_ccw.stateChanged.connect(self._on_ch_ov_ccw_toggle)
-        self.btn_ch_ov_place = QPushButton("Place"); self.btn_ch_ov_place.clicked.connect(self._on_ch_ov_place_clicked)
-        self.btn_ch_ov_test = QPushButton("Test"); self.btn_ch_ov_test.clicked.connect(self._on_ch_ov_test)
-        box_ch_sel = create_overlay_box("Challenge Menu", self.chk_ch_ov_portrait, self.chk_ch_ov_ccw, self.btn_ch_ov_place, self.btn_ch_ov_test)
-
-        # 4) Timers & Counters
-        self.chk_ch_timer_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_ch_timer_portrait.setChecked(bool(self.cfg.OVERLAY.get("ch_timer_portrait", True))); self.chk_ch_timer_portrait.stateChanged.connect(self._on_ch_timer_portrait_toggle)
-        self.chk_ch_timer_ccw = QCheckBox("Rotate CCW"); self.chk_ch_timer_ccw.setChecked(bool(self.cfg.OVERLAY.get("ch_timer_rotate_ccw", True))); self.chk_ch_timer_ccw.stateChanged.connect(self._on_ch_timer_ccw_toggle)
-        box_tc = QVBoxLayout(); box_tc.addWidget(QLabel("<b>Timers & Counters</b>")); box_tc.addWidget(self.chk_ch_timer_portrait); box_tc.addWidget(self.chk_ch_timer_ccw)
-        btn_r1 = QHBoxLayout(); self.btn_ch_timer_place = QPushButton("Place Timer"); self.btn_ch_timer_place.clicked.connect(self._on_ch_timer_place_clicked); self.btn_ch_timer_test = QPushButton("Test Timer"); self.btn_ch_timer_test.clicked.connect(self._on_ch_timer_test); btn_r1.addWidget(self.btn_ch_timer_place); btn_r1.addWidget(self.btn_ch_timer_test)
-        btn_r2 = QHBoxLayout(); self.btn_flip_counter_place = QPushButton("Place Counter"); self.btn_flip_counter_place.clicked.connect(self._on_flip_counter_place_clicked); self.btn_flip_counter_test = QPushButton("Test Counter"); self.btn_flip_counter_test.clicked.connect(self._on_flip_counter_test); btn_r2.addWidget(self.btn_flip_counter_place); btn_r2.addWidget(self.btn_flip_counter_test)
-        box_tc.addLayout(btn_r1); box_tc.addLayout(btn_r2); box_tc.addStretch(1)
-
-        self.chk_flip_counter_portrait = self.chk_ch_timer_portrait
-        self.chk_flip_counter_ccw = self.chk_ch_timer_ccw
-
-        # 5) NEW: Mini Info / Notifications Overlay
+        # 4) Mini Info / Notifications Overlay
         self.chk_mini_info_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_mini_info_portrait.setChecked(bool(self.cfg.OVERLAY.get("notifications_portrait", True))); self.chk_mini_info_portrait.stateChanged.connect(self._on_mini_info_portrait_toggle)
         self.chk_mini_info_ccw = QCheckBox("Rotate CCW"); self.chk_mini_info_ccw.setChecked(bool(self.cfg.OVERLAY.get("notifications_rotate_ccw", True))); self.chk_mini_info_ccw.stateChanged.connect(self._on_mini_info_ccw_toggle)
         self.btn_mini_info_place = QPushButton("Place"); self.btn_mini_info_place.clicked.connect(self._on_mini_info_place_clicked)
         self.btn_mini_info_test = QPushButton("Test"); self.btn_mini_info_test.clicked.connect(self._on_mini_info_test)
         box_mini_info = create_overlay_box("System Notifications", self.chk_mini_info_portrait, self.chk_mini_info_ccw, self.btn_mini_info_place, self.btn_mini_info_test)
 
-        # 6) Heat Bar
-        self.chk_heat_bar_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_heat_bar_portrait.setChecked(bool(self.cfg.OVERLAY.get("heat_bar_portrait", False))); self.chk_heat_bar_portrait.stateChanged.connect(self._on_heat_bar_portrait_toggle)
-        self.chk_heat_bar_ccw = QCheckBox("Rotate CCW"); self.chk_heat_bar_ccw.setChecked(bool(self.cfg.OVERLAY.get("heat_bar_rotate_ccw", True))); self.chk_heat_bar_ccw.stateChanged.connect(self._on_heat_bar_ccw_toggle)
-        self.btn_heat_bar_place = QPushButton("Place"); self.btn_heat_bar_place.clicked.connect(self._on_heat_bar_place_clicked)
-        self.btn_heat_bar_test = QPushButton("Test"); self.btn_heat_bar_test.clicked.connect(self._on_heat_bar_test)
-        box_heat_bar = create_overlay_box("Heat Bar (Heat Challenge)", self.chk_heat_bar_portrait, self.chk_heat_bar_ccw, self.btn_heat_bar_place, self.btn_heat_bar_test)
-
-        # 7) Status Overlay (cloud / leaderboard status messages)
+        # 5) Status Overlay (cloud / leaderboard status messages)
         self.chk_status_overlay_enabled = QCheckBox("Enabled"); self.chk_status_overlay_enabled.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_enabled", True))); self.chk_status_overlay_enabled.stateChanged.connect(self._on_status_overlay_enabled_toggle)
         self.chk_status_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_status_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_portrait", False))); self.chk_status_overlay_portrait.stateChanged.connect(self._on_status_overlay_portrait_toggle)
         self.chk_status_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_status_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_rotate_ccw", False))); self.chk_status_overlay_ccw.stateChanged.connect(self._on_status_overlay_ccw_toggle)
@@ -682,9 +430,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         box_status_overlay.addStretch(1)
 
         lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
-        lay_pos.addLayout(box_ch_sel, 2, 0); lay_pos.addLayout(box_tc, 2, 1)
-        lay_pos.addLayout(box_mini_info, 3, 0); lay_pos.addLayout(box_heat_bar, 3, 1)
-        lay_pos.addLayout(box_status_overlay, 4, 0)
+        lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
 
         layout.addWidget(grp_pos)
 
@@ -854,18 +600,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_ov_test.addLayout(_make_ov_row(
             "#00E5FF", "Achievement Toast", "Pops up on each unlock",
             self._on_theme_toast_test, track_dot=True))
-        lay_ov_test.addLayout(_make_ov_row(
-            "#00E5FF", "Challenge Menu", "Choose Timed/Flip/Heat",
-            self._on_ch_ov_test, track_dot=True))
-        lay_ov_test.addLayout(_make_ov_row(
-            "#00E5FF", "Challenge Timer", "Countdown during timed challenge",
-            self._on_theme_timer_test, track_dot=True))
-        lay_ov_test.addLayout(_make_ov_row(
-            "#00E5FF", "Flip Counter", "Flip tally for flip challenge",
-            self._on_flip_counter_test, track_dot=True))
-        lay_ov_test.addLayout(_make_ov_row(
-            "#00E5FF", "Heat Bar", "Heat barometer for heat challenge",
-            self._on_heat_bar_test, track_dot=True))
         theme_layout.addWidget(grp_ov_test)
 
         # ── 4. Available Themes ────────────────────────────────────────────────
@@ -1071,10 +805,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         return [
             self.chk_portrait,
             self.chk_ach_toast_portrait,
-            self.chk_ch_ov_portrait,
-            self.chk_ch_timer_portrait,
             self.chk_mini_info_portrait,
-            self.chk_heat_bar_portrait,
             self.chk_status_overlay_portrait,
         ]
 
@@ -1083,10 +814,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         return [
             self.chk_portrait_ccw,
             self.chk_ach_toast_ccw,
-            self.chk_ch_ov_ccw,
-            self.chk_ch_timer_ccw,
             self.chk_mini_info_ccw,
-            self.chk_heat_bar_ccw,
             self.chk_status_overlay_ccw,
         ]
 
@@ -1133,20 +861,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "chk_ach_toast_ccw": "Rotate achievement popups counter-clockwise.",
             "btn_ach_toast_place": "Set and save the screen position for achievement popups.",
             "btn_test_toast": "Trigger a test achievement popup to check your placement.",
-            
-            # Appearance Tab - Challenge Menu
-            "chk_ch_ov_portrait": "Rotate the challenge selection menu for portrait screens.",
-            "chk_ch_ov_ccw": "Rotate the challenge selection menu counter-clockwise.",
-            "btn_ch_ov_place": "Set and save the screen position for the challenge menu.",
-            "btn_ch_ov_test": "Show the challenge selection menu for testing.",
-            
-            # Appearance Tab - Timers & Counters
-            "chk_ch_timer_portrait": "Rotate timers and counters for portrait screens.",
-            "chk_ch_timer_ccw": "Rotate timers and counters counter-clockwise.",
-            "btn_ch_timer_place": "Set and save the screen position for the countdown timer.",
-            "btn_ch_timer_test": "Show a test countdown timer to check your placement.",
-            "btn_flip_counter_place": "Set and save the screen position for the flip challenge counter.",
-            "btn_flip_counter_test": "Show a test flip counter to check your placement.",
             
             # Appearance Tab - System Notifications (Mini Info Overlay)
             "chk_mini_info_portrait": "Rotate system notifications (errors, warnings, info) for portrait screens.",
@@ -1259,7 +973,3 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             flip = getattr(self, attr, None)
             if flip is not None:
                 flip.update_font()
-        for attr in ("_challenge_select", "_challenge_select_test", "_flip_diff_select", "_challenge_timer"):
-            win = getattr(self, attr, None)
-            if win is not None and win.isVisible():
-                win.update_font()
