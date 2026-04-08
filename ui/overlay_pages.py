@@ -35,7 +35,6 @@ class OverlayPagesMixin:
         self._prepare_overlay_sections()
         self._show_overlay_section(section)
         self._start_overlay_auto_close_timer()
-        self._build_challenges_results_html()
         self._generate_cloud_html(...)
     """
 

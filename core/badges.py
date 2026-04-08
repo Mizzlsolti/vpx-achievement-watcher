@@ -137,13 +137,6 @@ BADGE_DEFINITIONS = [
     ("three_stars",       "⭐", "Superstar",           "Reach Prestige 3"),
     ("four_stars",        "🌟", "Elite Star",          "Reach Prestige 4"),
     ("five_stars",        "👑", "Maximum Prestige",    "Reach Prestige 5 — Fully Maxed"),
-    # Challenges
-    ("challenger",        "⚔️", "Challenger",          "Complete your first challenge"),
-    ("timed_10",          "⏱️", "Time Trial",          "Complete 10 Timed challenges"),
-    ("flip_pro",          "🏓", "Flip Pro",            "Complete a Pro Flip challenge"),
-    ("heat_10",           "🌡️", "Heat Survivor",       "Complete 10 Heat challenges"),
-    ("triple_threat",     "🎯", "Triple Threat",       "Complete all 3 challenge types on one table"),
-    ("challenge_50",      "🏋️", "Challenge Addict",    "Complete 50 challenges total"),
     # Exploration
     ("explorer",          "🗺️", "Explorer",            "Play 10 different tables"),
     ("globetrotter",      "🌍", "Globetrotter",        "Play tables from 5 different manufacturers"),

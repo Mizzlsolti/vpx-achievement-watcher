@@ -561,3 +561,20 @@ def _migrate_runtime_dirs(cfg):
         _notif.migrate_notifications(cfg)
     except Exception:
         pass
+
+    # Migrate duel nav hotkey keys: challenge_left/right_* → duel_left/right_*
+    _duel_nav_keys = (
+        "input_source", "vk", "mods", "joy_button",
+    )
+    for _side in ("left", "right"):
+        for _suffix in _duel_nav_keys:
+            _old_key = f"challenge_{_side}_{_suffix}"
+            _new_key = f"duel_{_side}_{_suffix}"
+            if _old_key in cfg.OVERLAY and _new_key not in cfg.OVERLAY:
+                cfg.OVERLAY[_new_key] = cfg.OVERLAY.pop(_old_key)
+            elif _old_key in cfg.OVERLAY:
+                del cfg.OVERLAY[_old_key]
+    try:
+        cfg.save()
+    except Exception:
+        pass
