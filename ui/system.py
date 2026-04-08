@@ -501,6 +501,18 @@ class SystemMixin:
                         target=lambda: _CloudSync.set_node(self.cfg, f"players/{_pid}/achievements/name", _name),
                         daemon=True,
                     ).start()
+                # Also upload VPS mapping so new players' tables are visible in duel dropdowns
+                if _pid:
+                    try:
+                        from .vps import _load_vps_mapping as _lvm
+                        _mapping = _lvm(self.cfg)
+                        if _mapping:
+                            _threading.Thread(
+                                target=lambda m=_mapping: _CloudSync.set_node(self.cfg, f"players/{_pid}/vps_mapping", m),
+                                daemon=True,
+                            ).start()
+                    except Exception:
+                        pass
             if getattr(self, "btn_backup_cloud", None):
                 self.btn_backup_cloud.setVisible(True)
             if getattr(self, "btn_restore_cloud", None):
