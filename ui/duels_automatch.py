@@ -16,8 +16,8 @@ from PyQt6.QtWidgets import (
 
 # Total search timeout in seconds (5 minutes).
 _TIMEOUT_SECONDS = 300
-# Polling interval in milliseconds (15 seconds).
-_POLL_INTERVAL_MS = 15_000
+# Polling interval in milliseconds (5 seconds).
+_POLL_INTERVAL_MS = 5_000
 # Countdown refresh interval in milliseconds (1 second).
 _COUNTDOWN_INTERVAL_MS = 1_000
 
