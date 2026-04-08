@@ -486,9 +486,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• Table must have a VPS-ID assigned.<br>"
             "• All three conditions must be met — no exceptions.<br><br>"
             "<b>⚠️ Session Rules:</b><br>"
-            "• You must play for at least 60 seconds.<br>"
-            "• Your score must improve from the baseline.<br>"
-            "• Quitting VPX early or not improving your score will abort the duel.<br>"
+            "• You must play for at least 60 seconds. "
+            "Quitting VPX early will abort the duel.<br>"
             "<br>"
             "<b>🔀 Auto-Match</b><br>"
             "• Press Auto-Match to join the matchmaking queue.<br>"
@@ -509,7 +508,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
-            "(Pages 2–5). Page 1 (Highlights & Score) is always active. "
+            "(Pages 2–6). Page 1 (Highlights & Score) is always active. "
             "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
         ),
         "appearance_theme": (

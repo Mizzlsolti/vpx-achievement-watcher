@@ -10,7 +10,7 @@ class OverlaysMixin:
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
-        ("TIME'S UP!<br>Score: 42.069.000", "#00C853"),
+        ("Score Duel finished!<br>Score: 42.069.000", "#00C853"),
         ("Score submitted to cloud.", "#00C853"),
     ]
 
@@ -71,7 +71,7 @@ class OverlaysMixin:
         self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
 
     def _on_mini_info_message(self, message: str, seconds: int, color_hex: str = "#FFFFFF"):
-        """Show a message in the mini info overlay with no challenge-specific side-effects."""
+        """Show a message in the mini info overlay with no duel-specific side-effects."""
         try:
             if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
                 self._mini_overlay = MiniInfoOverlay(self)

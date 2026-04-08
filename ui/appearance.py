@@ -968,6 +968,9 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         mini = getattr(self, "_mini_overlay", None)
         if mini is not None:
             mini.update_font()
+        status = getattr(self, "_status_overlay", None)
+        if status is not None:
+            status.update_font()
         for attr in ("_flip_total_win", "_flip_total_test_win"):
             flip = getattr(self, attr, None)
             if flip is not None:

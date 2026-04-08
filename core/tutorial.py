@@ -120,7 +120,7 @@ _STEPS = [
             "Position — Each overlay has a \"Set Position\" button.\n"
             "Click it to drag the overlay where you want it on screen.\n"
             "Examples: Stats Overlay, Achievement Toast, and more.\n\n"
-            "Page Controls — Enable or disable overlay pages (2–5)\n"
+            "Page Controls — Enable or disable overlay pages (2–6)\n"
             "to choose which information is shown during gameplay.\n\n"
             "💡 Set positions now so overlays don't cover important\n"
             "   parts of your playfield. You can always adjust later."
@@ -131,11 +131,15 @@ _STEPS = [
     {
         "title": "⌨️ Controls & Hotkeys",
         "body": (
-            "The Controls tab lets you configure keyboard hotkeys\n"
-            "for use during gameplay.\n\n"
-            "  • Toggle overlay on/off while playing\n"
-            "  • Cycle through overlay pages\n"
-            "  • Quick actions without leaving the table"
+            "The Controls tab lets you configure keyboard and joystick\n"
+            "hotkeys for use during gameplay.\n\n"
+            "  • Show/Hide Stats Overlay: toggle the overlay on/off\n"
+            "  • Duel Accept / Left: accept duel invitations, start\n"
+            "    Auto-Match search on the Score Duels overlay page\n"
+            "  • Duel Decline / Right: decline invitations, cancel\n"
+            "    Auto-Match search\n\n"
+            "💡 Flipper buttons or Magna Save buttons work best\n"
+            "   for duel hotkeys on a cabinet."
         ),
         "tab": 3,   # Controls
         "subtab": None,
@@ -261,7 +265,7 @@ _STEPS = [
             "  🆔 Tables must have a VPS-ID assigned.\n\n"
             "⚠️ Duel Rules:\n"
             "  Tables need: NVRAM map + locally installed + VPS-ID.\n"
-            "  Play at least 60 seconds. Score must improve!\n"
+            "  Play at least 60 seconds.\n"
             "  Quitting early = duel aborted.\n\n"
             "🔀 Auto-Match:\n"
             "  Press Auto-Match to automatically find an opponent.\n"

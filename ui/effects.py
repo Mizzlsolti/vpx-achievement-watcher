@@ -73,7 +73,7 @@ _NO_SLIDER_EFFECTS: frozenset[str] = frozenset({
     "fx_toast_slide_motion",
     "fx_toast_energy_flash",
     "fx_toast_hologram_flicker",
-    # Challenge Select — easing/alpha-only effects
+    # Score Duel result — easing/alpha-only effects
     # Timer — subtle/alpha-only effects
     # Heat Barometer — threshold-based or alpha-only
     # Flip Counter — fixed speed/alpha/non-OpenGL effects
