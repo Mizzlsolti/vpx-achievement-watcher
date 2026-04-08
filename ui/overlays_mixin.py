@@ -11,7 +11,6 @@ class OverlaysMixin:
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
         ("Score Duel finished!<br>Score: 42.069.000", "#00C853"),
-        ("Score submitted to cloud.", "#00C853"),
     ]
 
     _STATUS_TEST_MESSAGES = [
@@ -224,21 +223,6 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_left duel invite handling failed: {e}", "WARN")
             except Exception:
                 pass
-        # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
-        try:
-            overlay = getattr(self, "_duel_invite_overlay", None)
-            if overlay is not None and overlay.isVisible():
-                if overlay.is_accept_focused():
-                    overlay.focus_decline()
-                else:
-                    overlay.focus_accept()
-                return
-        except Exception as e:
-            try:
-                from core.watcher_core import log
-                log(self.cfg, f"[NAV] _on_nav_left legacy overlay handling failed: {e}", "WARN")
-            except Exception:
-                pass
         # Page 5 (Score Duels): intercept Left for duel actions.
         try:
             if (
@@ -294,21 +278,6 @@ class OverlaysMixin:
             try:
                 from core.watcher_core import log
                 log(self.cfg, f"[NAV] _on_nav_right duel invite handling failed: {e}", "WARN")
-            except Exception:
-                pass
-        # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
-        try:
-            overlay = getattr(self, "_duel_invite_overlay", None)
-            if overlay is not None and overlay.isVisible():
-                if overlay.is_accept_focused():
-                    overlay.focus_decline()
-                else:
-                    overlay.focus_accept()
-                return
-        except Exception as e:
-            try:
-                from core.watcher_core import log
-                log(self.cfg, f"[NAV] _on_nav_right legacy overlay handling failed: {e}", "WARN")
             except Exception:
                 pass
         # Page 5 (Score Duels): intercept Right for duel actions.
