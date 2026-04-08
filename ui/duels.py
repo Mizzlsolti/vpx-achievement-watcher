@@ -629,8 +629,8 @@ class DuelsMixin:
             from core.cloud_sync import CloudSync
             try:
                 player_ids = CloudSync.fetch_player_ids(self.cfg) or []
-                my_id = self.cfg.OVERLAY.get("player_id", "").strip()
-                other_ids = [pid for pid in player_ids if pid != my_id]
+                my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
+                other_ids = [pid for pid in player_ids if pid.strip().lower() != my_id]
                 name_nodes = [f"players/{pid}/achievements/name" for pid in other_ids]
                 names_map: dict[str, str] = {}
                 if name_nodes:
@@ -644,6 +644,19 @@ class DuelsMixin:
                             names_map[pid] = raw.get("name", "")
                         else:
                             names_map[pid] = ""
+                # Fallback: for players with no name from achievements/name, try progress node.
+                missing_ids = [pid for pid in other_ids if not names_map.get(pid, "").strip()]
+                if missing_ids:
+                    progress_nodes = [f"players/{pid}/progress" for pid in missing_ids]
+                    progress_results = CloudSync.fetch_parallel(self.cfg, progress_nodes) or {}
+                    for pid in missing_ids:
+                        progress_data = progress_results.get(f"players/{pid}/progress")
+                        if isinstance(progress_data, dict) and progress_data:
+                            first_entry = next(iter(progress_data.values()), None)
+                            if isinstance(first_entry, dict):
+                                fallback_name = first_entry.get("name", "").strip()
+                                if fallback_name:
+                                    names_map[pid] = fallback_name
                 # Build fallback name map from active duel records (once, O(N+M)).
                 duel_name_map: dict[str, str] = {}
                 try:
@@ -656,11 +669,14 @@ class DuelsMixin:
                 except Exception:
                     pass
                 players = []
+                my_name = self.cfg.OVERLAY.get("player_name", "").strip()
                 for pid in other_ids:
                     name = names_map.get(pid, "").strip()
                     if not name:
                         name = duel_name_map.get(pid, "").strip()
-                    if name and name != "Player":
+                    if name and name.lower() != "player":
+                        if my_name and name.lower() == my_name.lower():
+                            continue
                         players.append((name, pid))
                 players.sort(key=lambda x: x[0].lower())
             except Exception:
@@ -1629,9 +1645,9 @@ class DuelsMixin:
             else:
                 tbl.setItem(row, 3, QTableWidgetItem("—"))
 
-            # Actions column: Cancel button for PENDING (challenger only) and ACCEPTED (either player).
+            # Actions column: Cancel button for PENDING (either participant) and ACCEPTED (either player).
             can_cancel = (
-                (duel.status == DuelStatus.PENDING and is_challenger)
+                (duel.status == DuelStatus.PENDING and (is_challenger or duel.opponent == my_id))
                 or (duel.status == DuelStatus.ACCEPTED and (duel.challenger == my_id or duel.opponent == my_id))
             )
             if can_cancel:

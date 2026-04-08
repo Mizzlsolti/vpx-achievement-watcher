@@ -468,7 +468,7 @@ class DuelEngine:
     def cancel_duel(self, duel_id: str) -> bool:
         """Cancel a duel that was sent by or involves this player.
 
-        PENDING duels: only the challenger can cancel.
+        PENDING duels: either the challenger or the opponent can cancel.
         ACCEPTED duels: either the challenger or opponent can cancel.
 
         The duel is marked as CANCELLED, moved to history, and the updated
@@ -483,8 +483,8 @@ class DuelEngine:
                 return False
             my_id = self._my_player_id()
             if duel.status == DuelStatus.PENDING:
-                if duel.challenger != my_id:
-                    log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not the challenger.", "WARN")
+                if duel.challenger != my_id and duel.opponent != my_id:
+                    log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not a participant.", "WARN")
                     return False
             elif duel.status == DuelStatus.ACCEPTED:
                 if duel.challenger != my_id and duel.opponent != my_id:

@@ -402,6 +402,18 @@ class SystemMixin:
             self._save_player_id(new_id)
             self.cfg.CLOUD_ENABLED = True
             self.cfg.save()
+            # Immediately upload the player name so new players appear in opponent lists
+            # before their first game session (which is when upload_full_achievements runs).
+            if self.cfg.CLOUD_URL:
+                import threading as _threading
+                from core.cloud_sync import CloudSync as _CloudSync
+                _pid = new_id.strip()
+                _name = new_name.strip()
+                if _pid and _name and _name.lower() != "player":
+                    _threading.Thread(
+                        target=lambda: _CloudSync.set_node(self.cfg, f"players/{_pid}/achievements/name", _name),
+                        daemon=True,
+                    ).start()
             if getattr(self, "btn_backup_cloud", None):
                 self.btn_backup_cloud.setVisible(True)
             if getattr(self, "btn_restore_cloud", None):
