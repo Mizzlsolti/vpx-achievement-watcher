@@ -406,7 +406,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.btn_test_toast = QPushButton("Test"); self.btn_test_toast.clicked.connect(lambda: self._ach_toast_mgr.enqueue("TEST – Achievement", "test_rom", 5))
         box_toast = create_overlay_box("Achievement Toasts", self.chk_ach_toast_portrait, self.chk_ach_toast_ccw, self.btn_ach_toast_place, self.btn_test_toast)
 
-        # 3) Challenge Menu
         # 4) Mini Info / Notifications Overlay
         self.chk_mini_info_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_mini_info_portrait.setChecked(bool(self.cfg.OVERLAY.get("notifications_portrait", True))); self.chk_mini_info_portrait.stateChanged.connect(self._on_mini_info_portrait_toggle)
         self.chk_mini_info_ccw = QCheckBox("Rotate CCW"); self.chk_mini_info_ccw.setChecked(bool(self.cfg.OVERLAY.get("notifications_rotate_ccw", True))); self.chk_mini_info_ccw.stateChanged.connect(self._on_mini_info_ccw_toggle)
@@ -460,25 +459,20 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.chk_overlay_page2.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page2)
 
-        self.chk_overlay_page3 = QCheckBox("Page 3: Challenge Leaderboard")
+        self.chk_overlay_page3 = QCheckBox("Page 3: Cloud Leaderboard")
         self.chk_overlay_page3.setChecked(bool(self.cfg.OVERLAY.get("overlay_page3_enabled", True)))
         self.chk_overlay_page3.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page3)
 
-        self.chk_overlay_page4 = QCheckBox("Page 4: Cloud Leaderboard")
+        self.chk_overlay_page4 = QCheckBox("Page 4: VPC Leaderboard")
         self.chk_overlay_page4.setChecked(bool(self.cfg.OVERLAY.get("overlay_page4_enabled", True)))
         self.chk_overlay_page4.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page4)
 
-        self.chk_overlay_page5 = QCheckBox("Page 5: VPC Leaderboard")
+        self.chk_overlay_page5 = QCheckBox("Page 5: Score Duels")
         self.chk_overlay_page5.setChecked(bool(self.cfg.OVERLAY.get("overlay_page5_enabled", True)))
         self.chk_overlay_page5.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page5)
-
-        self.chk_overlay_page6 = QCheckBox("Page 6: Score Duels")
-        self.chk_overlay_page6.setChecked(bool(self.cfg.OVERLAY.get("overlay_page6_enabled", True)))
-        self.chk_overlay_page6.stateChanged.connect(self._save_overlay_page_settings)
-        lay_pages.addWidget(self.chk_overlay_page6)
 
         layout.addWidget(grp_pages)
 

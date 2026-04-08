@@ -11,8 +11,6 @@ class OverlaysMixin:
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
         ("TIME'S UP!<br>Score: 42.069.000", "#00C853"),
-        ("Challenge Aborted!", "#FF3B30"),
-        ("Challenges disabled: No active VPX Player detected.", "#FF3B30"),
         ("Score submitted to cloud.", "#00C853"),
     ]
 
@@ -168,25 +166,25 @@ class OverlaysMixin:
 
     def _nav_binding_label_text(self, kind: str) -> str:
         if kind == "left":
-            src = str(self.cfg.OVERLAY.get("challenge_left_input_source", "keyboard")).lower()
+            src = str(self.cfg.OVERLAY.get("duel_left_input_source", "keyboard")).lower()
             if src == "joystick":
-                btn = int(self.cfg.OVERLAY.get("challenge_left_joy_button", 4))
+                btn = int(self.cfg.OVERLAY.get("duel_left_joy_button", 4))
                 return f"Current: joystick button {btn}"
-            vk = int(self.cfg.OVERLAY.get("challenge_left_vk", 0x25))
-            mods = int(self.cfg.OVERLAY.get("challenge_left_mods", 0))
+            vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0x25))
+            mods = int(self.cfg.OVERLAY.get("duel_left_mods", 0))
             return f"Current: {self._fmt_hotkey_label(vk, mods)}"
         if kind == "right":
-            src = str(self.cfg.OVERLAY.get("challenge_right_input_source", "keyboard")).lower()
+            src = str(self.cfg.OVERLAY.get("duel_right_input_source", "keyboard")).lower()
             if src == "joystick":
-                btn = int(self.cfg.OVERLAY.get("challenge_right_joy_button", 5))
+                btn = int(self.cfg.OVERLAY.get("duel_right_joy_button", 5))
                 return f"Current: joystick button {btn}"
-            vk = int(self.cfg.OVERLAY.get("challenge_right_vk", 0x27))
-            mods = int(self.cfg.OVERLAY.get("challenge_right_mods", 0))
+            vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0x27))
+            mods = int(self.cfg.OVERLAY.get("duel_right_mods", 0))
             return f"Current: {self._fmt_hotkey_label(vk, mods)}"
         return "Current: (none)"
 
     def _on_nav_src_changed(self, kind: str, src: str):
-        key = f"challenge_{kind}_input_source"
+        key = f"duel_{kind}_input_source"
         self.cfg.OVERLAY[key] = str(src)
         self.cfg.save()
         if kind == "left":

@@ -74,7 +74,7 @@ class CloudStatsMixin:
         lay_ctrl = QHBoxLayout(grp_controls)
         
         self.cmb_cloud_category = QComboBox()
-        self.cmb_cloud_category.addItems(["Achievement Progress", "Timed Challenge", "Flip Challenge", "Heat Challenge"])        
+        self.cmb_cloud_category.addItems(["Achievement Progress"])        
         self.cmb_cloud_category.currentIndexChanged.connect(self._on_cloud_cat_changed)
         
         self.cmb_cloud_diff = QComboBox()
@@ -138,10 +138,7 @@ class CloudStatsMixin:
             pass
 
     def _on_cloud_cat_changed(self, idx: int):
-        if idx == 2:
-            self.cmb_cloud_diff.show()
-        else:
-            self.cmb_cloud_diff.hide()
+        self.cmb_cloud_diff.hide()
 
     def _on_cloud_view_anchor_clicked(self, url: QUrl):
         """Handle info badge clicks: show VPS table info dialog instead of opening a browser."""
@@ -183,10 +180,10 @@ class CloudStatsMixin:
 
     def _fetch_cloud_leaderboard(self):
         cat_index = self.cmb_cloud_category.currentIndex()
-        cat_map = {0: "progress", 1: "timed", 2: "flip", 3: "heat"}
+        cat_map = {0: "progress"}
         category = cat_map.get(cat_index, "progress")
         rom_input = self.txt_cloud_rom.text().strip().lower()
-        selected_diff = self.cmb_cloud_diff.currentText() if category == "flip" else None
+        selected_diff = None
 
         if not rom_input:
             self.cloud_view.setHtml("<div style='color:#FF3B30;'>(Please enter a ROM or Title first)</div>")

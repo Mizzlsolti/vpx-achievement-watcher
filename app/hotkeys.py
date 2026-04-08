@@ -68,10 +68,10 @@ class HotkeysMixin:
 
     def _on_joy_toggle_poll(self):
         def _need_nav(kind: str) -> int | None:
-            if str(self.cfg.OVERLAY.get(f"challenge_{kind}_input_source", "keyboard")).lower() != "joystick":
+            if str(self.cfg.OVERLAY.get(f"duel_{kind}_input_source", "keyboard")).lower() != "joystick":
                 return None
             try:
-                return int(self.cfg.OVERLAY.get(f"challenge_{kind}_joy_button", 0) or 0)
+                return int(self.cfg.OVERLAY.get(f"duel_{kind}_joy_button", 0) or 0)
             except Exception:
                 return None
         overlay_src = str(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")).lower()
@@ -130,7 +130,7 @@ class HotkeysMixin:
         try:
             src_overlay = str(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")).lower()
             any_nav_joy = any(
-                str(self.cfg.OVERLAY.get(f"challenge_{k}_input_source", "keyboard")).lower() == "joystick"
+                str(self.cfg.OVERLAY.get(f"duel_{k}_input_source", "keyboard")).lower() == "joystick"
                 for k in ("left", "right")
             )
             need_poll = (src_overlay == "joystick") or any_nav_joy
@@ -300,7 +300,7 @@ class HotkeysMixin:
         self._unregister_global_hotkeys()
         self._uninstall_global_keyboard_hook()
         
-        src = self.cfg.OVERLAY.get(f"challenge_{kind}_input_source", "keyboard")
+        src = self.cfg.OVERLAY.get(f"duel_{kind}_input_source", "keyboard")
         is_joy = (src == "joystick")
         
         dlg = QDialog(self)
@@ -355,8 +355,8 @@ class HotkeysMixin:
                                     
                                 mods = self.parent._get_hotkey_mods_now()
                                 self._done = True
-                                self.parent.cfg.OVERLAY[f"challenge_{kind}_vk"] = int(vk)
-                                self.parent.cfg.OVERLAY[f"challenge_{kind}_mods"] = int(mods)
+                                self.parent.cfg.OVERLAY[f"duel_{kind}_vk"] = int(vk)
+                                self.parent.cfg.OVERLAY[f"duel_{kind}_mods"] = int(mods)
                                 self.parent.cfg.save()
                                 QTimer.singleShot(0, dlg.accept)
                                 return True, 0
@@ -398,7 +398,7 @@ class HotkeysMixin:
                         lsb = newly & -newly
                         idx = lsb.bit_length() - 1
                         btn_num = idx + 1
-                        self.cfg.OVERLAY[f"challenge_{kind}_joy_button"] = int(btn_num)
+                        self.cfg.OVERLAY[f"duel_{kind}_joy_button"] = int(btn_num)
                         self.cfg.save()
                         timer.stop()
                         dlg.accept()
@@ -482,13 +482,13 @@ class HotkeysMixin:
                 vk_overlay = int(self.cfg.OVERLAY.get("toggle_vk", 120))  # F9
                 mods_overlay = int(self.cfg.OVERLAY.get("toggle_mods", 0))
                 _reg_ch(ids["overlay_toggle"], vk_overlay, mods_overlay)
-            if str(self.cfg.OVERLAY.get("challenge_left_input_source", "keyboard")).lower() == "keyboard":
-                vk = int(self.cfg.OVERLAY.get("challenge_left_vk", 0x25))
-                mods = int(self.cfg.OVERLAY.get("challenge_left_mods", 0))
+            if str(self.cfg.OVERLAY.get("duel_left_input_source", "keyboard")).lower() == "keyboard":
+                vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0x25))
+                mods = int(self.cfg.OVERLAY.get("duel_left_mods", 0))
                 _reg_ch(ids["ch_left"], vk, mods)
-            if str(self.cfg.OVERLAY.get("challenge_right_input_source", "keyboard")).lower() == "keyboard":
-                vk = int(self.cfg.OVERLAY.get("challenge_right_vk", 0x27))
-                mods = int(self.cfg.OVERLAY.get("challenge_right_mods", 0))
+            if str(self.cfg.OVERLAY.get("duel_right_input_source", "keyboard")).lower() == "keyboard":
+                vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0x27))
+                mods = int(self.cfg.OVERLAY.get("duel_right_mods", 0))
                 _reg_ch(ids["ch_right"], vk, mods)
             class _HotkeyFilter(QAbstractNativeEventFilter):
                 def __init__(self, parent_ref, ids_map):

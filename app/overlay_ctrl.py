@@ -236,10 +236,6 @@ class OverlayCtrlMixin:
 
         try:
             if self.watcher and self.watcher.game_active:
-                # Wenn eine Challenge aktiv ist oder gestartet wird → nichts tun
-                ch = getattr(self.watcher, "challenge", {}) or {}
-                if ch.get("active") or ch.get("suppress_big_overlay_once"):
-                    return
                 try:
                     if self.overlay and self.overlay.isVisible():
                         self.overlay.hide()
@@ -306,8 +302,6 @@ class OverlayCtrlMixin:
                     enabled_pages.append(3)
                 if ov.get("overlay_page5_enabled", True):
                     enabled_pages.append(4)
-                if ov.get("overlay_page6_enabled", True):
-                    enabled_pages.append(5)
                 if not enabled_pages:
                     enabled_pages = [1] if self._is_active_cat_table() else [0]
                 current = int(getattr(self, "_overlay_page", 0))
@@ -343,15 +337,10 @@ class OverlayCtrlMixin:
 
         def _do_show():
             try:
-                # Don't auto-open the main overlay when a challenge is active or
-                # being started (suppress_big_overlay_once is set at challenge start
-                # before the first challenge notification fires).
                 # Also suppress when a duel is active for the current table.
                 try:
                     _w = getattr(self, "watcher", None)
-                    ch = getattr(_w, "challenge", {}) if _w is not None else {}
-                    if ((ch or {}).get("active") or (ch or {}).get("suppress_big_overlay_once")
-                            or getattr(_w, "duel_active_for_current_table", False)):
+                    if getattr(_w, "duel_active_for_current_table", False):
                         return
                 except Exception:
                     pass
@@ -400,7 +389,7 @@ class OverlayCtrlMixin:
         _do_show()
 
     def _hide_overlay(self):
-        # Clean up page 6 (Score Duels) search state before hiding.
+        # Clean up Score Duels search state before hiding.
         try:
             if getattr(self, "_p6_state", "IDLE") == "SEARCHING":
                 self._overlay_page6_stop_search()

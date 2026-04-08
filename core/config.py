@@ -106,7 +106,6 @@ DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page5_enabled", True)
-DEFAULT_OVERLAY.setdefault("overlay_page6_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
 DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
@@ -166,7 +165,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",
-    "overlay_page4_enabled", "overlay_page5_enabled", "overlay_page6_enabled",
+    "overlay_page4_enabled", "overlay_page5_enabled",
     "sound_enabled", "sound_volume", "sound_pack", "sound_events",
 
     # Granular fx_* effect toggles and intensities
@@ -559,5 +558,33 @@ def _migrate_runtime_dirs(cfg):
     try:
         from . import notifications as _notif
         _notif.migrate_notifications(cfg)
+    except Exception:
+        pass
+
+    # Migrate duel nav hotkey keys: challenge_left/right_* → duel_left/right_*
+    _duel_nav_keys = (
+        "input_source", "vk", "mods", "joy_button",
+    )
+    for _side in ("left", "right"):
+        for _suffix in _duel_nav_keys:
+            _old_key = f"challenge_{_side}_{_suffix}"
+            _new_key = f"duel_{_side}_{_suffix}"
+            if _old_key in cfg.OVERLAY and _new_key not in cfg.OVERLAY:
+                cfg.OVERLAY[_new_key] = cfg.OVERLAY.pop(_old_key)
+            elif _old_key in cfg.OVERLAY:
+                del cfg.OVERLAY[_old_key]
+
+    # Migrate overlay page numbering: old page4/5/6 → new page3/4/5
+    # (Challenge Leaderboard page removed; pages shifted down by one)
+    for _old_num, _new_num in ((4, 3), (5, 4), (6, 5)):
+        _old_key = f"overlay_page{_old_num}_enabled"
+        _new_key = f"overlay_page{_new_num}_enabled"
+        if _old_key in cfg.OVERLAY and _new_key not in cfg.OVERLAY:
+            cfg.OVERLAY[_new_key] = cfg.OVERLAY.pop(_old_key)
+        elif _old_key in cfg.OVERLAY:
+            del cfg.OVERLAY[_old_key]
+
+    try:
+        cfg.save()
     except Exception:
         pass

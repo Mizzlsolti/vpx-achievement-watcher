@@ -787,9 +787,6 @@ class _TrophieMemory:
             return 30.0
         return sum(self.session_durations) / len(self.session_durations)
 
-    def is_challenge_fan(self) -> bool:
-        return False
-
     def dismisses_quickly(self) -> bool:
         if len(self.dismiss_speed) < 5:
             return False
