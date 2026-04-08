@@ -133,6 +133,7 @@ class DuelsMixin:
         self._duel_opponent_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._duel_opponent_completer.setFilterMode(Qt.MatchFlag.MatchContains)
         self._cmb_duel_opponent.setCompleter(self._duel_opponent_completer)
+        self._cmb_duel_opponent.currentIndexChanged.connect(self._on_duel_opponent_changed)
         row_opponent.addWidget(self._cmb_duel_opponent, 1)
 
         self._btn_duel_refresh_players = QPushButton("🔄 Refresh Players")
@@ -146,6 +147,10 @@ class DuelsMixin:
         lay_new.addLayout(row_opponent)
 
         self._cmb_duel_opponent.setMaxVisibleItems(20)
+
+        # Stores the set of VPS-IDs for the currently selected opponent.
+        # None means "no opponent selected / show all tables".
+        self._current_opponent_vps_ids: set | None = None
 
         row_table = QHBoxLayout()
         row_table.addWidget(QLabel("Table:"))
@@ -420,6 +425,10 @@ class DuelsMixin:
         assigned a VPS-ID) when _all_maps_cache has no matching entries, e.g.
         on first launch before the map list has been loaded.
 
+        When self._current_opponent_vps_ids is a non-empty set the list is
+        further filtered to only tables whose VPS-ID is also in the opponent's
+        mapping (i.e. shared tables only).
+
         Preserves the current selection if the same ROM is still available
         after repopulating.
         """
@@ -434,11 +443,23 @@ class DuelsMixin:
             vps_mapping = _load_vps_mapping(self.cfg)
         except Exception:
             vps_mapping = {}
+
+        # Opponent VPS-ID filter: None means "show all", set means "shared only".
+        opp_ids: set | None = getattr(self, "_current_opponent_vps_ids", None)
+
+        def _passes_opponent_filter(rom: str) -> bool:
+            """Return True if this ROM's VPS-ID is shared with the opponent (or no filter active)."""
+            if opp_ids is None:
+                return True
+            my_vps_id = vps_mapping.get(rom.lower().strip(), "")
+            return bool(my_vps_id) and my_vps_id in opp_ids
+
         entries = sorted(
             (e for e in cache if isinstance(e, dict)
              and e.get("is_local")
              and e.get("rom", "").lower().strip() in vps_mapping
-             and (e.get("has_map") or e.get("cat_enabled", False))),
+             and (e.get("has_map") or e.get("cat_enabled", False))
+             and _passes_opponent_filter(e.get("rom", ""))),
             key=lambda e: e.get("title", e.get("rom", "")).lower(),
         )
         # Detect duplicate clean names and add author suffix to disambiguate.
@@ -471,12 +492,19 @@ class DuelsMixin:
             mapping = vps_mapping
             if mapping:
                 romnames = getattr(getattr(self, "watcher", None), "ROMNAMES", {})
-                fallback_entries = sorted(mapping.keys(), key=lambda r: (romnames.get(r) or r).lower())
+                fallback_entries = sorted(
+                    (r for r in mapping.keys() if _passes_opponent_filter(r)),
+                    key=lambda r: (romnames.get(r) or r).lower(),
+                )
                 for rom in fallback_entries:
                     title = romnames.get(rom) or rom
                     clean_title = _strip_version_from_name(title)
                     display = clean_title
                     self._cmb_duel_table.addItem(display, rom)
+                if not fallback_entries and opp_ids is not None:
+                    self._cmb_duel_table.addItem("(No shared tables with this opponent)", "")
+                elif not fallback_entries:
+                    self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
             else:
                 self._cmb_duel_table.addItem("(No tables found – load the map list first)", "")
 
@@ -491,6 +519,8 @@ class DuelsMixin:
                         table_key = fname[:-len(".custom.json")]
                         if lookup_by_table_key(table_key) is None:
                             continue  # Not approved → skip
+                        if not _passes_opponent_filter(table_key):
+                            continue  # Not shared with opponent → skip
                         clean_name = _strip_version_from_name(table_key)
                         display = clean_name
                         if table_key not in existing_data and table_key in vps_mapping:
@@ -648,6 +678,8 @@ class DuelsMixin:
     def _on_duel_players_loaded(self, players) -> None:
         """Populate the opponent combo box with the fetched player list."""
         self._btn_duel_refresh_players.setEnabled(True)
+        # Reset opponent filter so the table combo shows all local tables.
+        self._current_opponent_vps_ids = None
         self._cmb_duel_opponent.clear()
         if not players:
             self._cmb_duel_opponent.addItem("(No players found)", "")
@@ -656,6 +688,70 @@ class DuelsMixin:
         for display_name, player_id in players:
             self._cmb_duel_opponent.addItem(display_name, player_id)
         self._cmb_duel_opponent.setCurrentIndex(0)
+
+    # ── Slot: opponent selection changed ──────────────────────────────────────
+
+    @pyqtSlot(int)
+    def _on_duel_opponent_changed(self, _index: int) -> None:
+        """Triggered when the user selects a different opponent.
+
+        Fetches the opponent's vps_mapping from the cloud in a background thread
+        and filters the table combo to only show shared tables.
+        """
+        opponent_id = (self._cmb_duel_opponent.currentData() or "").strip()
+        if not opponent_id:
+            # No valid opponent selected – reset to show all local tables.
+            self._current_opponent_vps_ids = None
+            self._populate_duel_table_combo()
+            self._lbl_duel_status.setText("")
+            return
+
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            return
+
+        self._lbl_duel_status.setText("⏳ Loading shared tables…")
+        self._lbl_duel_status.setStyleSheet("color:#00E5FF; font-style:italic;")
+        self._cmb_duel_table.setEnabled(False)
+
+        def _fetch():
+            from core.cloud_sync import CloudSync
+            from PyQt6.QtCore import QMetaObject, Q_ARG, Qt as _Qt
+            try:
+                mapping = CloudSync.fetch_node(self.cfg, f"players/{opponent_id}/vps_mapping")
+            except Exception:
+                mapping = None
+            QMetaObject.invokeMethod(
+                self, "_on_opponent_vps_loaded",
+                _Qt.ConnectionType.QueuedConnection,
+                Q_ARG(object, mapping),
+            )
+
+        threading.Thread(target=_fetch, daemon=True).start()
+
+    @pyqtSlot(object)
+    def _on_opponent_vps_loaded(self, opponent_vps_mapping) -> None:
+        """Called on the GUI thread after the opponent's vps_mapping has been fetched.
+
+        Stores the opponent's VPS-ID set, re-enables the table combo, and
+        repopulates it so only shared tables are shown.
+        """
+        self._cmb_duel_table.setEnabled(True)
+        if isinstance(opponent_vps_mapping, dict) and opponent_vps_mapping:
+            self._current_opponent_vps_ids = {v for v in opponent_vps_mapping.values() if v}
+        else:
+            self._current_opponent_vps_ids = set()
+        self._populate_duel_table_combo()
+        # Update status based on how many shared tables were found.
+        count = self._cmb_duel_table.count()
+        # Subtract the placeholder "— Select Table —" entry.
+        real_count = sum(
+            1 for i in range(count) if self._cmb_duel_table.itemData(i)
+        )
+        if real_count == 0:
+            self._lbl_duel_status.setText("(No shared tables with this opponent)")
+            self._lbl_duel_status.setStyleSheet("color:#FFAA00; font-style:italic;")
+        else:
+            self._lbl_duel_status.setText("")
 
     # ── Slot: start duel ─────────────────────────────────────────────────────
 
