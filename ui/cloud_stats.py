@@ -288,7 +288,7 @@ class CloudStatsMixin:
         if category == "progress":
             title_cat = "Achievement Progress"
         elif category == "flip" and selected_diff and selected_diff != "All Difficulties":
-            title_cat = f"Flip Challenge ({selected_diff})"
+            title_cat = f"Flip Contest ({selected_diff})"
         else:
             title_cat = f"{category.upper()} Challenge"
             

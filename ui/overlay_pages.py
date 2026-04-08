@@ -675,7 +675,7 @@ class OverlayPagesMixin:
         _tc_primary = get_theme_color(self.cfg, "primary")
         loading_html = (
             f"<div style='color:{_tc_primary};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
-            f"VPC Weekly Challenge</div>"
+            f"VPC Weekly</div>"
             f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
         )
         self._show_page_with_transition(lambda: self.overlay.set_html_fullsize(loading_html, "VPC Weekly"))

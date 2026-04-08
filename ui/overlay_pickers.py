@@ -113,8 +113,8 @@ class MiniInfoPositionPicker(_BasePositionPicker):
         max_text_width = 520
         _accent = get_theme_color(self.parent_gui.cfg, "accent")
         candidate_messages = [
-            f"<span style='color:{_accent};'>CHALLENGE COMPLETE!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
-            f"<span style='color:{_accent};'>TIME'S UP!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>SCORE DUEL COMPLETE!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>SCORE DUEL FINISHED!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>NVRAM file not found or not readable</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
