@@ -351,7 +351,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             self._mini_overlay.show_info(message, seconds=seconds, color_hex=color_hex)
             try:
                 from ui.overlay_base import _force_topmost
-                _force_topmost(self._mini_overlay)
+                ov = self._mini_overlay
+                _force_topmost(ov)
+                # VPX fullscreen may reclaim topmost after the initial call;
+                # repeat at 100/300/500 ms to keep the notification visible.
+                QTimer.singleShot(100, lambda: _force_topmost(ov))
+                QTimer.singleShot(300, lambda: _force_topmost(ov))
+                QTimer.singleShot(500, lambda: _force_topmost(ov))
             except Exception:
                 pass
         except Exception:
