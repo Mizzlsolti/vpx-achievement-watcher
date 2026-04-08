@@ -804,13 +804,13 @@ class OverlayPagesMixin:
 
         threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
 
-    # ── Page 6: Score Duels Auto-Match ───────────────────────────────────────
+    # ── Page 5: Score Duels Auto-Match ───────────────────────────────────────
 
     _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
     _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
 
     def _overlay_page6_build_html(self) -> str:
-        """Build and return the full HTML string for Page 6 (Score Duels Auto-Match)."""
+        """Build and return the full HTML string for Page 5 (Score Duels Auto-Match)."""
         state = getattr(self, "_p6_state", "IDLE")
 
         _tc_primary = get_theme_color(self.cfg, "primary")
@@ -973,7 +973,7 @@ class OverlayPagesMixin:
             pass
 
     def _overlay_page6_show(self):
-        """Show Page 6: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
+        """Show Page 5: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
         self._ensure_overlay()
         html = self._overlay_page6_build_html()
         state = getattr(self, "_p6_state", "IDLE")
@@ -1046,7 +1046,7 @@ class OverlayPagesMixin:
         except Exception:
             pass
         # Refresh display and disable auto-close
-        if getattr(self, "_overlay_page", -1) == 5:
+        if getattr(self, "_overlay_page", -1) == 4:
             self._overlay_page6_show()
         # Immediate first poll
         self._overlay_page6_do_poll()
@@ -1059,10 +1059,10 @@ class OverlayPagesMixin:
         self._p6_elapsed_sec = int(getattr(self, "_p6_elapsed_sec", 0)) + 1
         if self._p6_elapsed_sec >= 300:
             self._overlay_page6_stop_search()
-            if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+            if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
                 self._overlay_page6_refresh()
             return
-        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_refresh()
 
     def _overlay_page6_do_poll(self):
@@ -1116,7 +1116,7 @@ class OverlayPagesMixin:
                     trophie.on_automatch_found()
             except Exception:
                 pass
-            if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+            if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
                 self._overlay_page6_show()
         else:
             self._p6_queue_count   = result.get("queue_count", 0)
@@ -1165,7 +1165,7 @@ class OverlayPagesMixin:
                 play_sound(self.cfg, "duel_accepted")
             except Exception:
                 pass
-        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 
     def _overlay_page6_decline(self):
@@ -1184,7 +1184,7 @@ class OverlayPagesMixin:
                         duel_engine.decline_duel(duel_id)
                 except Exception:
                     pass
-        if getattr(self, "_overlay_page", -1) == 5 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 
     # ── Cloud overlay slot ────────────────────────────────────────────────────

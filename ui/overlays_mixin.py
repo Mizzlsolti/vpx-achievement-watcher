@@ -239,10 +239,10 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_left legacy overlay handling failed: {e}", "WARN")
             except Exception:
                 pass
-        # Page 6 (Score Duels): intercept Left for duel actions.
+        # Page 5 (Score Duels): intercept Left for duel actions.
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 5
+                getattr(self, "_overlay_page", -1) == 4
                 and getattr(self, "overlay", None) is not None
                 and self.overlay.isVisible()
             ):
@@ -255,7 +255,7 @@ class OverlaysMixin:
         except Exception as e:
             try:
                 from core.watcher_core import log
-                log(self.cfg, f"[NAV] _on_nav_left page6 handling failed: {e}", "WARN")
+                log(self.cfg, f"[NAV] _on_nav_left page5 handling failed: {e}", "WARN")
             except Exception:
                 pass
 
@@ -311,10 +311,10 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_right legacy overlay handling failed: {e}", "WARN")
             except Exception:
                 pass
-        # Page 6 (Score Duels): intercept Right for duel actions.
+        # Page 5 (Score Duels): intercept Right for duel actions.
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 5
+                getattr(self, "_overlay_page", -1) == 4
                 and getattr(self, "overlay", None) is not None
                 and self.overlay.isVisible()
             ):
@@ -329,6 +329,6 @@ class OverlaysMixin:
         except Exception as e:
             try:
                 from core.watcher_core import log
-                log(self.cfg, f"[NAV] _on_nav_right page6 handling failed: {e}", "WARN")
+                log(self.cfg, f"[NAV] _on_nav_right page5 handling failed: {e}", "WARN")
             except Exception:
                 pass
