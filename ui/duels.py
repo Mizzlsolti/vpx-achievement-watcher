@@ -1859,35 +1859,59 @@ class DuelsMixin:
         self._duel_baseline_games_started = baseline_gs
         self._duel_baseline_rom = rom
 
-        def _player_visible() -> bool:
+        def _duel_notify_worker():
             try:
-                w = getattr(self, "watcher", None)
-                return bool(w and w._vp_player_visible())
-            except Exception:
-                return False
+                import win32gui
+            except ImportError:
+                win32gui = None
 
-        def _show_duel_start_notify():
+            def _vpx_window_visible() -> bool:
+                if not win32gui:
+                    try:
+                        _w = getattr(self, "watcher", None)
+                        return bool(_w and _w._vp_player_visible())
+                    except Exception:
+                        return False
+                found = False
+
+                def _cb(hwnd, _):
+                    nonlocal found
+                    try:
+                        title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
+                        if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
+                            found = True
+                            return False
+                    except Exception:
+                        pass
+                    return True
+
+                try:
+                    win32gui.EnumWindows(_cb, None)
+                except Exception:
+                    pass
+                return found
+
+            detected = False
+            for _ in range(120):  # max 60 s – VPX can take a while to show its window
+                try:
+                    _w = getattr(self, "watcher", None)
+                    if _w is not None and not _w.game_active:
+                        return
+                except Exception:
+                    return
+                if _vpx_window_visible():
+                    detected = True
+                    break
+                time.sleep(0.5)
+
+            if detected:
+                time.sleep(3)  # extra wait so the table finishes rendering
             try:
                 self.bridge.duel_info_show.emit(msg, 6, "#FF7F00")
             except Exception:
                 pass
 
-        if _player_visible():
-            _show_duel_start_notify()
-        else:
-            tries = [0]
-
-            def _retry():
-                if _player_visible():
-                    _show_duel_start_notify()
-                    return
-                tries[0] += 1
-                if tries[0] < 20:
-                    QTimer.singleShot(250, _retry)
-                else:
-                    _show_duel_start_notify()
-
-            QTimer.singleShot(250, _retry)
+        threading.Thread(target=_duel_notify_worker, daemon=True, name="DuelStartNotify").start()
 
         # Capture session start timestamp.
         self._duel_session_start_ts = time.time()
