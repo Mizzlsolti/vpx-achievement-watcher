@@ -453,7 +453,6 @@ class SystemMixin:
         self.cfg.OVERLAY["overlay_page3_enabled"] = self.chk_overlay_page3.isChecked()
         self.cfg.OVERLAY["overlay_page4_enabled"] = self.chk_overlay_page4.isChecked()
         self.cfg.OVERLAY["overlay_page5_enabled"] = self.chk_overlay_page5.isChecked()
-        self.cfg.OVERLAY["overlay_page6_enabled"] = self.chk_overlay_page6.isChecked()
         self.cfg.save()
 
     def _save_player_name(self, name):

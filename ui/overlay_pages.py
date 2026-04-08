@@ -71,8 +71,6 @@ class OverlayPagesMixin:
             enabled_pages.append(3)
         if ov.get("overlay_page5_enabled", True):
             enabled_pages.append(4)
-        if ov.get("overlay_page6_enabled", True):
-            enabled_pages.append(5)
 
         if not enabled_pages:
             enabled_pages = [0]
@@ -151,20 +149,13 @@ class OverlayPagesMixin:
             )
         elif page_idx == 2:
             self._vpc_page5_data = None
-            # Page 3: Local Challenge Leaderboard (1:1 mirror of GUI)
-            html = self._overlay_page3_html()
-            self._show_page_with_transition(
-                lambda: self.overlay.set_html(html, "Challenge Leaderboard")
-            )
-        elif page_idx == 3:
-            self._vpc_page5_data = None
-            # Page 4: Cloud Leaderboard (dynamic)
+            # Page 3: Cloud Leaderboard (dynamic)
             self._overlay_page4_show()
-        elif page_idx == 4:
-            # Page 5: VPC Weekly Challenge Leaderboard
+        elif page_idx == 3:
+            # Page 4: VPC Weekly Challenge Leaderboard
             self._overlay_page5_show()
-        elif page_idx == 5:
-            # Page 6: Score Duels Auto-Match
+        elif page_idx == 4:
+            # Page 5: Score Duels Auto-Match
             self._overlay_page6_show()
 
     # ── Last-played helpers ───────────────────────────────────────────────────

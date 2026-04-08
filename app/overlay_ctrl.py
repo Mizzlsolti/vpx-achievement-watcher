@@ -302,8 +302,6 @@ class OverlayCtrlMixin:
                     enabled_pages.append(3)
                 if ov.get("overlay_page5_enabled", True):
                     enabled_pages.append(4)
-                if ov.get("overlay_page6_enabled", True):
-                    enabled_pages.append(5)
                 if not enabled_pages:
                     enabled_pages = [1] if self._is_active_cat_table() else [0]
                 current = int(getattr(self, "_overlay_page", 0))
@@ -391,7 +389,7 @@ class OverlayCtrlMixin:
         _do_show()
 
     def _hide_overlay(self):
-        # Clean up page 6 (Score Duels) search state before hiding.
+        # Clean up Score Duels search state before hiding.
         try:
             if getattr(self, "_p6_state", "IDLE") == "SEARCHING":
                 self._overlay_page6_stop_search()

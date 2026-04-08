@@ -29,7 +29,6 @@ from effects.gl_effects_opengl import (
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
     GodRayBurst, ConfettiShower, HologramFlicker, ShockwaveRipple,
-    ElectricArc, HoverShimmer, PlasmaNoise, HoloSweep,
     # Timer / Countdown effects
     CountdownScaleGlow, RadialPulseBackground, UrgencyShake, TimeWarpDistortion,
     TrailAfterimage, FinalExplosion, PulseRingCountdown, GlitchNumbers,

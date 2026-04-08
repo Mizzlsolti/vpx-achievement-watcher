@@ -376,7 +376,7 @@ def tick_event_jackpot_glow(widget) -> None:
 
 
 def tick_event_victory_lap(widget) -> None:
-    """Steely circles the widget area once to celebrate a challenge win."""
+    """Steely circles the widget area once to celebrate a win."""
     t = widget._event_anim_t
     duration = EVENT_ANIM_DURATIONS["victory_lap"]
     progress = min(1.0, t / duration)
@@ -389,7 +389,7 @@ def tick_event_victory_lap(widget) -> None:
 
 
 def tick_event_drain_fall(widget) -> None:
-    """Steely falls downward on a challenge loss, then re-enters from top."""
+    """Steely falls downward on a loss, then re-enters from top."""
     t = widget._event_anim_t
     th = float(widget._th)
     pad = float(widget._pad)
@@ -500,7 +500,7 @@ def tick_event_show_off(widget) -> None:
 
 
 def tick_event_nervous(widget) -> None:
-    """Extra vibration before a challenge — rapid jitter + wide eyes."""
+    """Rapid jitter + wide eyes — extra vibration animation."""
     t = widget._event_anim_t
     intensity = min(1.0, t / 2.0)  # ramp up over 2 s
     jitter = intensity * 3.5

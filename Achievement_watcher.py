@@ -196,7 +196,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._overlay_busy = False
         self._overlay_last_action = 0.0
         self.overlay = None
-        self._overlay_page = 0  # current page in the 4-page main overlay (0=Main Stats, 1=Achievement Progress, 2=(unused), 3=Cloud Leaderboard)
+        self._overlay_page = 0  # current page: 0=Highlights/Score, 1=Achievement Progress, 2=Cloud Leaderboard, 3=VPC Leaderboard, 4=Score Duels
 
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
@@ -502,7 +502,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, Challenge Menu, Timers &amp; Counters, System Notifications, Heat Bar, Status Overlay).<br>"
+            "(Main Overlay, Toast, System Notifications, Status Overlay).<br>"
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
@@ -522,7 +522,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Click <b>Test</b> to open a live preview.<br>"
             "• <b>Available Themes</b>: Browse all 15 built-in themes with their color schemes and descriptions.<br><br>"
             "Theme changes affect the main application window, all overlay windows, achievement toasts, "
-            "and challenge UI elements. The default theme is <b>Neon Blue</b> (cyan + orange)."
+            "and overlay windows. The default theme is <b>Neon Blue</b> (cyan + orange)."
         ),
         "appearance_sound": (
             "<b>🔊 Sound</b><br><br>"
@@ -550,16 +550,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "<b>Effects are grouped by overlay:</b><br>"
             "• 🖥️ Main Overlay — glow border, particles, transitions, score spin, shine sweep…<br>"
             "• 🏆 Achievement Toast — burst particles, neon rings, typewriter, god rays, confetti…<br>"
-            "• ⚡ Challenge Select — carousel, selection glow, electric arc, plasma noise…<br>"
-            "• ⏱️ Timer / Countdown — 3-2-1-GO, radial pulse, urgency shake, glitch numbers…<br>"
-            "• 🌡️ Heat Barometer — warning pulse, flame particles, heat shimmer, lava glow…<br>"
             "• 🔢 Flip Counter — breathing glow, counter spin, milestone burst, firework…<br><br>"
             "• <b>Enable All / Disable All</b>: Quick toggle for all 60 effects at once.<br><br>"
             "<b>🎬 Post-Processing</b><br>"
             "Screen-space effects applied on top of overlay windows. Require OpenGL. "
             "Disabled automatically in Low Performance Mode. Use the toggle buttons below "
             "the effect controls to choose which overlays receive post-processing "
-            "(Main, Toast, Challenge, Timer, Heat, Flip).<br>"
+            "(Main, Toast, Flip).<br>"
             "• <b>Bloom</b>: Makes bright and neon elements glow and bleed light into surrounding areas.<br>"
             "• <b>Motion Blur</b>: Adds a directional blur trail to animated elements to simulate motion speed.<br>"
             "• <b>Chromatic Aberration</b>: Slightly offsets the red and blue color channels for a lens distortion or glitch effect.<br>"
@@ -567,7 +564,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Film Grain</b>: Adds subtle random noise over the overlay for a retro analog film or CRT look.<br>"
             "• <b>Scanlines</b>: Overlays horizontal lines to simulate a classic CRT monitor screen.<br>"
             "• <b>Overlay Toggles</b>: Use the buttons below the post-processing effects to enable or disable "
-            "post-processing per overlay (Main, Toast, Challenge, Timer, Heat Bar, Flip Counter). "
+            "post-processing per overlay (Main, Toast, Flip Counter). "
             "By default, only Main and Toast are enabled.<br><br>"
             "All settings are saved to config.json and persist across restarts.<br>"
             "Effects use OpenGL GPU acceleration when available, with automatic "

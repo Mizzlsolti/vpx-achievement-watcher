@@ -459,25 +459,20 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.chk_overlay_page2.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page2)
 
-        self.chk_overlay_page3 = QCheckBox("Page 3: (unused)")
+        self.chk_overlay_page3 = QCheckBox("Page 3: Cloud Leaderboard")
         self.chk_overlay_page3.setChecked(bool(self.cfg.OVERLAY.get("overlay_page3_enabled", True)))
         self.chk_overlay_page3.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page3)
 
-        self.chk_overlay_page4 = QCheckBox("Page 4: Cloud Leaderboard")
+        self.chk_overlay_page4 = QCheckBox("Page 4: VPC Leaderboard")
         self.chk_overlay_page4.setChecked(bool(self.cfg.OVERLAY.get("overlay_page4_enabled", True)))
         self.chk_overlay_page4.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page4)
 
-        self.chk_overlay_page5 = QCheckBox("Page 5: VPC Leaderboard")
+        self.chk_overlay_page5 = QCheckBox("Page 5: Score Duels")
         self.chk_overlay_page5.setChecked(bool(self.cfg.OVERLAY.get("overlay_page5_enabled", True)))
         self.chk_overlay_page5.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page5)
-
-        self.chk_overlay_page6 = QCheckBox("Page 6: Score Duels")
-        self.chk_overlay_page6.setChecked(bool(self.cfg.OVERLAY.get("overlay_page6_enabled", True)))
-        self.chk_overlay_page6.stateChanged.connect(self._save_overlay_page_settings)
-        lay_pages.addWidget(self.chk_overlay_page6)
 
         layout.addWidget(grp_pages)
 
