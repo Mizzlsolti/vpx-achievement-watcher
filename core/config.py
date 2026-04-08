@@ -244,6 +244,12 @@ def _migrate_anim_to_fx(ov: dict) -> None:
 
     ov["_fx_migrated"] = True
 
+# ---------------------------------------------------------------------------
+# Virtual-key constants (Windows)
+# ---------------------------------------------------------------------------
+VK_LSHIFT = 0xA0
+VK_RSHIFT = 0xA1
+
 EXCLUDED_FIELDS = {
     "Last Game Start", "Last Printout", "Last Replay", "Champion Reset", "Clock Last Set", "Coins Cleared",
     "Factory Setting", "Recent Paid Cred", "Recent Serv. Cred", "Burn-in Time", "Totals Cleared", "Audits Cleared",
