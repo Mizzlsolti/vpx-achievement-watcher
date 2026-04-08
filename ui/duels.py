@@ -1103,7 +1103,15 @@ class DuelsMixin:
         if state is None:
             return ""
         opponent  = _html_escape(state.get("opponent",   "?"))
+        duel_id   = state.get("duel_id", "")
         table     = _html_escape(state.get("table_name", "?"))
+        try:
+            for d in self._duel_engine.get_active_duels():
+                if d.duel_id == duel_id:
+                    table = _html_escape(_get_duel_table_display(d, getattr(self, "watcher", None)))
+                    break
+        except Exception:
+            pass
         if focused == 0:
             accept_part  = "<b>[✅ Accept]</b>"
             decline_part = "Decline"
@@ -1111,9 +1119,12 @@ class DuelsMixin:
             accept_part  = "Accept"
             decline_part = "<b>[❌ Decline]</b>"
         return (
-            f"⚔️ Duel from <b>{opponent}</b> — Table: <b>{table}</b><br>"
+            "<div style='text-align:center'>"
+            f"⚔️ Duel from <b>{opponent}</b><br>"
+            f"🎰 <b>{table}</b><br>"
             f"{accept_part} / {decline_part}<br>"
             f"<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
+            "</div>"
         )
 
     def _duel_invite_notify_update(self) -> None:
@@ -1837,9 +1848,13 @@ class DuelsMixin:
         my_id = self.cfg.OVERLAY.get("player_id", "").strip()
         is_challenger = (duel.challenger == my_id)
         opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
+        table_display = _get_duel_table_display(duel, getattr(self, "watcher", None))
         msg = (
+            "<div style='text-align:center'>"
             f"⚔️ Duel active against {opponent_name}!<br>"
+            f"🎰 {table_display}<br>"
             "⚠️ One game only — restarting in-game will abort the duel!"
+            "</div>"
         )
 
         # Capture NVRAM "Games Started" baseline so we can detect in-game
