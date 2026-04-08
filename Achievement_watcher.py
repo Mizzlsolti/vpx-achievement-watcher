@@ -592,10 +592,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "<b>🕹️ Controls</b><br><br>"
             "The Controls tab lets you configure hotkeys and input bindings for the overlay and Score Duels.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Duel Accept (Left)</b> and <b>Duel Decline (Right)</b>: Bind keys or buttons to accept or decline incoming duel invitations.<br>"
+            "• <b>Duel Accept / Left</b>: Starts the Auto-Match search on the Score Duels overlay page. "
+            "On the mini overlay for incoming duel invitations, this key accepts the invitation.<br>"
+            "• <b>Duel Decline / Right</b>: Cancels the Auto-Match search on the Score Duels overlay page. "
+            "On the mini overlay for incoming duel invitations, this key declines the invitation.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
-            "💡 Tip: You can combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
+            "💡 Tip: Flipper buttons or MagnaSave buttons work best for the Duel Accept / Left and Duel Decline / Right bindings.<br>"
+            "💡 You can also combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
         ),
         "cloud": (
             "<b>☁️ Cloud</b><br><br>"
@@ -892,9 +896,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Duel Accept:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Duel Decline:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
+        lay_inputs.addWidget(QLabel("<b>Duel Accept / Left:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
+        lay_inputs.addWidget(QLabel("<b>Duel Decline / Right:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
+
+        lbl_hint = QLabel("💡 Tip: Flipper buttons or MagnaSave buttons work best for these bindings.")
+        lbl_hint.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
+        layout.addWidget(lbl_hint)
 
         layout.addStretch(1)
         self._add_tab_help_button(layout, "controls")
@@ -1883,11 +1891,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         _set_tip("cmb_toggle_src", "Choose whether to use a keyboard key or joystick button to show/hide the main overlay.")
         _set_tip("btn_bind_toggle", "Assign the hotkey used to show/hide the main stats overlay. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination (e.g. Ctrl+F9).")
         _set_tip("lbl_toggle_binding", "Currently assigned hotkey for the main overlay.")
-        _set_tip("cmb_ch_left_src", "Input source for navigating left in Duel menus.")
-        _set_tip("btn_ch_left_bind", "Assign the hotkey used to navigate left / accept a duel. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
+        _set_tip("cmb_ch_left_src", "Input source for Duel Accept / Left action (flipper or MagnaSave buttons recommended).")
+        _set_tip("btn_ch_left_bind", "Assign the hotkey for Accept / Left. Used to start Auto-Match search on the Score Duels overlay page and to accept incoming duel invitations.")
         _set_tip("lbl_ch_left_binding", "Currently assigned left navigation hotkey (used to accept duels).")
-        _set_tip("cmb_ch_right_src", "Input source for navigating right in Duel menus.")
-        _set_tip("btn_ch_right_bind", "Assign the hotkey used to navigate right / decline a duel. Hold Shift, Ctrl, or Alt while pressing a key to bind a modifier combination.")
+        _set_tip("cmb_ch_right_src", "Input source for Duel Decline / Right action (flipper or MagnaSave buttons recommended).")
+        _set_tip("btn_ch_right_bind", "Assign the hotkey for Decline / Right. Used to cancel Auto-Match search on the Score Duels overlay page and to decline incoming duel invitations.")
         _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey (used to decline duels).")
         
         # Cloud Tab

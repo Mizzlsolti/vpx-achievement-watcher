@@ -144,6 +144,14 @@ DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
 DEFAULT_OVERLAY.setdefault("pp_overlay_main", True)
 DEFAULT_OVERLAY.setdefault("pp_overlay_toast", True)
 DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", True)
+DEFAULT_OVERLAY.setdefault("duel_left_input_source", "keyboard")
+DEFAULT_OVERLAY.setdefault("duel_left_vk", 0x25)       # Left Arrow
+DEFAULT_OVERLAY.setdefault("duel_left_mods", 0)
+DEFAULT_OVERLAY.setdefault("duel_left_joy_button", 0)
+DEFAULT_OVERLAY.setdefault("duel_right_input_source", "keyboard")
+DEFAULT_OVERLAY.setdefault("duel_right_vk", 0x27)      # Right Arrow
+DEFAULT_OVERLAY.setdefault("duel_right_mods", 0)
+DEFAULT_OVERLAY.setdefault("duel_right_joy_button", 0)
 
 _ALLOWED_OVERLAY_KEYS = [
     "theme",
@@ -205,6 +213,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_post_scanlines", "fx_post_scanlines_intensity",
     # Per-overlay post-processing toggles
     "duels_do_not_disturb",
+    "duel_left_input_source", "duel_left_vk", "duel_left_mods", "duel_left_joy_button",
+    "duel_right_input_source", "duel_right_vk", "duel_right_mods", "duel_right_joy_button",
 ]
 
 
