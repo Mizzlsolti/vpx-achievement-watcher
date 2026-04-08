@@ -1000,11 +1000,20 @@ class OverlayPagesMixin:
 
     def _overlay_page6_start_search(self):
         """Join matchmaking queue and enter SEARCHING state."""
+        _CLOUD_REQUIRED_MSG = "Score Duels not available — Cloud Sync required"
         # Validate prerequisites
         if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            try:
+                self._on_mini_info_message(_CLOUD_REQUIRED_MSG, 3, "#FF3B30")
+            except Exception:
+                pass
             return
         duel_engine = getattr(self, "_duel_engine", None)
         if duel_engine is None:
+            try:
+                self._on_mini_info_message(_CLOUD_REQUIRED_MSG, 3, "#FF3B30")
+            except Exception:
+                pass
             return
 
         def _join():
