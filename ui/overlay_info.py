@@ -329,3 +329,196 @@ class MiniInfoOverlay(QWidget):
         if self.isVisible():
             self._refresh_view()
 
+
+class StatusOverlay(QWidget):
+    """Small frameless status badge overlay for persistent cloud/tracking status display."""
+
+    _AUTO_HIDE_SECS = 8
+
+    def __init__(self, parent: "MainWindow"):
+        super().__init__(None)
+        self.parent_gui = parent
+        self.setWindowTitle("Status")
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.Tool
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        self._font_family = str(ov.get("font_family", "Segoe UI"))
+        self._badge_font_pt = 13
+        self._pad_w = 22
+        self._pad_h = 14
+        self._radius = 10
+        self._message = "Online · Tracking"
+        self._color_hex = "#00C853"
+        self._snap_label = QLabel(self)
+        self._snap_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._snap_label.setStyleSheet("background:transparent;")
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self.hide)
+        # Entry-animation effects
+        self._scan_in = ScanIn()
+        self._glow_sweep = GlowSweep()
+        self._color_morph = ColorMorph()
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(30)
+        self._anim_timer.timeout.connect(self._on_anim_tick)
+        self._anim_alpha = 0.0
+        self._anim_done = False
+        self.hide()
+        _start_topmost_timer(self)
+
+    def _get_portrait(self) -> bool:
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return bool(ov.get("status_overlay_portrait", False))
+        except Exception:
+            return False
+
+    def _get_ccw(self) -> bool:
+        try:
+            ov = self.parent_gui.cfg.OVERLAY or {}
+            return bool(ov.get("status_overlay_rotate_ccw", False))
+        except Exception:
+            return False
+
+    def _render_badge_image(self) -> QImage:
+        fam = str(self._font_family).replace("'", "").replace('"', "").replace(";", "").replace("<", "").replace(">", "")
+        pt = self._badge_font_pt
+        color = str(self._color_hex or "#00C853")
+        text = str(self._message or "").strip()
+        html = (
+            f"<span style='font-size:{pt}pt;font-family:\"{fam}\";'>"
+            f"<span style='color:{color};'>&#9679;</span>"
+            f"&nbsp;<span style='color:#EEEEEE;'>{text}</span>"
+            f"</span>"
+        )
+        tmp = QLabel()
+        tmp.setTextFormat(Qt.TextFormat.RichText)
+        tmp.setStyleSheet("color:#EEEEEE;background:transparent;")
+        tmp.setFont(QFont(fam, pt))
+        tmp.setWordWrap(False)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        tmp.setText(html)
+        sh = tmp.sizeHint()
+        text_w = max(60, min(sh.width(), 340))
+        text_h = max(1, sh.height())
+        W = max(120, text_w + self._pad_w)
+        H = max(36, text_h + self._pad_h)
+
+        bg_color = _theme_bg_qcolor(self.parent_gui.cfg, 220)
+        img = QImage(W, H, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(Qt.GlobalColor.transparent)
+        p = QPainter(img)
+        try:
+            p.setRenderHints(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.TextAntialiasing, True)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(bg_color)
+            p.drawRoundedRect(0, 0, W, H, self._radius, self._radius)
+            try:
+                glow_col = QColor(self._color_hex)
+                _draw_glow_border(p, 0, 0, W, H, self._radius, glow_col, alpha=120, width=2)
+            except Exception:
+                pass
+            margin_left = self._pad_w // 2
+            margin_top = (H - text_h) // 2
+            tmp.render(p, QPoint(margin_left, margin_top))
+        finally:
+            p.end()
+        return img
+
+    def _compute_position(self, W: int, H: int) -> tuple[int, int]:
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        portrait = self._get_portrait()
+        use_saved = bool(ov.get("status_overlay_saved", False))
+        screens = QApplication.screens() or []
+        geo = screens[0].availableGeometry() if screens else QRect(0, 0, 1280, 720)
+        for s in screens[1:]:
+            geo = geo.united(s.availableGeometry())
+        if use_saved:
+            if portrait:
+                x = int(ov.get("status_overlay_x_portrait", 100))
+                y = int(ov.get("status_overlay_y_portrait", 100))
+            else:
+                x = int(ov.get("status_overlay_x_landscape", 100))
+                y = int(ov.get("status_overlay_y_landscape", 100))
+        else:
+            x = geo.right() - W - 20
+            y = geo.top() + 20
+        x = max(geo.left(), min(x, geo.right() - W))
+        y = max(geo.top(), min(y, geo.bottom() - H))
+        return x, y
+
+    def _refresh_view(self):
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        self._font_family = str(ov.get("font_family", self._font_family))
+        portrait = self._get_portrait()
+        ccw = self._get_ccw()
+
+        img = self._render_badge_image()
+        if portrait:
+            angle = -90 if ccw else 90
+            img = img.transformed(QTransform().rotate(angle), Qt.TransformationMode.SmoothTransformation)
+
+        # Apply animation alpha fade-in
+        if not self._anim_done and self._anim_alpha < 1.0:
+            faded = QImage(img.size(), QImage.Format.Format_ARGB32_Premultiplied)
+            faded.fill(Qt.GlobalColor.transparent)
+            p = QPainter(faded)
+            p.setOpacity(max(0.0, min(1.0, self._anim_alpha)))
+            p.drawImage(0, 0, img)
+            p.end()
+            img = faded
+
+        W, H = img.width(), img.height()
+        x, y = self._compute_position(W, H)
+        self.setGeometry(x, y, W, H)
+        self._snap_label.setGeometry(0, 0, W, H)
+        self._snap_label.setPixmap(QPixmap.fromImage(img))
+        self.show()
+        self.raise_()
+        _force_topmost(self)
+
+    def _on_anim_tick(self):
+        self._anim_alpha = min(1.0, self._anim_alpha + 0.12)
+        self._refresh_view()
+        if self._anim_alpha >= 1.0:
+            self._anim_done = True
+            self._anim_timer.stop()
+
+    def update_font(self):
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        self._font_family = str(ov.get("font_family", "Segoe UI"))
+        if self.isVisible():
+            self._refresh_view()
+
+    def update_status(self, message: str, color_hex: str):
+        """Update the displayed status message and color, then show (or refresh) the overlay."""
+        self._message = str(message or "").strip()
+        self._color_hex = str(color_hex or "#00C853")
+        ov = self.parent_gui.cfg.OVERLAY or {}
+        auto_hide_secs = int(ov.get("status_overlay_auto_hide_secs", self._AUTO_HIDE_SECS))
+        # Start fade-in animation if newly shown
+        if not self.isVisible():
+            self._anim_alpha = 0.0
+            self._anim_done = False
+            try:
+                self._scan_in.reset()
+                self._glow_sweep.reset()
+                self._color_morph.reset()
+            except Exception:
+                pass
+            if not self._anim_timer.isActive():
+                self._anim_timer.start()
+        self._refresh_view()
+        # Reset auto-hide timer
+        self._hide_timer.stop()
+        if auto_hide_secs > 0:
+            self._hide_timer.start(auto_hide_secs * 1000)
+

@@ -61,7 +61,7 @@ from ui.overlay_toast import AchToastWindow, AchToastManager, read_active_player
 
 
 
-from ui.overlay_info import MiniInfoOverlay, OverlayNavArrows
+from ui.overlay_info import MiniInfoOverlay, StatusOverlay, OverlayNavArrows
 
 # Per-page accent colours for the main overlay – kept only as a last-resort
 # emergency fallback.  All themes now define their own ``page_accents`` list
