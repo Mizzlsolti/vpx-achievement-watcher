@@ -1701,7 +1701,27 @@ class DuelsMixin:
         my_id = self.cfg.OVERLAY.get("player_id", "").strip()
         is_challenger = (duel.challenger == my_id)
         opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
-        msg = f"⚔️ Duel active against {opponent_name}!"
+        msg = (
+            f"⚔️ Duel active against {opponent_name}!<br>"
+            "⚠️ One game only — restarting in-game will abort the duel!"
+        )
+
+        # Capture NVRAM "Games Started" baseline so we can detect in-game
+        # restarts (F3 / VPX menu) at session end.
+        baseline_gs = -1
+        try:
+            w = getattr(self, "watcher", None)
+            if w:
+                _ba, _, _ = w.read_nvram_audits_with_autofix(rom)
+                for _k in self._DUEL_GAMES_STARTED_KEYS:
+                    _v = w._nv_get_int_ci(_ba, _k, -1)
+                    if _v >= 0:
+                        baseline_gs = _v
+                        break
+        except Exception:
+            pass
+        self._duel_baseline_games_started = baseline_gs
+        self._duel_baseline_rom = rom
 
         def _player_visible() -> bool:
             try:
@@ -1737,6 +1757,11 @@ class DuelsMixin:
     # ── Session-ended hook: submit duel scores ─────────────────────────────────
 
     _DUEL_MIN_PLAY_SECONDS = 60
+    # NVRAM audit keys searched (in order) when looking up "Games Started".
+    _DUEL_GAMES_STARTED_KEYS = (
+        "Games Started", "games started", "Games Played",
+        "Total Plays", "1 Player Games",
+    )
 
     def _on_session_ended_duels(self, rom: str) -> None:
         """Called when a game session ends. Validates the session and submits
@@ -1787,6 +1812,44 @@ class DuelsMixin:
                 if score <= 0:
                     # Fallback: try current high score from NVRAM state.
                     score = int(getattr(w, "current_highscore", 0) or 0)
+        except Exception:
+            pass
+
+        # ── Multi-game detection (F3 / in-game restart via NVRAM) ──────────
+        # NVRAM is only reliably written when VPinMAME flushes, so we only
+        # check here at session end — not in the live watcher loop.
+        try:
+            baseline = getattr(self, "_duel_baseline_games_started", -1)
+            baseline_rom = getattr(self, "_duel_baseline_rom", "")
+            if baseline >= 0 and baseline_rom.lower().strip() == rom_lower:
+                w = getattr(self, "watcher", None)
+                if w:
+                    end_audits, _, _ = w.read_nvram_audits_with_autofix(rom)
+                    current_games = -1
+                    for _k in self._DUEL_GAMES_STARTED_KEYS:
+                        _v = w._nv_get_int_ci(end_audits, _k, -1)
+                        if _v >= 0:
+                            current_games = _v
+                            break
+                    # Allow +1 for the legitimate game; abort if counter went higher.
+                    if current_games > baseline + 1:
+                        for duel in matching:
+                            try:
+                                self._duel_engine.abort_duel(
+                                    duel.duel_id, reason="multiple_games_in_session"
+                                )
+                            except Exception:
+                                pass
+                        self._duel_notify(
+                            "⚠️ Duel aborted: Multiple games detected in single VPX session."
+                            " Only one game per duel allowed!",
+                            "#FF3B30", 8,
+                        )
+                        self._notify_trophies_duel_aborted()
+                        self._refresh_active_duels()
+                        self._duel_baseline_games_started = -1
+                        self._duel_baseline_rom = ""
+                        return
         except Exception:
             pass
 
@@ -1849,6 +1912,10 @@ class DuelsMixin:
                 w.duel_active_for_current_table = False
         except Exception:
             pass
+
+        # Reset NVRAM baseline used for in-game restart detection.
+        self._duel_baseline_games_started = -1
+        self._duel_baseline_rom = ""
 
     # ── Re-check ACTIVE duel scores (race condition mitigation) ────────────────
 
