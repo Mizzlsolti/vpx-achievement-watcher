@@ -1,7 +1,7 @@
 """Overlays mixin: mini info, status overlay, close secondary overlays, and nav (duel) handlers."""
 from __future__ import annotations
 from PyQt6.QtCore import QTimer
-from .overlay import MiniInfoOverlay, StatusOverlay
+from .overlay import MiniInfoOverlay
 import core.sound as sound
 
 
@@ -80,11 +80,7 @@ class OverlaysMixin:
             pass
 
     def _on_status_overlay_test(self):
-        if not hasattr(self, "_status_overlay") or self._status_overlay is None:
-            self._status_overlay = StatusOverlay(self)
-        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
-        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
-        self._status_overlay.update_status(msg, color)
+        pass  # StatusOverlay has been removed
 
     def _determine_status_state(self) -> tuple[str, str]:
         cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
@@ -132,36 +128,18 @@ class OverlaysMixin:
     def _poll_status_badge(self):
         try:
             if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
-                if hasattr(self, "_status_overlay") and self._status_overlay:
-                    self._status_overlay.hide_badge()
                 return
             in_game = self._in_game_now()
             if not in_game:
-                if hasattr(self, "_status_overlay") and self._status_overlay:
-                    self._status_overlay.hide_badge()
                 self._status_badge_state = None
                 self._status_badge_explicit = None
                 return
-            explicit = getattr(self, "_status_badge_explicit", None)
-            if explicit:
-                txt, color = explicit
-            else:
-                txt, color = self._determine_status_state()
-            if not hasattr(self, "_status_overlay") or self._status_overlay is None:
-                self._status_overlay = StatusOverlay(self)
-            self._status_overlay.update_status(txt, color)
+            # StatusOverlay has been removed; badge display is a no-op.
         except Exception:
             pass
 
     def _close_secondary_overlays(self):
         """Close all secondary overlay windows (NOT the main overlay) when VPX exits."""
-        if getattr(self, '_status_overlay', None) is not None:
-            try:
-                self._status_overlay.close()
-                self._status_overlay.deleteLater()
-            except Exception:
-                pass
-            self._status_overlay = None
         # NOTE: _ach_toast_mgr and _mini_overlay are intentionally NOT cleared here.
 
     def _nav_binding_label_text(self, kind: str) -> str:
