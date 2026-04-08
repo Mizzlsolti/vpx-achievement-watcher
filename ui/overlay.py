@@ -29,11 +29,6 @@ from effects.gl_effects_opengl import (
     SlideMotion, EnergyFlash, BreathingPulse, CarouselSlide,
     SnapScale, HeatPulse, ScanIn, GlowSweep, ColorMorph, GlitchFrame,
     GodRayBurst, ConfettiShower, HologramFlicker, ShockwaveRipple,
-    # Heat Barometer effects
-    FlameParticles, HeatShimmer, SmokeWisps, LavaGlowEdge, NumberThrob, MeltdownShake,
-    # Flip Counter effects
-    FlipImpactPulse, MilestoneBurst, ElectricSpark,
-    GoalProximityGlow, CompletionFirework,
 )
 
 try:

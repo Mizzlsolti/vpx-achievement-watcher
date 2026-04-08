@@ -21,8 +21,6 @@ from effects.gl_effects_opengl import (
     draw_glow_border as _draw_glow_border,
     BreathingPulse,
     ScanIn, GlowSweep, ColorMorph,
-    FlipImpactPulse, MilestoneBurst, ElectricSpark,
-    GoalProximityGlow, CompletionFirework,
 )
 
 
