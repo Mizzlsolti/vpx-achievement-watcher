@@ -40,14 +40,6 @@ After a game (or at the touch of a button on the keyboard/controller), transpare
 
 ---
 
-### ⚔️ Challenge Modes (like Pinball FX)
-
-- **Timed Challenge**: Achieve the maximum score in 3 or 5 minutes.
-- **Flip Challenge**: How many points can you score with a limited number of flips? Select your difficulty level (e.g., Pro = Only 100 flips!).
-- **Heat Challenge**: When the barometer reaches 100%, it's over. The heat rises if you hold down the button or press it too quickly. But it cools down when you let go.
-
----
-
 ### ⚔️ Score Duels
 
 Challenge other players to direct score duels on the same table! Compete head-to-head with Auto-Match or invite friends. Includes a global feed of active duels.
@@ -65,7 +57,7 @@ Track your overall achievement progress per table:
 
 ### 🔔 Feedback
 
-Displays small pop-up notifications (toasts) directly after the game when you achieve a success and offers optional voice output for challenge events.
+Displays small pop-up notifications (toasts) directly after the game when you achieve a success.
 
 ---
 
@@ -74,7 +66,6 @@ Displays small pop-up notifications (toasts) directly after the game when you ac
 Records every round played, the duration of the game, and the points scored in the background. These can be conveniently evaluated in the user interface (GUI):
 - **Global NVRAM Dumps**: Full data overview per table
 - **Player Session Deltas**: Actions and changes from your sessions
-- **Challenge Leaderboards**: Latest challenge results and rankings
 
 ---
 
@@ -118,8 +109,8 @@ Create custom achievements for tables that don't use VPinMAME ROMs (Non-ROM / Or
 
 Two animated companion mascots that react to your gameplay:
 
-- **🏆 Trophie** (GUI Mascot): Lives in the bottom-left corner of the main window. An intellectual office-themed character — reads books, checks clipboards, analyzes charts, and celebrates your achievements with a scholarly flair.
-- **🎱 Steely** (Desktop Overlay Mascot): A metallic chrome pinball that lives on your desktop as an always-on-top overlay. Reacts to game events with pinball-themed animations — gets launched by plungers, bounces off bumpers, rides wireforms, and celebrates jackpots.
+- **🏆 Trophie** (GUI Mascot): Lives in the bottom-left corner of the main window.
+- **🎱 Steely** (Desktop Overlay Mascot): A metallic chrome pinball that lives on your desktop as an always-on-top overlay. Reacts to game events.
 - **Skins**: Multiple visual skins for both mascots (configurable in the Appearance tab)
 - **Personality**: Both mascots have unique speech bubbles, reactions, memory, and even a "bickering" system between them
 - **Portrait Mode**: Steely supports 90° rotation for cabinet screens
