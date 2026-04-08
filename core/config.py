@@ -214,6 +214,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "duels_do_not_disturb",
     "duel_left_input_source", "duel_left_vk", "duel_left_mods", "duel_left_joy_button",
     "duel_right_input_source", "duel_right_vk", "duel_right_mods", "duel_right_joy_button",
+    "player_name", "player_id",
 ]
 
 
