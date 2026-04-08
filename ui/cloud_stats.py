@@ -77,10 +77,6 @@ class CloudStatsMixin:
         self.cmb_cloud_category.addItems(["Achievement Progress"])        
         self.cmb_cloud_category.currentIndexChanged.connect(self._on_cloud_cat_changed)
         
-        self.cmb_cloud_diff = QComboBox()
-        self.cmb_cloud_diff.addItems(["All Difficulties", "Pro", "Difficult", "Medium", "Easy"])
-        self.cmb_cloud_diff.hide() 
-        
         self.txt_cloud_rom = QLineEdit()
         self.txt_cloud_rom.setPlaceholderText("Enter Table or ROM Name")
         self.txt_cloud_rom.returnPressed.connect(self._fetch_cloud_leaderboard)
@@ -111,7 +107,6 @@ class CloudStatsMixin:
         
         lay_ctrl.addWidget(QLabel("Category:"))
         lay_ctrl.addWidget(self.cmb_cloud_category)
-        lay_ctrl.addWidget(self.cmb_cloud_diff)
         lay_ctrl.addWidget(QLabel("Table/ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
@@ -138,7 +133,7 @@ class CloudStatsMixin:
             pass
 
     def _on_cloud_cat_changed(self, idx: int):
-        self.cmb_cloud_diff.hide()
+        pass
 
     def _on_cloud_view_anchor_clicked(self, url: QUrl):
         """Handle info badge clicks: show VPS table info dialog instead of opening a browser."""
@@ -183,7 +178,6 @@ class CloudStatsMixin:
         cat_map = {0: "progress"}
         category = cat_map.get(cat_index, "progress")
         rom_input = self.txt_cloud_rom.text().strip().lower()
-        selected_diff = None
 
         if not rom_input:
             self.cloud_view.setHtml("<div style='color:#FF3B30;'>(Please enter a ROM or Title first)</div>")
@@ -214,58 +208,22 @@ class CloudStatsMixin:
         def _bg_fetch():
             player_ids = CloudSync.fetch_player_ids(self.cfg)
             data = []
-            if category == "flip":
-                paths = [f"players/{pid}/scores/flip" for pid in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-                for path, flip_node in batch.items():
-                    if flip_node and isinstance(flip_node, dict):
-                        for rom_key, entry in flip_node.items():
-                            if rom_key == rom or rom_key.startswith(f"{rom}_"):
-                                if entry and isinstance(entry, dict):
-                                    data.append(entry)
-            elif category == "progress":
-                paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-                for path in paths:
-                    entry = batch.get(path)
-                    if entry and isinstance(entry, dict):
-                        data.append(entry)
-            else:
-                paths = [f"players/{pid}/scores/{category}/{rom}" for pid in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-                for path in paths:
-                    entry = batch.get(path)
-                    if entry and isinstance(entry, dict):
-                        data.append(entry)
+            paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
+            batch = CloudSync.fetch_parallel(self.cfg, paths)
+            for path in paths:
+                entry = batch.get(path)
+                if entry and isinstance(entry, dict):
+                    data.append(entry)
 
             if data:
-                if category == "progress":
-                    data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
-                else:
-                    if category == "flip" and selected_diff != "All Difficulties":
-                        filtered_data = []
-                        for row in data:
-                            diff_str = str(row.get("difficulty", "")).strip()
-                            if not diff_str:
-                                tf = int(row.get("target_flips", 0) or 0)
-                                if tf <= 100: diff_str = "Pro"
-                                elif tf <= 200: diff_str = "Difficult"
-                                elif tf <= 300: diff_str = "Medium"
-                                elif tf <= 400: diff_str = "Easy"
-                                else: diff_str = f"{tf} Flips"
-                            
-                            if diff_str.lower() == selected_diff.lower():
-                                filtered_data.append(row)
-                        data = filtered_data
-                        
-                    data.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
+                data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
                     
-            html = self._generate_cloud_html(data, category, rom, selected_diff)
+            html = self._generate_cloud_html(data, category, rom)
             QMetaObject.invokeMethod(self.cloud_view, "setHtml", Qt.ConnectionType.QueuedConnection, Q_ARG(str, html))
             
         threading.Thread(target=_bg_fetch, daemon=True).start()
 
-    def _generate_cloud_html(self, data: list, category: str, rom: str, selected_diff: str = None, include_info_badges: bool = True) -> str:
+    def _generate_cloud_html(self, data: list, category: str, rom: str, include_info_badges: bool = True) -> str:
         _tc_primary = get_theme_color(self.cfg, "primary")
         _tc_accent = get_theme_color(self.cfg, "accent")
         _tc_border = get_theme_color(self.cfg, "border")
@@ -285,23 +243,11 @@ class CloudStatsMixin:
         if not data:
             return f"<div style='text-align:center; color:#888; margin-top:20px;'>No cloud records found for {rom.upper()}</div>"
             
-        if category == "progress":
-            title_cat = "Achievement Progress"
-        elif category == "flip" and selected_diff and selected_diff != "All Difficulties":
-            title_cat = f"Flip Contest ({selected_diff})"
-        else:
-            title_cat = f"{category.upper()} Challenge"
+        title_cat = "Achievement Progress"
             
         html = [css, f"<div class='title'>Leaderboard: {rom.upper()} ({title_cat})</div>"]
         
-        show_diff_col = (category == "flip" and (not selected_diff or selected_diff == "All Difficulties"))
-        
-        if category == "progress":
-            html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th style='width: 50%;'>Progress</th><th>Date</th></tr>")
-        elif show_diff_col:
-            html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Difficulty</th><th>Score</th><th>Date</th></tr>")
-        else:
-            html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Score</th><th>Date</th></tr>")
+        html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th style='width: 50%;'>Progress</th><th>Date</th></tr>")
         
         def _cloud_info_badge(r: dict) -> str:
             if not include_info_badges:
@@ -385,28 +331,6 @@ class CloudStatsMixin:
                 </div>
                 """
                 html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td>{bar}</td><td>{ts}</td></tr>")
-            elif category == "flip":
-                badge = _cloud_info_badge(row)
-                score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
-                if show_diff_col:
-                    diff_str = row.get("difficulty", "")
-                    if not diff_str:
-                        tf = int(row.get("target_flips", 0))
-                        if tf > 0:
-                            if tf <= 100: diff_str = "Pro"
-                            elif tf <= 200: diff_str = "Difficult"
-                            elif tf <= 300: diff_str = "Medium"
-                            elif tf <= 400: diff_str = "Easy"
-                            else: diff_str = f"{tf} Flips"
-                        else:
-                            diff_str = "-"
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td style='color:#AAAAAA; font-style:italic;'>{diff_str}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
-                else:
-                    html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
-            else:
-                badge = _cloud_info_badge(row)
-                score = f"{int(row.get('score', 0)):,d}".replace(",", ".")
-                html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}{badge}</td><td class='score'>{score}</td><td>{ts}</td></tr>")
             
         html.append("</table>")
         return "".join(html)
