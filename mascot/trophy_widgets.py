@@ -55,8 +55,6 @@ from PyQt6.QtWidgets import (
     QApplication, QMenu, QWidget,
 )
 
-from ui.overlay_base import _force_topmost, _start_topmost_timer
-
 class GUITrophie(QWidget):
     """Trophie mascot that lives in the bottom-left corner of the main window."""
 
@@ -618,12 +616,7 @@ class OverlayTrophie(QWidget):
         self._zank_tick.timeout.connect(self._zank_tick_fn)
         self._zank_tick.start()
 
-        # Keep Steely above fullscreen DirectX/OpenGL apps.
-        _start_topmost_timer(self)
-
-    def showEvent(self, event) -> None:
-        super().showEvent(event)
-        _force_topmost(self)
+    def set_memory(self, mem: _TrophieMemory) -> None:
         self._memory = mem
 
     def set_skin(self, skin_id: str) -> None:
@@ -1104,8 +1097,6 @@ class OverlayTrophie(QWidget):
         self._current_bubble = bubble
         self._position_bubble(bubble)
         bubble.show()
-        _force_topmost(bubble)
-        _start_topmost_timer(bubble)
 
     def _show_comment_key(self, key: str, text: str, state: str = TALKING) -> None:
         if self._memory:
