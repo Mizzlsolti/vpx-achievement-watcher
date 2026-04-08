@@ -181,6 +181,13 @@ class DuelsMixin:
         self._lbl_duel_status.setStyleSheet("color:#00E5FF; font-style:italic;")
         lay_new.addWidget(self._lbl_duel_status)
 
+        self._lbl_duel_onegame_warning = QLabel(
+            "⚠️ One game only per duel — restarting in-game (F3) or starting at ball 1 new will abort the duel! (NVRAM tracking)"
+        )
+        self._lbl_duel_onegame_warning.setStyleSheet("color:#FFAA00; font-size:9pt; font-style:italic; padding:2px 4px;")
+        self._lbl_duel_onegame_warning.setWordWrap(True)
+        lay_new.addWidget(self._lbl_duel_onegame_warning)
+
         layout.addWidget(grp_new)
 
         # ── b2) OR separator + Auto-Match ────────────────────────────────────
@@ -396,6 +403,7 @@ class DuelsMixin:
             "• VPX must NOT be running when accepting\n"
             "• Unanswered invitations expire automatically\n\n"
             "⏱️ SESSION RULES\n"
+            "• Only ONE game per duel — restarting in-game (F3) or starting at ball 1 new will abort the duel (NVRAM tracking)\n"
             "• Quitting VPX early aborts the duel\n"
             "• NVRAM highscore is captured at session start\n\n"
             "🏆 SCORING\n"
