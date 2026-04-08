@@ -195,11 +195,19 @@ class OverlaysMixin:
                     pass
                 try:
                     self._on_inbox_accept(duel_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    try:
+                        from core.watcher_core import log
+                        log(self.cfg, f"[NAV] _on_nav_left inbox accept failed: {e}", "WARN")
+                    except Exception:
+                        pass
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left duel invite handling failed: {e}", "WARN")
+            except Exception:
+                pass
         # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
         try:
             overlay = getattr(self, "_duel_invite_overlay", None)
@@ -209,8 +217,12 @@ class OverlaysMixin:
                 else:
                     overlay.focus_accept()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left legacy overlay handling failed: {e}", "WARN")
+            except Exception:
+                pass
         # Page 6 (Score Duels): intercept Left for duel actions.
         try:
             if (
@@ -224,8 +236,12 @@ class OverlaysMixin:
                 elif p6_state == "MATCH_FOUND":
                     self._overlay_page6_accept()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left page6 handling failed: {e}", "WARN")
+            except Exception:
+                pass
 
     def _on_nav_right(self):
         try:
@@ -251,11 +267,19 @@ class OverlaysMixin:
                     pass
                 try:
                     self._on_inbox_decline(duel_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    try:
+                        from core.watcher_core import log
+                        log(self.cfg, f"[NAV] _on_nav_right inbox decline failed: {e}", "WARN")
+                    except Exception:
+                        pass
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_right duel invite handling failed: {e}", "WARN")
+            except Exception:
+                pass
         # Legacy DuelInviteOverlay fallback (no longer shown for GUI-hidden case).
         try:
             overlay = getattr(self, "_duel_invite_overlay", None)
@@ -265,8 +289,12 @@ class OverlaysMixin:
                 else:
                     overlay.focus_accept()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_right legacy overlay handling failed: {e}", "WARN")
+            except Exception:
+                pass
         # Page 6 (Score Duels): intercept Right for duel actions.
         try:
             if (
@@ -282,5 +310,9 @@ class OverlaysMixin:
                 elif p6_state == "MATCH_FOUND":
                     self._overlay_page6_decline()
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_right page6 handling failed: {e}", "WARN")
+            except Exception:
+                pass

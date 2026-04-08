@@ -891,8 +891,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Nav Left / Duel Accept:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Nav Right / Duel Decline:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
+        lay_inputs.addWidget(QLabel("<b>Duel Accept:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
+        lay_inputs.addWidget(QLabel("<b>Duel Decline:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
 
         layout.addStretch(1)
