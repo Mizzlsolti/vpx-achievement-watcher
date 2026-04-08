@@ -391,8 +391,6 @@ class DuelsMixin:
             "• VPX must NOT be running when accepting\n"
             "• Unanswered invitations expire automatically\n\n"
             "⏱️ SESSION RULES\n"
-            "• Minimum play time: 60 seconds\n"
-            "• Score must improve from baseline\n"
             "• Quitting VPX early aborts the duel\n"
             "• NVRAM highscore is captured at session start\n\n"
             "🏆 SCORING\n"
@@ -995,7 +993,7 @@ class DuelsMixin:
         return (
             f"⚔️ Duel from <b>{opponent}</b> — Table: <b>{table}</b><br>"
             f"{accept_part} / {decline_part}<br>"
-            f"<small>◀ Left = Accept  |  Right = Decline ▶</small>"
+            f"<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
         )
 
     def _duel_invite_notify_update(self) -> None:

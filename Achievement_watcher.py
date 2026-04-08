@@ -485,10 +485,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• Table must be locally installed (.vpx file found).<br>"
             "• Table must have a VPS-ID assigned.<br>"
             "• All three conditions must be met — no exceptions.<br><br>"
-            "<b>⚠️ Session Rules:</b><br>"
-            "• You must play for at least 60 seconds. "
-            "Quitting VPX early will abort the duel.<br>"
-            "<br>"
             "<b>🔀 Auto-Match</b><br>"
             "• Press Auto-Match to join the matchmaking queue.<br>"
             "• The system automatically finds an opponent with matching tables (shared VPS-IDs).<br>"
@@ -902,6 +898,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         lbl_hint = QLabel("💡 Tip: Flipper buttons or MagnaSave buttons work best for these bindings.")
         lbl_hint.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
         layout.addWidget(lbl_hint)
+
+        lbl_hint2 = QLabel("💡 Tip: These bindings are used to accept or decline duel invitations when the app is minimized to the system tray.")
+        lbl_hint2.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
+        lbl_hint2.setWordWrap(True)
+        layout.addWidget(lbl_hint2)
 
         layout.addStretch(1)
         self._add_tab_help_button(layout, "controls")

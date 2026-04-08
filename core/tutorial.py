@@ -265,7 +265,6 @@ _STEPS = [
             "  🆔 Tables must have a VPS-ID assigned.\n\n"
             "⚠️ Duel Rules:\n"
             "  Tables need: NVRAM map + locally installed + VPS-ID.\n"
-            "  Play at least 60 seconds.\n"
             "  Quitting early = duel aborted.\n\n"
             "🔀 Auto-Match:\n"
             "  Press Auto-Match to automatically find an opponent.\n"
