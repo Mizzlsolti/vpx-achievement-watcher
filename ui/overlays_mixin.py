@@ -63,8 +63,10 @@ class OverlaysMixin:
                 _show_now()
                 return
             tries["n"] += 1
-            if tries["n"] < 8:
+            if tries["n"] < 20:
                 QTimer.singleShot(250, _retry)
+            else:
+                _show_now()
 
         QTimer.singleShot(250, _retry)
 

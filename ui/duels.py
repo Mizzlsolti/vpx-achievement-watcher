@@ -1744,8 +1744,10 @@ class DuelsMixin:
                     _show_duel_start_notify()
                     return
                 tries[0] += 1
-                if tries[0] < 8:
+                if tries[0] < 20:
                     QTimer.singleShot(250, _retry)
+                else:
+                    _show_duel_start_notify()
 
             QTimer.singleShot(250, _retry)
 
