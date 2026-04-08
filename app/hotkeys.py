@@ -78,6 +78,12 @@ class HotkeysMixin:
         overlay_btn = int(self.cfg.OVERLAY.get("toggle_joy_button", 0) or 0) if overlay_src == "joystick" else 0
         j_left   = _need_nav("left")
         j_right  = _need_nav("right")
+        tray_toggle_joy_btn = None
+        if bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False)) and str(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")).lower() == "joystick":
+            try:
+                tray_toggle_joy_btn = int(self.cfg.OVERLAY.get("tray_toggle_joy_button", 6) or 6)
+            except Exception:
+                tray_toggle_joy_btn = None
 
         def _bit(btn: int | None) -> int:
             try:
@@ -85,10 +91,11 @@ class HotkeysMixin:
                 return (1 << (b - 1)) if b > 0 else 0
             except Exception:
                 return 0
-        overlay_bit = _bit(overlay_btn)
-        left_bit    = _bit(j_left)
-        right_bit   = _bit(j_right)
-        interested_mask = overlay_bit | left_bit | right_bit
+        overlay_bit    = _bit(overlay_btn)
+        left_bit       = _bit(j_left)
+        right_bit      = _bit(j_right)
+        tray_toggle_bit = _bit(tray_toggle_joy_btn)
+        interested_mask = overlay_bit | left_bit | right_bit | tray_toggle_bit
         if interested_mask == 0:
             self._joy_toggle_last_mask = 0
             return
@@ -115,6 +122,9 @@ class HotkeysMixin:
             self._last_ch_event_src = "joystick"
             self._on_nav_right()
             return
+        if tray_toggle_bit and (newly & tray_toggle_bit):
+            self._on_tray_toggle_trigger()
+            return
         if overlay_bit and (newly & overlay_bit):
             self._cycle_overlay_button()
             return
@@ -133,7 +143,11 @@ class HotkeysMixin:
                 str(self.cfg.OVERLAY.get(f"duel_{k}_input_source", "keyboard")).lower() == "joystick"
                 for k in ("left", "right")
             )
-            need_poll = (src_overlay == "joystick") or any_nav_joy
+            tray_toggle_joy = (
+                bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False))
+                and str(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")).lower() == "joystick"
+            )
+            need_poll = (src_overlay == "joystick") or any_nav_joy or tray_toggle_joy
             if need_poll:
                 self._joy_toggle_timer.start()
             else:
@@ -443,6 +457,173 @@ class HotkeysMixin:
     def _on_overlay_trigger(self):
         self._toggle_overlay()
 
+    def _tray_toggle_binding_label_text(self) -> str:
+        src = self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")
+        if src == "joystick":
+            btn = int(self.cfg.OVERLAY.get("tray_toggle_joy_button", 6))
+            return f"Current: joystick button {btn}"
+        else:
+            vk = int(self.cfg.OVERLAY.get("tray_toggle_vk", 0))
+            mods = int(self.cfg.OVERLAY.get("tray_toggle_mods", 0))
+            if vk == 0:
+                return "Current: (none)"
+            return f"Current: {self._fmt_hotkey_label(vk, mods)}"
+
+    def _on_tray_toggle_trigger(self):
+        """Toggle the main GUI window between visible and minimized-to-systray."""
+        try:
+            now = time.monotonic()
+            if (now - float(getattr(self, "_last_tray_toggle_ts", 0.0) or 0.0)) < 0.3:
+                return
+            self._last_tray_toggle_ts = now
+        except Exception:
+            pass
+        if self.isVisible():
+            self.hide()
+        else:
+            self._show_from_tray()
+
+    def _on_tray_toggle_enabled_changed(self, state: int):
+        enabled = bool(state)
+        self.cfg.OVERLAY["tray_toggle_enabled"] = enabled
+        self.cfg.save()
+        self._refresh_input_bindings()
+
+    def _on_tray_toggle_src_changed(self, src: str):
+        self.cfg.OVERLAY["tray_toggle_input_source"] = str(src)
+        self.cfg.save()
+        self.lbl_tray_toggle_binding.setText(self._tray_toggle_binding_label_text())
+        self._refresh_input_bindings()
+
+    def _on_bind_tray_toggle_clicked(self):
+        self._unregister_global_hotkeys()
+        self._uninstall_global_keyboard_hook()
+
+        src = self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")
+        is_joy = (src == "joystick")
+
+        dlg = QDialog(self)
+        dlg.setWindowFlags(dlg.windowFlags() | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        dlg.setWindowTitle("Binding")
+        dlg.resize(360, 140)
+
+        lay = QVBoxLayout(dlg)
+        lbl = QLabel()
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay.addWidget(lbl)
+
+        cancelled = {"flag": False}
+        start_ts = time.time()
+
+        def update_lbl():
+            elapsed = time.time() - start_ts
+            rem = max(0.0, 10.0 - elapsed)
+            if is_joy:
+                lbl.setText(f"Press any joystick button to bind…\n(Timeout in {rem:.1f}s; ESC to cancel)")
+            else:
+                lbl.setText(f"Press any key to bind… (hold Shift, Ctrl, or Alt to add a modifier)\n(Timeout in {rem:.1f}s; ESC to cancel)")
+            return elapsed
+
+        update_lbl()
+
+        class _UnifiedFilter(QAbstractNativeEventFilter):
+            def __init__(self, parent_ref):
+                super().__init__()
+                self.parent = parent_ref
+                self._done = False
+
+            def nativeEventFilter(self, eventType, message):
+                if self._done:
+                    return False, 0
+                try:
+                    if eventType == b"windows_generic_MSG":
+                        msg = ctypes.wintypes.MSG.from_address(int(message))
+                        if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                            vk = int(msg.wParam)
+
+                            if vk == 0x1B:
+                                self._done = True
+                                cancelled["flag"] = True
+                                QTimer.singleShot(0, dlg.reject)
+                                return True, 0
+
+                            if not is_joy:
+                                if vk in (0x10, 0x11, 0x12, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5):
+                                    return False, 0
+
+                                mods = self.parent._get_hotkey_mods_now()
+                                self._done = True
+                                self.parent.cfg.OVERLAY["tray_toggle_vk"] = int(vk)
+                                self.parent.cfg.OVERLAY["tray_toggle_mods"] = int(mods)
+                                self.parent.cfg.save()
+                                QTimer.singleShot(0, dlg.accept)
+                                return True, 0
+                except Exception:
+                    pass
+                return False, 0
+
+        fil = _UnifiedFilter(self)
+        QCoreApplication.instance().installNativeEventFilter(fil)
+
+        def _read_buttons_mask() -> int:
+            jix = JOYINFOEX()
+            jix.dwSize = ctypes.sizeof(JOYINFOEX)
+            jix.dwFlags = JOY_RETURNALL
+            m_all = 0
+            for jid in range(16):
+                try:
+                    if _joyGetPosEx(jid, ctypes.byref(jix)) == JOYERR_NOERROR:
+                        m_all |= int(jix.dwButtons)
+                except Exception:
+                    continue
+            return m_all
+
+        baseline = _read_buttons_mask() if is_joy else 0
+        timer = QTimer(dlg)
+
+        def _poll():
+            if cancelled["flag"]:
+                timer.stop()
+                return
+
+            elapsed = update_lbl()
+
+            if is_joy:
+                try:
+                    mask = _read_buttons_mask()
+                    newly = mask & ~baseline
+                    if newly:
+                        lsb = newly & -newly
+                        idx = lsb.bit_length() - 1
+                        btn_num = idx + 1
+                        self.cfg.OVERLAY["tray_toggle_joy_button"] = int(btn_num)
+                        self.cfg.save()
+                        timer.stop()
+                        dlg.accept()
+                        return
+                except Exception:
+                    pass
+
+            if elapsed > 10.0:
+                timer.stop()
+                dlg.reject()
+
+        timer.setInterval(35)
+        timer.timeout.connect(_poll)
+        timer.start()
+
+        def cleanup():
+            try:
+                QCoreApplication.instance().removeNativeEventFilter(fil)
+            except Exception:
+                pass
+            self.lbl_tray_toggle_binding.setText(self._tray_toggle_binding_label_text())
+            self._refresh_input_bindings()
+
+        dlg.finished.connect(cleanup)
+        dlg.exec()
+
     def _install_global_keyboard_hook(self):
         try:
             if getattr(self, "_global_keyhook", None):
@@ -469,6 +650,7 @@ class HotkeysMixin:
                 "overlay_toggle": 0xA11,
                 "ch_left":        0xA22,
                 "ch_right":       0xA23,
+                "tray_toggle":    0xA33,
             }
 
             def _reg(_id: int, vk: int):
@@ -490,6 +672,13 @@ class HotkeysMixin:
                 vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0x27))
                 mods = int(self.cfg.OVERLAY.get("duel_right_mods", 0))
                 _reg_ch(ids["ch_right"], vk, mods)
+            if bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False)) and str(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")).lower() == "keyboard":
+                vk = int(self.cfg.OVERLAY.get("tray_toggle_vk", 0))
+                mods = int(self.cfg.OVERLAY.get("tray_toggle_mods", 0))
+                if vk != 0:
+                    _reg_ch(ids["tray_toggle"], vk, mods)
+                    if getattr(self.cfg, "LOG_CTRL", False):
+                        log(self.cfg, "[HOTKEY] Registered tray toggle hotkey (keyboard)")
             class _HotkeyFilter(QAbstractNativeEventFilter):
                 def __init__(self, parent_ref, ids_map):
                     super().__init__()
@@ -509,6 +698,8 @@ class HotkeysMixin:
                                 elif hid == self.ids["ch_right"]:
                                     self.p._last_ch_event_src = "keyboard"
                                     QTimer.singleShot(0, self.p._on_nav_right)
+                                elif hid == self.ids["tray_toggle"]:
+                                    QTimer.singleShot(0, self.p._on_tray_toggle_trigger)
                     except Exception:
                         pass
                     return False, 0
