@@ -1,7 +1,7 @@
 """Overlays mixin: mini info, status overlay, close secondary overlays, and nav (duel) handlers."""
 from __future__ import annotations
 from PyQt6.QtCore import QTimer
-from .overlay import MiniInfoOverlay
+from .overlay import MiniInfoOverlay, StatusOverlay
 import core.sound as sound
 
 
@@ -80,7 +80,11 @@ class OverlaysMixin:
             pass
 
     def _on_status_overlay_test(self):
-        pass  # StatusOverlay has been removed
+        if not hasattr(self, "_status_overlay") or self._status_overlay is None:
+            self._status_overlay = StatusOverlay(self)
+        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
+        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
+        self._status_overlay.update_status(msg, color)
 
     def _determine_status_state(self) -> tuple[str, str]:
         cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
@@ -134,13 +138,25 @@ class OverlaysMixin:
                 self._status_badge_state = None
                 self._status_badge_explicit = None
                 return
-            # StatusOverlay has been removed; badge display is a no-op.
+            explicit = getattr(self, "_status_badge_explicit", None)
+            if explicit:
+                msg, color = explicit
+            else:
+                msg, color = self._determine_status_state()
+            if not hasattr(self, "_status_overlay") or self._status_overlay is None:
+                self._status_overlay = StatusOverlay(self)
+            self._status_overlay.update_status(msg, color)
         except Exception:
             pass
 
     def _close_secondary_overlays(self):
         """Close all secondary overlay windows (NOT the main overlay) when VPX exits."""
         # NOTE: _ach_toast_mgr and _mini_overlay are intentionally NOT cleared here.
+        try:
+            if hasattr(self, "_status_overlay") and self._status_overlay is not None:
+                self._status_overlay.hide()
+        except Exception:
+            pass
 
     def _nav_binding_label_text(self, kind: str) -> str:
         if kind == "left":

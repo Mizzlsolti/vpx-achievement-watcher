@@ -84,6 +84,7 @@ from mascot.mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieM
 from ui.overlay import (
     OverlayWindow,
     MiniInfoOverlay,
+    StatusOverlay,
     StatusOverlayPositionPicker,
     read_active_players,
     ToastPositionPicker,
