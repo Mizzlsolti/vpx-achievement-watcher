@@ -63,9 +63,21 @@ class AutoMatchWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # ── Auto-Match button ──────────────────────────────────────────────
+        # ── Button row: [Stop] [Auto-Match] (stretch) ──────────────────────
         row_btn = QHBoxLayout()
         row_btn.setContentsMargins(0, 0, 0, 0)
+
+        self._btn_stop = QPushButton("❌ Stop")
+        self._btn_stop.setStyleSheet(
+            "QPushButton { background-color:#3a1a1a; color:#FF6666; font-weight:bold;"
+            " border:1px solid #993333; border-radius:5px; padding:6px 10px; }"
+            "QPushButton:hover { background-color:#5a2020; }"
+            "QPushButton:disabled { background-color:#222222; color:#555555;"
+            " border-color:#333333; }"
+        )
+        self._btn_stop.setEnabled(False)
+        self._btn_stop.clicked.connect(self._on_stop_clicked)
+        row_btn.addWidget(self._btn_stop)
 
         self._btn_automatch = QPushButton("🔀 Auto-Match")
         self._btn_automatch.setToolTip(
@@ -83,7 +95,7 @@ class AutoMatchWidget(QWidget):
         row_btn.addStretch(1)
         layout.addLayout(row_btn)
 
-        # ── Status row (visible only while searching) ──────────────────────
+        # ── Status row (visible only while searching or showing a result) ───
         self._row_status = QWidget()
         row_status_layout = QHBoxLayout(self._row_status)
         row_status_layout.setContentsMargins(0, 0, 0, 0)
@@ -92,15 +104,6 @@ class AutoMatchWidget(QWidget):
         self._lbl_status = QLabel("")
         self._lbl_status.setStyleSheet("color:#00BFFF; font-style:italic;")
         row_status_layout.addWidget(self._lbl_status, 1)
-
-        self._btn_stop = QPushButton("❌ Stop")
-        self._btn_stop.setStyleSheet(
-            "QPushButton { background-color:#3a1a1a; color:#FF6666; font-weight:bold;"
-            " border:1px solid #993333; border-radius:5px; padding:4px 10px; }"
-            "QPushButton:hover { background-color:#5a2020; }"
-        )
-        self._btn_stop.clicked.connect(self._on_stop_clicked)
-        row_status_layout.addWidget(self._btn_stop)
 
         self._row_status.setVisible(False)
         layout.addWidget(self._row_status)
@@ -136,7 +139,6 @@ class AutoMatchWidget(QWidget):
         """Cancel the ongoing search."""
         self._stop_search()
         self._show_result("", "")  # clear status
-        self._btn_automatch.setEnabled(True)
 
     # ── Search lifecycle ──────────────────────────────────────────────────────
 
@@ -158,6 +160,7 @@ class AutoMatchWidget(QWidget):
             return
         self._searching = True
         self._elapsed = 0
+        self._btn_stop.setEnabled(True)
         self._btn_automatch.setEnabled(False)
         self._row_status.setVisible(True)
         self._lbl_info.setText("0 players in queue • 0 shared tables")
@@ -180,6 +183,8 @@ class AutoMatchWidget(QWidget):
         self._searching = False
         self._poll_timer.stop()
         self._countdown_timer.stop()
+        self._btn_stop.setEnabled(False)
+        self._btn_automatch.setEnabled(True)
         self._row_status.setVisible(False)
         self._lbl_info.setVisible(False)
         threading.Thread(target=self._engine.leave_matchmaking, daemon=True).start()
@@ -194,7 +199,6 @@ class AutoMatchWidget(QWidget):
         if self._elapsed >= _TIMEOUT_SECONDS:
             self._stop_search()
             self._show_result("⏰ No match found. Try again later.", "#FFAA00")
-            self._btn_automatch.setEnabled(True)
             # Notify Trophie.
             try:
                 trophie = getattr(self._mw, "_trophie_gui", None)
@@ -248,7 +252,6 @@ class AutoMatchWidget(QWidget):
                 f"✅ Match found! Duel invitation sent to {opponent} on {table}",
                 "#00E500",
             )
-            self._btn_automatch.setEnabled(True)
             # Notify Trophie.
             try:
                 trophie = getattr(self._mw, "_trophie_gui", None)
@@ -282,7 +285,6 @@ class AutoMatchWidget(QWidget):
                 f"color:{color}; font-style:italic;" if color else "color:#888888; font-style:italic;"
             )
             self._row_status.setVisible(True)
-            self._btn_stop.setVisible(False)  # hide Stop when showing final result
         else:
             self._lbl_status.setText("")
             self._row_status.setVisible(False)
