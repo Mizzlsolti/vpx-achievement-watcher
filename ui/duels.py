@@ -959,6 +959,14 @@ class DuelsMixin:
             try:
                 msg = self._duel_invite_notify_text(0)
                 self._get_mini_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
+                # Force the overlay above the desktop/taskbar; a delayed retry
+                # handles cases where the shell repaints on top right after show().
+                try:
+                    from ui.overlay_base import _force_topmost
+                    _force_topmost(self._get_mini_overlay())
+                    QTimer.singleShot(200, lambda: _force_topmost(self._get_mini_overlay()))
+                except Exception:
+                    pass
             except Exception:
                 pass
         else:
@@ -1096,7 +1104,7 @@ class DuelsMixin:
             else:
                 msg = "⏰ Duel expired \u2014 no response received."
                 color = "#888888"
-            self._duel_notify(msg, color, seconds=8)
+            self._duel_notify(msg, color, seconds=8, skip_vpx_check=True)
         except Exception:
             pass
 
@@ -1113,14 +1121,23 @@ class DuelsMixin:
             self._mini_overlay = MiniInfoOverlay(self)
         return self._mini_overlay
 
-    def _duel_notify(self, msg: str, color_hex: str = "#888888", seconds: int = 6) -> None:
-        """Show a duel notification — in-tab label if GUI visible, MiniOverlay if systray, nothing if VPX running."""
-        try:
-            w = getattr(self, "watcher", None)
-            if w and (w.game_active or w._vp_player_visible()):
-                return  # VPX is running → no notification
-        except Exception:
-            pass
+    def _duel_notify(self, msg: str, color_hex: str = "#888888", seconds: int = 6, *, skip_vpx_check: bool = False) -> None:
+        """Show a duel notification — in-tab label if GUI visible, MiniOverlay if systray, nothing if VPX running.
+
+        Parameters
+        ----------
+        skip_vpx_check : bool
+            When ``True`` the VPX-running guard is bypassed.  Use this for
+            result notifications that are triggered right after a session ends,
+            when ``game_active`` may not have been cleared yet.
+        """
+        if not skip_vpx_check:
+            try:
+                w = getattr(self, "watcher", None)
+                if w and (w.game_active or w._vp_player_visible()):
+                    return  # VPX is running → no notification
+            except Exception:
+                pass
 
         gui_visible = self.isVisible() and not self.isMinimized()
         if gui_visible:
@@ -1128,7 +1145,16 @@ class DuelsMixin:
             self._lbl_duel_status.setStyleSheet(f"color:{color_hex}; font-style:italic;")
         else:
             try:
-                self._get_mini_overlay().show_info(msg, seconds=seconds, color_hex=color_hex)
+                ov = self._get_mini_overlay()
+                ov.show_info(msg, seconds=seconds, color_hex=color_hex)
+                # Ensure the overlay appears above other windows; a delayed retry
+                # handles the shell repainting on top right after show().
+                try:
+                    from ui.overlay_base import _force_topmost
+                    _force_topmost(ov)
+                    QTimer.singleShot(200, lambda: _force_topmost(ov))
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -1888,7 +1914,15 @@ class DuelsMixin:
                 # message shows even though VPX is no longer running.
                 waiting_msg = "⏳ Score submitted! Waiting for opponent's score..."
                 try:
-                    self._get_mini_overlay().show_info(waiting_msg, seconds=10, color_hex="#FF7F00")
+                    ov = self._get_mini_overlay()
+                    ov.show_info(waiting_msg, seconds=10, color_hex="#FF7F00")
+                    # Ensure overlay stays above the desktop after VPX closes.
+                    try:
+                        from ui.overlay_base import _force_topmost
+                        _force_topmost(ov)
+                        QTimer.singleShot(200, lambda: _force_topmost(ov))
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -1976,7 +2010,7 @@ class DuelsMixin:
                     else:
                         res_msg = f"💀 DUEL LOST. You: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#CC2200"
-                    self._duel_notify(res_msg, res_color, seconds=10)
+                    self._duel_notify(res_msg, res_color, seconds=10, skip_vpx_check=True)
                 except Exception:
                     pass
                 self._refresh_active_duels()
