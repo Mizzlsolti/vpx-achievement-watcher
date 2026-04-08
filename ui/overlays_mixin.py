@@ -10,7 +10,13 @@ class OverlaysMixin:
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
-        ("Score Duel finished!<br>Score: 42.069.000", "#00C853"),
+        ("🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
+        ("💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
+        ("🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000", "#FF7F00"),
+        ("⏰ Duel expired — no response received.", "#888888"),
+        ("⚔️ Duel active against xPinballWizard!", "#FF7F00"),
+        ("⏳ Score submitted! Waiting for opponent's score...", "#FF7F00"),
+        ("⚠️ Duel aborted: Session too short (45s). Minimum: 60s.", "#FFAA00"),
     ]
 
     _STATUS_TEST_MESSAGES = [
