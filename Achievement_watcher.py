@@ -597,6 +597,9 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "On the mini overlay for incoming duel invitations, this key accepts the invitation.<br>"
             "• <b>Duel Decline / Right</b>: Cancels the Auto-Match search on the Score Duels overlay page. "
             "On the mini overlay for incoming duel invitations, this key declines the invitation.<br>"
+            "• <b>Show/Hide GUI (Systray)</b>: Enable this binding to toggle the main GUI window between visible "
+            "and minimized-to-systray using a keyboard key or joystick button. Disabled by default — "
+            "check <b>Enable</b> and click <b>Bind…</b> to assign a key.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
             "💡 Tip: Flipper buttons or MagnaSave buttons work best for the Duel Accept / Left and Duel Decline / Right bindings.<br>"
@@ -895,10 +898,18 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.btn_ch_right_bind = QPushButton("Bind..."); self.btn_ch_right_bind.clicked.connect(lambda: self._on_bind_ch_clicked("right"))
         self.lbl_ch_right_binding = QLabel(self._nav_binding_label_text("right"))
 
+        self.chk_tray_toggle_enabled = QCheckBox("Enable"); self.chk_tray_toggle_enabled.setChecked(bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False))); self.chk_tray_toggle_enabled.stateChanged.connect(self._on_tray_toggle_enabled_changed)
+        self.cmb_tray_toggle_src = QComboBox(); self.cmb_tray_toggle_src.addItems(["keyboard", "joystick"]); self.cmb_tray_toggle_src.setCurrentText(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")); self.cmb_tray_toggle_src.currentTextChanged.connect(self._on_tray_toggle_src_changed)
+        self.btn_bind_tray_toggle = QPushButton("Bind..."); self.btn_bind_tray_toggle.clicked.connect(self._on_bind_tray_toggle_clicked)
+        self.lbl_tray_toggle_binding = QLabel(self._tray_toggle_binding_label_text())
+
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
         lay_inputs.addWidget(QLabel("<b>Duel Accept / Left:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
         lay_inputs.addWidget(QLabel("<b>Duel Decline / Right:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
+        lay_inputs.addWidget(QLabel("<hr>"), 4, 0, 1, 4)
+        _tray_row0_w = QWidget(); _tray_row0_lay = QHBoxLayout(_tray_row0_w); _tray_row0_lay.setContentsMargins(0, 0, 4, 0); _tray_row0_lay.setSpacing(4); _tray_row0_lay.addWidget(self.chk_tray_toggle_enabled); _tray_row0_lay.addWidget(QLabel("<b>Show/Hide GUI (Systray):</b>")); _tray_row0_lay.addStretch()
+        lay_inputs.addWidget(_tray_row0_w, 5, 0); lay_inputs.addWidget(self.cmb_tray_toggle_src, 5, 1); lay_inputs.addWidget(self.btn_bind_tray_toggle, 5, 2); lay_inputs.addWidget(self.lbl_tray_toggle_binding, 5, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
 
         lbl_hint = QLabel("💡 Tip: Flipper buttons or MagnaSave buttons work best for these bindings.")
@@ -1903,6 +1914,10 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         _set_tip("cmb_ch_right_src", "Input source for Duel Decline / Right action (flipper or MagnaSave buttons recommended).")
         _set_tip("btn_ch_right_bind", "Assign the hotkey for Decline / Right. Used to cancel Auto-Match search on the Score Duels overlay page and to decline incoming duel invitations.")
         _set_tip("lbl_ch_right_binding", "Currently assigned right navigation hotkey (used to decline duels).")
+        _set_tip("chk_tray_toggle_enabled", "Enable or disable the Systray Toggle hotkey.")
+        _set_tip("cmb_tray_toggle_src", "Input source for Show/Hide GUI action.")
+        _set_tip("btn_bind_tray_toggle", "Assign the hotkey to show/hide the main GUI window (toggle systray).")
+        _set_tip("lbl_tray_toggle_binding", "Currently assigned hotkey for the Systray Toggle.")
         
         # Cloud Tab
         _set_tip("cmb_cloud_category", "Select the leaderboard category you want to view.")
