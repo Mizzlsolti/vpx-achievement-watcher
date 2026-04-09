@@ -45,9 +45,7 @@ SOUND_PACKS = {
 SOUND_EVENTS = [
     ("achievement_unlock", "🏆 Achievement Unlock"),
     ("level_up",           "⬆️ Level Up"),
-    ("countdown_tick",     "🕐 Countdown Tick"),
-    ("countdown_final",    "🔔 Countdown Final"),
-    ("duel_received",      "⚔️ Duel Received"),
+    ("duel_received",      "⚔️ Automatch Found"),
     ("duel_accepted",      "🤝 Duel Accepted"),
     ("duel_won",           "🏆 Duel Won"),
     ("duel_lost",          "💀 Duel Lost"),
