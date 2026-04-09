@@ -50,6 +50,7 @@ _BTN_RED = (
 )
 
 _POLL_INTERVAL_MS = 30_000  # 30 seconds between background polls
+_COMPLETED_BRACKET_DISPLAY_MS = 300_000  # 5 minutes to keep completed bracket visible
 
 
 class TournamentWidget(QWidget):
@@ -77,6 +78,7 @@ class TournamentWidget(QWidget):
         self._active_tournament: dict | None = None
         # Notifications queued for display (not yet shown because VPX was running).
         self._deferred_notifications: list = []
+        self._completed_bracket_timer_started: bool = False
         self._build_ui()
         # Periodic poll timer.
         self._poll_timer = QTimer(self)
@@ -320,7 +322,20 @@ class TournamentWidget(QWidget):
             self._active_tournament = active
             self._update_bracket_ui(active)
             self._queue_pending_notifications(active)
+        elif self._active_tournament and self._active_tournament.get("status") == "completed":
+            # The cloud entry is gone (coordinator deleted it after completion)
+            # but we still have it cached.  Keep showing the completed bracket so
+            # the player can see the final result.  Also make sure this player's
+            # local history contains the entry (safety net for non-coordinators).
+            self._engine.ensure_in_history(self._active_tournament)
+            self._update_bracket_ui(self._active_tournament)
+            # Schedule cleanup: hide the bracket after 5 minutes so it doesn't
+            # linger forever in case the player never explicitly dismisses it.
+            if not self._completed_bracket_timer_started:
+                self._completed_bracket_timer_started = True
+                QTimer.singleShot(_COMPLETED_BRACKET_DISPLAY_MS, self._clear_completed_tournament)
         elif not self._in_queue:
+            self._active_tournament = None
             self._grp_bracket.hide()
 
         history = data.get("history", [])
@@ -338,6 +353,17 @@ class TournamentWidget(QWidget):
     def _on_poll_error(self, msg: str) -> None:
         self._lbl_status.setText(f"Error: {msg}")
         self._btn_refresh.setEnabled(True)
+
+    def _clear_completed_tournament(self) -> None:
+        """Hide the bracket and clear the cached completed tournament.
+
+        Called by a 5-minute QTimer so that a completed bracket does not
+        linger on screen indefinitely after the tournament has ended.
+        """
+        self._active_tournament = None
+        self._completed_bracket_timer_started = False
+        if not self._in_queue:
+            self._grp_bracket.hide()
 
     # ── Queue button handlers ─────────────────────────────────────────────────
 

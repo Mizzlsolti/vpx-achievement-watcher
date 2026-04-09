@@ -590,6 +590,11 @@ class TournamentEngine:
             my_tournament = self._maybe_advance_to_final(my_tournament)
         elif status == "final":
             my_tournament = self._maybe_complete_tournament(my_tournament)
+        elif status == "completed":
+            # Save to local history if not already saved.  This covers
+            # non-coordinator players who see the completed tournament on
+            # their next poll before the coordinator deletes it from the cloud.
+            self.ensure_in_history(my_tournament)
 
         return my_tournament
 
@@ -938,6 +943,17 @@ class TournamentEngine:
         """Return completed tournament records (newest first)."""
         with self._lock:
             return list(reversed(self._history))
+
+    def ensure_in_history(self, tournament: dict) -> None:
+        """Save *tournament* to local history if not already present (idempotent)."""
+        tid = tournament.get("tournament_id", "")
+        if not tid:
+            return
+        with self._lock:
+            if not any(h.get("tournament_id") == tid for h in self._history):
+                self._history.append(dict(tournament))
+                self._save_history()
+                log(self._cfg, f"[TOURNAMENT] Saved completed tournament {tid} to local history (safety net).")
 
     def get_my_placement(self, tournament: dict) -> str:
         """Return the placement string for the local player in a completed tournament."""
