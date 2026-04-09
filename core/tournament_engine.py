@@ -839,7 +839,19 @@ class TournamentEngine:
         semifinals = bracket.get("semifinal") or []
         final      = bracket.get("final") or {}
         status     = tournament.get("status", "")
-        table_name = tournament.get("table_name", "")
+        raw_table_name = tournament.get("table_name", "")
+        table_name = _clean_table_name(raw_table_name)
+        # If table_name still looks like a raw ROM key (no spaces), try romnames.json lookup.
+        if table_name and " " not in table_name:
+            try:
+                from .config import f_romnames
+                from .watcher_core import load_json
+                romnames = load_json(f_romnames(self._cfg), {}) or {}
+                resolved = romnames.get(table_name) or romnames.get(table_name.lower())
+                if resolved:
+                    table_name = _clean_table_name(resolved)
+            except Exception:
+                pass
 
         # 1. Tournament started.
         if not self.is_notification_shown(tid, "started"):
