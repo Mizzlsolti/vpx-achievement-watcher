@@ -1493,46 +1493,65 @@ class DuelsMixin:
         tables are refreshed, bridge.duel_expired is emitted for mascot
         reactions, and a brief expiry overlay is shown per expired duel.
         Also re-checks ACTIVE duels for opponent score availability.
-        Called every 60 seconds by self._duel_expiry_timer.
+        Called every 30 seconds by self._duel_expiry_timer.
+
+        Cloud HTTP calls are executed in a background thread to keep the Qt
+        main thread responsive.  Results are marshalled back via
+        QMetaObject.invokeMethod().
         """
-        # Sync cloud states BEFORE expiry to avoid race conditions.
-        try:
-            self._duel_engine.sync_active_duel_states()
-        except Exception:
-            pass
-
-        # Re-check ACTIVE duels for opponent score (mitigates race condition).
-        try:
-            self._recheck_active_duel_scores()
-        except Exception:
-            pass
-
-        expired = self._duel_engine.check_expiry()
-        if expired:
-            # Reset duel-active flag on watcher if any expired duel matches the
-            # current session ROM so achievements are unblocked after expiry.
+        def _expiry_worker():
+            # Sync cloud states BEFORE expiry to avoid race conditions.
             try:
-                w = getattr(self, "watcher", None)
-                if w is not None:
-                    cur_rom = (w.current_rom or "").lower().strip()
-                    if cur_rom and any(d.table_rom.lower().strip() == cur_rom for d in expired):
-                        w.duel_active_for_current_table = False
+                self._duel_engine.sync_active_duel_states()
             except Exception:
                 pass
-            self._refresh_invitation_inbox()
-            self._refresh_active_duels()
-            self._refresh_duel_history()
-            for duel in expired:
-                # Emit bridge signal so mascot dispatchers fire.
-                try:
-                    self.bridge.duel_expired.emit(duel.duel_id)
-                except Exception:
-                    pass
-                self._duel_notify(
-                    "⏰ Duel expired \u2014 no response received.",
-                    "#888888",
-                    seconds=6,
-                )
+
+            # Re-check ACTIVE duels for opponent score (mitigates race condition).
+            try:
+                self._recheck_active_duel_scores()
+            except Exception:
+                pass
+
+            expired = self._duel_engine.check_expiry()
+            from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
+            QMetaObject.invokeMethod(
+                self, "_on_duel_expiry_checked",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(object, expired),
+            )
+
+        threading.Thread(target=_expiry_worker, daemon=True).start()
+
+    @pyqtSlot(object)
+    def _on_duel_expiry_checked(self, expired: object) -> None:
+        """Handle expiry results on the GUI thread (called from _check_duel_expiry worker)."""
+        expired_duels = expired  # type: ignore[assignment]
+        if not expired_duels:
+            return
+        # Reset duel-active flag on watcher if any expired duel matches the
+        # current session ROM so achievements are unblocked after expiry.
+        try:
+            w = getattr(self, "watcher", None)
+            if w is not None:
+                cur_rom = (w.current_rom or "").lower().strip()
+                if cur_rom and any(d.table_rom.lower().strip() == cur_rom for d in expired_duels):
+                    w.duel_active_for_current_table = False
+        except Exception:
+            pass
+        self._refresh_invitation_inbox()
+        self._refresh_active_duels()
+        self._refresh_duel_history()
+        for duel in expired_duels:
+            # Emit bridge signal so mascot dispatchers fire.
+            try:
+                self.bridge.duel_expired.emit(duel.duel_id)
+            except Exception:
+                pass
+            self._duel_notify(
+                "⏰ Duel expired \u2014 no response received.",
+                "#888888",
+                seconds=6,
+            )
 
     # ── Refresh: invitation inbox table ────────────────────────────────────────
 

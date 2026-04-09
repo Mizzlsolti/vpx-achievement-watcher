@@ -29,8 +29,7 @@ class DuelStatus:
     ACTIVE    = "active"
     WON       = "won"
     LOST      = "lost"
-    TIE       = "tie"
-    DRAW      = "draw"
+    TIE       = "tie"  # canonical equal-score terminal status
     EXPIRED   = "expired"
     DECLINED  = "declined"
     CANCELLED = "cancelled"
@@ -518,8 +517,12 @@ class DuelEngine:
 
         Returns
         -------
-        str or None
-            The DuelStatus result ('won', 'lost', or 'expired'), or None on error.
+        str
+            ``DuelStatus.WON``, ``DuelStatus.LOST``, or ``DuelStatus.TIE``
+            when both scores are available and a winner has been determined.
+        None
+            When the duel is not found (``duel_id`` is unknown) or when the
+            opponent's score is not yet available (waiting for opponent to play).
         """
         with self._lock:
             duel = self._find_active(duel_id)
@@ -641,6 +644,11 @@ class DuelEngine:
             if expired:
                 self._save_active()
                 self._save_history()
+
+        # Upload each expired duel to the cloud outside the lock (mirrors abort_duel).
+        if self._cfg.CLOUD_ENABLED:
+            for duel in expired:
+                self._upload_duel(duel)
 
         return expired
 

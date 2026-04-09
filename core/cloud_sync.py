@@ -544,23 +544,34 @@ class CloudSync:
 
     @staticmethod
     def set_node(cfg: AppConfig, node_path: str, data) -> bool:
-        """Write (PUT) arbitrary data to a Firebase node. Returns True on success."""
+        """Write (PUT) arbitrary data to a Firebase node. Returns True on success.
+
+        Retries up to 3 times on transient ``UNEXPECTED_EOF_WHILE_READING``
+        errors, matching the retry pattern used in ``fetch_node()`` and
+        ``fetch_data()``.
+        """
         if not cfg.CLOUD_URL or not node_path:
             return False
         url = cfg.CLOUD_URL.strip().rstrip('/')
         endpoint = f"{url}/{node_path}.json"
         payload = None
-        try:
-            payload = json.dumps(data).encode('utf-8')
-            put_req = urllib.request.Request(endpoint, data=payload, method='PUT')
-            put_req.add_header('Content-Type', 'application/json')
-            with _urlopen_ssl_aware(cfg, put_req, 10):
-                pass
-            return True
-        except Exception as e:
-            size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
-            log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
-            return False
+        _MAX_RETRIES = 3
+        for _attempt in range(_MAX_RETRIES):
+            try:
+                payload = json.dumps(data).encode('utf-8')
+                put_req = urllib.request.Request(endpoint, data=payload, method='PUT')
+                put_req.add_header('Content-Type', 'application/json')
+                with _urlopen_ssl_aware(cfg, put_req, 10):
+                    pass
+                return True
+            except Exception as e:
+                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
+                    time.sleep(1 * (_attempt + 1))
+                    continue
+                size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
+                log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
+                return False
+        return False
 
     @staticmethod
     def restore_from_cloud(cfg: AppConfig) -> bool:

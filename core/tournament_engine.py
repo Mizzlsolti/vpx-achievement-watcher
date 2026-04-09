@@ -169,6 +169,8 @@ class TournamentEngine:
         except Exception as exc:
             log(self._cfg, f"[TOURNAMENT] join_queue: could not load VPS mapping: {exc}", "WARN")
             vps_mapping = {}
+        # vps_ids intentionally stores VPS-ID values (not ROM keys) so that the
+        # intersection logic in poll_queue() can compare sets of VPS-ID strings.
         vps_ids = list(vps_mapping.values())
         if not vps_ids:
             log(self._cfg, "[TOURNAMENT] join_queue: no VPS-IDs found.", "WARN")
@@ -283,6 +285,9 @@ class TournamentEngine:
         # Resolve a clean human-readable table name.
         try:
             romnames: dict = {}
+            # Scan loaded modules for a ROMNAMES dict.  This pattern relies on
+            # module load order and is fragile; if the lookup fails we fall back
+            # to using the raw table_rom string as the display name.
             for obj in list(sys.modules.values()):
                 if hasattr(obj, "ROMNAMES") and isinstance(getattr(obj, "ROMNAMES"), dict):
                     romnames = obj.ROMNAMES
@@ -372,9 +377,9 @@ class TournamentEngine:
         """Poll the tournament queue and possibly start a tournament.
 
         When exactly TOURNAMENT_SIZE players sharing at least one table are
-        found in the queue, the designated creator (player with the highest
-        ``queued_at``; player_id used as tiebreaker) creates the tournament and
-        removes all queue entries.
+        found in the queue, the designated creator (player with the
+        lex-smallest player_id, consistent with ``_maybe_advance_to_final()``)
+        creates the tournament and removes all queue entries.
 
         Returns
         -------
@@ -476,11 +481,9 @@ class TournamentEngine:
                 "error": "",
             }
 
-        # Deterministic creator selection: highest queued_at; player_id as tiebreaker.
-        creator_id = max(
-            group_ids,
-            key=lambda pid: (float(valid[pid].get("queued_at", 0)), pid),
-        )
+        # Deterministic creator selection: lex-smallest player_id (consistent with
+        # _maybe_advance_to_final() which also uses min(player_id) as coordinator).
+        creator_id = min(group_ids)
         if creator_id != my_id:
             return {
                 "in_queue": in_queue,
@@ -513,9 +516,19 @@ class TournamentEngine:
                 "error": "create_failed",
             }
 
-        # Remove all queue entries for the group.
+        # Remove all queue entries for the group.  Track failures and retry
+        # once to reduce the chance of a second tournament being created for
+        # the same group when a deletion fails partway through.
+        failed_deletions = []
         for pid in group_ids:
-            CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+            ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+            if not ok:
+                failed_deletions.append(pid)
+        if failed_deletions:
+            for pid in failed_deletions:
+                ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+                if not ok:
+                    log(self._cfg, f"[TOURNAMENT] poll_queue: failed to delete queue entry for {pid} after retry.", "WARN")
 
         return {
             "in_queue":           False,
@@ -617,8 +630,10 @@ class TournamentEngine:
 
         Returns
         -------
-        tuple ``(winner_id, winner_name, score_a, score_b)``
-            Where score_a / score_b correspond to player_a / player_b.
+        tuple ``(winner_id, winner_name, score_a, score_b, forfeit)``
+            Where score_a / score_b correspond to player_a / player_b, and
+            ``forfeit`` is True when neither player submitted a score (e.g.
+            EXPIRED or CANCELLED match where both raw scores were -1).
         None
             When the duel is not yet complete.
         """
@@ -626,7 +641,8 @@ class TournamentEngine:
             DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE,
             DuelStatus.EXPIRED, DuelStatus.CANCELLED,
         }
-        if duel_data.get("status") not in _terminal:
+        status = duel_data.get("status")
+        if status not in _terminal:
             return None
 
         ch_id   = duel_data.get("challenger", "")
@@ -634,8 +650,24 @@ class TournamentEngine:
         op_id   = duel_data.get("opponent", "")
         op_name = duel_data.get("opponent_name", "")
 
-        ch_score = max(0, int(duel_data.get("challenger_score", 0) or 0))
-        op_score = max(0, int(duel_data.get("opponent_score", 0) or 0))
+        raw_ch_score = int(duel_data.get("challenger_score", 0) or 0)
+        raw_op_score = int(duel_data.get("opponent_score", 0) or 0)
+
+        # Detect forfeit: expired/cancelled match where neither player played.
+        forfeit = (
+            status in (DuelStatus.EXPIRED, DuelStatus.CANCELLED)
+            and raw_ch_score <= 0
+            and raw_op_score <= 0
+        )
+        if forfeit:
+            log(self._cfg,
+                f"[TOURNAMENT] _resolve_match_winner: duel {duel_data.get('duel_id', '?')} "
+                f"was {status} with no scores submitted – advancing bracket as forfeit "
+                f"(challenger {ch_id} wins by default).",
+                "WARN")
+
+        ch_score = max(0, raw_ch_score)
+        op_score = max(0, raw_op_score)
 
         # Map challenger/opponent scores to player_a/player_b.
         if ch_id == player_a_id:
@@ -649,7 +681,7 @@ class TournamentEngine:
         else:
             winner_id, winner_name = op_id, op_name
 
-        return winner_id, winner_name, score_a, score_b
+        return winner_id, winner_name, score_a, score_b, forfeit
 
     def _maybe_advance_to_final(self, tournament: dict) -> dict:
         """Advance the tournament from 'semifinal' → 'final' if both SFs are done."""
@@ -672,7 +704,7 @@ class TournamentEngine:
             sf_results.append(result)
 
         # Update SF slots with results.
-        for i, (wid, wname, sa, sb) in enumerate(sf_results):
+        for i, (wid, wname, sa, sb, _forfeit) in enumerate(sf_results):
             semifinals[i].update(winner=wid, winner_name=wname, score_a=sa, score_b=sb)
 
         # Guard: final may have been created concurrently by another participant.
@@ -739,7 +771,7 @@ class TournamentEngine:
         if result is None:
             return tournament  # Final not done yet.
 
-        winner_id, winner_name, score_a, score_b = result
+        winner_id, winner_name, score_a, score_b, _forfeit = result
         final.update(winner=winner_id, winner_name=winner_name, score_a=score_a, score_b=score_b)
         bracket["final"] = final
 
@@ -757,6 +789,11 @@ class TournamentEngine:
             if not any(h.get("tournament_id") == tid for h in self._history):
                 self._history.append(dict(tournament))
                 self._save_history()
+
+        # Remove the completed tournament from the cloud to prevent unbounded growth
+        # of tournaments/active (poll_active_tournament fetches ALL entries every 30 s).
+        if tid:
+            CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", None)
 
         log(self._cfg, f"[TOURNAMENT] Completed. Winner: {winner_name}")
         return tournament
