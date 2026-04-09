@@ -47,9 +47,10 @@ from .watcher_io import load_json
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-TOURNAMENT_QUEUE_TTL = 600   # 10 minutes – queue entry lifetime
-TOURNAMENT_MATCH_TTL = 7200  # 2 hours  – per-match duel lifetime
-TOURNAMENT_SIZE      = 4     # fixed 4-player bracket
+TOURNAMENT_QUEUE_TTL = 600    # 10 minutes – queue entry lifetime
+TOURNAMENT_MATCH_TTL = 7200   # 2 hours  – per-match duel lifetime
+TOURNAMENT_SIZE      = 4      # fixed 4-player bracket
+TOURNAMENT_TTL       = 14400  # 4 hours  – active tournament lifetime (2h SF + 2h final)
 
 _CONFIRM_HINT = "<small>Press left [← Duel Accept] to confirm</small>"
 
@@ -487,6 +488,60 @@ class TournamentEngine:
                 "error": "",
             }
 
+        result_base = {
+            "in_queue": in_queue,
+            "queue_players": queue_players,
+            "queue_count": len(valid),
+        }
+
+        # Duplicate-tournament guard: skip creation if an active tournament
+        # already contains all players from the matched group.
+        try:
+            all_tournaments = CloudSync.fetch_node(self._cfg, "tournaments/active")
+            if isinstance(all_tournaments, dict):
+                for _tid, _t in all_tournaments.items():
+                    if not isinstance(_t, dict):
+                        continue
+                    t_pids = {p.get("player_id") for p in (_t.get("participants") or [])}
+                    if group_ids <= t_pids:
+                        log(self._cfg,
+                            f"[TOURNAMENT] poll_queue: skipping creation — tournament {_tid} "
+                            f"already exists for this group.")
+                        # Clean up queue entries anyway so the queue stays tidy.
+                        for pid in group_ids:
+                            CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+                        return {**result_base, "in_queue": False, "tournament_started": False,
+                                "tournament": None, "error": ""}
+        except Exception:
+            pass
+
+        # Delete-first, then create: removes the race-condition window where
+        # other players' poll_queue() calls could still see the same 4 entries
+        # after this player starts creating the tournament.
+        deleted_entries: dict = {}  # pid -> entry (for rollback)
+        failed_deletions: list = []
+        for pid in group_ids:
+            ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+            if ok:
+                deleted_entries[pid] = valid[pid]
+            else:
+                # Retry once.
+                ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
+                if ok:
+                    deleted_entries[pid] = valid[pid]
+                else:
+                    failed_deletions.append(pid)
+
+        if failed_deletions:
+            log(self._cfg,
+                f"[TOURNAMENT] poll_queue: queue deletion failed for {failed_deletions}; "
+                f"rolling back {list(deleted_entries.keys())}.", "WARN")
+            # Rollback: re-add entries that were successfully deleted.
+            for pid, entry in deleted_entries.items():
+                CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", entry)
+            return {**result_base, "tournament_started": False, "tournament": None,
+                    "error": "create_failed"}
+
         # I am the creator – build the tournament.
         players = [
             {
@@ -500,28 +555,8 @@ class TournamentEngine:
 
         tournament = self._create_tournament(players, shared)
         if not tournament:
-            return {
-                "in_queue": in_queue,
-                "queue_players": queue_players,
-                "queue_count": len(valid),
-                "tournament_started": False,
-                "tournament": None,
-                "error": "create_failed",
-            }
-
-        # Remove all queue entries for the group.  Track failures and retry
-        # once to reduce the chance of a second tournament being created for
-        # the same group when a deletion fails partway through.
-        failed_deletions = []
-        for pid in group_ids:
-            ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
-            if not ok:
-                failed_deletions.append(pid)
-        if failed_deletions:
-            for pid in failed_deletions:
-                ok = CloudSync.set_node(self._cfg, f"tournaments/queue/{pid}", None)
-                if not ok:
-                    log(self._cfg, f"[TOURNAMENT] poll_queue: failed to delete queue entry for {pid} after retry.", "WARN")
+            return {**result_base, "tournament_started": False, "tournament": None,
+                    "error": "create_failed"}
 
         return {
             "in_queue":           False,
@@ -561,6 +596,45 @@ class TournamentEngine:
 
         if not isinstance(all_tournaments, dict):
             return None
+
+        now = time.time()
+        my_id_str = my_id  # already resolved above
+
+        # ── TTL-based cleanup of expired tournaments ──────────────────────────
+        # Run BEFORE the "find my tournament" loop so that an expired tournament
+        # for this player is removed before it could be picked up as active.
+        for tid, t in list(all_tournaments.items()):
+            if not isinstance(t, dict):
+                continue
+            created_at = float(t.get("created_at") or 0)
+            if created_at <= 0 or (now - created_at) < TOURNAMENT_TTL:
+                continue
+            age_hours = (now - created_at) / 3600.0
+            participants = t.get("participants") or []
+            participant_ids = [p.get("player_id") for p in participants]
+            is_participant = my_id_str in participant_ids
+            if not is_participant:
+                continue
+            # Only the coordinator (lex-smallest player_id) performs the deletion.
+            coordinator_id = min((p for p in participant_ids if p), default="")
+            if my_id_str != coordinator_id:
+                continue
+            # If this was our own active tournament, save it to history first.
+            if t.get("status") != "completed":
+                expired_record = dict(t)
+                expired_record["tournament_id"] = tid
+                expired_record["status"] = "expired"
+                with self._lock:
+                    if not any(h.get("tournament_id") == tid for h in self._history):
+                        self._history.append(expired_record)
+                        self._save_history()
+            CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", None)
+            log(self._cfg,
+                f"[TOURNAMENT] Cleaned up expired tournament {tid} (age: {age_hours:.1f}h)",
+                "WARN")
+            # Remove it from the local snapshot so it is not picked up below.
+            all_tournaments.pop(tid, None)
+        # ─────────────────────────────────────────────────────────────────────
 
         # Find the tournament this player is participating in.
         my_tournament: Optional[dict] = None
