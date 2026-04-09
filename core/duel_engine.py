@@ -975,6 +975,52 @@ class DuelEngine:
             log(self._cfg, "[DUEL] leave_matchmaking: cloud delete failed.", "WARN")
         return ok
 
+    def register_cloud_duel(self, duel_id: str) -> Optional["Duel"]:
+        """Fetch a duel from the cloud and add it to the local active list if unknown.
+
+        Used by the tournament engine so that all participants discover their
+        tournament duels without going through the normal invitation flow.
+
+        Parameters
+        ----------
+        duel_id : str
+            Cloud duel ID to fetch.
+
+        Returns
+        -------
+        Duel
+            The registered (or already-known) Duel on success.
+        None
+            When the duel could not be fetched or parsed.
+        """
+        with self._lock:
+            existing = self._find_active(duel_id)
+            if existing is not None:
+                return existing
+
+        if not getattr(self._cfg, "CLOUD_ENABLED", False):
+            return None
+        try:
+            cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel_id}")
+        except Exception as exc:
+            log(self._cfg, f"[DUEL] register_cloud_duel fetch error for {duel_id}: {exc}", "WARN")
+            return None
+        if not isinstance(cloud_data, dict):
+            return None
+
+        duel = _duel_from_dict(cloud_data)
+        duel.duel_id = duel_id
+
+        with self._lock:
+            # Double-check under lock to avoid race condition.
+            if not any(d.duel_id == duel_id for d in self._active):
+                # Only add if the duel is still in an active state (not completed).
+                if duel.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
+                    self._active.append(duel)
+                    self._save_active()
+                    log(self._cfg, f"[DUEL] register_cloud_duel: registered {duel_id} (status={duel.status}).")
+        return duel
+
     # ── Private helpers ──────────────────────────────────────────────────────
 
     def _find_active(self, duel_id: str) -> Optional[Duel]:
