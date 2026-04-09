@@ -922,8 +922,6 @@ class SystemMixin:
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
             return
-        if not self.cfg.CLOUD_BACKUP_ENABLED:
-            return
         pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
         if not pid or pid == "unknown":
             return
