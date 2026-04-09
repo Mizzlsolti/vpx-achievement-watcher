@@ -49,7 +49,8 @@ _BTN_RED = (
     "QPushButton:disabled { background-color:#333; color:#666; }"
 )
 
-_POLL_INTERVAL_MS = 30_000  # 30 seconds between background polls
+_POLL_INTERVAL_IDLE_MS   = 30_000  # 30 seconds – queue / no tournament
+_POLL_INTERVAL_ACTIVE_MS = 10_000  # 10 seconds – active tournament (SF or final in progress)
 _COMPLETED_BRACKET_DISPLAY_MS = 300_000  # 5 minutes to keep completed bracket visible
 
 
@@ -82,7 +83,7 @@ class TournamentWidget(QWidget):
         self._build_ui()
         # Periodic poll timer.
         self._poll_timer = QTimer(self)
-        self._poll_timer.setInterval(_POLL_INTERVAL_MS)
+        self._poll_timer.setInterval(_POLL_INTERVAL_IDLE_MS)
         self._poll_timer.timeout.connect(self._on_poll_timer)
         if getattr(cfg, "CLOUD_ENABLED", False):
             self._poll_timer.start()
@@ -315,6 +316,8 @@ class TournamentWidget(QWidget):
             self._in_queue = q_data.get("in_queue", self._in_queue)
             if q_data.get("tournament_started"):
                 self._in_queue = False
+                # Force an immediate re-poll to show the bracket quickly
+                QTimer.singleShot(500, self.refresh)
             self._update_queue_ui(q_data)
 
         active = data.get("active")
@@ -348,11 +351,22 @@ class TournamentWidget(QWidget):
 
         # Try to show deferred notifications now that UI is refreshed.
         self._try_show_deferred_notification()
+        self._adjust_poll_interval()
 
     @pyqtSlot(str)
     def _on_poll_error(self, msg: str) -> None:
         self._lbl_status.setText(f"Error: {msg}")
         self._btn_refresh.setEnabled(True)
+
+    def _adjust_poll_interval(self) -> None:
+        """Switch to fast polling during active tournaments, slow polling otherwise."""
+        if (self._active_tournament
+                and self._active_tournament.get("status") in ("semifinal", "final")):
+            desired = _POLL_INTERVAL_ACTIVE_MS
+        else:
+            desired = _POLL_INTERVAL_IDLE_MS
+        if self._poll_timer.interval() != desired:
+            self._poll_timer.setInterval(desired)
 
     def _clear_completed_tournament(self) -> None:
         """Hide the bracket and clear the cached completed tournament.
