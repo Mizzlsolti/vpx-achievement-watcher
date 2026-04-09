@@ -952,6 +952,10 @@ class OverlayPagesMixin:
             f"<div style='background:{_tc_bg}; padding:8px; border-radius:8px;"
             f" border:1px solid {_tc_border};'>"
             f"{header}{body}"
+            f"<tr><td align='center' style='padding:4px 8px;"
+            f" color:#FFAA00; font-size:{fs_hint}pt; font-style:italic;'>"
+            f"⚠️ One game only per duel — restarting (F3) will abort the duel! (NVRAM tracking)"
+            f"</td></tr>"
             f"</table>"
             f"</div>"
         )
@@ -1012,6 +1016,18 @@ class OverlayPagesMixin:
         if duel_engine is None:
             try:
                 self._on_mini_info_message(_CLOUD_REQUIRED_MSG, 3, "#FF3B30")
+            except Exception:
+                pass
+            return
+        # Validate: player must have at least one VPS-ID.
+        try:
+            from .vps import _load_vps_mapping
+            vps_mapping = _load_vps_mapping(self.cfg)
+        except Exception:
+            vps_mapping = {}
+        if not vps_mapping:
+            try:
+                self._on_mini_info_message("No tables with VPS-ID found", 3, "#FFAA00")
             except Exception:
                 pass
             return

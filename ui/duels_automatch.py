@@ -259,6 +259,12 @@ class AutoMatchWidget(QWidget):
                     trophie.on_automatch_found()
             except Exception:
                 pass
+            # Play match-found sound.
+            try:
+                from core.sound import play_sound
+                play_sound(self._cfg, "duel_received")
+            except Exception:
+                pass
             # Refresh active duels table.
             try:
                 QMetaObject.invokeMethod(
