@@ -259,22 +259,26 @@ class TournamentWidget(QWidget):
     # ── Background poll ───────────────────────────────────────────────────────
 
     def _poll_in_background(self) -> None:
-        """Run queue + active-tournament polls in a worker thread."""
+        """Run queue + active-tournament polls in a worker thread.
+
+        Always calls ``poll_queue()`` regardless of the local ``_in_queue``
+        flag so that the UI correctly detects existing cloud queue entries
+        after an app restart (fixes _in_queue drift on restart).
+        """
         try:
             result: dict = {}
 
-            if self._in_queue:
-                # Poll the queue (may start a tournament).
-                q = self._engine.poll_queue()
-                result["queue"] = q
-                if q.get("tournament_started") and q.get("tournament"):
-                    result["active"] = q["tournament"]
-                else:
-                    # Also check if another player started a tournament for us.
-                    t = self._engine.poll_active_tournament()
-                    if t:
-                        result["active"] = t
+            # Always poll the queue to detect current cloud membership and to
+            # handle app-restart drift where _in_queue=False but a cloud entry
+            # exists.  Tournament creation is guarded by the deterministic
+            # creator-election inside poll_queue() so this is safe to call
+            # even when the local flag says we are not queued.
+            q = self._engine.poll_queue()
+            result["queue"] = q
+            if q.get("tournament_started") and q.get("tournament"):
+                result["active"] = q["tournament"]
             else:
+                # Also check if another player started a tournament for us.
                 t = self._engine.poll_active_tournament()
                 if t:
                     result["active"] = t
