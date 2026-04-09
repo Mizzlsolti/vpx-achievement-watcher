@@ -231,6 +231,29 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_left duel invite handling failed: {e}", "WARN")
             except Exception:
                 pass
+        # If a tournament notification is showing, Left = confirm/dismiss (read-only).
+        try:
+            t_state = getattr(self, "_tournament_notify_state", None)
+            if t_state is not None:
+                self._tournament_notify_state = None
+                try:
+                    self._get_mini_overlay().hide()
+                except Exception:
+                    pass
+                # Let the TournamentWidget show the next deferred notification.
+                try:
+                    tw = getattr(self, "_tournament_widget", None)
+                    if tw is not None:
+                        QTimer.singleShot(300, tw._try_show_deferred_notification)
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left tournament notify handling failed: {e}", "WARN")
+            except Exception:
+                pass
         # Page 5 (Score Duels): intercept Left for duel actions.
         try:
             if (

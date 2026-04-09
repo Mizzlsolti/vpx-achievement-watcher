@@ -284,6 +284,11 @@ class DuelsMixin:
         self._duel_leaderboard_widget = DuelLeaderboardWidget(self.cfg)
         self._duels_subtabs.addTab(self._duel_leaderboard_widget, "🏆 Leaderboard")
 
+        # ── Sub-tab 4: Tournament ─────────────────────────────────────────────
+        from .duels_tournament import TournamentWidget
+        self._tournament_widget = TournamentWidget(self, self.cfg, self._duel_engine)
+        self._duels_subtabs.addTab(self._tournament_widget, "🏆 Tournament")
+
         # Connect sub-tab change to auto-refresh global feed on activation
         self._duels_subtabs.currentChanged.connect(self._on_duels_subtab_changed)
 
@@ -383,6 +388,10 @@ class DuelsMixin:
                 lb = getattr(self, "_duel_leaderboard_widget", None)
                 if lb is not None:
                     lb.refresh()
+            elif "tournament" in tab_text:
+                tw = getattr(self, "_tournament_widget", None)
+                if tw is not None:
+                    tw.refresh()
         except Exception:
             pass
 
