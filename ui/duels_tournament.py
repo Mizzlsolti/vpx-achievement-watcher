@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from core.tournament_engine import TournamentEngine, TOURNAMENT_SIZE
+from core.tournament_engine import TournamentEngine, TOURNAMENT_SIZE, _clean_table_name
 
 _TABLE_STYLE = (
     "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
@@ -434,7 +434,7 @@ class TournamentWidget(QWidget):
         semifinals = bracket.get("semifinal") or []
         final      = bracket.get("final") or {}
         status     = tournament.get("status", "semifinal")
-        table_name = tournament.get("table_name", "")
+        table_name = _clean_table_name(tournament.get("table_name") or tournament.get("table_rom") or "")
 
         self._grp_bracket.show()
         self._lbl_table.setText(f"🎰 {table_name}")
@@ -517,7 +517,7 @@ class TournamentWidget(QWidget):
             except Exception:
                 date_text = "—"
 
-            table_name = t.get("table_name", t.get("table_rom", "?"))
+            table_name = _clean_table_name(t.get("table_name", "") or t.get("table_rom", "") or "?")
             placement  = self._engine.get_my_placement(t)
 
             for col, text in enumerate([date_text, table_name, placement]):

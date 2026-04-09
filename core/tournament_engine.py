@@ -33,17 +33,17 @@ from __future__ import annotations
 import json
 import os
 import random
-import sys
 import threading
 import time
 import uuid
 from itertools import combinations
 from typing import List, Optional
 
-from .config import p_session
+from .config import p_session, f_romnames
 from .cloud_sync import CloudSync
 from .duel_engine import DuelEngine, DuelStatus
 from .watcher_core import log
+from .watcher_io import load_json
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -282,19 +282,12 @@ class TournamentEngine:
             log(self._cfg, f"[TOURNAMENT] _create_tournament: no ROM for VPS-ID {chosen_vps_id}.", "WARN")
             return None
 
-        # Resolve a clean human-readable table name.
+        # Resolve a clean human-readable table name from romnames.json.
         try:
-            romnames: dict = {}
-            # Scan loaded modules for a ROMNAMES dict.  This pattern relies on
-            # module load order and is fragile; if the lookup fails we fall back
-            # to using the raw table_rom string as the display name.
-            for obj in list(sys.modules.values()):
-                if hasattr(obj, "ROMNAMES") and isinstance(getattr(obj, "ROMNAMES"), dict):
-                    romnames = obj.ROMNAMES
-                    break
+            romnames: dict = load_json(f_romnames(self._cfg), {}) or {}
             table_name = _clean_table_name(romnames.get(table_rom) or table_rom)
         except Exception:
-            table_name = table_rom
+            table_name = _clean_table_name(table_rom)
 
         # Random bracket pairings.
         shuffled = list(players)
