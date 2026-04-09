@@ -47,7 +47,7 @@ from .watcher_io import load_json
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-TOURNAMENT_QUEUE_TTL = 600    # 10 minutes – queue entry lifetime
+TOURNAMENT_QUEUE_TTL = 1800   # 30 minutes – queue entry lifetime
 TOURNAMENT_MATCH_TTL = 7200   # 2 hours  – per-match duel lifetime
 TOURNAMENT_SIZE      = 4      # fixed 4-player bracket
 TOURNAMENT_TTL       = 14400  # 4 hours  – active tournament lifetime (2h SF + 2h final)
@@ -396,6 +396,7 @@ class TournamentEngine:
         _empty = {
             "in_queue": False, "queue_players": [], "queue_count": 0,
             "tournament_started": False, "tournament": None, "error": "",
+            "my_expires_at": 0.0,
         }
 
         if not getattr(self._cfg, "CLOUD_ENABLED", False):
@@ -421,6 +422,7 @@ class TournamentEngine:
         }
 
         in_queue = my_id in valid
+        my_expires_at = float(valid[my_id].get("expires_at", 0)) if in_queue else 0.0
         queue_players = [
             {"player_id": pid, "player_name": e.get("player_name", pid)}
             for pid, e in valid.items()
@@ -435,6 +437,7 @@ class TournamentEngine:
                 "tournament_started": False,
                 "tournament": None,
                 "error": "",
+                "my_expires_at": my_expires_at,
             }
 
         # Try every combination of TOURNAMENT_SIZE players with a shared table.
@@ -460,6 +463,7 @@ class TournamentEngine:
                 "tournament_started": False,
                 "tournament": None,
                 "error": "",
+                "my_expires_at": my_expires_at,
             }
 
         group_ids = {pid for pid, _ in group}
@@ -486,12 +490,14 @@ class TournamentEngine:
                 "tournament_started": False,
                 "tournament": None,
                 "error": "",
+                "my_expires_at": my_expires_at,
             }
 
         result_base = {
             "in_queue": in_queue,
             "queue_players": queue_players,
             "queue_count": len(valid),
+            "my_expires_at": my_expires_at,
         }
 
         # Duplicate-tournament guard: skip creation if an active tournament
@@ -565,6 +571,7 @@ class TournamentEngine:
             "tournament_started": True,
             "tournament":         tournament,
             "error":              "",
+            "my_expires_at":      0.0,
         }
 
     # ── Active-tournament polling ─────────────────────────────────────────────

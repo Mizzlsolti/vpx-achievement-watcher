@@ -10,6 +10,7 @@ Provides:
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime
 from html import escape as _esc
 
@@ -79,6 +80,7 @@ class TournamentWidget(QWidget):
         # Notifications queued for display (not yet shown because VPX was running).
         self._deferred_notifications: list = []
         self._completed_bracket_timer_started: bool = False
+        self._queue_expires_at: float = 0.0
         self._build_ui()
         # Periodic poll timer.
         self._poll_timer = QTimer(self)
@@ -86,6 +88,10 @@ class TournamentWidget(QWidget):
         self._poll_timer.timeout.connect(self._on_poll_timer)
         if getattr(cfg, "CLOUD_ENABLED", False):
             self._poll_timer.start()
+        # 1-second countdown timer for queue expiry display.
+        self._countdown_timer = QTimer(self)
+        self._countdown_timer.setInterval(1000)
+        self._countdown_timer.timeout.connect(self._update_countdown)
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -122,6 +128,11 @@ class TournamentWidget(QWidget):
         self._lbl_queue_status = QLabel("Not in queue.")
         self._lbl_queue_status.setStyleSheet("color:#888; font-style:italic;")
         lay_q.addWidget(self._lbl_queue_status)
+
+        self._lbl_countdown = QLabel("")
+        self._lbl_countdown.setStyleSheet("color:#FF7F00; font-style:italic;")
+        self._lbl_countdown.hide()
+        lay_q.addWidget(self._lbl_countdown)
 
         self._progress_queue = QProgressBar()
         self._progress_queue.setRange(0, TOURNAMENT_SIZE)
@@ -415,6 +426,9 @@ class TournamentWidget(QWidget):
     @pyqtSlot(bool)
     def _on_leave_done(self, ok: bool) -> None:
         self._in_queue = False
+        self._queue_expires_at = 0.0
+        self._countdown_timer.stop()
+        self._lbl_countdown.hide()
         self._btn_join.setEnabled(True)
         self._btn_leave.setEnabled(False)
         self._progress_queue.hide()
@@ -436,6 +450,8 @@ class TournamentWidget(QWidget):
 
         if started:
             self._progress_queue.hide()
+            self._lbl_countdown.hide()
+            self._countdown_timer.stop()
             self._lbl_queue_status.setText("🏆 Tournament started!")
             return
 
@@ -449,9 +465,34 @@ class TournamentWidget(QWidget):
             else:
                 status = "In queue – waiting for more players…"
             self._lbl_queue_status.setText(status)
+            # Update countdown timer.
+            expires_at = q_data.get("my_expires_at", 0.0)
+            if expires_at > 0:
+                self._queue_expires_at = expires_at
+                self._lbl_countdown.show()
+                self._update_countdown()
+                if not self._countdown_timer.isActive():
+                    self._countdown_timer.start()
         else:
             self._progress_queue.hide()
+            self._lbl_countdown.hide()
+            self._countdown_timer.stop()
             self._lbl_queue_status.setText("Not in queue.")
+
+    @pyqtSlot()
+    def _update_countdown(self) -> None:
+        """Update the countdown label with the remaining queue time."""
+        if self._queue_expires_at <= 0:
+            self._lbl_countdown.hide()
+            return
+        remaining = self._queue_expires_at - time.time()
+        if remaining <= 0:
+            self._lbl_countdown.setText("⏱ Queue expired")
+            self._countdown_timer.stop()
+            return
+        mins = int(remaining) // 60
+        secs = int(remaining) % 60
+        self._lbl_countdown.setText(f"⏱ {mins:02d}:{secs:02d} remaining")
 
     def _update_bracket_ui(self, tournament: dict) -> None:
         """Refresh the bracket visualisation with the current tournament state."""
@@ -617,7 +658,7 @@ class TournamentWidget(QWidget):
             "• Once 4 players with a shared table are found, the tournament starts\n"
             "• A random shared table is selected automatically\n"
             "• You can leave the queue anytime before the tournament starts\n"
-            "• Queue entries expire after 10 minutes\n\n"
+            "• Queue entries expire after 30 minutes\n\n"
             "⚔️ MATCHES\n"
             "• All matches are auto-accepted – no declining once the tournament starts\n"
             "• You have 2 hours to play each match\n"
