@@ -279,6 +279,11 @@ class DuelsMixin:
         self._global_feed_widget = GlobalDuelFeedWidget(self.cfg)
         self._duels_subtabs.addTab(self._global_feed_widget, "🌍 Global Feed")
 
+        # ── Sub-tab 3: Leaderboard ────────────────────────────────────────────
+        from .duels_leaderboard import DuelLeaderboardWidget
+        self._duel_leaderboard_widget = DuelLeaderboardWidget(self.cfg)
+        self._duels_subtabs.addTab(self._duel_leaderboard_widget, "🏆 Leaderboard")
+
         # Connect sub-tab change to auto-refresh global feed on activation
         self._duels_subtabs.currentChanged.connect(self._on_duels_subtab_changed)
 
@@ -360,7 +365,7 @@ class DuelsMixin:
         layout.addLayout(row)
 
     def _on_duels_subtab_changed(self, index: int) -> None:
-        """Auto-refresh global feed when the user switches to it."""
+        """Auto-refresh global feed or leaderboard when the user switches to them."""
         try:
             tab_text = self._duels_subtabs.tabText(index).lower()
             # Notify Trophie of sub-tab switch
@@ -374,6 +379,10 @@ class DuelsMixin:
                 feed = getattr(self, "_global_feed_widget", None)
                 if feed is not None:
                     feed.refresh()
+            elif "leaderboard" in tab_text:
+                lb = getattr(self, "_duel_leaderboard_widget", None)
+                if lb is not None:
+                    lb.refresh()
         except Exception:
             pass
 
