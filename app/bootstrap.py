@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QSharedMemory, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
 from core.config import AppConfig
@@ -70,6 +70,19 @@ def main():
 
     cfg = AppConfig.load()
     app = QApplication(sys.argv)
+
+    # Single-instance guard — prevent multiple copies of the app from running
+    _shared = QSharedMemory("VPXAchievementWatcherSingleInstance")
+    if not _shared.create(1):
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.warning(
+            None,
+            "VPX Achievement Watcher",
+            "VPX Achievement Watcher is already running.\nOnly one instance is allowed.",
+        )
+        sys.exit(1)
+    app._single_instance_guard = _shared  # prevent garbage collection
+
     for sub in [
         os.path.join("tools", "NVRAM_Maps", "maps"),
         os.path.join("session_stats", "Highlights"),
