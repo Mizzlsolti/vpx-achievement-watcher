@@ -139,15 +139,14 @@ def main():
                 win.chk_cloud_enabled.blockSignals(False)
             if cfg.CLOUD_ENABLED and hasattr(win, "_lock_player_identity_fields"):
                 win._lock_player_identity_fields(True)
-            if cfg.CLOUD_ENABLED:
-                if hasattr(win, "_cloud_btns_overlay"):
-                    win._cloud_btns_overlay.hide()
-                if hasattr(win, "btn_backup_cloud"):
-                    win.btn_backup_cloud.setEnabled(True)
-                if hasattr(win, "btn_restore_cloud"):
-                    win.btn_restore_cloud.setEnabled(True)
-                if hasattr(win, "chk_cloud_backup"):
-                    win.chk_cloud_backup.setVisible(True)
+            if cfg.CLOUD_ENABLED and hasattr(win, "_cloud_btns_overlay"):
+                win._cloud_btns_overlay.hide()
+            if cfg.CLOUD_ENABLED and hasattr(win, "btn_backup_cloud"):
+                win.btn_backup_cloud.setEnabled(True)
+            if cfg.CLOUD_ENABLED and hasattr(win, "btn_restore_cloud"):
+                win.btn_restore_cloud.setEnabled(True)
+            if cfg.CLOUD_ENABLED and hasattr(win, "chk_cloud_backup"):
+                win.chk_cloud_backup.setVisible(True)
         except Exception:
             pass
     code = app.exec()
