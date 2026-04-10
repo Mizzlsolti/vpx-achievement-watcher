@@ -199,6 +199,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
+        self._duel_overlay_test_idx = 0
         # Transient state flags for the status badge
         self._status_badge_state: str | None = None
         self._status_badge_explicit: tuple[str, str] | None = None
@@ -344,13 +345,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
     def _on_duel_info_show(self, message: str, seconds: int = 6, color_hex: str = "#FF7F00") -> None:
         """Show an in-game duel notification as a standalone overlay window over VPX."""
         try:
-            if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
-                from ui.overlay import MiniInfoOverlay
-                self._mini_overlay = MiniInfoOverlay(self)
-            self._mini_overlay.show_info(message, seconds=seconds, color_hex=color_hex)
+            if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
+                from ui.overlay_duel import DuelInfoOverlay
+                self._duel_overlay = DuelInfoOverlay(self)
+            self._duel_overlay.show_info(message, seconds=seconds, color_hex=color_hex)
             try:
                 from ui.overlay_base import _force_topmost
-                ov = self._mini_overlay
+                ov = self._duel_overlay
                 _force_topmost(ov)
                 # VPX fullscreen may reclaim topmost after the initial call;
                 # repeat at 100/300/500 ms to keep the notification visible.

@@ -113,6 +113,23 @@ DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
+
+# Duel Overlay position
+DEFAULT_OVERLAY.setdefault("duel_overlay_portrait", True)
+DEFAULT_OVERLAY.setdefault("duel_overlay_rotate_ccw", True)
+DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)
+DEFAULT_OVERLAY.setdefault("duel_overlay_x_portrait", 100)
+DEFAULT_OVERLAY.setdefault("duel_overlay_y_portrait", 100)
+DEFAULT_OVERLAY.setdefault("duel_overlay_x_landscape", 100)
+DEFAULT_OVERLAY.setdefault("duel_overlay_y_landscape", 100)
+
+# Duel Overlay effects
+DEFAULT_OVERLAY.setdefault("fx_duel_breathing_glow", True)
+DEFAULT_OVERLAY.setdefault("fx_duel_breathing_glow_intensity", 80)
+DEFAULT_OVERLAY.setdefault("fx_duel_slide_motion", True)
+DEFAULT_OVERLAY.setdefault("fx_duel_energy_flash", True)
+DEFAULT_OVERLAY.setdefault("fx_duel_color_morph", True)
+DEFAULT_OVERLAY.setdefault("fx_duel_glow_sweep", True)
 DEFAULT_OVERLAY.setdefault("sound_enabled", False)
 DEFAULT_OVERLAY.setdefault("sound_volume", 20)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
@@ -142,6 +159,7 @@ DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
 # Per-overlay post-processing toggles
 DEFAULT_OVERLAY.setdefault("pp_overlay_main", True)
 DEFAULT_OVERLAY.setdefault("pp_overlay_toast", True)
+DEFAULT_OVERLAY.setdefault("pp_overlay_duel", True)
 DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", True)
 DEFAULT_OVERLAY.setdefault("duel_left_input_source", "keyboard")
 DEFAULT_OVERLAY.setdefault("duel_left_vk", 0x25)       # Left Arrow
@@ -169,6 +187,10 @@ _ALLOWED_OVERLAY_KEYS = [
     "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
     "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
     "status_overlay_x_portrait", "status_overlay_y_portrait",
+
+    "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
+    "duel_overlay_x_portrait", "duel_overlay_y_portrait",
+    "duel_overlay_x_landscape", "duel_overlay_y_landscape",
     
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
@@ -198,6 +220,11 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_toast_confetti", "fx_toast_confetti_intensity",
     "fx_toast_hologram_flicker",
     "fx_toast_shockwave", "fx_toast_shockwave_intensity",
+    "fx_duel_breathing_glow", "fx_duel_breathing_glow_intensity",
+    "fx_duel_slide_motion",
+    "fx_duel_energy_flash",
+    "fx_duel_color_morph",
+    "fx_duel_glow_sweep",
     "trophie_gui_enabled", "trophie_overlay_enabled",
     "trophie_overlay_x", "trophie_overlay_y",
     "trophie_overlay_portrait", "trophie_overlay_rotate_ccw",
@@ -211,6 +238,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_post_film_grain", "fx_post_film_grain_intensity",
     "fx_post_scanlines", "fx_post_scanlines_intensity",
     # Per-overlay post-processing toggles
+    "pp_overlay_main", "pp_overlay_toast", "pp_overlay_duel",
     "duels_do_not_disturb",
     "duel_left_input_source", "duel_left_vk", "duel_left_mods", "duel_left_joy_button",
     "duel_right_input_source", "duel_right_vk", "duel_right_mods", "duel_right_joy_button",

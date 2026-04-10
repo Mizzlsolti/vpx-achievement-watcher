@@ -2,6 +2,7 @@
 from __future__ import annotations
 from PyQt6.QtCore import QTimer
 from .overlay import MiniInfoOverlay, StatusOverlay
+from .overlay_duel import DuelInfoOverlay
 import core.sound as sound
 
 
@@ -10,13 +11,21 @@ class OverlaysMixin:
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
+        ("No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud. Go to 'Available Maps' tab to assign.", "#FF7F00"),
+        ("No NVRAM map found for ROM 'afm_113b'.", "#FF7F00"),
+        ("No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.", "#FF7F00"),
+    ]
+
+    _DUEL_TEST_MESSAGES = [
+        ("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to Popper.", "#FF7F00"),
         ("🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
         ("💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
         ("🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000", "#FF7F00"),
         ("⏰ Duel expired — no response received.", "#888888"),
-        ("⚔️ Duel active against xPinballWizard!", "#FF7F00"),
         ("⏳ Score submitted! Waiting for opponent's score...", "#FF7F00"),
-        ("⚠️ Duel aborted: Session too short (45s). Minimum: 60s.", "#FFAA00"),
+        ("⚠️ Duel aborted: Session too short.", "#FFAA00"),
+        ("✅ 'xPinballWizard' accepted your duel on Medieval Madness!", "#00E500"),
+        ("❌ 'xPinballWizard' declined your duel on Medieval Madness.", "#CC0000"),
     ]
 
     _STATUS_TEST_MESSAGES = [
@@ -76,6 +85,20 @@ class OverlaysMixin:
         msg, color = self._MINI_TEST_MESSAGES[self._mini_test_idx % len(self._MINI_TEST_MESSAGES)]
         self._mini_test_idx = (self._mini_test_idx + 1) % len(self._MINI_TEST_MESSAGES)
         self._mini_overlay.show_info(msg, seconds=5, color_hex=color)
+
+    def _get_duel_overlay(self):
+        """Return the shared DuelInfoOverlay instance, creating it lazily on first access."""
+        if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
+            self._duel_overlay = DuelInfoOverlay(self)
+        return self._duel_overlay
+
+    def _on_duel_overlay_test(self):
+        ov = self._get_duel_overlay()
+        if not hasattr(self, "_duel_overlay_test_idx"):
+            self._duel_overlay_test_idx = 0
+        msg, color = self._DUEL_TEST_MESSAGES[self._duel_overlay_test_idx % len(self._DUEL_TEST_MESSAGES)]
+        self._duel_overlay_test_idx = (self._duel_overlay_test_idx + 1) % len(self._DUEL_TEST_MESSAGES)
+        ov.show_info(msg, seconds=5, color_hex=color)
 
     def _on_mini_info_message(self, message: str, seconds: int, color_hex: str = "#FFFFFF"):
         """Show a message in the mini info overlay with no duel-specific side-effects."""
@@ -213,7 +236,7 @@ class OverlaysMixin:
                 self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
-                    self._get_mini_overlay().hide()
+                    self._get_duel_overlay().hide()
                 except Exception:
                     pass
                 try:
@@ -293,7 +316,7 @@ class OverlaysMixin:
                 self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
-                    self._get_mini_overlay().hide()
+                    self._get_duel_overlay().hide()
                 except Exception:
                     pass
                 try:

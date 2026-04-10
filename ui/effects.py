@@ -47,10 +47,20 @@ _TOAST_EFFECTS = [
 ]
 
 
+_DUEL_EFFECTS = [
+    ("fx_duel_breathing_glow",  "Breathing Glow Border"),
+    ("fx_duel_slide_motion",    "Slide-In / Slide-Out Motion"),
+    ("fx_duel_energy_flash",    "Energy Flash"),
+    ("fx_duel_color_morph",     "Color Morph"),
+    ("fx_duel_glow_sweep",      "Glow Sweep"),
+]
+
+
 # Ordered list of (title, overlay_type, effects_list) for the 2×3 grid
 _OVERLAY_GROUPS = [
     ("🖥️ Main Overlay",         "main",      _MAIN_EFFECTS),
     ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
+    ("⚔️ Duel Overlay",          "duel",      _DUEL_EFFECTS),
 ]
 
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
@@ -73,6 +83,11 @@ _NO_SLIDER_EFFECTS: frozenset[str] = frozenset({
     "fx_toast_slide_motion",
     "fx_toast_energy_flash",
     "fx_toast_hologram_flicker",
+    # Duel Overlay — easing/alpha-only effects
+    "fx_duel_slide_motion",
+    "fx_duel_energy_flash",
+    "fx_duel_color_morph",
+    "fx_duel_glow_sweep",
     # Score Duel result — easing/alpha-only effects
     # Timer — subtle/alpha-only effects
     # Heat Barometer — threshold-based or alpha-only
@@ -329,6 +344,7 @@ class EffectsMixin:
         _OVERLAY_TOGGLES = [
             ("pp_overlay_main",      "🖥️ Main",      True),
             ("pp_overlay_toast",     "🏆 Toast",     True),
+            ("pp_overlay_duel",      "⚔️ Duel",      True),
         ]
         _style_on = (
             "QPushButton { background-color: #1a1a1a; color: #FF7F00;"

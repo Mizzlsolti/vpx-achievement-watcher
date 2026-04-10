@@ -1166,13 +1166,13 @@ class DuelsMixin:
             # Show the notification overlay with no auto-hide (stays until player acts).
             try:
                 msg = self._duel_invite_notify_text(0)
-                self._get_mini_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
+                self._get_duel_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
                 # Force the overlay above the desktop/taskbar; a delayed retry
                 # handles cases where the shell repaints on top right after show().
                 try:
                     from ui.overlay_base import _force_topmost
-                    _force_topmost(self._get_mini_overlay())
-                    QTimer.singleShot(200, lambda: _force_topmost(self._get_mini_overlay()))
+                    _force_topmost(self._get_duel_overlay())
+                    QTimer.singleShot(200, lambda: _force_topmost(self._get_duel_overlay()))
                 except Exception:
                     pass
             except Exception:
@@ -1232,7 +1232,7 @@ class DuelsMixin:
             return
         try:
             msg = self._duel_invite_notify_text(state.get("focused", 0))
-            self._get_mini_overlay().update_message(msg, "#FF7F00")
+            self._get_duel_overlay().update_message(msg, "#FF7F00")
         except Exception:
             pass
 
@@ -1246,7 +1246,7 @@ class DuelsMixin:
         # Clear state and hide the overlay before acting.
         self._duel_invite_notify_cancel()
         try:
-            self._get_mini_overlay().hide()
+            self._get_duel_overlay().hide()
         except Exception:
             pass
         if focused == 0:
@@ -1342,6 +1342,17 @@ class DuelsMixin:
             self._mini_overlay = MiniInfoOverlay(self)
         return self._mini_overlay
 
+    def _get_duel_overlay(self):
+        """Return the shared :class:`~ui.overlay_duel.DuelInfoOverlay` instance.
+
+        Creates it lazily on first access so that the import is deferred and
+        circular-import issues are avoided.
+        """
+        if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
+            from .overlay_duel import DuelInfoOverlay  # deferred import
+            self._duel_overlay = DuelInfoOverlay(self)
+        return self._duel_overlay
+
     def _duel_notify(self, msg: str, color_hex: str = "#888888", seconds: int = 6, *, skip_vpx_check: bool = False) -> None:
         """Show a duel notification — in-tab label if GUI visible, MiniOverlay if systray, nothing if VPX running.
 
@@ -1366,7 +1377,7 @@ class DuelsMixin:
             self._lbl_duel_status.setStyleSheet(f"color:{color_hex}; font-style:italic;")
         else:
             try:
-                ov = self._get_mini_overlay()
+                ov = self._get_duel_overlay()
                 ov.show_info(msg, seconds=seconds, color_hex=color_hex)
                 # Ensure the overlay appears above other windows; a delayed retry
                 # handles the shell repainting on top right after show().
@@ -2180,11 +2191,11 @@ class DuelsMixin:
                        if d.table_rom.lower().strip() == rom_lower
                        and d.status == DuelStatus.ACTIVE]
             if pending:
-                # Inform the player — use MiniInfoOverlay directly so the
+                # Inform the player — use DuelInfoOverlay directly so the
                 # message shows even though VPX is no longer running.
                 waiting_msg = "⏳ Score submitted! Waiting for opponent's score..."
                 try:
-                    ov = self._get_mini_overlay()
+                    ov = self._get_duel_overlay()
                     ov.show_info(waiting_msg, seconds=10, color_hex="#FF7F00")
                     # Ensure overlay stays above the desktop after VPX closes.
                     try:
