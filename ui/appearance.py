@@ -18,6 +18,7 @@ from .overlay import (
     OverlayPositionPicker,
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
+    DuelOverlayPositionPicker,
 )
 from .effects import EffectsMixin
 from .mascots import MascotsMixin
@@ -211,6 +212,57 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         self._status_overlay_picker = StatusOverlayPositionPicker(self)
         self.btn_status_overlay_place.setText("Save position")
+
+    def _on_duel_overlay_portrait_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_overlay_portrait"] = bool(is_checked)
+        self.cfg.save()
+        try:
+            if hasattr(self, "_duel_overlay_picker") and isinstance(self._duel_overlay_picker, DuelOverlayPositionPicker):
+                self._duel_overlay_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+        self._update_switch_all_button_label()
+
+    def _on_duel_overlay_ccw_toggle(self, state: int):
+        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_overlay_rotate_ccw"] = bool(is_ccw)
+        self.cfg.save()
+        try:
+            if hasattr(self, "_duel_overlay_picker") and isinstance(self._duel_overlay_picker, DuelOverlayPositionPicker):
+                self._duel_overlay_picker.apply_portrait_from_cfg()
+        except Exception:
+            pass
+
+    def _on_duel_overlay_place_clicked(self):
+        picker = getattr(self, "_duel_overlay_picker", None)
+        if picker and isinstance(picker, DuelOverlayPositionPicker):
+            try:
+                x, y = picker.current_top_left()
+            except Exception:
+                g = picker.geometry()
+                x, y = g.x(), g.y()
+            ov = self.cfg.OVERLAY or {}
+            portrait = bool(ov.get("duel_overlay_portrait", True))
+            if portrait:
+                self.cfg.OVERLAY["duel_overlay_x_portrait"] = int(x)
+                self.cfg.OVERLAY["duel_overlay_y_portrait"] = int(y)
+            else:
+                self.cfg.OVERLAY["duel_overlay_x_landscape"] = int(x)
+                self.cfg.OVERLAY["duel_overlay_y_landscape"] = int(y)
+            self.cfg.OVERLAY["duel_overlay_saved"] = True
+            self.cfg.save()
+            try:
+                picker.close()
+                picker.deleteLater()
+            except Exception:
+                pass
+            self._duel_overlay_picker = None
+            self.btn_duel_overlay_place.setText("Place / Save position")
+            return
+
+        self._duel_overlay_picker = DuelOverlayPositionPicker(self)
+        self.btn_duel_overlay_place.setText("Save position")
 
     def _on_overlay_place_clicked(self):
         picker = getattr(self, "_overlay_picker", None)
@@ -428,8 +480,16 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         box_status_overlay.addLayout(_btns_status)
         box_status_overlay.addStretch(1)
 
+        # 6) Duel Overlay (dedicated overlay for all duel/tournament messages)
+        self.chk_duel_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_duel_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_portrait", True))); self.chk_duel_overlay_portrait.stateChanged.connect(self._on_duel_overlay_portrait_toggle)
+        self.chk_duel_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_duel_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_rotate_ccw", True))); self.chk_duel_overlay_ccw.stateChanged.connect(self._on_duel_overlay_ccw_toggle)
+        self.btn_duel_overlay_place = QPushButton("Place"); self.btn_duel_overlay_place.clicked.connect(self._on_duel_overlay_place_clicked)
+        self.btn_duel_overlay_test = QPushButton("Test"); self.btn_duel_overlay_test.clicked.connect(self._on_duel_overlay_test)
+        box_duel_overlay = create_overlay_box("⚔️ Duel Notifications", self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw, self.btn_duel_overlay_place, self.btn_duel_overlay_test)
+
         lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
+        lay_pos.addLayout(box_duel_overlay, 3, 0)
 
         layout.addWidget(grp_pos)
 
@@ -801,6 +861,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_ach_toast_portrait,
             self.chk_mini_info_portrait,
             self.chk_status_overlay_portrait,
+            self.chk_duel_overlay_portrait,
         ]
 
     def _ccw_checkboxes(self):
@@ -810,6 +871,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_ach_toast_ccw,
             self.chk_mini_info_ccw,
             self.chk_status_overlay_ccw,
+            self.chk_duel_overlay_ccw,
         ]
 
     def _update_switch_all_button_label(self):
@@ -868,6 +930,12 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "chk_status_overlay_ccw": "Rotate the Status Overlay counter-clockwise.",
             "btn_status_overlay_place": "Set and save the screen position for the Status Overlay.",
             "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement.",
+
+            # Appearance Tab - Duel Overlay
+            "chk_duel_overlay_portrait": "Rotate duel/tournament notifications for portrait/cabinet screens.",
+            "chk_duel_overlay_ccw": "Rotate duel/tournament notifications counter-clockwise.",
+            "btn_duel_overlay_place": "Set and save the screen position for duel notifications.",
+            "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
 
             # Appearance Tab - Switch All button
             "btn_switch_all_orientation": "Toggle all overlay widgets between Portrait and Landscape mode at once.",

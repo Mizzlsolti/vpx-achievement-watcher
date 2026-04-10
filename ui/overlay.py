@@ -56,6 +56,7 @@ from ui.overlay_pickers import (
     MiniInfoPositionPicker,
     StatusOverlayPositionPicker,
     OverlayPositionPicker,
+    DuelOverlayPositionPicker,
 )
 from ui.overlay_toast import AchToastWindow, AchToastManager, read_active_players
 
