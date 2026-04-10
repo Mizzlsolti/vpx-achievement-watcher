@@ -113,13 +113,14 @@ class MiniInfoPositionPicker(_BasePositionPicker):
         max_text_width = 520
         _accent = get_theme_color(self.parent_gui.cfg, "accent")
         candidate_messages = [
-            f"<span style='color:{_accent};'>SCORE DUEL COMPLETE!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
-            f"<span style='color:{_accent};'>SCORE DUEL FINISHED!</span><br><span style='color:#DDDDDD;'>Score: 42.069.000</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>NVRAM map not found for afm_113b.</span><br><span style='color:#DDDDDD;'>closing in 10…</span>",
+            f"<span style='color:{_accent};'>No NVRAM map found for ROM 'afm_113b'.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>NVRAM file not found or not readable</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
-            f"<span style='color:{_accent};'>💀 DUEL LOST. You: 42,069,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>Overlay only available after VPX end</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>Score Duels not available — Cloud Sync required</span><br><span style='color:#DDDDDD;'>closing in 3…</span>",
+            f"<span style='color:{_accent};'>No tables with VPS-ID found</span><br><span style='color:#DDDDDD;'>closing in 3…</span>",
         ]
         max_w, max_h = 200, 60
         for msg_html in candidate_messages:
@@ -361,7 +362,7 @@ class DuelOverlayPositionPicker(_BasePositionPicker):
         _accent = get_theme_color(self.parent_gui.cfg, "accent")
         candidate_messages = [
             f"<span style='color:{_accent};'>⚔️ Duel active against xPinballWizard!<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.</span><br><span style='color:#DDDDDD;'>closing in 20…</span>",
-            f"<span style='color:{_accent};'>⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>[✅ Accept] / Decline</span>",
+            f"<span style='color:{_accent};'>⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>[✅ Accept] / Decline<br><small>Use your Duel Accept / Decline keys bound in the Controls tab.</small></span>",
             f"<span style='color:{_accent};'>🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
@@ -374,6 +375,8 @@ class DuelOverlayPositionPicker(_BasePositionPicker):
             f"<span style='color:{_accent};'>❌ 'xPinballWizard' declined your duel on Medieval Madness.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>⏰ Your duel invitation on Medieval Madness expired (not accepted).</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>🚫 Your duel on Medieval Madness was cancelled.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
+            f"<span style='color:{_accent};'>Cannot accept duel while VPX is running.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
+            f"<span style='color:{_accent};'>❌ Duel cancelled – Table 'Medieval Madness' is not available.</span><br><span style='color:#DDDDDD;'>closing in 6…</span>",
         ]
         max_w, max_h = 200, 60
         for msg_html in candidate_messages:
