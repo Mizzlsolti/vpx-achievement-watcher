@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import sys
 
-from PyQt6.QtCore import QObject, QSharedMemory, pyqtSignal
+from PyQt6.QtCore import QObject, QSharedMemory, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 
 from core.config import AppConfig
@@ -147,6 +147,20 @@ def main():
                 win.btn_restore_cloud.setEnabled(True)
             if cfg.CLOUD_ENABLED and hasattr(win, "chk_cloud_backup"):
                 win.chk_cloud_backup.setVisible(True)
+        except Exception:
+            pass
+        # Force an immediate Dashboard refresh so the Setup Status checklist
+        # reflects the values the wizard just saved (player name, cloud sync).
+        try:
+            if hasattr(win, '_refresh_dashboard_cards'):
+                win._refresh_dashboard_cards()
+        except Exception:
+            pass
+        # Safety-net delayed refresh in case some values (e.g. cloud name
+        # upload) are updated asynchronously after the wizard closes.
+        try:
+            if hasattr(win, '_refresh_dashboard_cards'):
+                QTimer.singleShot(500, win._refresh_dashboard_cards)
         except Exception:
             pass
     code = app.exec()
