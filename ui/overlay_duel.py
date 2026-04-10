@@ -148,7 +148,10 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         try:
             from ui.overlay import PostProcessingWidget
             self._pp_widget = PostProcessingWidget(self, overlay_type="duel")
-        except Exception:
+        except ImportError:
+            self._pp_widget = None
+        except Exception as e:
+            print(f"[DuelInfoOverlay] PostProcessingWidget init failed: {e}")
             self._pp_widget = None
 
         self.hide()
@@ -203,9 +206,15 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         else:
             countdown = ""
 
-        # Detect whether the message is already rich HTML (from _duel_invite_notify_text)
+        # Detect whether the message is already rich HTML (from _duel_invite_notify_text).
+        # We recognise pre-formatted HTML by the presence of a recognised HTML opening tag
+        # at the start of the string, combined with a closing tag or <br> somewhere inside.
         msg = str(self._base_msg or "")
-        if msg.lstrip().startswith("<") and ("<br" in msg or "</" in msg):
+        _stripped = msg.lstrip()
+        _is_html = (
+            _stripped.startswith("<div") or _stripped.startswith("<p") or _stripped.startswith("<span")
+        ) and ("</" in msg or "<br" in msg)
+        if _is_html:
             # Already HTML – use as-is; apply font/size via the outer div only
             inner = msg
         else:
@@ -337,12 +346,17 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         # Apply slide offset along the appropriate axis
         if self._is_fx_enabled("fx_duel_slide_motion"):
             if self._portrait_mode:
-                # Portrait: slide on X axis (same direction logic as AchToastWindow)
+                # In portrait mode the image is rotated 90°; the logical slide direction
+                # maps to the X axis.  CCW rotation (-90°) means the "bottom" edge of the
+                # overlay is on the right side of the screen, so the overlay slides in from
+                # the right (positive offset = starts further right, decreases to 0).
+                # CW rotation (+90°) is the mirror: slide in from the left.
                 if self._rotate_ccw:
                     x += slide_offset
                 else:
                     x -= slide_offset
             else:
+                # Landscape: slide along Y axis (bottom → up, positive offset starts lower).
                 y += slide_offset
 
         self.setGeometry(x, y, W, H)
@@ -461,7 +475,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         self._is_closing = False
 
         # Handle color morph on accent change (only when overlay is already visible)
-        old_color = self._accent_override or get_theme_color(self.parent_gui.cfg, "accent")
+        old_color = self._accent_color()
         self._accent_override = color_hex if color_hex else None
         new_color = self._accent_color()
         if (self._is_fx_enabled("fx_duel_color_morph")
@@ -498,7 +512,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         focused option in a duel invite) but the remaining time must not change.
         Has no effect if the overlay is not currently visible.
         """
-        old_color = self._accent_override or get_theme_color(self.parent_gui.cfg, "accent")
+        old_color = self._accent_color()
         self._base_msg = str(message or "").strip()
         if color_hex:
             self._accent_override = color_hex
