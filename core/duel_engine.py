@@ -44,6 +44,11 @@ ACTIVE_DUEL_TTL_SECONDS = 172_800
 # Sentinel value indicating a score has not yet been submitted.
 SCORE_NOT_SUBMITTED = -1
 
+# Duel statuses that represent a finished duel (no further transitions).
+_TERMINAL_STATUSES = (
+    "won", "lost", "tie", "expired", "declined", "cancelled",
+)
+
 
 @dataclass
 class Duel:
@@ -69,9 +74,9 @@ def _duel_from_dict(d: dict) -> Duel:
     """Reconstruct a Duel dataclass from a plain dict (e.g. loaded from JSON)."""
     return Duel(
         duel_id=d.get("duel_id", ""),
-        challenger=d.get("challenger", ""),
+        challenger=d.get("challenger", "").lower(),
         challenger_name=d.get("challenger_name", ""),
-        opponent=d.get("opponent", ""),
+        opponent=d.get("opponent", "").lower(),
         opponent_name=d.get("opponent_name", ""),
         table_rom=d.get("table_rom", ""),
         table_name=d.get("table_name", ""),
@@ -159,7 +164,7 @@ class DuelEngine:
     # ── Player helpers ───────────────────────────────────────────────────────
 
     def _my_player_id(self) -> str:
-        return str(self._cfg.OVERLAY.get("player_id", "")).strip()
+        return str(self._cfg.OVERLAY.get("player_id", "")).strip().lower()
 
     def _my_player_name(self) -> str:
         return str(self._cfg.OVERLAY.get("player_name", "Player")).strip()
@@ -174,7 +179,13 @@ class DuelEngine:
         if not self._cfg.CLOUD_ENABLED:
             return False
         node = self._cloud_node_for_duel(duel.duel_id)
-        ok = CloudSync.set_node(self._cfg, node, asdict(duel))
+        terminal = _TERMINAL_STATUSES
+        if duel.status in terminal:
+            # Terminal states: delete from cloud to keep duels/ node small.
+            # The duel is already saved in local duel_history.json.
+            ok = CloudSync.set_node(self._cfg, node, None)
+        else:
+            ok = CloudSync.set_node(self._cfg, node, asdict(duel))
         if not ok:
             log(self._cfg, f"[DUEL] Cloud upload failed for duel {duel.duel_id}.", "WARN")
         return ok
@@ -223,6 +234,7 @@ class DuelEngine:
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
             return "no_opponent"
+        opponent_id = opponent_id.lower().strip()
 
         # Triple-condition validation when maps_cache is provided.
         if maps_cache is not None:
@@ -238,7 +250,7 @@ class DuelEngine:
                 if (existing.table_rom == norm_rom
                         and existing.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)):
                     # Block if same opponent (either direction).
-                    if existing.opponent == opponent_id or existing.challenger == opponent_id:
+                    if existing.opponent.lower() == opponent_id or existing.challenger.lower() == opponent_id:
                         log(self._cfg, "[DUEL] send_invitation: duplicate – an active duel for this opponent/table already exists.", "WARN")
                         return "duplicate"
 
@@ -385,7 +397,7 @@ class DuelEngine:
             for duel_id, data in all_duels.items():
                 if not isinstance(data, dict):
                     continue
-                if data.get("opponent") != my_id:
+                if data.get("opponent", "").lower() != my_id:
                     continue
                 if data.get("status") != DuelStatus.PENDING:
                     continue
@@ -393,12 +405,12 @@ class DuelEngine:
                     continue
                 # Receiver-side dedup: skip if a duel for the same challenger + table_rom
                 # already exists in active with status PENDING/ACCEPTED/ACTIVE.
-                challenger_id = data.get("challenger", "")
+                challenger_id = data.get("challenger", "").lower().strip()
                 table_rom_norm = data.get("table_rom", "").lower().strip()
                 duplicate = any(
                     d.table_rom == table_rom_norm
                     and d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)
-                    and (d.challenger == challenger_id or d.opponent == challenger_id)
+                    and (d.challenger.lower() == challenger_id or d.opponent.lower() == challenger_id)
                     for d in self._active
                 )
                 if duplicate:
@@ -482,11 +494,11 @@ class DuelEngine:
                 return False
             my_id = self._my_player_id()
             if duel.status == DuelStatus.PENDING:
-                if duel.challenger != my_id and duel.opponent != my_id:
+                if duel.challenger.lower() != my_id and duel.opponent.lower() != my_id:
                     log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not a participant.", "WARN")
                     return False
             elif duel.status == DuelStatus.ACCEPTED:
-                if duel.challenger != my_id and duel.opponent != my_id:
+                if duel.challenger.lower() != my_id and duel.opponent.lower() != my_id:
                     log(self._cfg, f"[DUEL] cancel_duel: duel {duel_id} – not a participant.", "WARN")
                     return False
             else:
@@ -531,7 +543,7 @@ class DuelEngine:
                 return None
 
             my_id = self._my_player_id()
-            is_challenger = (duel.challenger == my_id)
+            is_challenger = (duel.challenger.lower() == my_id)
 
             if is_challenger:
                 duel.challenger_score = score
@@ -678,7 +690,7 @@ class DuelEngine:
         with self._lock:
             snapshot = [
                 d for d in self._active
-                if (d.challenger == my_id or d.opponent == my_id)
+                if (d.challenger.lower() == my_id or d.opponent.lower() == my_id)
                 and d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)
             ]
 
@@ -707,7 +719,7 @@ class DuelEngine:
                 if cloud_status == duel.status:
                     # For ACTIVE duels, still check if the other player's score arrived.
                     if duel.status == DuelStatus.ACTIVE:
-                        is_challenger = (duel.challenger == my_id)
+                        is_challenger = (duel.challenger.lower() == my_id)
                         if is_challenger:
                             other_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
                             if other_score != SCORE_NOT_SUBMITTED and duel.opponent_score == SCORE_NOT_SUBMITTED:
@@ -743,7 +755,7 @@ class DuelEngine:
                 elif cloud_status in (DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE):
                     ch_score = int(cloud_data.get("challenger_score", SCORE_NOT_SUBMITTED))
                     op_score = int(cloud_data.get("opponent_score", SCORE_NOT_SUBMITTED))
-                    is_challenger = (duel.challenger == my_id)
+                    is_challenger = (duel.challenger.lower() == my_id)
                     if ch_score == op_score:
                         correct_status = DuelStatus.TIE
                     elif ch_score > op_score:
@@ -896,26 +908,26 @@ class DuelEngine:
             vps_mapping = {}
         my_vps_ids = set(vps_mapping.values())
         # Determine own queued_at (for first-come principle).
-        my_entry = all_entries.get(my_id)
+        my_entry = next((v for k, v in all_entries.items() if k.lower() == my_id), None)
         my_queued_at = float(my_entry.get("queued_at", 0)) if isinstance(my_entry, dict) else 0.0
         # Active opponent IDs (skip if we already have a duel against them).
         active_opponents = set()
         with self._lock:
             for d in self._active:
                 if d.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
-                    active_opponents.add(d.challenger)
-                    active_opponents.add(d.opponent)
+                    active_opponents.add(d.challenger.lower())
+                    active_opponents.add(d.opponent.lower())
         active_opponents.discard(my_id)
         max_shared = 0
         queue_count = 0
         for pid, entry in all_entries.items():
-            if pid == my_id:
+            if pid.lower() == my_id:
                 continue
             if not isinstance(entry, dict):
                 continue
             if float(entry.get("expires_at", 0)) < now:
                 continue
-            if pid in active_opponents:
+            if pid.lower() in active_opponents:
                 continue
             queue_count += 1
             their_vps_ids = set(entry.get("vps_ids") or [])
