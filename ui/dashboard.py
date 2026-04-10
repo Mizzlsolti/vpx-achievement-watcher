@@ -142,7 +142,7 @@ class DashboardMixin:
         # Row helper: (check_label, link_button_or_None)
         self._setup_check_rows: list[tuple[QLabel, QPushButton | None]] = []
 
-        for _ in range(4):
+        for _ in range(5):
             row = QHBoxLayout()
             row.setSpacing(6)
             lbl = QLabel("")
@@ -515,7 +515,25 @@ class DashboardMixin:
         maps_ok = isinstance(maps_cache, list) and len(maps_cache) > 0
         maps_count = len(maps_cache) if maps_ok else 0
 
-        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok
+        # ── Check 5: Overlay positions saved ─────────────────────────────────
+        _OVERLAY_CHECKS = [
+            ("overlay_pos_saved",    None),
+            ("ach_toast_saved",      None),
+            ("notifications_saved",  None),
+            ("duel_overlay_saved",   None),
+            ("status_overlay_saved", "status_overlay_enabled"),
+        ]
+        total_relevant = 0
+        total_configured = 0
+        for saved_key, enabled_key in _OVERLAY_CHECKS:
+            if enabled_key and not bool(self.cfg.OVERLAY.get(enabled_key, True)):
+                continue
+            total_relevant += 1
+            if bool(self.cfg.OVERLAY.get(saved_key, False)):
+                total_configured += 1
+        overlay_all_ok = (total_configured == total_relevant)
+
+        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok and overlay_all_ok
 
         # Hide individual rows and show "all good" label when everything passes.
         for lbl, btn in self._setup_check_rows:
@@ -579,6 +597,33 @@ class DashboardMixin:
             "Available Maps not loaded",
             "Load Maps", _IDX_MAPS,
         )
+
+        # ── Row 5: Overlays ───────────────────────────────────────────────
+        _IDX_APPEARANCE = 2
+        lbl5, btn5 = self._setup_check_rows[4]
+        if overlay_all_ok:
+            lbl5.setText("✅ All overlays configured")
+            lbl5.setStyleSheet(_GREEN)
+            if btn5 is not None:
+                btn5.hide()
+        else:
+            _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
+            if total_configured > 0:
+                lbl5.setText(f"⚠️ {total_configured}/{total_relevant} overlays configured")
+                lbl5.setStyleSheet(_YELLOW)
+            else:
+                lbl5.setText("❌ Overlays not configured")
+                lbl5.setStyleSheet(_RED)
+            if btn5 is not None:
+                btn5.setText("[→ Configure]")
+                try:
+                    btn5.clicked.disconnect()
+                except Exception:
+                    pass
+                btn5.clicked.connect(
+                    lambda _=False, t=_IDX_APPEARANCE: self.main_tabs.setCurrentIndex(t)
+                )
+                btn5.show()
 
     def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
         """Create a single notification row widget."""
