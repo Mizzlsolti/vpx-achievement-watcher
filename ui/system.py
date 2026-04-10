@@ -225,9 +225,9 @@ class SystemMixin:
 
         layout.addStretch(1)
 
-        # ── Admin Login button (bottom-right, System tab) ──────────────────
-        admin_row = QHBoxLayout()
-        admin_row.addStretch(1)
+        # ── Bottom row: Admin Login (left) + Help ❓ (right) ──────────────────
+        bottom_row = QHBoxLayout()
+        bottom_row.addStretch(1)
         self._btn_admin_login = QPushButton("🔑 Admin Login")
         self._btn_admin_login.setFixedHeight(28)
         self._btn_admin_login.setToolTip("Log in as chat moderator (admin only)")
@@ -238,10 +238,23 @@ class SystemMixin:
             "QPushButton[adminActive=true] { color:#FF7F00; border-color:#FF7F00; }"
         )
         self._btn_admin_login.clicked.connect(self._on_admin_login_clicked)
-        admin_row.addWidget(self._btn_admin_login)
-        layout.addLayout(admin_row)
+        bottom_row.addWidget(self._btn_admin_login)
 
-        self._add_tab_help_button(layout, "system_general")
+        bottom_row.addSpacing(6)
+
+        btn_help = QPushButton("❓")
+        btn_help.setFixedSize(28, 28)
+        btn_help.setToolTip("Show help for this tab")
+        btn_help.setStyleSheet(
+            "QPushButton { background-color: #1a1a1a; color: #FF7F00; border: 1px solid #FF7F00; "
+            "border-radius: 14px; font-size: 11pt; font-weight: bold; padding: 0; }"
+            "QPushButton:hover { background-color: #FF7F00; color: #000000; }"
+        )
+        btn_help.clicked.connect(lambda: self._show_tab_help("system_general"))
+        bottom_row.addWidget(btn_help)
+
+        layout.addLayout(bottom_row)
+
         system_subtabs.addTab(general_tab, "⚙️ General")
 
         # ── Maintenance sub-tab ────────────────────────────────────────────────
