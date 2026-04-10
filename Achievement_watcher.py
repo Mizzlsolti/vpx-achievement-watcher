@@ -577,7 +577,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>🎯 Local tables with nvram map</b>: Show only locally installed tables that have an NVRAM mapping.<br>"
             "• <b>⚡ Auto-Match All</b>: Automatically assign VPS-IDs to all local ROMs by matching table names, authors and ROM files against the VPS database.<br>"
             "• <b>🔄 Load List</b>: Scan your tables directory and refresh the list.<br>"
-            "• <b>📥 Import from Popper</b>: Import VPS-IDs from PinUP Popper's PUPDatabase.db. Reads the CUSTOM3 field (where VPinStudio stores VPS-IDs) and matches tables by filename and name.<br>"
+            "• <b>📥 Import from PinUp Popper</b>: Import VPS-IDs from PinUP Popper's PUPDatabase.db. Reads the CUSTOM3 field (where VPinStudio stores VPS-IDs) and matches tables by filename and name.<br>"
             "• <b>🗑️ Clear VPS Mapping</b>: Deletes all VPS-ID assignments (vps_id_mapping.json) and resets the Popper DB path cache. Use this to start fresh if mappings are incorrect.<br><br>"
             "<b>Columns:</b><br>"
             "• <b>Table Name</b>: Display name of the table.<br>"
@@ -980,7 +980,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         btn_auto.clicked.connect(self._on_vps_auto_match_all)
         row.addWidget(btn_auto)
 
-        btn_popper = QPushButton("📥 Import from Popper")
+        btn_popper = QPushButton("📥 Import from PinUp Popper")
         btn_popper.setStyleSheet(
             "QPushButton { background-color:#1A0A00; color:#FFAA44; font-weight:bold;"
             " border:1px solid #BB6600; border-radius:5px; padding:7px 16px; }"
@@ -1001,6 +1001,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         row.addWidget(btn_clear_vps)
 
         lay.addLayout(row)
+
+        lbl_tip = QLabel("💡 Tip: \"Import from PinUp Popper\" is the best and fastest option if you use PinUP Popper. \"Auto-Match\" is only needed if you don't use Popper or your Popper database has no VPS-IDs assigned. Always click \"Load List\" first. Use \"Clear VPS Mapping\" before re-importing to get a fresh update from PinUp Popper.")
+        lbl_tip.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
+        lbl_tip.setWordWrap(True)
+        lay.addWidget(lbl_tip)
 
         # Legend bar
         lbl_legend = QLabel(
@@ -1530,7 +1535,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         return None
 
     def _on_import_from_popper(self):
-        """Handler for the '📥 Import from Popper' button."""
+        """Handler for the '📥 Import from PinUp Popper' button."""
         import sqlite3
 
         # ----------------------------------------------------------------
@@ -1562,7 +1567,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             scan_thread.start()
 
             progress = QProgressDialog("Searching for PUPDatabase.db…", "Cancel", 0, 0, self)
-            progress.setWindowTitle("📥 Import from Popper")
+            progress.setWindowTitle("📥 Import from PinUp Popper")
             progress.setWindowModality(Qt.WindowModality.WindowModal)
             progress.setMinimumDuration(0)
             progress.setValue(0)
@@ -1583,7 +1588,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         if db_path is None:
             # Fallback — manual path entry
             dlg = QDialog(self)
-            dlg.setWindowTitle("📥 Import from Popper — Enter Path")
+            dlg.setWindowTitle("📥 Import from PinUp Popper — Enter Path")
             dlg.setMinimumWidth(500)
             dlg_layout = QVBoxLayout(dlg)
             lbl = QLabel("PUPDatabase.db not found. Enter path manually:")
@@ -1619,7 +1624,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             if not db_path:
                 return
             if not os.path.isfile(db_path):
-                QMessageBox.warning(self, "Import from Popper",
+                QMessageBox.warning(self, "Import from PinUp Popper",
                                     f"File not found:\n{db_path}")
                 return
 
@@ -1684,13 +1689,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                             err3 = str(exc3).lower()
                             if "no such table" in err3 or "no such column" in err3:
                                 QMessageBox.warning(
-                                    self, "Import from Popper",
+                                    self, "Import from PinUp Popper",
                                     "No VPS-ID data found in this database.\n"
                                     "Make sure your Popper version supports VPS-IDs."
                                 )
                             else:
                                 QMessageBox.warning(
-                                    self, "Import from Popper",
+                                    self, "Import from PinUp Popper",
                                     f"Could not read from PUPDatabase.db.\n{exc3}\n\n"
                                     "If Popper is running, try closing it first."
                                 )
@@ -1698,7 +1703,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                 elif "no such table" in err:
                     conn.close()
                     QMessageBox.warning(
-                        self, "Import from Popper",
+                        self, "Import from PinUp Popper",
                         "No VPS-ID data found in this database.\n"
                         "Make sure your Popper version supports VPS-IDs."
                     )
@@ -1706,7 +1711,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                 else:
                     conn.close()
                     QMessageBox.warning(
-                        self, "Import from Popper",
+                        self, "Import from PinUp Popper",
                         f"Could not read from PUPDatabase.db.\n{exc}\n\n"
                         "If Popper is running, try closing it first."
                     )
@@ -1714,14 +1719,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             conn.close()
         except sqlite3.OperationalError as exc:
             QMessageBox.warning(
-                self, "Import from Popper",
+                self, "Import from PinUp Popper",
                 f"Could not open PUPDatabase.db.\n{exc}\n\n"
                 "The file may be corrupted, locked, or currently in use by Popper."
             )
             return
         except Exception as exc:
             QMessageBox.warning(
-                self, "Import from Popper",
+                self, "Import from PinUp Popper",
                 f"Unexpected error opening PUPDatabase.db:\n{exc}"
             )
             return
