@@ -174,19 +174,24 @@ class CloudSync:
 
         existing_ids = CloudSync.fetch_player_ids(cfg)
 
-        # Check 1: if this ID already exists, verify the stored name matches.
-        if player_id in existing_ids:
-            stored_name = CloudSync.fetch_node(cfg, f"players/{player_id}/achievements/name")
+        # Build a lowercase → actual-key mapping for case-insensitive lookup.
+        existing_ids_lower = {pid.lower(): pid for pid in existing_ids}
+        player_id_lower = player_id.lower()
+
+        # Check 1: if this ID already exists (case-insensitive), verify the stored name matches.
+        if player_id_lower in existing_ids_lower:
+            cloud_key = existing_ids_lower[player_id_lower]
+            stored_name = CloudSync.fetch_node(cfg, f"players/{cloud_key}/achievements/name")
             if not isinstance(stored_name, str) or not stored_name.strip():
                 # Fall back to a progress entry for the stored name.
                 try:
-                    progress = CloudSync.fetch_node(cfg, f"players/{player_id}/progress")
+                    progress = CloudSync.fetch_node(cfg, f"players/{cloud_key}/progress")
                     if isinstance(progress, dict) and progress:
                         first_entry = next(iter(progress.values()), None)
                         if isinstance(first_entry, dict):
                             stored_name = first_entry.get("name", "")
                 except Exception as _e:
-                    log(cfg, f"[CLOUD] validate_player_identity: progress fallback error for {player_id}: {_e}", "WARN")
+                    log(cfg, f"[CLOUD] validate_player_identity: progress fallback error for {cloud_key}: {_e}", "WARN")
                     stored_name = ""
 
             if isinstance(stored_name, str) and stored_name.strip():
@@ -201,8 +206,8 @@ class CloudSync:
                         ),
                     }
 
-        # Check 2: if the entered name is already used by a different player ID.
-        other_ids = [pid for pid in existing_ids if pid != player_id]
+        # Check 2: if the entered name is already used by a different player ID (case-insensitive).
+        other_ids = [pid for pid in existing_ids if pid.lower() != player_id_lower]
         if other_ids:
             paths = [f"players/{pid}/achievements/name" for pid in other_ids]
             batch = CloudSync.fetch_parallel(cfg, paths, max_workers=20)
