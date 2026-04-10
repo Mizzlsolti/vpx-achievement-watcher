@@ -439,10 +439,12 @@ class ChatWidget(QGroupBox):
     def _post_message(self, msg_data: dict) -> None:
         """Write a new chat message to Firebase (background thread)."""
         try:
+            import random
             from core.cloud_sync import CloudSync
             pid = msg_data.get("senderId", "unknown")
             ts = msg_data.get("timestamp", int(time.time() * 1000))
-            msg_id = f"{ts}_{pid}"
+            rnd = random.randint(0, 0xFFFF)
+            msg_id = f"{ts}_{pid}_{rnd:04x}"
             CloudSync.set_node(self._cfg, f"{_CHAT_PATH}/{msg_id}", msg_data)
         except Exception:
             pass
