@@ -437,24 +437,13 @@ class ChatWidget(QGroupBox):
         ).start()
 
     def _post_message(self, msg_data: dict) -> None:
-        """POST a new chat message to Firebase (background thread)."""
-        cfg = self._cfg
-        base_url = getattr(cfg, "CLOUD_URL", None)
-        if not base_url:
-            return
-        url = f"{base_url.rstrip('/')}/{_CHAT_PATH}.json"
+        """Write a new chat message to Firebase (background thread)."""
         try:
-            payload = json.dumps(msg_data).encode("utf-8")
-            req = urllib.request.Request(
-                url, data=payload, method="POST",
-                headers={
-                    "Content-Type": "application/json",
-                    "User-Agent": "AchievementWatcher/2.0",
-                },
-            )
-            from core.cloud_sync import _urlopen_ssl_aware
-            with _urlopen_ssl_aware(cfg, req, 10):
-                pass
+            from core.cloud_sync import CloudSync
+            pid = msg_data.get("senderId", "unknown")
+            ts = msg_data.get("timestamp", int(time.time() * 1000))
+            msg_id = f"{ts}_{pid}"
+            CloudSync.set_node(self._cfg, f"{_CHAT_PATH}/{msg_id}", msg_data)
         except Exception:
             pass
         finally:
@@ -468,7 +457,6 @@ class ChatWidget(QGroupBox):
 
     # ── Admin right-click context menu ─────────────────────────────────────────
 
-    @pyqtSlot(QPoint)
     def _on_context_menu(self, pos) -> None:
         """Show admin moderation menu on right-click (admin only)."""
         if not get_admin_uid():
@@ -590,10 +578,10 @@ class AdminLoginDialog(QDialog):
         form.setSpacing(4)
 
         form.addWidget(QLabel("Nickname:"))
-        self._edit_nick = QLineEdit(ADMIN_NICKNAME)
-        self._edit_nick.setReadOnly(True)
+        self._edit_nick = QLineEdit()
+        self._edit_nick.setPlaceholderText("Enter admin nickname…")
         self._edit_nick.setStyleSheet(
-            "QLineEdit { background:#1a1a1a; color:#888; border:1px solid #333;"
+            "QLineEdit { background:#1a1a1a; color:#DDD; border:1px solid #444;"
             " border-radius:4px; padding:4px 8px; }"
         )
         form.addWidget(self._edit_nick)
@@ -623,6 +611,10 @@ class AdminLoginDialog(QDialog):
         self._ok_btn = btn_box.button(QDialogButtonBox.StandardButton.Ok)
 
     def _on_ok(self) -> None:
+        entered_nick = self._edit_nick.text().strip()
+        if entered_nick != ADMIN_NICKNAME:
+            self._show_error("Invalid nickname.")
+            return
         entered_id = self._edit_id.text().strip()
         if not entered_id:
             self._show_error("Please enter a cloud ID.")
