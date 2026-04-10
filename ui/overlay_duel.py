@@ -71,7 +71,7 @@ def _calc_duel_overlay_fixed_size(cfg) -> tuple[int, int]:
         tmp.setStyleSheet(f"color:{accent};background:transparent;")
         tmp.setFont(QFont(font_family, _DUEL_BODY_PT))
         tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         tmp.setText(html)
         tmp.setFixedWidth(_DUEL_MAX_TEXT_W)
         tmp.adjustSize()
@@ -223,7 +223,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
             inner = f"<span style='color:{msg_color};'>{safe}</span>"
 
         return (
-            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:left;'>"
+            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:center;'>"
             f"{inner}"
             f"{countdown}"
             f"</div>"
@@ -239,7 +239,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         font_family = str(ov.get("font_family", "Segoe UI"))
         accent_color = QColor(self._accent_color())
         bg_color = _theme_bg_qcolor(self.parent_gui.cfg, 245)
-        border_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+        border_color = QColor(get_theme_color(self.parent_gui.cfg, "border"))
 
         W, H = self._fixed_W, self._fixed_H
         text_area_w = max(100, W - _DUEL_PAD_W)
@@ -250,7 +250,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         tmp.setStyleSheet(f"color:{self._accent_color()};background:transparent;")
         tmp.setFont(QFont(font_family, _DUEL_BODY_PT))
         tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         tmp.setText(html)
         tmp.setFixedWidth(text_area_w)
         tmp.adjustSize()

@@ -17,6 +17,17 @@ class OverlaysMixin:
     ]
 
     _DUEL_TEST_MESSAGES = [
+        (
+            "<div style='text-align:center'>"
+            "⚔️ Duel from <b>xPinballWizard</b><br>"
+            "🎰 <b>Medieval Madness</b><br>"
+            "⚠️ One game only — restarting in-game will abort the duel!<br>"
+            "🔙 After the duel, close VPX or return to Popper.<br>"
+            "<b>[✅ Accept]</b> / Decline<br>"
+            "<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
+            "</div>",
+            "#FF7F00"
+        ),
         ("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to Popper.", "#FF7F00"),
         ("🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
         ("💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
