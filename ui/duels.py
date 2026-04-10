@@ -1218,6 +1218,8 @@ class DuelsMixin:
             "<div style='text-align:center'>"
             f"⚔️ Duel from <b>{opponent}</b><br>"
             f"🎰 <b>{table}</b><br>"
+            "⚠️ One game only — restarting in-game will abort the duel!<br>"
+            "🔙 After the duel, close VPX or return to Popper.<br>"
             f"{accept_part} / {decline_part}<br>"
             f"<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
             "</div>"
@@ -1968,7 +1970,8 @@ class DuelsMixin:
             "<div style='text-align:center'>"
             f"⚔️ Duel active against {opponent_name}!<br>"
             f"🎰 {table_display}<br>"
-            "⚠️ One game only — restarting in-game will abort the duel!"
+            "⚠️ One game only — restarting in-game will abort the duel!<br>"
+            "🔙 After the duel, close VPX or return to Popper."
             "</div>"
         )
 
@@ -2037,7 +2040,7 @@ class DuelsMixin:
             if detected:
                 time.sleep(3)  # extra wait so the table finishes rendering
             try:
-                self.bridge.duel_info_show.emit(msg, 6, "#FF7F00")
+                self.bridge.duel_info_show.emit(msg, 20, "#FF7F00")
             except Exception:
                 pass
 
@@ -2088,7 +2091,7 @@ class DuelsMixin:
                 except Exception:
                     pass
             self._duel_notify(
-                f"⚠️ Duel aborted: Session too short ({int(elapsed)}s). Minimum: {self._DUEL_MIN_PLAY_SECONDS}s.",
+                "⚠️ Duel aborted: Session too short.",
                 "#FFAA00", 8,
             )
             self._notify_trophies_duel_aborted()
