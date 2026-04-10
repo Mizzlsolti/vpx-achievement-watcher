@@ -216,6 +216,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_right_input_source", "duel_right_vk", "duel_right_mods", "duel_right_joy_button",
     "tray_toggle_enabled", "tray_toggle_input_source", "tray_toggle_vk", "tray_toggle_mods", "tray_toggle_joy_button",
     "player_name", "player_id",
+    "first_setup_done",
 ]
 
 
@@ -297,7 +298,6 @@ class AppConfig:
     TABLES_DIR: str = r"C:\vPinball\VisualPinball\Tables"
     OVERLAY: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_OVERLAY))
     FIRST_RUN: bool = True
-    TUTORIAL_COMPLETED: bool = False
     LOG_CTRL: bool = False
     LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
     CLOUD_ENABLED: bool = False
@@ -334,7 +334,6 @@ class AppConfig:
             TABLES_DIR=data.get("TABLES_DIR", AppConfig.TABLES_DIR),
             OVERLAY=ov,
             FIRST_RUN=bool(data.get("FIRST_RUN", False)),
-            TUTORIAL_COMPLETED=bool(data.get("TUTORIAL_COMPLETED", False)),
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
@@ -392,7 +391,6 @@ class AppConfig:
                 "CLOUD_ENABLED": cloud_enabled_val,
                 "CLOUD_BACKUP_ENABLED": cloud_backup_val,
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
-                "TUTORIAL_COMPLETED": getattr(self, "TUTORIAL_COMPLETED", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
             }

@@ -57,7 +57,6 @@ from core.badges import (
 )
 
 from ui.dialogs import FeedbackDialog, AchievementBeatenDialog
-from core.tutorial import TutorialWizardDialog
 from core.theme import pinball_arcade_style, generate_stylesheet, list_themes, get_theme, DEFAULT_THEME, get_theme_color
 from ui.cloud_stats import CloudStatsMixin
 from aweditor import AWEditorMixin

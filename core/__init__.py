@@ -10,7 +10,6 @@ __all__ = [
     "notifications",
     "sound",
     "theme",
-    "tutorial",
     "watcher_core",
     "watcher_io",
     "watcher_migrate",

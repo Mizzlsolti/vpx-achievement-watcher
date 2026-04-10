@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QApplication
 
 from core.config import AppConfig
 from core.watcher_core import Watcher, ensure_dir, log
-from core.tutorial import TutorialWizardDialog
+from ui.setup_wizard import SetupWizardDialog
 
 
 class Bridge(QObject):
@@ -90,12 +90,44 @@ def main():
     if cfg.FIRST_RUN:
         cfg.FIRST_RUN = False
         cfg.save()
-    if not cfg.TUTORIAL_COMPLETED:
+
+    # ── Setup Wizard logic ──────────────────────────────────────────────────
+    # Scenario 1: first_setup_done == True → skip wizard, normal start
+    first_setup_done = bool(cfg.OVERLAY.get("first_setup_done", False))
+    player_name = (cfg.OVERLAY.get("player_name") or "").strip()
+    player_id = (cfg.OVERLAY.get("player_id") or "").strip()
+
+    if first_setup_done:
+        # Already set up — show main window normally
         win.showNormal()
-        tutorial = TutorialWizardDialog(cfg, win)
-        tutorial.show()
+    elif (
+        player_name and player_name.lower() != "player"
+        and player_id and player_id != "0000"
+        and len(player_id) == 4
+    ):
+        # Scenario 2: Existing player who updated — mark setup done, skip wizard
+        cfg.OVERLAY["first_setup_done"] = True
+        cfg.save()
+        win.showNormal()
     else:
-        win.hide()
+        # Scenario 3: New player / fresh install — show Setup Wizard
+        win.showNormal()
+        wizard = SetupWizardDialog(cfg, win)
+        wizard.exec()  # modal — blocks until wizard is completed
+        # After wizard, refresh System tab fields so they reflect the new values
+        try:
+            if hasattr(win, "txt_player_name"):
+                win.txt_player_name.setText(cfg.OVERLAY.get("player_name", ""))
+            if hasattr(win, "txt_player_id"):
+                win.txt_player_id.setText(cfg.OVERLAY.get("player_id", ""))
+            if hasattr(win, "chk_cloud_enabled"):
+                win.chk_cloud_enabled.blockSignals(True)
+                win.chk_cloud_enabled.setChecked(cfg.CLOUD_ENABLED)
+                win.chk_cloud_enabled.blockSignals(False)
+            if cfg.CLOUD_ENABLED and hasattr(win, "_lock_player_identity_fields"):
+                win._lock_player_identity_fields(True)
+        except Exception:
+            pass
     code = app.exec()
     cfg.save()
     sys.exit(code)
