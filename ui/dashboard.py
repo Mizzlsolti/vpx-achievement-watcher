@@ -142,7 +142,7 @@ class DashboardMixin:
         # Row helper: (check_label, link_button_or_None)
         self._setup_check_rows: list[tuple[QLabel, QPushButton | None]] = []
 
-        for _ in range(5):
+        for _ in range(6):
             row = QHBoxLayout()
             row.setSpacing(6)
             lbl = QLabel("")
@@ -533,7 +533,25 @@ class DashboardMixin:
                 total_configured += 1
         overlay_all_ok = (total_configured == total_relevant)
 
-        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok and overlay_all_ok
+        # ── Check 6: Widget Controls configured ───────────────────────────────
+        _IDX_CONTROLS = 3
+        _CONTROLS = [
+            ("toggle_input_source",     "toggle_vk",       "toggle_joy_button"),
+            ("duel_left_input_source",  "duel_left_vk",    "duel_left_joy_button"),
+            ("duel_right_input_source", "duel_right_vk",   "duel_right_joy_button"),
+        ]
+        controls_configured = 0
+        for _src_key, _kbd_key, _joy_key in _CONTROLS:
+            _src = str(self.cfg.OVERLAY.get(_src_key, "keyboard")).lower()
+            if _src == "joystick":
+                _val = int(self.cfg.OVERLAY.get(_joy_key, 0) or 0)
+            else:
+                _val = int(self.cfg.OVERLAY.get(_kbd_key, 0) or 0)
+            if _val != 0:
+                controls_configured += 1
+        controls_all_ok = (controls_configured == 3)
+
+        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok and overlay_all_ok and controls_all_ok
 
         # Hide individual rows and show "all good" label when everything passes.
         for lbl, btn in self._setup_check_rows:
@@ -547,8 +565,9 @@ class DashboardMixin:
         if all_ok:
             return
 
-        _GREEN = "color: #00C853; font-size: 9pt; padding: 1px 0;"
-        _RED   = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
+        _GREEN  = "color: #00C853; font-size: 9pt; padding: 1px 0;"
+        _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
+        _RED    = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
 
         def _apply_row(idx: int, ok: bool, ok_text: str, fail_text: str,
                        link_text: str | None, link_target: int | None) -> None:
@@ -607,7 +626,6 @@ class DashboardMixin:
             if btn5 is not None:
                 btn5.hide()
         else:
-            _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
             if total_configured > 0:
                 lbl5.setText(f"⚠️ {total_configured}/{total_relevant} overlays configured")
                 lbl5.setStyleSheet(_YELLOW)
@@ -624,6 +642,31 @@ class DashboardMixin:
                     lambda _=False, t=_IDX_APPEARANCE: self.main_tabs.setCurrentIndex(t)
                 )
                 btn5.show()
+
+        # ── Row 6: Widget Controls ────────────────────────────────────────────
+        lbl6, btn6 = self._setup_check_rows[5]
+        if controls_all_ok:
+            lbl6.setText("✅ 3/3 Widget Controls configured")
+            lbl6.setStyleSheet(_GREEN)
+            if btn6 is not None:
+                btn6.hide()
+        else:
+            if controls_configured > 0:
+                lbl6.setText(f"⚠️ {controls_configured}/3 Widget Controls configured")
+                lbl6.setStyleSheet(_YELLOW)
+            else:
+                lbl6.setText("❌ 0/3 Widget Controls configured")
+                lbl6.setStyleSheet(_RED)
+            if btn6 is not None:
+                btn6.setText("[→ Configure]")
+                try:
+                    btn6.clicked.disconnect()
+                except Exception:
+                    pass
+                btn6.clicked.connect(
+                    lambda _=False, t=_IDX_CONTROLS: self.main_tabs.setCurrentIndex(t)
+                )
+                btn6.show()
 
     def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
         """Create a single notification row widget."""
