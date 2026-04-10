@@ -402,6 +402,21 @@ class SetupWizardDialog(QDialog):
 
         lay.addWidget(grp_cloud)
 
+        # ── Overlay reminder ──────────────────────────────────────────────
+        lbl_overlay_reminder = QLabel(
+            "🖼️ Don't forget to configure your Overlays!\n\n"
+            "After setup, go to:\n"
+            "Appearance → Overlay\n\n"
+            "Position all overlays for your screen.\n\n"
+            "⚠️ Without this, overlays may appear in wrong positions during gameplay!"
+        )
+        lbl_overlay_reminder.setWordWrap(True)
+        lbl_overlay_reminder.setStyleSheet(
+            "color: #FF7F00; font-size: 8pt; background: #1A0D00;"
+            " border: 1px solid #FF7F00; border-radius: 4px; padding: 6px;"
+        )
+        lay.addWidget(lbl_overlay_reminder)
+
         # ── Error label ───────────────────────────────────────────────────
         self._lbl_error_p2 = QLabel("")
         self._lbl_error_p2.setWordWrap(True)
