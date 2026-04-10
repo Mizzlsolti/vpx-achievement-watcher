@@ -184,7 +184,9 @@ class DuelsMixin:
         lay_new.addWidget(self._lbl_duel_onegame_warning)
 
         self._lbl_duel_vpx_hint = QLabel(
-            "ℹ️ Scores are submitted when VPX is closed — remind your opponent to close VPX after playing!"
+            "ℹ️ Scores are submitted when VPX is closed. "
+            "Most frontends (PinUp Popper, PinballY, etc.) close VPX automatically when you leave the table. "
+            "If playing standalone, close VPX manually after the game."
         )
         self._lbl_duel_vpx_hint.setStyleSheet("color:#888; font-style:italic; font-size:9pt;")
         self._lbl_duel_vpx_hint.setWordWrap(True)
@@ -438,7 +440,9 @@ class DuelsMixin:
             "<p><b>⏱️ SESSION RULES</b><br>"
             "• Only ONE game per duel — restarting in-game (F3) or starting at ball 1 new will abort the duel (NVRAM tracking)<br>"
             "• Quitting VPX early aborts the duel<br>"
-            "• NVRAM highscore is captured at session start</p>"
+            "• NVRAM highscore is captured at session start<br>"
+            "• VPX must be closed after playing — scores are submitted when VPX exits<br>"
+            "• Most frontends (PinUp Popper, PinballY, etc.) close VPX automatically when you leave the table</p>"
             "<p><b>🏆 SCORING</b><br>"
             "• Both players play the table independently<br>"
             "• Scores are submitted and compared via the cloud<br>"

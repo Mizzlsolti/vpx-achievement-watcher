@@ -93,6 +93,24 @@ class DashboardMixin:
         lay_run_cards.addWidget(grp_run_status)
         layout.addWidget(grp_run_cards)
 
+        # ── ⌨️ Input Bindings ───────────────────────────────────────────────────
+        grp_bindings = QGroupBox("⌨️ Input Bindings")
+        lay_bindings = QVBoxLayout(grp_bindings)
+        lay_bindings.setContentsMargins(8, 6, 8, 6)
+        lay_bindings.setSpacing(4)
+
+        self._lbl_dash_binding_overlay = QLabel()
+        self._lbl_dash_binding_left = QLabel()
+        self._lbl_dash_binding_right = QLabel()
+
+        _binding_style = "color: #CCC; font-size: 9pt; padding: 1px 0;"
+        for lbl in (self._lbl_dash_binding_overlay, self._lbl_dash_binding_left, self._lbl_dash_binding_right):
+            lbl.setStyleSheet(_binding_style)
+            lay_bindings.addWidget(lbl)
+
+        self._refresh_binding_labels()
+        layout.addWidget(grp_bindings)
+
         # ── 📬 Notifications ────────────────────────────────────────────────────
         grp_notif = QGroupBox("📬 Notifications")
         lay_notif_outer = QVBoxLayout(grp_notif)
@@ -429,6 +447,12 @@ class DashboardMixin:
         except Exception:
             pass
 
+        # Refresh input binding labels
+        try:
+            self._refresh_binding_labels()
+        except Exception:
+            pass
+
     # ── Notification feed ────────────────────────────────────────────────────
 
     def _refresh_notification_feed(self):
@@ -624,6 +648,28 @@ class DashboardMixin:
                     lambda _=False, t=_IDX_APPEARANCE: self.main_tabs.setCurrentIndex(t)
                 )
                 btn5.show()
+
+    # ── Input Bindings ────────────────────────────────────────────────────────
+
+    def _refresh_binding_labels(self) -> None:
+        """Update the Input Bindings labels in the Dashboard tab."""
+        if not hasattr(self, "_lbl_dash_binding_overlay"):
+            return
+        try:
+            overlay_text = self._toggle_binding_label_text()
+        except Exception:
+            overlay_text = "—"
+        try:
+            left_text = self._nav_binding_label_text("left")
+        except Exception:
+            left_text = "—"
+        try:
+            right_text = self._nav_binding_label_text("right")
+        except Exception:
+            right_text = "—"
+        self._lbl_dash_binding_overlay.setText(f"Show/Hide Stats Overlay:   {overlay_text}")
+        self._lbl_dash_binding_left.setText(f"Duel Accept / Left:   {left_text}")
+        self._lbl_dash_binding_right.setText(f"Duel Decline / Right:   {right_text}")
 
     def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
         """Create a single notification row widget."""
