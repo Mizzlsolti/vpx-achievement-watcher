@@ -228,7 +228,7 @@ class TournamentWidget(QWidget):
 
         # ── Chat panel (below tournament content) ─────────────────────────
         self._chat_widget = ChatWidget(self._cfg)
-        self._chat_widget.setMaximumHeight(220)
+        self._chat_widget.setMaximumHeight(660)
 
         # Compose the vertical layout: tournament content on top, chat below
         root.addLayout(left_col, 1)
