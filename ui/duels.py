@@ -399,47 +399,45 @@ class DuelsMixin:
     def _show_duel_rules(self) -> None:
         """Show the Score Duel rules dialog."""
         from PyQt6.QtWidgets import QMessageBox
-        rules = (
-            "📜 Score Duel Rules\n\n"
-            "⚔️ OVERVIEW\n"
-            "Score Duels are asynchronous high-score battles. Challenge any\n"
-            "cloud-connected player to compete on the same table.\n\n"
-            "👥 OPPONENTS\n"
-            "• Cloud Sync must be enabled for both players\n"
-            "• Only players with a valid Player Name appear\n"
-            "• Players using the default name \"Player\" are hidden\n\n"
-            "🎰 TABLE REQUIREMENTS\n"
-            "• NVRAM map must exist (or CAT table must be enabled)\n"
-            "• Table must be locally installed (.vpx found)\n"
-            "• VPS-ID must be assigned\n"
-            "• All three conditions are mandatory\n\n"
-            "🔗 MATCHING\n"
-            "• Both players must have the same ROM name for the table\n"
-            "• If the opponent does not have the table installed, the duel is automatically declined\n\n"
-            "⏳ INVITATIONS\n"
-            "• You have 7 days to accept or decline\n"
-            "• Invitations are visible in the 📬 Incoming Invitations table\n"
-            "• VPX must NOT be running when accepting\n"
-            "• Unanswered invitations expire automatically\n\n"
-            "⏱️ SESSION RULES\n"
-            "• Only ONE game per duel — restarting in-game (F3) or starting at ball 1 new will abort the duel (NVRAM tracking)\n"
-            "• Quitting VPX early aborts the duel\n"
-            "• NVRAM highscore is captured at session start\n\n"
-            "🏆 SCORING\n"
-            "• Both players play the table independently\n"
-            "• Scores are submitted and compared via the cloud\n"
-            "• Highest score wins the duel\n\n"
-            "🔀 AUTO-MATCH\n"
-            "• Press Auto-Match to join the matchmaking queue\n"
-            "• You are matched with players who share at least one table (by VPS-ID)\n"
-            "• A random shared table is automatically selected\n"
-            "• The matched opponent must still accept the invitation\n"
-            "• Search times out after 5 minutes\n"
-            "• Cloud Sync must be enabled\n\n"
+        from PyQt6.QtCore import Qt
+        html_rules = (
+            "<p><b>📜 Score Duel Rules</b></p>"
+            "<p><b>⚔️ OVERVIEW</b><br>"
+            "Score Duels are asynchronous high-score battles. Challenge any<br>"
+            "cloud-connected player to compete on the same table.</p>"
+            "<p><b>⚠️ Cloud Sync must be enabled to participate in Score Duels!<br>"
+            "You can find this option in the System tab → General Settings.</b></p>"
+            "<p><b>📋 REQUIREMENTS</b><br>"
+            "• NVRAM map must exist for the table<br>"
+            "• Table must be locally installed (.vpx found)<br>"
+            "• VPS-ID must be assigned (see Available Maps tab)<br>"
+            "• All three conditions are mandatory<br>"
+            "• Only players with a valid Player Name appear<br>"
+            "• Players using the default name \"Player\" are hidden</p>"
+            "<p><b>⏳ INVITATIONS</b><br>"
+            "• You have 7 days to accept or decline<br>"
+            "• Invitations are visible in the 📬 Incoming Invitations table<br>"
+            "• VPX must NOT be running when accepting<br>"
+            "• Unanswered invitations expire automatically</p>"
+            "<p><b>⏱️ SESSION RULES</b><br>"
+            "• Only ONE game per duel — restarting in-game (F3) or starting at ball 1 new will abort the duel (NVRAM tracking)<br>"
+            "• Quitting VPX early aborts the duel<br>"
+            "• NVRAM highscore is captured at session start</p>"
+            "<p><b>🏆 SCORING</b><br>"
+            "• Both players play the table independently<br>"
+            "• Scores are submitted and compared via the cloud<br>"
+            "• Highest score wins the duel</p>"
+            "<p><b>🔀 AUTO-MATCH</b><br>"
+            "• Press Auto-Match to join the matchmaking queue<br>"
+            "• You are matched with players who share at least one table (by VPS-ID)<br>"
+            "• A random shared table is automatically selected<br>"
+            "• The matched opponent must still accept the invitation<br>"
+            "• Search times out after 5 minutes</p>"
         )
         box = QMessageBox(self)
         box.setWindowTitle("📜 Score Duel Rules")
-        box.setText(rules)
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setText(html_rules)
         box.setIcon(QMessageBox.Icon.Information)
         box.exec()
 
@@ -603,6 +601,10 @@ class DuelsMixin:
         if index == getattr(self, "_duels_tab_index", -1):
             if hasattr(self, "_cmb_duel_table"):
                 self._populate_duel_table_combo()
+            if not self.cfg.OVERLAY.get("duel_rules_seen", False):
+                self.cfg.OVERLAY["duel_rules_seen"] = True
+                self.cfg.save()
+                self._show_duel_rules()
 
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
