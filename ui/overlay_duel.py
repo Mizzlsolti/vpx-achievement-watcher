@@ -46,6 +46,11 @@ _DUEL_CANDIDATE_MESSAGES = [
     "🚫 Your duel on Medieval Madness was cancelled.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "Cannot accept duel while VPX is running.<br><span style='color:#DDDDDD;'>closing in 5…</span>",
     "❌ Duel cancelled – Table 'Medieval Madness' is not available.<br><span style='color:#DDDDDD;'>closing in 6…</span>",
+    "🏆 Tournament started!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your first match: against <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left [← Duel Accept] to confirm</small>",
+    "💀 Eliminated in the semifinal<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left [← Duel Accept] to confirm</small>",
+    "🏆 FINAL!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your opponent: <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left [← Duel Accept] to confirm</small>",
+    "🏆 TOURNAMENT CHAMPION!<br>🎰 <b>Medieval Madness</b><br><br>You won the tournament!<br><br><small>Press left [← Duel Accept] to confirm</small>",
+    "💀 Final lost – Place #2<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left [← Duel Accept] to confirm</small>",
 ]
 
 
@@ -71,7 +76,7 @@ def _calc_duel_overlay_fixed_size(cfg) -> tuple[int, int]:
         tmp.setStyleSheet(f"color:{accent};background:transparent;")
         tmp.setFont(QFont(font_family, _DUEL_BODY_PT))
         tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         tmp.setText(html)
         tmp.setFixedWidth(_DUEL_MAX_TEXT_W)
         tmp.adjustSize()
@@ -223,7 +228,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
             inner = f"<span style='color:{msg_color};'>{safe}</span>"
 
         return (
-            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:left;'>"
+            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:center;'>"
             f"{inner}"
             f"{countdown}"
             f"</div>"
@@ -239,7 +244,8 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         font_family = str(ov.get("font_family", "Segoe UI"))
         accent_color = QColor(self._accent_color())
         bg_color = _theme_bg_qcolor(self.parent_gui.cfg, 245)
-        border_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
+        border_color = QColor(get_theme_color(self.parent_gui.cfg, "border"))
+        primary_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
 
         W, H = self._fixed_W, self._fixed_H
         text_area_w = max(100, W - _DUEL_PAD_W)
@@ -250,7 +256,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         tmp.setStyleSheet(f"color:{self._accent_color()};background:transparent;")
         tmp.setFont(QFont(font_family, _DUEL_BODY_PT))
         tmp.setWordWrap(True)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        tmp.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         tmp.setText(html)
         tmp.setFixedWidth(text_area_w)
         tmp.adjustSize()
@@ -284,15 +290,15 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
 
             # ── Effect: Breathing Glow Border ────────────────────────────
             if self._is_fx_enabled("fx_duel_breathing_glow"):
-                self._breathing.draw(p, 1, 1, W - 2, H - 2, self._radius, accent_color, width=4)
+                self._breathing.draw(p, 1, 1, W - 2, H - 2, self._radius, primary_color, width=4)
 
             # ── Effect: Energy Flash ──────────────────────────────────────
             if self._is_fx_enabled("fx_duel_energy_flash") and self._flash.is_active():
-                self._flash.draw(p, W, H, self._radius, accent_color)
+                self._flash.draw(p, W, H, self._radius, primary_color)
 
             # ── Effect: Glow Sweep ────────────────────────────────────────
             if self._is_fx_enabled("fx_duel_glow_sweep") and self._glow_sweep.is_active():
-                self._glow_sweep.draw(p, W, H, self._radius, accent_color)
+                self._glow_sweep.draw(p, W, H, self._radius, primary_color)
 
         finally:
             p.end()
