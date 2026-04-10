@@ -133,6 +133,56 @@ class DashboardMixin:
 
         layout.addWidget(grp_notif)
 
+        # ── 📋 Setup Status ────────────────────────────────────────────────────
+        grp_setup = QGroupBox("📋 Setup Status")
+        lay_setup = QVBoxLayout(grp_setup)
+        lay_setup.setContentsMargins(8, 8, 8, 8)
+        lay_setup.setSpacing(4)
+
+        # Row helper: (check_label, link_button_or_None)
+        self._setup_check_rows: list[tuple[QLabel, QPushButton | None]] = []
+
+        for _ in range(4):
+            row = QHBoxLayout()
+            row.setSpacing(6)
+            lbl = QLabel("")
+            lbl.setStyleSheet("font-size: 9pt; padding: 1px 0;")
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
+            row.addWidget(lbl)
+            row.addStretch(1)
+            btn = QPushButton("")
+            btn.setFlat(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(
+                "QPushButton { color: #FF7F00; font-size: 9pt; border: none; padding: 0 2px;"
+                " text-decoration: none; background: transparent; }"
+                "QPushButton:hover { text-decoration: underline; }"
+            )
+            btn.hide()
+            row.addWidget(btn)
+            lay_setup.addLayout(row)
+            self._setup_check_rows.append((lbl, btn))
+
+        self._lbl_setup_all_good = QLabel("✅ All set! You're ready to play.")
+        self._lbl_setup_all_good.setStyleSheet(
+            "color: #00C853; font-size: 9pt; font-weight: bold; padding: 2px 0;"
+        )
+        self._lbl_setup_all_good.setTextFormat(Qt.TextFormat.PlainText)
+        self._lbl_setup_all_good.hide()
+        lay_setup.addWidget(self._lbl_setup_all_good)
+
+        self._lbl_setup_info = QLabel(
+            "ℹ️ All checks must pass for Duels, Tournaments and Leaderboards to work."
+        )
+        self._lbl_setup_info.setStyleSheet(
+            "color: #888; font-size: 8pt; font-style: italic; padding: 2px 0;"
+        )
+        self._lbl_setup_info.setTextFormat(Qt.TextFormat.PlainText)
+        self._lbl_setup_info.setWordWrap(True)
+        lay_setup.addWidget(self._lbl_setup_info)
+
+        layout.addWidget(grp_setup)
+
         grp_actions = QGroupBox("Quick Actions")
         lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
@@ -373,6 +423,12 @@ class DashboardMixin:
         except Exception:
             pass
 
+        # Refresh setup checklist
+        try:
+            self._refresh_setup_checklist()
+        except Exception:
+            pass
+
     # ── Notification feed ────────────────────────────────────────────────────
 
     def _refresh_notification_feed(self):
@@ -423,6 +479,106 @@ class DashboardMixin:
                 self.main_tabs.setTabText(0, "🏠 Dashboard")
         except Exception:
             pass
+
+    # ── Setup checklist ──────────────────────────────────────────────────────
+
+    def _refresh_setup_checklist(self) -> None:
+        """Update the Setup Status GroupBox to reflect current configuration state."""
+        if not hasattr(self, "_setup_check_rows"):
+            return
+
+        # Tab indices matching addTab call order in the main window.
+        _IDX_SYSTEM = 9
+        _IDX_MAPS = 7
+
+        # ── Check 1: Player Name ──────────────────────────────────────────────
+        pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
+        check1_ok = bool(pname and pname.lower() != "player")
+
+        # ── Check 2: Cloud Sync ───────────────────────────────────────────────
+        cloud_ok = bool(
+            getattr(self.cfg, "CLOUD_ENABLED", False)
+            and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        )
+
+        # ── Check 3: VPS-ID assignments ───────────────────────────────────────
+        try:
+            from ui.vps import _load_vps_mapping
+            mapping = _load_vps_mapping(self.cfg)
+            vps_count = len(mapping)
+        except Exception:
+            vps_count = 0
+        check3_ok = vps_count > 0
+
+        # ── Check 4: Available Maps loaded ────────────────────────────────────
+        maps_cache = getattr(self, "_all_maps_cache", None)
+        maps_ok = isinstance(maps_cache, list) and len(maps_cache) > 0
+        maps_count = len(maps_cache) if maps_ok else 0
+
+        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok
+
+        # Hide individual rows and show "all good" label when everything passes.
+        for lbl, btn in self._setup_check_rows:
+            lbl.setVisible(not all_ok)
+            if btn is not None:
+                btn.setVisible(False)
+
+        self._lbl_setup_all_good.setVisible(all_ok)
+        self._lbl_setup_info.setVisible(not all_ok)
+
+        if all_ok:
+            return
+
+        _GREEN = "color: #00C853; font-size: 9pt; padding: 1px 0;"
+        _RED   = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
+
+        def _apply_row(idx: int, ok: bool, ok_text: str, fail_text: str,
+                       link_text: str | None, link_target: int | None) -> None:
+            lbl, btn = self._setup_check_rows[idx]
+            if ok:
+                lbl.setText(f"✅ {ok_text}")
+                lbl.setStyleSheet(_GREEN)
+                if btn is not None:
+                    btn.hide()
+            else:
+                lbl.setText(f"❌ {fail_text}")
+                lbl.setStyleSheet(_RED)
+                if btn is not None and link_text and link_target is not None:
+                    btn.setText(f"[→ {link_text}]")
+                    try:
+                        btn.clicked.disconnect()
+                    except Exception:
+                        pass
+                    _target = link_target
+                    btn.clicked.connect(lambda _=False, t=_target: self.main_tabs.setCurrentIndex(t))
+                    btn.show()
+                elif btn is not None:
+                    btn.hide()
+
+        _apply_row(
+            0, check1_ok,
+            f'Player Name set: "{pname}"',
+            "Player Name not set",
+            "Set Name", _IDX_SYSTEM,
+        )
+        _apply_row(
+            1, cloud_ok,
+            "Cloud Sync enabled",
+            "Cloud Sync disabled",
+            "Enable", _IDX_SYSTEM,
+        )
+        _apply_row(
+            2, check3_ok,
+            f"{vps_count} table{'s' if vps_count != 1 else ''} with VPS-ID assigned",
+            "No VPS-IDs assigned",
+            None, None,
+        )
+        _apply_row(
+            3, maps_ok,
+            f"{maps_count} map{'s' if maps_count != 1 else ''} loaded",
+            "Available Maps not loaded",
+            "Load Maps", _IDX_MAPS,
+        )
 
     def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
         """Create a single notification row widget."""

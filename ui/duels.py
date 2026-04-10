@@ -20,6 +20,7 @@ from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 from core.config import p_aweditor
 from core.duel_engine import Duel, DuelEngine, DuelStatus
 from core.watcher_core import _strip_version_from_name
+from .widgets import HazardStripeOverlay
 
 # Interval (ms) between opponent-score re-checks while waiting for the result.
 _DUEL_RECHECK_INTERVAL_MS = 12_000
@@ -191,6 +192,12 @@ class DuelsMixin:
 
         layout.addWidget(grp_new)
 
+        # Cloud-lock overlay for the "Start New Duel" GroupBox.
+        self._duel_start_lock_overlay = HazardStripeOverlay(
+            grp_new,
+            "🔒 Cloud Sync required – enable in System tab",
+        )
+
         # ── b2) OR separator + Auto-Match ────────────────────────────────────
         lbl_or = QLabel("── OR ──")
         lbl_or.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -200,6 +207,15 @@ class DuelsMixin:
         from .duels_automatch import AutoMatchWidget
         self._automatch_widget = AutoMatchWidget(self, self.cfg, self._duel_engine)
         layout.addWidget(self._automatch_widget)
+
+        # Cloud-lock overlay for the Auto-Match widget.
+        self._duel_automatch_lock_overlay = HazardStripeOverlay(
+            self._automatch_widget,
+            "🔒 Cloud Sync required",
+        )
+
+        # Show/hide cloud-lock overlays based on current Cloud Sync state.
+        self._update_duel_cloud_overlays()
 
         # ── c) Active Duels ──────────────────────────────────────────────────
         grp_active = QGroupBox("🔵 Active Duels")
@@ -605,6 +621,20 @@ class DuelsMixin:
                 self.cfg.OVERLAY["duel_rules_seen"] = True
                 self.cfg.save()
                 self._show_duel_rules()
+            self._update_duel_cloud_overlays()
+
+    def _update_duel_cloud_overlays(self) -> None:
+        """Show or hide the cloud-lock hazard overlays based on Cloud Sync state."""
+        cloud_on = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
+        for overlay_attr in ("_duel_start_lock_overlay", "_duel_automatch_lock_overlay"):
+            overlay = getattr(self, overlay_attr, None)
+            if overlay is None:
+                continue
+            if cloud_on:
+                overlay.hide()
+            else:
+                overlay.show()
+                overlay.raise_()
 
     # ── Slot: fetch opponent players from cloud ───────────────────────────────
 
