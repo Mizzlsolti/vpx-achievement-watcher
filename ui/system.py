@@ -809,7 +809,7 @@ class SystemMixin:
                 }
                 if custom_progress:
                     metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
-                if CloudSync.set_node(self.cfg, f"players/{pid}/achievements", metadata_payload):
+                if CloudSync.patch_node(self.cfg, f"players/{pid}/achievements", metadata_payload):
                     results.append("✅ Achievements metadata")
                     log(self.cfg, "[CLOUD] Manual backup: achievements metadata uploaded")
                 else:
