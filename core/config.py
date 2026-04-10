@@ -160,7 +160,7 @@ DEFAULT_OVERLAY.setdefault("fx_post_scanlines_intensity", 50)
 DEFAULT_OVERLAY.setdefault("pp_overlay_main", True)
 DEFAULT_OVERLAY.setdefault("pp_overlay_toast", True)
 DEFAULT_OVERLAY.setdefault("pp_overlay_duel", True)
-DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", True)
+DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", False)
 DEFAULT_OVERLAY.setdefault("duel_left_input_source", "keyboard")
 DEFAULT_OVERLAY.setdefault("duel_left_vk", 0x25)       # Left Arrow
 DEFAULT_OVERLAY.setdefault("duel_left_mods", 0)
