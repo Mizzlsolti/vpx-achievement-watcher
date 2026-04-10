@@ -21,17 +21,11 @@ from core.config import p_aweditor
 from core.duel_engine import Duel, DuelEngine, DuelStatus
 from core.watcher_core import _strip_version_from_name
 
-# Delay (ms) before the first fast opponent-score re-check after our own score is submitted.
-_DUEL_FAST_RECHECK_DELAY_MS = 5_000
+# Interval (ms) between opponent-score re-checks while waiting for the result.
+_DUEL_RECHECK_INTERVAL_MS = 12_000
 
-# How long (seconds) the aggressive fast-recheck loop runs after score submission (2 minutes).
-_DUEL_FAST_RECHECK_WINDOW_S = 120
-
-# Interval (ms) between fast rechecks during the aggressive window.
-_DUEL_FAST_RECHECK_INTERVAL_MS = 12_000
-
-# Per-duel cooldown (seconds) used during the aggressive fast-recheck window.
-_DUEL_FAST_RECHECK_COOLDOWN_S = 12
+# Per-duel cooldown (seconds) between individual re-check API calls.
+_DUEL_RECHECK_COOLDOWN_S = 12
 
 
 def _get_duel_table_display(duel, watcher=None) -> str:
@@ -187,6 +181,13 @@ class DuelsMixin:
         self._lbl_duel_onegame_warning.setStyleSheet("color:#FFAA00; font-size:9pt; font-style:italic; padding:2px 4px;")
         self._lbl_duel_onegame_warning.setWordWrap(True)
         lay_new.addWidget(self._lbl_duel_onegame_warning)
+
+        self._lbl_duel_vpx_hint = QLabel(
+            "ℹ️ Scores are submitted when VPX is closed — remind your opponent to close VPX after playing!"
+        )
+        self._lbl_duel_vpx_hint.setStyleSheet("color:#888; font-style:italic; font-size:9pt;")
+        self._lbl_duel_vpx_hint.setWordWrap(True)
+        lay_new.addWidget(self._lbl_duel_vpx_hint)
 
         layout.addWidget(grp_new)
 
@@ -2098,8 +2099,9 @@ class DuelsMixin:
                 pass
 
         # If any duel is now ACTIVE (score submitted, waiting for opponent),
-        # notify the player and start an aggressive fast-recheck loop for the
-        # next _DUEL_FAST_RECHECK_WINDOW_S seconds so the result appears quickly.
+        # notify the player and start the recheck loop that keeps polling until
+        # the opponent's score arrives (no time limit — scores are only submitted
+        # when the opponent closes VPX, which may take more than 2 minutes).
         try:
             active_after = self._duel_engine.get_active_duels()
             pending = [d for d in active_after
@@ -2122,13 +2124,10 @@ class DuelsMixin:
                 except Exception:
                     pass
 
-                # Open a 2-minute aggressive fast-recheck window.
-                self._duel_fast_recheck_end_ts = time.time() + _DUEL_FAST_RECHECK_WINDOW_S
-
-                # Clear per-duel cooldown so the fast timer can proceed immediately.
+                # Clear per-duel cooldown so the recheck loop starts immediately.
                 for d in pending:
                     self._duel_recheck_cooldown.pop(d.duel_id, None)
-                QTimer.singleShot(_DUEL_FAST_RECHECK_DELAY_MS, self._recheck_active_duel_scores)
+                QTimer.singleShot(_DUEL_RECHECK_INTERVAL_MS, self._recheck_active_duel_scores)
         except Exception:
             pass
 
@@ -2152,15 +2151,13 @@ class DuelsMixin:
     def _recheck_active_duel_scores(self) -> None:
         """Re-check ACTIVE duels where we are waiting for the opponent's score.
 
-        Called periodically by _check_duel_expiry and by the aggressive
-        fast-recheck loop (started in _on_session_ended_duels) to mitigate
-        the race condition where both players submit at similar times and one
-        does not see the other's score on the first attempt.
+        Called periodically by _check_duel_expiry and by the recheck loop
+        (started in _on_session_ended_duels) to pick up the opponent's score
+        as soon as they close VPX and their score is uploaded.
 
-        During the fast-recheck window (_DUEL_FAST_RECHECK_WINDOW_S seconds
-        after score submission) a short per-duel cooldown of
-        _DUEL_FAST_RECHECK_COOLDOWN_S is used.  Outside that window the
-        normal 5-minute cooldown applies to avoid write amplification.
+        Always uses the short _DUEL_RECHECK_COOLDOWN_S interval so there
+        is no time-limited "fast window" — the loop keeps running until the
+        opponent's score arrives or the duel expires.
         """
         from core.duel_engine import SCORE_NOT_SUBMITTED
         try:
@@ -2180,12 +2177,8 @@ class DuelsMixin:
             my_score = duel.challenger_score if is_challenger else duel.opponent_score
             if my_score == SCORE_NOT_SUBMITTED:
                 continue  # We haven't submitted yet; nothing to re-check.
-            # Cooldown: use a short interval during the aggressive fast-recheck
-            # window, otherwise fall back to the normal 5-minute cooldown.
-            in_fast_window = now < getattr(self, "_duel_fast_recheck_end_ts", 0)
-            cooldown = _DUEL_FAST_RECHECK_COOLDOWN_S if in_fast_window else 300
             last = self._duel_recheck_cooldown.get(duel.duel_id, 0)
-            if now - last < cooldown:
+            if now - last < _DUEL_RECHECK_COOLDOWN_S:
                 continue
             self._duel_recheck_cooldown[duel.duel_id] = now
             result = self._duel_engine.submit_result(duel.duel_id, my_score)
@@ -2212,20 +2205,19 @@ class DuelsMixin:
                 self._refresh_active_duels()
                 self._refresh_duel_history()
 
-        # If still inside the fast-recheck window and there are ACTIVE duels
-        # where our score is already submitted, schedule the next fast recheck.
-        if time.time() < getattr(self, "_duel_fast_recheck_end_ts", 0):
-            try:
-                active_now = self._duel_engine.get_active_duels()
-                my_id = self.cfg.OVERLAY.get("player_id", "").strip()
-                still_pending = []
-                for d in active_now:
-                    if d.status != DuelStatus.ACTIVE:
-                        continue
-                    my_sc = d.challenger_score if d.challenger == my_id else d.opponent_score
-                    if my_sc != SCORE_NOT_SUBMITTED:
-                        still_pending.append(d)
-                if still_pending:
-                    QTimer.singleShot(_DUEL_FAST_RECHECK_INTERVAL_MS, self._recheck_active_duel_scores)
-            except Exception:
-                pass
+        # Re-schedule as long as there are ACTIVE duels where our score is
+        # submitted but the opponent's score is still missing.
+        try:
+            active_now = self._duel_engine.get_active_duels()
+            my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            still_pending = []
+            for d in active_now:
+                if d.status != DuelStatus.ACTIVE:
+                    continue
+                my_sc = d.challenger_score if d.challenger == my_id else d.opponent_score
+                if my_sc != SCORE_NOT_SUBMITTED:
+                    still_pending.append(d)
+            if still_pending:
+                QTimer.singleShot(_DUEL_RECHECK_INTERVAL_MS, self._recheck_active_duel_scores)
+        except Exception:
+            pass
