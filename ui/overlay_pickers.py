@@ -353,48 +353,8 @@ class DuelOverlayPositionPicker(_BasePositionPicker):
             self._ccw = True
 
     def _calc_overlay_size(self) -> tuple[int, int]:
-        ov = self.parent_gui.cfg.OVERLAY or {}
-        font_family = str(ov.get("font_family", "Segoe UI"))
-        body_pt = 20
-        pad_w = 28
-        pad_h = 22
-        max_text_width = 520
-        _accent = get_theme_color(self.parent_gui.cfg, "accent")
-        candidate_messages = [
-            f"<span style='color:{_accent};'>⚔️ Duel active against xPinballWizard!<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.</span><br><span style='color:#DDDDDD;'>closing in 20…</span>",
-            f"<span style='color:{_accent};'>⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>[✅ Accept] / Decline<br><small>Use your Duel Accept / Decline keys bound in the Controls tab.</small></span>",
-            f"<span style='color:{_accent};'>🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>⏰ Duel expired — no response received.</span><br><span style='color:#DDDDDD;'>closing in 6…</span>",
-            f"<span style='color:{_accent};'>⏳ Score submitted! Waiting for opponent's score...</span><br><span style='color:#DDDDDD;'>closing in 10…</span>",
-            f"<span style='color:{_accent};'>⚠️ Duel aborted: Session too short.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>⚠️ Duel aborted: VPX restarted during active duel. Only one attempt allowed!</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>⚠️ Duel aborted: Multiple games detected in single VPX session. Only one game per duel allowed!</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>✅ 'xPinballWizard' accepted your duel on Medieval Madness!</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>❌ 'xPinballWizard' declined your duel on Medieval Madness.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>⏰ Your duel invitation on Medieval Madness expired (not accepted).</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>🚫 Your duel on Medieval Madness was cancelled.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
-            f"<span style='color:{_accent};'>Cannot accept duel while VPX is running.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
-            f"<span style='color:{_accent};'>❌ Duel cancelled – Table 'Medieval Madness' is not available.</span><br><span style='color:#DDDDDD;'>closing in 6…</span>",
-        ]
-        max_w, max_h = 200, 60
-        for msg_html in candidate_messages:
-            html = f"<div style='font-size:{body_pt}pt;font-family:\"{font_family}\";'>{msg_html}</div>"
-            tmp = QLabel()
-            tmp.setTextFormat(Qt.TextFormat.RichText)
-            tmp.setStyleSheet(f"color:{_accent};background:transparent;")
-            tmp.setFont(QFont(font_family, body_pt))
-            tmp.setWordWrap(True)
-            tmp.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            tmp.setText(html)
-            tmp.setFixedWidth(max_text_width)
-            tmp.adjustSize()
-            text_w = tmp.width()
-            text_h = tmp.sizeHint().height()
-            max_w = max(max_w, text_w + pad_w)
-            max_h = max(max_h, text_h + pad_h)
-        return max_w, max_h
+        from ui.overlay_duel import _calc_duel_overlay_fixed_size
+        return _calc_duel_overlay_fixed_size(self.parent_gui.cfg)
 
 
 # ---------------------------------------------------------------------------
