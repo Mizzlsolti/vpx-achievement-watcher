@@ -342,6 +342,8 @@ class GUITrophie(QWidget):
         self._schedule_random()
         if self._is_silenced():
             return
+        if self._is_vpx_running():
+            return
         # Occasionally do a zank comment if overlay is visible
         if _TROPHIE_SHARED["gui_visible"] and random.random() < 0.2:
             self._fire_zank_comment()
@@ -355,6 +357,8 @@ class GUITrophie(QWidget):
             self._show_comment_key(tip[0], tip[1], IDLE)
 
     def _fire_zank_comment(self) -> None:
+        if self._is_vpx_running():
+            return
         if self._memory:
             tip = self._memory.pick_unseen(_GUI_ZANK)
         else:
@@ -365,6 +369,8 @@ class GUITrophie(QWidget):
     def _try_zank(self, trigger: str) -> bool:
         """Attempt to fire a synchronized zank pair. Returns True if zank fired."""
         if not _TROPHIE_SHARED["gui_visible"]:
+            return False
+        if self._is_vpx_running():
             return False
         if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
             return False
@@ -381,6 +387,8 @@ class GUITrophie(QWidget):
 
     def _try_idle_bicker(self) -> None:
         """Fire a spontaneous bicker exchange when both trophies are visible."""
+        if self._is_vpx_running():
+            return
         if not _TROPHIE_SHARED["gui_visible"]:
             return
         if _TROPHIE_SHARED["idle_bicker_cooldown_ms"] > 0:
@@ -406,9 +414,19 @@ class GUITrophie(QWidget):
         pending = _TROPHIE_SHARED.get("zank_pending_gui")
         if pending:
             _TROPHIE_SHARED["zank_pending_gui"] = None
-            options = _ZANK_GUI_LINES.get(pending, [])
-            if options:
-                self._show_comment(random.choice(options), TALKING)
+            if not self._is_vpx_running():
+                options = _ZANK_GUI_LINES.get(pending, [])
+                if options:
+                    self._show_comment(random.choice(options), TALKING)
+
+    def _is_vpx_running(self) -> bool:
+        """Return True when VPX Player is currently running/visible."""
+        try:
+            win = self._central.window()
+            w = getattr(win, "watcher", None)
+            return bool(w and w._vp_player_visible())
+        except Exception:
+            return False
 
     def _is_silenced(self) -> bool:
         return time.time() < self._silenced_until
@@ -993,6 +1011,8 @@ class OverlayTrophie(QWidget):
         self._schedule_random()
         if self._is_silenced():
             return
+        if self._vp_visible():
+            return
         if _TROPHIE_SHARED["gui_visible"] and random.random() < 0.2:
             self._fire_zank_comment()
             return
@@ -1006,6 +1026,8 @@ class OverlayTrophie(QWidget):
     def _fire_zank_comment(self) -> None:
         if not _TROPHIE_SHARED["gui_visible"]:
             return
+        if self._vp_visible():
+            return
         if self._memory:
             tip = self._memory.pick_unseen(_OV_ZANK)
         else:
@@ -1015,6 +1037,8 @@ class OverlayTrophie(QWidget):
 
     def _try_zank(self, trigger: str) -> bool:
         if not _TROPHIE_SHARED["gui_visible"]:
+            return False
+        if self._vp_visible():
             return False
         if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
             return False
@@ -1037,17 +1061,18 @@ class OverlayTrophie(QWidget):
         pending = _TROPHIE_SHARED.get("zank_pending_overlay")
         if pending:
             _TROPHIE_SHARED["zank_pending_overlay"] = None
-            options = _ZANK_OVERLAY_LINES.get(pending, [])
-            if options:
-                ov_text = random.choice(options)
-                QTimer.singleShot(2000, lambda t=ov_text, k=pending: self._show_comment_key(k, t, TALKING))
+            if not self._vp_visible():
+                options = _ZANK_OVERLAY_LINES.get(pending, [])
+                if options:
+                    ov_text = random.choice(options)
+                    QTimer.singleShot(2000, lambda t=ov_text, k=pending: self._show_comment_key(k, t, TALKING))
         # Handle spontaneous idle bicker response
         bicker_key = _TROPHIE_SHARED.get("idle_bicker_ov_key")
         bicker_text = _TROPHIE_SHARED.get("idle_bicker_ov_text")
         if bicker_key and bicker_text:
             _TROPHIE_SHARED["idle_bicker_ov_key"] = None
             _TROPHIE_SHARED["idle_bicker_ov_text"] = None
-            if _TROPHIE_SHARED["gui_visible"]:
+            if _TROPHIE_SHARED["gui_visible"] and not self._vp_visible():
                 QTimer.singleShot(2000, lambda t=bicker_text, k=bicker_key: self._show_comment_key(k, t, TALKING))
 
     def _days_since_last_played(self, rom: str) -> Optional[int]:

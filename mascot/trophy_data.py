@@ -427,7 +427,7 @@ _GUI_TIPS: dict[str, list[tuple[str, str]]] = {
     "tab_duels": [
         ("duels_intro",    "Score Duels let you challenge other players head-to-head!"),
         ("duels_invite",   "Send a duel invitation and see who scores higher on the same table!"),
-        ("duels_accept",   "You have 15 seconds to accept an incoming duel — stay alert!"),
+        ("duels_accept",   "Accept incoming duel invitations before they expire — don't keep your rival waiting!"),
         ("duels_history",  "Check your duel history to see your win rate against rivals!"),
         ("duels_cloud",    "Duels require Cloud Sync to communicate with other players!"),
         ("duels_table",    "Pick a table you know well for duels — home advantage matters!"),
@@ -489,7 +489,7 @@ _GUI_DUEL: dict[str, list[str]] = {
         "A challenger approaches! Check your Score Duels tab!",
         "You have been challenged! Open the Score Duels tab to respond!",
         "Incoming duel invitation! Will you accept the challenge?",
-        "Someone wants to duel you! 15 seconds to decide!",
+        "Someone wants to duel you! Check your inbox!",
     ],
     "gui_duel_won": [
         "DUEL CHAMPION! You crushed that duel!",
@@ -654,7 +654,7 @@ _OV_DUEL: dict[str, list[str]] = {
     "ov_duel_received": [
         "A challenger approaches! Open the app to respond!",
         "Incoming duel invitation! Check your Score Duels tab!",
-        "Someone wants to duel you! You have 15 seconds!",
+        "Someone wants to duel you! Open the app to respond!",
         "DUEL ALERT! Will you answer the challenge?",
     ],
     "ov_duel_won": [
