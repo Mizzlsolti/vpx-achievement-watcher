@@ -491,10 +491,10 @@ class ChatWidget(QGroupBox):
             "QMenu::item:selected { background:#FF7F00; color:#000; }"
             "QMenu::item { padding:4px 20px; }"
         )
-        kick_action = menu.addAction(f"🚫 Kick {_esc(sender_name)}")
-        ban_action  = menu.addAction(f"🔨 Ban {_esc(sender_name)}")
+        kick_action = menu.addAction(f"🚫 Kick {sender_name}")
+        ban_action  = menu.addAction(f"🔨 Ban {sender_name}")
 
-        timeout_menu = menu.addMenu(f"⏱️ Timeout {_esc(sender_name)}")
+        timeout_menu = menu.addMenu(f"⏱️ Timeout {sender_name}")
         timeout_menu.setStyleSheet(menu.styleSheet())
         t1  = timeout_menu.addAction("1 Minute")
         t5  = timeout_menu.addAction("5 Minutes")
