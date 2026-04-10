@@ -450,8 +450,10 @@ class HotkeysMixin:
             btn = int(self.cfg.OVERLAY.get("toggle_joy_button", 2))
             return f"Current: joystick button {btn}"
         else:
-            vk = int(self.cfg.OVERLAY.get("toggle_vk", 120))
+            vk = int(self.cfg.OVERLAY.get("toggle_vk", 0))
             mods = int(self.cfg.OVERLAY.get("toggle_mods", 0))
+            if vk == 0:
+                return "Current: (none)"
             return f"Current: {self._fmt_hotkey_label(vk, mods)}"
 
     def _on_overlay_trigger(self):
@@ -661,17 +663,20 @@ class HotkeysMixin:
                 mods = (int(mods_cfg) | MOD_NOREPEAT)
                 user32.RegisterHotKey(wintypes.HWND(hwnd), _id, mods, int(vk))
             if str(self.cfg.OVERLAY.get("toggle_input_source", "keyboard")).lower() == "keyboard":
-                vk_overlay = int(self.cfg.OVERLAY.get("toggle_vk", 120))  # F9
+                vk_overlay = int(self.cfg.OVERLAY.get("toggle_vk", 0))
                 mods_overlay = int(self.cfg.OVERLAY.get("toggle_mods", 0))
-                _reg_ch(ids["overlay_toggle"], vk_overlay, mods_overlay)
+                if vk_overlay != 0:
+                    _reg_ch(ids["overlay_toggle"], vk_overlay, mods_overlay)
             if str(self.cfg.OVERLAY.get("duel_left_input_source", "keyboard")).lower() == "keyboard":
-                vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0x25))
+                vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0))
                 mods = int(self.cfg.OVERLAY.get("duel_left_mods", 0))
-                _reg_ch(ids["ch_left"], vk, mods)
+                if vk != 0:
+                    _reg_ch(ids["ch_left"], vk, mods)
             if str(self.cfg.OVERLAY.get("duel_right_input_source", "keyboard")).lower() == "keyboard":
-                vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0x27))
+                vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0))
                 mods = int(self.cfg.OVERLAY.get("duel_right_mods", 0))
-                _reg_ch(ids["ch_right"], vk, mods)
+                if vk != 0:
+                    _reg_ch(ids["ch_right"], vk, mods)
             if bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False)) and str(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")).lower() == "keyboard":
                 vk = int(self.cfg.OVERLAY.get("tray_toggle_vk", 0))
                 mods = int(self.cfg.OVERLAY.get("tray_toggle_mods", 0))
