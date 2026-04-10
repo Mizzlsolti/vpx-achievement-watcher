@@ -47,6 +47,11 @@ class HazardStripeOverlay(QWidget):
         super().showEvent(event)
         self.resize(self.parent().size())
 
+    def set_text(self, text: str) -> None:
+        """Update the overlay message text and trigger a repaint."""
+        self._text = text
+        self.update()
+
     # ------------------------------------------------------------------
     # Custom painting
     # ------------------------------------------------------------------
