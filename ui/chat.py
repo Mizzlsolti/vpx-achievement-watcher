@@ -96,6 +96,7 @@ _ADMIN_PATH   = "tournament_chat/admin/uid"
 # ── UI constants ───────────────────────────────────────────────────────────────
 _MAX_DISPLAY = 100           # Number of messages kept in the list
 _RECONNECT_DELAY_S = 5       # Seconds between SSE reconnect attempts
+_ADMIN_STATUS_HIDE_MS = 5_000  # Auto-hide admin status label after this delay
 _MSG_ROLE = Qt.ItemDataRole.UserRole  # QListWidgetItem data role for sender info
 
 _BTN_STYLE = (
@@ -263,21 +264,24 @@ class ChatWidget(QGroupBox):
             if not self._stream_running:
                 self._start_stream()
         else:
-            # Choose overlay text based on reason.
-            if self._self_banned:
-                self._locked_overlay.set_text("🔨 You are banned from chat")
-            elif self._self_timeout_until > int(time.time() * 1000):
-                remaining_s = (self._self_timeout_until - int(time.time() * 1000)) / 1000
-                remaining_min = max(1, int(remaining_s / 60 + 0.5))
-                self._locked_overlay.set_text(
-                    f"⏱️ You are timed out ({remaining_min} min remaining)"
-                )
-            else:
-                self._locked_overlay.set_text(_ChatLockedOverlay._TEXT)
+            self._update_overlay_text()
             self._locked_overlay.show()
             self._locked_overlay.raise_()
             if self._stream_running:
                 self._stop_stream()
+
+    def _update_overlay_text(self) -> None:
+        """Set the overlay text based on the current moderation / lock reason."""
+        if self._self_banned:
+            self._locked_overlay.set_text("🔨 You are banned from chat")
+        elif self._self_timeout_until > int(time.time() * 1000):
+            remaining_s = (self._self_timeout_until - int(time.time() * 1000)) / 1000
+            remaining_min = max(1, int(remaining_s / 60 + 0.5))
+            self._locked_overlay.set_text(
+                f"⏱️ You are timed out ({remaining_min} min remaining)"
+            )
+        else:
+            self._locked_overlay.set_text(_ChatLockedOverlay._TEXT)
 
     # ── Moderation cache refresh ───────────────────────────────────────────────
 
@@ -340,16 +344,7 @@ class ChatWidget(QGroupBox):
             if not self._stream_running:
                 self._start_stream()
         else:
-            if self._self_banned:
-                self._locked_overlay.set_text("🔨 You are banned from chat")
-            elif self._self_timeout_until > int(time.time() * 1000):
-                remaining_s = (self._self_timeout_until - int(time.time() * 1000)) / 1000
-                remaining_min = max(1, int(remaining_s / 60 + 0.5))
-                self._locked_overlay.set_text(
-                    f"⏱️ You are timed out ({remaining_min} min remaining)"
-                )
-            else:
-                self._locked_overlay.set_text(_ChatLockedOverlay._TEXT)
+            self._update_overlay_text()
             self._locked_overlay.show()
             self._locked_overlay.raise_()
 
@@ -706,8 +701,8 @@ class ChatWidget(QGroupBox):
             )
         self._lbl_admin_status.setText(msg)
         self._lbl_admin_status.show()
-        # Auto-hide the status message after 5 seconds.
-        QTimer.singleShot(5_000, self._lbl_admin_status.hide)
+        # Auto-hide the status message after a short delay.
+        QTimer.singleShot(_ADMIN_STATUS_HIDE_MS, self._lbl_admin_status.hide)
         # Immediately refresh the moderation cache so messages disappear.
         self._refresh_moderation_cache()
 
