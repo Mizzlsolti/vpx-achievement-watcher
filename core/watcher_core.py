@@ -87,7 +87,7 @@ from .watcher_migrate import (
     _migrate_rom_keys_to_lowercase,
 )
 
-WATCHER_VERSION = "2.9.1"
+WATCHER_VERSION = "3.0"
 
 # Custom-events polling constants
 _CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
