@@ -579,6 +579,39 @@ class CloudSync:
         return False
 
     @staticmethod
+    def patch_node(cfg: AppConfig, node_path: str, data) -> bool:
+        """Update (PATCH) fields on a Firebase node without deleting unmentioned children.
+
+        Uses HTTP PATCH instead of PUT so that existing child nodes (e.g. ``session/``
+        sub-nodes) are preserved when only metadata fields are updated.
+        Retries up to 3 times on transient ``UNEXPECTED_EOF_WHILE_READING`` errors,
+        matching the retry pattern used in ``set_node()``.
+        Returns True on success.
+        """
+        if not cfg.CLOUD_URL or not node_path:
+            return False
+        url = cfg.CLOUD_URL.strip().rstrip('/')
+        endpoint = f"{url}/{node_path}.json"
+        payload = None
+        _MAX_RETRIES = 3
+        for _attempt in range(_MAX_RETRIES):
+            try:
+                payload = json.dumps(data).encode('utf-8')
+                patch_req = urllib.request.Request(endpoint, data=payload, method='PATCH')
+                patch_req.add_header('Content-Type', 'application/json')
+                with _urlopen_ssl_aware(cfg, patch_req, 10):
+                    pass
+                return True
+            except Exception as e:
+                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
+                    time.sleep(1 * (_attempt + 1))
+                    continue
+                size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
+                log(cfg, f"[CLOUD] patch_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
+                return False
+        return False
+
+    @staticmethod
     def restore_from_cloud(cfg: AppConfig) -> bool:
         """Restore local achievement state from the cloud.
 
@@ -631,18 +664,23 @@ class CloudSync:
         if not isinstance(state["roms_played"], list):
             state["roms_played"] = []
 
-        # If session is absent or empty, try fetching it from the sub-node
-        # (new chunked format stores session per-ROM under achievements/session/).
-        # fetch_node returns the merged subtree as {rom: [entries], ...} which
-        # matches the same structure as the old inline session dict.
-        # Old format stored session inline; both are handled for backward compat.
-        if not state["session"]:
-            try:
-                session_data = CloudSync.fetch_node(cfg, f"players/{pid}/achievements/session")
-                if isinstance(session_data, dict) and session_data:
-                    state["session"] = session_data
-            except Exception as e:
-                log(cfg, f"[CLOUD] restore_from_cloud: session sub-node fetch failed (non-critical): {e}", "WARN")
+        # Always fetch the session sub-node and merge it into state["session"].
+        # Session data is stored per-ROM under achievements/session/{rom} (chunked
+        # format) to avoid oversized single requests.  The inline metadata PUT/PATCH
+        # never includes the session key, so sub-nodes are the canonical source.
+        # Merging ensures ROMs present in the inline metadata but absent from the
+        # sub-node are also preserved (backward-compat with old inline format).
+        try:
+            session_data = CloudSync.fetch_node(cfg, f"players/{pid}/achievements/session")
+            if isinstance(session_data, dict) and session_data:
+                # Merge: sub-node entries take precedence per ROM (they are the
+                # authoritative chunked store), but keep any ROMs that came from
+                # the inline metadata and are not present in the sub-node.
+                for rom, entries in session_data.items():
+                    if entries:  # Only overwrite if sub-node has actual data
+                        state["session"][rom] = entries
+        except Exception as e:
+            log(cfg, f"[CLOUD] restore_from_cloud: session sub-node fetch failed (non-critical): {e}", "WARN")
 
         # ── 3. Fetch progress node, enrich state, update local upload log ─────
         try:
@@ -870,7 +908,7 @@ class CloudSync:
             }
             if custom_progress:
                 metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
-            if CloudSync.set_node(cfg, f"players/{pid}/achievements", metadata_payload):
+            if CloudSync.patch_node(cfg, f"players/{pid}/achievements", metadata_payload):
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:
                 log(cfg, "[CLOUD] upload_full_achievements: metadata upload failed", "WARN")
