@@ -62,7 +62,7 @@ class TournamentWidget(QWidget):
     ----------
     main_window :
         The application main window (provides ``watcher``, ``cfg`` and the
-        overlay helpers ``_get_mini_overlay`` / ``_tournament_notify_state``).
+        overlay helpers ``_get_duel_overlay`` / ``_tournament_notify_state``).
     cfg : AppConfig
         Application configuration instance.
     duel_engine : DuelEngine
@@ -647,11 +647,11 @@ class TournamentWidget(QWidget):
         self._display_notification(notification)
 
     def _display_notification(self, notification: dict) -> None:
-        """Display a tournament notification using the mini overlay."""
+        """Display a tournament notification using the duel overlay."""
         msg = notification.get("msg", "")
         try:
             from ui.overlay_base import _force_topmost
-            ov = self._main_window._get_mini_overlay()
+            ov = self._main_window._get_duel_overlay()
             ov.show_info(msg, seconds=0, color_hex="#FF7F00")
             _force_topmost(ov)
             QTimer.singleShot(200, lambda: _force_topmost(ov))

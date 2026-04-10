@@ -260,7 +260,7 @@ class OverlaysMixin:
             if t_state is not None:
                 self._tournament_notify_state = None
                 try:
-                    self._get_mini_overlay().hide()
+                    self._get_duel_overlay().hide()
                 except Exception:
                     pass
                 # Let the TournamentWidget show the next deferred notification.
