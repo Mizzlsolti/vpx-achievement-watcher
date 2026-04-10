@@ -143,6 +143,8 @@ class ChatWidget(QGroupBox):
         self._stream_stop = threading.Event()
         self._stream_running = False
         self._messages: dict[str, dict] = {}  # msgId → message dict
+        self._pending_text: str = ""           # text being sent; restored on failure
+        self._last_send_success: bool = False  # set by background send thread
         self._build_ui()
 
         # Hazard overlay shown when participation requirements are not met.
@@ -281,10 +283,7 @@ class ChatWidget(QGroupBox):
         base_url = getattr(cfg, "CLOUD_URL", None)
         if not base_url:
             return
-        url = (
-            f"{base_url.rstrip('/')}/{_CHAT_PATH}.json"
-            "?orderBy=%22timestamp%22&limitToLast=100"
-        )
+        url = f"{base_url.rstrip('/')}/{_CHAT_PATH}.json"
         req = urllib.request.Request(url, headers={
             "Accept": "text/event-stream",
             "User-Agent": "AchievementWatcher/2.0",
@@ -417,6 +416,7 @@ class ChatWidget(QGroupBox):
         text = self._input_line.text().strip()
         if not text or not self._can_participate():
             return
+        self._pending_text = text  # track for restore on failure
         self._input_line.clear()
         self._btn_send.setEnabled(False)
 
@@ -438,6 +438,7 @@ class ChatWidget(QGroupBox):
 
     def _post_message(self, msg_data: dict) -> None:
         """Write a new chat message to Firebase (background thread)."""
+        success = False
         try:
             import random
             from core.cloud_sync import CloudSync
@@ -446,15 +447,24 @@ class ChatWidget(QGroupBox):
             rnd = random.randint(0, 0xFFFF)
             msg_id = f"{ts}_{pid}_{rnd:04x}"
             CloudSync.set_node(self._cfg, f"{_CHAT_PATH}/{msg_id}", msg_data)
-        except Exception:
-            pass
+            success = True
+        except Exception as e:
+            from core.watcher_core import log
+            log(self._cfg, f"[CHAT] Failed to send message: {e}", "WARN")
         finally:
+            self._last_send_success = success
             QMetaObject.invokeMethod(
                 self, "_on_send_done", Qt.ConnectionType.QueuedConnection,
             )
 
     @pyqtSlot()
     def _on_send_done(self) -> None:
+        if getattr(self, "_last_send_success", False):
+            self._input_line.clear()
+        else:
+            pending = getattr(self, "_pending_text", "")
+            if pending:
+                self._input_line.setText(pending)
         self._btn_send.setEnabled(self._can_participate())
 
     # ── Admin right-click context menu ─────────────────────────────────────────

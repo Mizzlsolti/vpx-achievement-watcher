@@ -161,6 +161,7 @@ DEFAULT_OVERLAY.setdefault("pp_overlay_main", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_toast", False)
 DEFAULT_OVERLAY.setdefault("pp_overlay_duel", False)
 DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", False)
+DEFAULT_OVERLAY.setdefault("duel_rules_seen", False)
 DEFAULT_OVERLAY.setdefault("duel_left_input_source", "keyboard")
 DEFAULT_OVERLAY.setdefault("duel_left_vk", 0x25)       # Left Arrow
 DEFAULT_OVERLAY.setdefault("duel_left_mods", 0)
@@ -245,6 +246,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "tray_toggle_enabled", "tray_toggle_input_source", "tray_toggle_vk", "tray_toggle_mods", "tray_toggle_joy_button",
     "player_name", "player_id",
     "first_setup_done",
+    "duel_rules_seen",
 ]
 
 
