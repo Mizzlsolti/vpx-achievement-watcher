@@ -963,8 +963,12 @@ class DuelEngine:
                 table_name = _strip_version_from_name(raw_name)
                 if "(" in table_name:
                     table_name = table_name[:table_name.index("(")].strip()
+                # If ROMNAMES didn't resolve (raw_name == table_rom), clean up
+                # the ROM string: replace underscores with spaces and title-case.
+                if raw_name == table_rom and table_name == table_rom:
+                    table_name = table_rom.replace("_", " ").strip().title()
             except Exception:
-                table_name = table_rom
+                table_name = table_rom.replace("_", " ").strip().title()
             opponent_id   = entry.get("player_id", pid)
             opponent_name = entry.get("player_name", pid)
             result = self.send_invitation(opponent_id, table_rom, table_name,

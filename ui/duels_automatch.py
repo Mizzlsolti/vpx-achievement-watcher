@@ -242,12 +242,27 @@ class AutoMatchWidget(QWidget):
             # Match found!
             self._stop_search()
             opponent = result.get("opponent_name", "")
-            raw_table = result.get("table_name", "")
+            duel_id = result.get("duel_id", "")
+
+            # Resolve clean table name from the Duel object via
+            # _get_duel_table_display (ROMNAMES lookup + strip version +
+            # strip parenthetical author/year).
+            table = result.get("table_name", "")
             try:
-                from core.watcher_core import _strip_version_from_name
-                table = _strip_version_from_name(raw_table)
+                from ui.duels import _get_duel_table_display
+                for d in self._engine.get_active_duels():
+                    if d.duel_id == duel_id:
+                        table = _get_duel_table_display(d, getattr(self._mw, "watcher", None))
+                        break
             except Exception:
-                table = raw_table
+                # Fallback: strip version + parenthetical manually.
+                try:
+                    from core.watcher_core import _strip_version_from_name
+                    table = _strip_version_from_name(table)
+                    if "(" in table:
+                        table = table[:table.index("(")].strip()
+                except Exception:
+                    pass
             self._show_result(
                 f"✅ Match found! Duel invitation sent to {opponent} on {table}",
                 "#00E500",
