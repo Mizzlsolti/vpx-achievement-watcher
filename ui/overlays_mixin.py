@@ -268,7 +268,9 @@ class OverlaysMixin:
             if src == "joystick":
                 btn = int(self.cfg.OVERLAY.get("duel_left_joy_button", 4))
                 return f"Current: joystick button {btn}"
-            vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0x25))
+            vk = int(self.cfg.OVERLAY.get("duel_left_vk", 0))
+            if vk == 0:
+                return "Current: (none)"
             mods = int(self.cfg.OVERLAY.get("duel_left_mods", 0))
             return f"Current: {self._fmt_hotkey_label(vk, mods)}"
         if kind == "right":
@@ -276,7 +278,9 @@ class OverlaysMixin:
             if src == "joystick":
                 btn = int(self.cfg.OVERLAY.get("duel_right_joy_button", 5))
                 return f"Current: joystick button {btn}"
-            vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0x27))
+            vk = int(self.cfg.OVERLAY.get("duel_right_vk", 0))
+            if vk == 0:
+                return "Current: (none)"
             mods = int(self.cfg.OVERLAY.get("duel_right_mods", 0))
             return f"Current: {self._fmt_hotkey_label(vk, mods)}"
         return "Current: (none)"

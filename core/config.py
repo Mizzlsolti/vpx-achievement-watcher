@@ -34,7 +34,7 @@ DEFAULT_OVERLAY = {
     "portrait_rotate_ccw": False,
     "lines_per_category":12,
     "toggle_input_source": "keyboard",
-    "toggle_vk": 120,
+    "toggle_vk": 0,
     "toggle_joy_button": 2,
     "font_family": "Segoe UI",
     "base_title_size": 17,
@@ -163,11 +163,11 @@ DEFAULT_OVERLAY.setdefault("pp_overlay_duel", False)
 DEFAULT_OVERLAY.setdefault("duels_do_not_disturb", False)
 DEFAULT_OVERLAY.setdefault("duel_rules_seen", False)
 DEFAULT_OVERLAY.setdefault("duel_left_input_source", "keyboard")
-DEFAULT_OVERLAY.setdefault("duel_left_vk", 0x25)       # Left Arrow
+DEFAULT_OVERLAY.setdefault("duel_left_vk", 0)
 DEFAULT_OVERLAY.setdefault("duel_left_mods", 0)
 DEFAULT_OVERLAY.setdefault("duel_left_joy_button", 0)
 DEFAULT_OVERLAY.setdefault("duel_right_input_source", "keyboard")
-DEFAULT_OVERLAY.setdefault("duel_right_vk", 0x27)      # Right Arrow
+DEFAULT_OVERLAY.setdefault("duel_right_vk", 0)
 DEFAULT_OVERLAY.setdefault("duel_right_mods", 0)
 DEFAULT_OVERLAY.setdefault("duel_right_joy_button", 0)
 

@@ -308,8 +308,10 @@ class GUITrophie(QWidget):
     def _build_controls_tip(self) -> Optional[str]:
         try:
             src = self._cfg.OVERLAY.get("toggle_input_source", "keyboard")
-            vk = self._cfg.OVERLAY.get("toggle_vk", 120)
+            vk = self._cfg.OVERLAY.get("toggle_vk", 0)
             if src == "keyboard":
+                if int(vk) == 0:
+                    return None
                 from core.input_hook import vk_to_name_en
                 key_name = vk_to_name_en(int(vk))
             else:
