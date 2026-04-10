@@ -565,8 +565,9 @@ class DashboardMixin:
         if all_ok:
             return
 
-        _GREEN = "color: #00C853; font-size: 9pt; padding: 1px 0;"
-        _RED   = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
+        _GREEN  = "color: #00C853; font-size: 9pt; padding: 1px 0;"
+        _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
+        _RED    = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
 
         def _apply_row(idx: int, ok: bool, ok_text: str, fail_text: str,
                        link_text: str | None, link_target: int | None) -> None:
@@ -625,7 +626,6 @@ class DashboardMixin:
             if btn5 is not None:
                 btn5.hide()
         else:
-            _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
             if total_configured > 0:
                 lbl5.setText(f"⚠️ {total_configured}/{total_relevant} overlays configured")
                 lbl5.setStyleSheet(_YELLOW)
@@ -651,7 +651,6 @@ class DashboardMixin:
             if btn6 is not None:
                 btn6.hide()
         else:
-            _YELLOW = "color: #FFA500; font-size: 9pt; padding: 1px 0;"
             if controls_configured > 0:
                 lbl6.setText(f"⚠️ {controls_configured}/3 Widget Controls configured")
                 lbl6.setStyleSheet(_YELLOW)
