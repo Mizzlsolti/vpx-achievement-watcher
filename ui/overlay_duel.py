@@ -63,13 +63,13 @@ class DuelInfoOverlay(QWidget):
 
     def _primary_center(self) -> tuple[int, int]:
         try:
-            screens = QApplication.screens() or []
-            geo = screens[0].geometry() if screens else QRect(0, 0, 1280, 720)
-            for s in screens[1:]:
-                geo = geo.united(s.geometry())
-            return geo.left() + geo.width() // 2, geo.top() + geo.height() // 2
+            scr = QApplication.primaryScreen()
+            if scr:
+                geo = scr.availableGeometry()
+                return geo.left() + geo.width() // 2, geo.top() + geo.height() // 2
         except Exception:
-            return 640, 360
+            pass
+        return 640, 360
 
     def _compose_html(self) -> str:
         pt = getattr(self, "_body_pt", 20)
