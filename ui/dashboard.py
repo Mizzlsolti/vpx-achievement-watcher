@@ -667,9 +667,9 @@ class DashboardMixin:
             right_text = self._nav_binding_label_text("right")
         except Exception:
             right_text = "—"
-        self._lbl_dash_binding_overlay.setText(f"Show/Hide Stats Overlay:   {overlay_text}")
-        self._lbl_dash_binding_left.setText(f"Duel Accept / Left:   {left_text}")
-        self._lbl_dash_binding_right.setText(f"Duel Decline / Right:   {right_text}")
+        self._lbl_dash_binding_overlay.setText(f"Show/Hide Stats Overlay:  {overlay_text}")
+        self._lbl_dash_binding_left.setText(f"Duel Accept / Left:  {left_text}")
+        self._lbl_dash_binding_right.setText(f"Duel Decline / Right:  {right_text}")
 
     def _make_notif_row(self, notif: dict, tab_map: dict) -> QWidget:
         """Create a single notification row widget."""
