@@ -169,14 +169,16 @@ class SystemMixin:
         self.chk_cloud_backup.stateChanged.connect(self._save_cloud_backup_settings)
         lay_cloud.addWidget(self.chk_cloud_backup)
 
-        lay_cloud_btns = QHBoxLayout()
+        cloud_btns_wrapper = QWidget()
+        lay_cloud_btns = QHBoxLayout(cloud_btns_wrapper)
+        lay_cloud_btns.setContentsMargins(0, 0, 0, 0)
 
         self.btn_backup_cloud = QPushButton("☁️ Backup to Cloud")
         self.btn_backup_cloud.setToolTip(
             "Manually upload your full achievement data, VPS mapping, and ROM progress to the cloud. "
             "Use this to create an immediate backup of your current data."
         )
-        self.btn_backup_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        self.btn_backup_cloud.setEnabled(self.cfg.CLOUD_ENABLED)
         self.btn_backup_cloud.clicked.connect(self._manual_cloud_backup)
         lay_cloud_btns.addWidget(self.btn_backup_cloud)
 
@@ -186,11 +188,16 @@ class SystemMixin:
             "Use this to restore your achievements on a new PC. "
             "Warning: This will overwrite your local achievement data."
         )
-        self.btn_restore_cloud.setVisible(self.cfg.CLOUD_ENABLED)
+        self.btn_restore_cloud.setEnabled(self.cfg.CLOUD_ENABLED)
         self.btn_restore_cloud.clicked.connect(self._restore_achievements_from_cloud)
         lay_cloud_btns.addWidget(self.btn_restore_cloud)
 
-        lay_cloud.addLayout(lay_cloud_btns)
+        self._cloud_btns_overlay = HazardStripeOverlay(cloud_btns_wrapper, text="🔒 Enable Cloud Sync to use")
+        if not self.cfg.CLOUD_ENABLED:
+            self._cloud_btns_overlay.show()
+            self._cloud_btns_overlay.raise_()
+
+        lay_cloud.addWidget(cloud_btns_wrapper)
         layout.addWidget(grp_cloud)
 
         # Lock player identity fields on startup if Cloud Sync is already enabled
@@ -349,9 +356,12 @@ class SystemMixin:
                 self.chk_cloud_enabled.blockSignals(False)
                 self.cfg.CLOUD_ENABLED = False
                 if getattr(self, "btn_backup_cloud", None):
-                    self.btn_backup_cloud.setVisible(False)
+                    self.btn_backup_cloud.setEnabled(False)
                 if getattr(self, "btn_restore_cloud", None):
-                    self.btn_restore_cloud.setVisible(False)
+                    self.btn_restore_cloud.setEnabled(False)
+                if getattr(self, "_cloud_btns_overlay", None):
+                    self._cloud_btns_overlay.show()
+                    self._cloud_btns_overlay.raise_()
                 if getattr(self, "chk_cloud_backup", None):
                     self.chk_cloud_backup.setVisible(False)
                     self.chk_cloud_backup.setChecked(False)
@@ -407,9 +417,12 @@ class SystemMixin:
         if hasattr(self, "_highscore_poll_timer"):
             self._highscore_poll_timer.stop()
         if getattr(self, "btn_backup_cloud", None):
-            self.btn_backup_cloud.setVisible(False)
+            self.btn_backup_cloud.setEnabled(False)
         if getattr(self, "btn_restore_cloud", None):
-            self.btn_restore_cloud.setVisible(False)
+            self.btn_restore_cloud.setEnabled(False)
+        if getattr(self, "_cloud_btns_overlay", None):
+            self._cloud_btns_overlay.show()
+            self._cloud_btns_overlay.raise_()
         if getattr(self, "chk_cloud_backup", None):
             self.chk_cloud_backup.setVisible(False)
             self.chk_cloud_backup.setChecked(False)
@@ -459,9 +472,11 @@ class SystemMixin:
                     except Exception:
                         pass
             if getattr(self, "btn_backup_cloud", None):
-                self.btn_backup_cloud.setVisible(True)
+                self.btn_backup_cloud.setEnabled(True)
             if getattr(self, "btn_restore_cloud", None):
-                self.btn_restore_cloud.setVisible(True)
+                self.btn_restore_cloud.setEnabled(True)
+            if getattr(self, "_cloud_btns_overlay", None):
+                self._cloud_btns_overlay.hide()
             if getattr(self, "chk_cloud_backup", None):
                 self.chk_cloud_backup.setVisible(True)
             if hasattr(self, "_highscore_poll_timer"):

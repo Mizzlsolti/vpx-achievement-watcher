@@ -468,7 +468,6 @@ class ChatWidget(QGroupBox):
 
     # ── Admin right-click context menu ─────────────────────────────────────────
 
-    @pyqtSlot(QPoint)
     def _on_context_menu(self, pos) -> None:
         """Show admin moderation menu on right-click (admin only)."""
         if not get_admin_uid():
