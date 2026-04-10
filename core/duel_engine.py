@@ -179,13 +179,7 @@ class DuelEngine:
         if not self._cfg.CLOUD_ENABLED:
             return False
         node = self._cloud_node_for_duel(duel.duel_id)
-        terminal = _TERMINAL_STATUSES
-        if duel.status in terminal:
-            # Terminal states: delete from cloud to keep duels/ node small.
-            # The duel is already saved in local duel_history.json.
-            ok = CloudSync.set_node(self._cfg, node, None)
-        else:
-            ok = CloudSync.set_node(self._cfg, node, asdict(duel))
+        ok = CloudSync.set_node(self._cfg, node, asdict(duel))
         if not ok:
             log(self._cfg, f"[DUEL] Cloud upload failed for duel {duel.duel_id}.", "WARN")
         return ok
