@@ -103,10 +103,6 @@ class TournamentWidget(QWidget):
         root.setContentsMargins(6, 6, 6, 6)
         root.setSpacing(8)
 
-        # Horizontal split: left = tournament info, right = chat
-        main_row = QHBoxLayout()
-        main_row.setSpacing(8)
-
         # Left column holds all existing tournament widgets
         left_col = QVBoxLayout()
         left_col.setSpacing(8)
@@ -230,14 +226,13 @@ class TournamentWidget(QWidget):
         left_col.addWidget(grp_hist)
         left_col.addStretch(1)
 
-        # ── Chat panel (right side) ────────────────────────────────────────
+        # ── Chat panel (below tournament content) ─────────────────────────
         self._chat_widget = ChatWidget(self._cfg)
-        self._chat_widget.setMinimumWidth(260)
+        self._chat_widget.setMaximumHeight(220)
 
-        # Compose the horizontal split
-        main_row.addLayout(left_col, 3)
-        main_row.addWidget(self._chat_widget, 2)
-        root.addLayout(main_row, 1)
+        # Compose the vertical layout: tournament content on top, chat below
+        root.addLayout(left_col, 1)
+        root.addWidget(self._chat_widget)
 
         # ── Bottom bar ─────────────────────────────────────────────────────
         bottom = QHBoxLayout()
