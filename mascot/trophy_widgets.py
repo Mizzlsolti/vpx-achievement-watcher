@@ -370,9 +370,9 @@ class GUITrophie(QWidget):
         """Attempt to fire a synchronized zank pair. Returns True if zank fired."""
         if not _TROPHIE_SHARED["gui_visible"]:
             return False
-        if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
-            return False
         if self._is_vpx_running():
+            return False
+        if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
             return False
         for trig, gui_key, ov_key in _ZANK_PAIRS:
             if trig == trigger:
@@ -1038,9 +1038,9 @@ class OverlayTrophie(QWidget):
     def _try_zank(self, trigger: str) -> bool:
         if not _TROPHIE_SHARED["gui_visible"]:
             return False
-        if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
-            return False
         if self._vp_visible():
+            return False
+        if _TROPHIE_SHARED["zank_cooldown_ms"] > 0:
             return False
         for trig, gui_key, ov_key in _ZANK_PAIRS:
             if trig == trigger:
