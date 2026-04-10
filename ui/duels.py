@@ -1115,7 +1115,7 @@ class DuelsMixin:
 
         Updates the inbox table to show the new invitation.  When the window is
         minimized or hidden (e.g. to the system tray) and VPX is **not** running,
-        the shared :class:`~ui.overlay.MiniInfoOverlay` is used to show a
+        the shared :class:`~ui.overlay_duel.DuelInfoOverlay` is used to show a
         notification with Accept / Decline options navigable via the Challenge
         hotkeys.  The notification auto-hides after 60 seconds **without**
         declining the invitation; it stays in the Duels-tab inbox.
@@ -1300,7 +1300,7 @@ class DuelsMixin:
     def _show_duel_result_overlay(self, result: str, your_score: int, their_score: int) -> None:
         """Display a brief result overlay after a duel completes.
 
-        Uses :class:`~ui.overlay.MiniInfoOverlay` (the System Notifications
+        Uses :class:`~ui.overlay_duel.DuelInfoOverlay` (the dedicated Duel Notifications
         widget) to show a win, loss, or expiry message with the final scores.
 
         Parameters
@@ -1920,7 +1920,7 @@ class DuelsMixin:
         Checks whether an ACCEPTED or ACTIVE duel exists for the current ROM.
         If so, sets ``watcher.duel_active_for_current_table = True`` to block
         achievements, challenges and the main overlay for this session, and
-        shows a brief in-game notification via MiniInfoOverlay.
+        shows a brief in-game notification via DuelInfoOverlay.
         """
         if not rom:
             return
@@ -1969,7 +1969,7 @@ class DuelsMixin:
         except Exception:
             pass
 
-        # Show in-game notification via MiniInfoOverlay — but wait until the VP
+        # Show in-game notification via DuelInfoOverlay — but wait until the VP
         # player window is actually visible (same retry pattern as the "No NVRAM
         # map" notification in ui_challenges.py).
         duel = matching[0]
@@ -2271,7 +2271,7 @@ class DuelsMixin:
                     self.bridge.duel_result.emit(duel.duel_id, result, my_score, opp_score)
                 except Exception:
                     pass
-                # Show result notification via MiniInfoOverlay (suppressed when VPX is running)
+                # Show result notification via DuelInfoOverlay (suppressed when VPX is running)
                 try:
                     if result == "won":
                         res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"

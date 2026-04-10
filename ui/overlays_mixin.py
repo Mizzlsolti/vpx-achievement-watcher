@@ -226,7 +226,7 @@ class OverlaysMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, Left = Accept directly.
+        # If a duel invite notification is showing in the duel overlay, Left = Accept directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
@@ -306,7 +306,7 @@ class OverlaysMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the mini overlay, Right = Decline directly.
+        # If a duel invite notification is showing in the duel overlay, Right = Decline directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:

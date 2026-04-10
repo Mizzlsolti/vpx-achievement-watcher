@@ -502,7 +502,7 @@ class EffectsMixin:
 
     def _preview_all_overlays(self):
         """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
-        for overlay_type in ("main", "toast"):
+        for overlay_type in ("main", "toast", "duel"):
             self._open_demo_overlay(overlay_type, duration_ms=6000)
 
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):
@@ -526,6 +526,13 @@ class EffectsMixin:
         try:
             if overlay_type == "toast":
                 win = AchToastWindow(self, "🏆 Preview Effect", "__levelup__", seconds=5)
+
+            elif overlay_type == "duel":
+                from .overlay_duel import DuelInfoOverlay
+                if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
+                    self._duel_overlay = DuelInfoOverlay(self)
+                win = self._duel_overlay
+                win.show_info("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to Popper.", seconds=6, color_hex="#FF7F00")
 
             elif overlay_type == "main":
                 # Main overlay: show the existing overlay window with demo triggers
