@@ -145,6 +145,13 @@ class ChatWidget(QGroupBox):
         self._messages: dict[str, dict] = {}  # msgId → message dict
         self._pending_text: str = ""           # text being sent; restored on failure
         self._last_send_success: bool = False  # set by background send thread
+
+        # ── Moderation cache (refreshed every 5 s by _check_participation_state) ──
+        self._banned_ids: set = set()          # set of banned player IDs
+        self._timeout_map: dict = {}           # player_id → until (ms timestamp)
+        self._self_banned: bool = False        # True when local player is banned
+        self._self_timeout_until: int = 0      # ms timestamp when own timeout expires
+
         self._build_ui()
 
         # Hazard overlay shown when participation requirements are not met.
@@ -205,6 +212,14 @@ class ChatWidget(QGroupBox):
 
         root.addLayout(input_row)
 
+        # Admin status feedback label (visible only after moderation actions)
+        self._lbl_admin_status = QLabel("")
+        self._lbl_admin_status.setStyleSheet(
+            "QLabel { color:#44FF44; font-size:9pt; padding:2px 4px; }"
+        )
+        self._lbl_admin_status.hide()
+        root.addWidget(self._lbl_admin_status)
+
     # ── Participation requirements ─────────────────────────────────────────────
 
     def _can_participate(self) -> bool:
@@ -220,6 +235,10 @@ class ChatWidget(QGroupBox):
             return False
         if not self._has_vpsid():
             return False
+        if self._self_banned:
+            return False
+        if self._self_timeout_until > int(time.time() * 1000):
+            return False
         return True
 
     def _has_vpsid(self) -> bool:
@@ -233,6 +252,9 @@ class ChatWidget(QGroupBox):
     @pyqtSlot()
     def _check_participation_state(self) -> None:
         """Update overlay visibility, input state, and stream based on requirements."""
+        # Trigger background refresh of ban/timeout cache.
+        self._refresh_moderation_cache()
+
         can = self._can_participate()
         self._input_line.setEnabled(can)
         self._btn_send.setEnabled(can)
@@ -241,10 +263,95 @@ class ChatWidget(QGroupBox):
             if not self._stream_running:
                 self._start_stream()
         else:
+            # Choose overlay text based on reason.
+            if self._self_banned:
+                self._locked_overlay.set_text("🔨 You are banned from chat")
+            elif self._self_timeout_until > int(time.time() * 1000):
+                remaining_s = (self._self_timeout_until - int(time.time() * 1000)) / 1000
+                remaining_min = max(1, int(remaining_s / 60 + 0.5))
+                self._locked_overlay.set_text(
+                    f"⏱️ You are timed out ({remaining_min} min remaining)"
+                )
+            else:
+                self._locked_overlay.set_text(_ChatLockedOverlay._TEXT)
             self._locked_overlay.show()
             self._locked_overlay.raise_()
             if self._stream_running:
                 self._stop_stream()
+
+    # ── Moderation cache refresh ───────────────────────────────────────────────
+
+    def _refresh_moderation_cache(self) -> None:
+        """Fetch ban and timeout lists from Firebase in a background thread."""
+        threading.Thread(
+            target=self._do_refresh_moderation,
+            daemon=True,
+            name="ChatModRefresh",
+        ).start()
+
+    def _do_refresh_moderation(self) -> None:
+        """Background worker: fetch banned + timeout lists and update caches."""
+        try:
+            from core.cloud_sync import CloudSync
+            banned_data = CloudSync.fetch_node(self._cfg, _BANNED_PATH)
+            timeout_data = CloudSync.fetch_node(self._cfg, _TIMEOUT_PATH)
+        except Exception:
+            return
+
+        banned_ids: set = set()
+        if isinstance(banned_data, dict):
+            banned_ids = set(banned_data.keys())
+
+        timeout_map: dict = {}
+        if isinstance(timeout_data, dict):
+            for pid, val in timeout_data.items():
+                if isinstance(val, dict):
+                    until = int(val.get("until", 0))
+                elif isinstance(val, (int, float)):
+                    until = int(val)
+                else:
+                    continue
+                timeout_map[pid] = until
+
+        player_id = self._cfg.OVERLAY.get("player_id", "").strip()
+        self_banned = player_id in banned_ids
+        self_timeout_until = timeout_map.get(player_id, 0)
+
+        self._banned_ids = banned_ids
+        self._timeout_map = timeout_map
+        self._self_banned = self_banned
+        self._self_timeout_until = self_timeout_until
+
+        # Rebuild message list on the GUI thread to apply the new filters.
+        QMetaObject.invokeMethod(
+            self, "_on_moderation_refreshed", Qt.ConnectionType.QueuedConnection,
+        )
+
+    @pyqtSlot()
+    def _on_moderation_refreshed(self) -> None:
+        """GUI-thread callback after moderation cache has been updated."""
+        self._rebuild_message_list()
+        # Re-evaluate participation (ban/timeout may have changed).
+        can = self._can_participate()
+        self._input_line.setEnabled(can)
+        self._btn_send.setEnabled(can)
+        if can:
+            self._locked_overlay.hide()
+            if not self._stream_running:
+                self._start_stream()
+        else:
+            if self._self_banned:
+                self._locked_overlay.set_text("🔨 You are banned from chat")
+            elif self._self_timeout_until > int(time.time() * 1000):
+                remaining_s = (self._self_timeout_until - int(time.time() * 1000)) / 1000
+                remaining_min = max(1, int(remaining_s / 60 + 0.5))
+                self._locked_overlay.set_text(
+                    f"⏱️ You are timed out ({remaining_min} min remaining)"
+                )
+            else:
+                self._locked_overlay.set_text(_ChatLockedOverlay._TEXT)
+            self._locked_overlay.show()
+            self._locked_overlay.raise_()
 
     # ── Firebase SSE stream ────────────────────────────────────────────────────
 
@@ -393,9 +500,19 @@ class ChatWidget(QGroupBox):
 
         self._msg_list.clear()
         for msg_id, msg in sorted_msgs:
+            sender_id   = str(msg.get("senderId", ""))
             sender_name = str(msg.get("senderName", "?"))
             text        = str(msg.get("text", ""))
             ts          = int(msg.get("timestamp", 0))
+
+            # Filter out messages from banned users.
+            if sender_id in self._banned_ids:
+                continue
+            # Filter out messages sent during an active timeout period.
+            timeout_until = self._timeout_map.get(sender_id, 0)
+            if timeout_until > 0 and ts <= timeout_until:
+                continue
+
             try:
                 time_str = datetime.fromtimestamp(ts / 1000).strftime("%H:%M")
             except Exception:
@@ -404,7 +521,7 @@ class ChatWidget(QGroupBox):
             display = f"[{time_str}] {_esc(sender_name)}: {_esc(text)}"
             item = QListWidgetItem(display)
             item.setData(_MSG_ROLE, {
-                "senderId":   str(msg.get("senderId", "")),
+                "senderId":   sender_id,
                 "senderName": sender_name,
             })
             self._msg_list.addItem(item)
@@ -530,27 +647,69 @@ class ChatWidget(QGroupBox):
     def _admin_ban(self, player_id: str) -> None:
         """Write a permanent ban entry to Firebase."""
         def _do() -> None:
+            ok = False
             try:
                 from core.cloud_sync import CloudSync
-                CloudSync.set_node(self._cfg, f"{_BANNED_PATH}/{player_id}", True)
+                ok = CloudSync.set_node(self._cfg, f"{_BANNED_PATH}/{player_id}", True)
             except Exception:
                 pass
+            QMetaObject.invokeMethod(
+                self, "_on_admin_action_done",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, "ban"),
+                Q_ARG(str, player_id),
+                Q_ARG(bool, ok),
+            )
         threading.Thread(target=_do, daemon=True, name="ChatBan").start()
 
     def _admin_timeout(self, player_id: str, minutes: int) -> None:
         """Write a timed-out entry to Firebase (until = now + minutes)."""
         until_ms = int((time.time() + minutes * 60) * 1000)
         def _do() -> None:
+            ok = False
             try:
                 from core.cloud_sync import CloudSync
-                CloudSync.set_node(
+                ok = CloudSync.set_node(
                     self._cfg,
                     f"{_TIMEOUT_PATH}/{player_id}",
                     {"until": until_ms},
                 )
             except Exception:
                 pass
+            label = "kick" if minutes <= 1 else "timeout"
+            QMetaObject.invokeMethod(
+                self, "_on_admin_action_done",
+                Qt.ConnectionType.QueuedConnection,
+                Q_ARG(str, label),
+                Q_ARG(str, player_id),
+                Q_ARG(bool, ok),
+            )
         threading.Thread(target=_do, daemon=True, name="ChatTimeout").start()
+
+    @pyqtSlot(str, str, bool)
+    def _on_admin_action_done(self, action: str, player_id: str, ok: bool) -> None:
+        """Show feedback after an admin moderation action and refresh cache."""
+        if ok:
+            if action == "ban":
+                msg = f"✅ User {player_id} banned"
+            elif action == "kick":
+                msg = f"✅ User {player_id} kicked (1 min timeout)"
+            else:
+                msg = f"✅ User {player_id} timed out"
+            self._lbl_admin_status.setStyleSheet(
+                "QLabel { color:#44FF44; font-size:9pt; padding:2px 4px; }"
+            )
+        else:
+            msg = f"❌ Failed to {action} user {player_id}"
+            self._lbl_admin_status.setStyleSheet(
+                "QLabel { color:#FF4444; font-size:9pt; padding:2px 4px; }"
+            )
+        self._lbl_admin_status.setText(msg)
+        self._lbl_admin_status.show()
+        # Auto-hide the status message after 5 seconds.
+        QTimer.singleShot(5_000, self._lbl_admin_status.hide)
+        # Immediately refresh the moderation cache so messages disappear.
+        self._refresh_moderation_cache()
 
     # ── Cleanup ────────────────────────────────────────────────────────────────
 
