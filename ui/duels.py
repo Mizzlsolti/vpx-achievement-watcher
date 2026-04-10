@@ -1977,7 +1977,7 @@ class DuelsMixin:
         # player window is actually visible (same retry pattern as the "No NVRAM
         # map" notification in ui_challenges.py).
         duel = matching[0]
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         is_challenger = (duel.challenger == my_id)
         opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
         table_display = _get_duel_table_display(duel, getattr(self, "watcher", None))
