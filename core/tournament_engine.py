@@ -165,8 +165,9 @@ class TournamentEngine:
             log(self._cfg, "[TOURNAMENT] join_queue: player_id not configured.", "WARN")
             return False
         try:
-            from ui.vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping, _filter_vps_mapping_by_nvram
             vps_mapping = _load_vps_mapping(self._cfg)
+            vps_mapping = _filter_vps_mapping_by_nvram(self._cfg, vps_mapping)
         except Exception as exc:
             log(self._cfg, f"[TOURNAMENT] join_queue: could not load VPS mapping: {exc}", "WARN")
             vps_mapping = {}

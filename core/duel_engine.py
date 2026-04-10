@@ -823,10 +823,11 @@ class DuelEngine:
     def join_matchmaking(self) -> bool:
         """Add the local player to the cloud matchmaking queue.
 
-        Collects all VPS-IDs from ``vps_id_mapping.json``, writes an entry to
-        ``duels/matchmaking/{player_id}`` in the cloud, and returns True on
-        success.  Returns False when Cloud Sync is disabled, the player has no
-        VPS-IDs, or the upload fails.
+        Collects VPS-IDs from ``vps_id_mapping.json``, **filtered** to only
+        include ROMs that have an NVRAM map (or are enabled CAT tables).
+        Writes the entry to ``duels/matchmaking/{player_id}`` in the cloud and
+        returns True on success.  Returns False when Cloud Sync is disabled,
+        the player has no eligible VPS-IDs, or the upload fails.
         """
         if not getattr(self._cfg, "CLOUD_ENABLED", False):
             log(self._cfg, "[DUEL] join_matchmaking: Cloud Sync is disabled.", "WARN")
@@ -836,8 +837,9 @@ class DuelEngine:
             log(self._cfg, "[DUEL] join_matchmaking: player_id not configured.", "WARN")
             return False
         try:
-            from ui.vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping, _filter_vps_mapping_by_nvram
             vps_mapping = _load_vps_mapping(self._cfg)
+            vps_mapping = _filter_vps_mapping_by_nvram(self._cfg, vps_mapping)
         except Exception as exc:
             log(self._cfg, f"[DUEL] join_matchmaking: could not load VPS mapping: {exc}", "WARN")
             vps_mapping = {}
@@ -896,8 +898,9 @@ class DuelEngine:
         now = time.time()
         # Load own VPS-IDs.
         try:
-            from ui.vps import _load_vps_mapping
+            from ui.vps import _load_vps_mapping, _filter_vps_mapping_by_nvram
             vps_mapping = _load_vps_mapping(self._cfg)
+            vps_mapping = _filter_vps_mapping_by_nvram(self._cfg, vps_mapping)
         except Exception:
             vps_mapping = {}
         my_vps_ids = set(vps_mapping.values())
