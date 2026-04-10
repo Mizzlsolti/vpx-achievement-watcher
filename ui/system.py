@@ -10,9 +10,10 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QTextBrowser, QProgressDialog,
     QTabWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, QRegularExpression, QEvent, QPoint
-from PyQt6.QtGui import QRegularExpressionValidator, QPainter, QColor, QFont, QFontMetrics, QPolygon
+from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator
 from core.cloud_sync import CloudSync, _sanitize_firebase_keys
+from .widgets import HazardStripeOverlay
 from core.watcher_core import (
     ensure_dir, log, sanitize_filename,
     secure_load_json, secure_save_json,
@@ -31,90 +32,17 @@ def _parse_version(v_str):
         return (0,)
 
 
-class _PlayerNameLockOverlay(QWidget):
-    """Hazard-stripe overlay drawn on top of txt_player_name when Cloud Sync is active.
+class _PlayerNameLockOverlay(HazardStripeOverlay):
+    """Hazard-stripe overlay for the Player Name / Player ID fields.
 
-    Paints alternating yellow/black diagonal stripes and centered white text
-    indicating that the field is locked.  The overlay is a child of the target
-    QLineEdit so it naturally follows the widget when the UI is resized.
+    Shown when Cloud Sync is active, preventing changes to the player identity.
+    Inherits all painting and resize-tracking logic from :class:`HazardStripeOverlay`.
     """
 
     _TEXT = "🔒 Locked – deactivate Cloud Sync to change"
-    _STRIPE_W = 18       # pixel width of each colour band
-    _YELLOW = QColor("#F5C518")
-    _BLACK = QColor("#000000")
-    _MIN_FONT_PX = 9
-    _MAX_FONT_PX = 13
-    _FONT_PADDING = 4
 
     def __init__(self, parent: QWidget) -> None:
-        super().__init__(parent)
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
-        self.hide()
-        parent.installEventFilter(self)
-
-    # ------------------------------------------------------------------
-    # Keep overlay sized to cover the parent field at all times
-    # ------------------------------------------------------------------
-    def eventFilter(self, obj: object, event: QEvent) -> bool:
-        if obj is self.parent() and event.type() == QEvent.Type.Resize:
-            self.resize(self.parent().size())
-        return False
-
-    def showEvent(self, event) -> None:  # type: ignore[override]
-        super().showEvent(event)
-        self.resize(self.parent().size())
-
-    # ------------------------------------------------------------------
-    # Custom painting
-    # ------------------------------------------------------------------
-    def paintEvent(self, event) -> None:  # type: ignore[override]
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        w, h = self.width(), self.height()
-        if w <= 0 or h <= 0:
-            return
-
-        # Yellow base fill
-        p.fillRect(0, 0, w, h, self._YELLOW)
-
-        # Black diagonal stripes (45° – going from upper-left to lower-right)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(self._BLACK)
-        sw = self._STRIPE_W
-        i = -h
-        while i < w:
-            poly = QPolygon([
-                QPoint(i,          0),
-                QPoint(i + sw,     0),
-                QPoint(i + sw + h, h),
-                QPoint(i + h,      h),
-            ])
-            p.drawPolygon(poly)
-            i += sw * 2
-
-        # Centred text
-        font = QFont()
-        font.setPixelSize(max(self._MIN_FONT_PX, min(self._MAX_FONT_PX, h - self._FONT_PADDING)))
-        font.setBold(True)
-        p.setFont(font)
-        fm = QFontMetrics(font)
-        br = fm.boundingRect(self._TEXT)
-        tx = (w - br.width()) // 2
-        ty = (h + fm.ascent() - fm.descent()) // 2
-
-        # Dark outline / shadow
-        p.setPen(self._BLACK)
-        for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1),
-                       (0, -1),  (0, 1),  (-1, 0), (1, 0)):
-            p.drawText(tx + dx, ty + dy, self._TEXT)
-
-        # White text
-        p.setPen(QColor("#FFFFFF"))
-        p.drawText(tx, ty, self._TEXT)
-
-        p.end()
+        super().__init__(parent, text=self._TEXT)
 
 
 class SystemMixin:
