@@ -111,17 +111,17 @@ def main():
     player_id = (cfg.OVERLAY.get("player_id") or "").strip()
 
     if first_setup_done:
-        # Already set up — show main window normally
-        win.showNormal()
+        # Scenario 1: Already set up — start minimized in system tray
+        win.hide()
     elif (
         player_name and player_name.lower() != "player"
         and player_id and player_id != "0000"
         and len(player_id) == 4
     ):
-        # Scenario 2: Existing player who updated — mark setup done, skip wizard
+        # Scenario 2: Existing player who updated — mark setup done, start minimized
         cfg.OVERLAY["first_setup_done"] = True
         cfg.save()
-        win.showNormal()
+        win.hide()
     else:
         # Scenario 3: New player / fresh install — show Setup Wizard
         win.showNormal()
@@ -141,6 +141,8 @@ def main():
                 win._lock_player_identity_fields(True)
         except Exception:
             pass
+        # After wizard completes, minimize to system tray
+        win.hide()
     code = app.exec()
     cfg.save()
     sys.exit(code)
