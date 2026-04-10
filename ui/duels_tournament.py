@@ -6,6 +6,7 @@ Provides:
 - Tournament history table
 - Tournament Rules dialog
 - Notification overlay integration (deferred when VPX is running)
+- Real-time Tournament Chat (backed by Firebase Realtime Database)
 """
 from __future__ import annotations
 
@@ -22,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from core.tournament_engine import TournamentEngine, TOURNAMENT_SIZE, _clean_table_name
+from .chat import ChatWidget
 
 _TABLE_STYLE = (
     "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
@@ -101,6 +103,14 @@ class TournamentWidget(QWidget):
         root.setContentsMargins(6, 6, 6, 6)
         root.setSpacing(8)
 
+        # Horizontal split: left = tournament info, right = chat
+        main_row = QHBoxLayout()
+        main_row.setSpacing(8)
+
+        # Left column holds all existing tournament widgets
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
+
         # ── Queue section ──────────────────────────────────────────────────
         self._grp_queue = QGroupBox("📝 Tournament Queue")
         self._grp_queue.setStyleSheet(
@@ -148,7 +158,7 @@ class TournamentWidget(QWidget):
         self._progress_queue.hide()
         lay_q.addWidget(self._progress_queue)
 
-        root.addWidget(self._grp_queue)
+        left_col.addWidget(self._grp_queue)
 
         # ── Bracket section ────────────────────────────────────────────────
         self._grp_bracket = QGroupBox("🏆 My Tournament")
@@ -197,7 +207,7 @@ class TournamentWidget(QWidget):
         lay_b.addWidget(self._lbl_tournament_vpx_hint)
 
         self._grp_bracket.hide()
-        root.addWidget(self._grp_bracket)
+        left_col.addWidget(self._grp_bracket)
 
         # ── History section ────────────────────────────────────────────────
         grp_hist = QGroupBox("📜 Tournament History")
@@ -217,8 +227,17 @@ class TournamentWidget(QWidget):
         self._tbl_history.setStyleSheet(_TABLE_STYLE)
         lay_h.addWidget(self._tbl_history)
 
-        root.addWidget(grp_hist)
-        root.addStretch(1)
+        left_col.addWidget(grp_hist)
+        left_col.addStretch(1)
+
+        # ── Chat panel (right side) ────────────────────────────────────────
+        self._chat_widget = ChatWidget(self._cfg)
+        self._chat_widget.setMinimumWidth(260)
+
+        # Compose the horizontal split
+        main_row.addLayout(left_col, 3)
+        main_row.addWidget(self._chat_widget, 2)
+        root.addLayout(main_row, 1)
 
         # ── Bottom bar ─────────────────────────────────────────────────────
         bottom = QHBoxLayout()
