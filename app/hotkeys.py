@@ -5,7 +5,7 @@ import time
 from ctypes import wintypes
 
 from PyQt6.QtCore import QAbstractNativeEventFilter, QCoreApplication, QTimer, Qt
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QApplication, QDialog, QLineEdit, QPlainTextEdit, QTextEdit, QVBoxLayout, QLabel
 
 from core.watcher_core import (
     JOYINFOEX, JOYERR_NOERROR, JOY_RETURNALL, _joyGetPosEx,
@@ -169,6 +169,29 @@ class HotkeysMixin:
             self._register_global_hotkeys()       
         except Exception:
             pass
+        self._setup_focus_hotkey_suppression()
+
+    def _setup_focus_hotkey_suppression(self):
+        """Connect focusChanged once so hotkeys are suspended while typing in a text input."""
+        if getattr(self, "_focus_hotkey_suppression_connected", False):
+            return
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                app.focusChanged.connect(self._on_focus_changed)
+                self._focus_hotkey_suppression_connected = True
+        except Exception:
+            pass
+
+    def _on_focus_changed(self, old_widget, new_widget):
+        """Unregister/re-register hotkeys when focus enters/leaves a text input widget."""
+        _text_types = (QLineEdit, QTextEdit, QPlainTextEdit)
+        new_is_text = isinstance(new_widget, _text_types)
+        old_is_text = isinstance(old_widget, _text_types)
+        if new_is_text and not old_is_text:
+            self._unregister_global_hotkeys()
+        elif old_is_text and not new_is_text:
+            self._register_global_hotkeys()
 
     def _on_bind_toggle_clicked(self):
         # 1. Globale Hotkeys deaktivieren
