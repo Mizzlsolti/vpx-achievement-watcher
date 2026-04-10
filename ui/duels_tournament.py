@@ -177,6 +177,13 @@ class TournamentWidget(QWidget):
         self._lbl_bracket_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay_b.addWidget(self._lbl_bracket_status)
 
+        self._lbl_tournament_vpx_hint = QLabel(
+            "ℹ️ Scores are submitted when VPX is closed — remind opponents to close VPX after playing!"
+        )
+        self._lbl_tournament_vpx_hint.setStyleSheet("color:#888; font-style:italic; font-size:9pt;")
+        self._lbl_tournament_vpx_hint.setWordWrap(True)
+        lay_b.addWidget(self._lbl_tournament_vpx_hint)
+
         self._grp_bracket.hide()
         root.addWidget(self._grp_bracket)
 
