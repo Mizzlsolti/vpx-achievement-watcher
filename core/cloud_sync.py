@@ -237,7 +237,7 @@ class CloudSync:
         if os.path.isfile(marker):
             return
 
-        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             return
 
@@ -291,7 +291,7 @@ class CloudSync:
         if os.path.isfile(marker):
             return
 
-        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             return
 
@@ -357,7 +357,7 @@ class CloudSync:
             return
 
         url = cfg.CLOUD_URL.strip().rstrip('/')
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
         if not pid or pid == "unknown":
             log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: no valid player_id", "WARN")
             return
@@ -640,7 +640,7 @@ class CloudSync:
             log(cfg, "[CLOUD] restore_from_cloud: cloud not enabled", "WARN")
             return False
 
-        pid = str(cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             log(cfg, "[CLOUD] restore_from_cloud: no valid player_id set", "WARN")
             return False
@@ -854,7 +854,7 @@ class CloudSync:
                     log(cfg, "[CLOUD] Upload skipped: Please set a player name (not 'Player') in System tab to enable cloud uploads.", "WARN")
                     CloudSync._upload_skip_warned = True
             return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
 
         # Dedup: suppress burst duplicates when multiple callers fire within the same
         # session-end cycle (e.g. _ach_record_unlocks + _persist_and_toast).
@@ -967,7 +967,7 @@ class CloudSync:
         try:
             if result and cfg.CLOUD_URL and cfg.CLOUD_ENABLED:
                 overlay = cfg.OVERLAY if isinstance(cfg.OVERLAY, dict) else {}
-                pid = str(overlay.get("player_id", "unknown")).strip()
+                pid = str(overlay.get("player_id", "unknown")).strip().lower()
                 safe_rom = rom.replace("/", "_").replace(".", "_")
                 result_list = [{"title": t, **info} for t, info in result.items()]
                 CloudSync.set_node(

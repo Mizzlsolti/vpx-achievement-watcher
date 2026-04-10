@@ -1420,7 +1420,7 @@ class DuelsMixin:
         try:
             if getattr(self.cfg, "CLOUD_ENABLED", False):
                 from core.cloud_sync import CloudSync
-                my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+                my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
                 if my_id:
                     CloudSync.set_node(self.cfg, f"players/{my_id}/achievements/duels_dnd", bool(enabled))
         except Exception:
