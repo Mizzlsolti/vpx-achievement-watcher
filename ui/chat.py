@@ -314,7 +314,7 @@ class ChatWidget(QGroupBox):
                     # Dispatch accumulated event
                     if event_type and data_parts:
                         data_str = "".join(data_parts)
-                        if data_str not in ("null", ""):
+                        if data_str != "":
                             try:
                                 # Validate JSON before dispatching
                                 json.loads(data_str)
@@ -348,6 +348,9 @@ class ChatWidget(QGroupBox):
             data = payload.get("data")
             if path == "/" and isinstance(data, dict):
                 self._messages = data
+                self._rebuild_message_list()
+            elif path == "/" and data is None:
+                self._messages = {}
                 self._rebuild_message_list()
             elif isinstance(data, dict):
                 key = path.strip("/")
