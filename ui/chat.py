@@ -61,7 +61,7 @@ import urllib.error
 from datetime import datetime
 from html import escape as _esc
 
-from PyQt6.QtCore import QMetaObject, Qt, Q_ARG, QTimer, pyqtSlot
+from PyQt6.QtCore import QMetaObject, QPoint, Qt, Q_ARG, QTimer, pyqtSlot
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -468,7 +468,7 @@ class ChatWidget(QGroupBox):
 
     # ── Admin right-click context menu ─────────────────────────────────────────
 
-    @pyqtSlot(object)
+    @pyqtSlot(QPoint)
     def _on_context_menu(self, pos) -> None:
         """Show admin moderation menu on right-click (admin only)."""
         if not get_admin_uid():
