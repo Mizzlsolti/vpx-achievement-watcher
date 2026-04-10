@@ -622,7 +622,7 @@ class SetupWizardDialog(QDialog):
         """Upload the player name to the cloud in a background thread."""
         if not self.cfg.CLOUD_URL:
             return
-        pid = self._chosen_id.strip()
+        pid = self._chosen_id.strip().lower()
         name = self._chosen_name.strip()
         if not pid or not name or name.lower() == "player":
             return

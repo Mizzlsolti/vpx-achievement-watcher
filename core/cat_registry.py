@@ -118,7 +118,7 @@ def upload_cat_progress(
         return False
 
     # 4. Player ID check
-    pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip()
+    pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
     if not pid or pid == "unknown":
         log(cfg, f"[CAT] upload_cat_progress blocked for '{table_key}': no valid player_id", "WARN")
         return False

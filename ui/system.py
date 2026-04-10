@@ -465,7 +465,7 @@ class SystemMixin:
             if self.cfg.CLOUD_URL:
                 import threading as _threading
                 from core.cloud_sync import CloudSync as _CloudSync
-                _pid = new_id.strip()
+                _pid = new_id.strip().lower()
                 _name = new_name.strip()
                 if _pid and _name and _name.lower() != "player":
                     _threading.Thread(
@@ -606,7 +606,7 @@ class SystemMixin:
             self._msgbox_topmost("warn", "Restore from Cloud", "Cloud sync is not enabled.")
             return
 
-        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             self._msgbox_topmost("warn", "Restore from Cloud", "Please set a valid Player ID first.")
             return
@@ -748,7 +748,7 @@ class SystemMixin:
             self._msgbox_topmost("warn", "Backup to Cloud", "Cloud sync is not enabled.")
             return
 
-        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             self._msgbox_topmost("warn", "Backup to Cloud", "Please set a valid Player ID first.")
             return
@@ -943,7 +943,7 @@ class SystemMixin:
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
             return
-        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip()
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
         if not pid or pid == "unknown":
             return
         try:
