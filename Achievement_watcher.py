@@ -1002,7 +1002,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         lay.addLayout(row)
 
-        lbl_tip = QLabel('💡 Tip: "Import from PinUp Popper" is the best and fastest option if you use PinUP Popper. "Auto-Match" is only needed if you don\'t use Popper or your Popper database has no VPS-IDs assigned. Always click "Load List" first. Use "Clear VPS Mapping" before re-importing to get a fresh update from PinUp Popper.')
+        lbl_tip = QLabel("💡 Tip: \"Import from PinUp Popper\" is the best and fastest option if you use PinUP Popper. \"Auto-Match\" is only needed if you don't use Popper or your Popper database has no VPS-IDs assigned. Always click \"Load List\" first. Use \"Clear VPS Mapping\" before re-importing to get a fresh update from PinUp Popper.")
         lbl_tip.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
         lbl_tip.setWordWrap(True)
         lay.addWidget(lbl_tip)
