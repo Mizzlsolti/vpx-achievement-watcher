@@ -98,7 +98,14 @@ class ProgressMixin:
                     if len(parts) >= 2:
                         roms.add(parts[0])
                         
-        valid_roms = sorted([r for r in roms if self.watcher._has_any_map(r)])
+        # ROMs with a local NVRAM map are always included; ROMs that have
+        # session data in the achievement state (e.g. restored from cloud) are
+        # also included even when no local map file exists yet.
+        session_roms = set(state.get("session", {}).keys())
+        valid_roms = sorted([
+            r for r in roms
+            if self.watcher._has_any_map(r) or r in session_roms
+        ])
         
         self.cmb_progress_rom.addItem("Global", "Global")
         
@@ -358,10 +365,20 @@ class ProgressMixin:
         
         if not all_rules:
             if rom == "Global":
-                self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No global achievements defined.</div>")
+                if unlocked_titles:
+                    # global_achievements.json is missing (e.g. fresh PC after
+                    # Cloud Restore) but unlocked achievements were restored from
+                    # the cloud state.  Build synthetic rules so they are visible.
+                    # The empty condition dict is intentional: these entries are
+                    # display-only and the rendering loop checks for a matching
+                    # unlocked title to decide the badge state, not the condition.
+                    all_rules = [{"title": t, "condition": {}} for t in sorted(unlocked_titles)]
+                else:
+                    self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No global achievements defined.</div>")
+                    return
             else:
                 self.progress_view.setHtml("<div style='color:#FF7F00; text-align:center;'>No specific achievements defined for this ROM.</div>")
-            return
+                return
             
         global_tally = state.get("global_tally", {}) if rom == "Global" else {}
 

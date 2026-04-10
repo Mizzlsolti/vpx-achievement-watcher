@@ -717,6 +717,13 @@ class SystemMixin:
         except Exception:
             pass
 
+        # Generate global_achievements.json from the restored state so that the
+        # Progress tab and watcher have the rules file available immediately.
+        try:
+            self.watcher._ensure_global_ach()
+        except Exception as _e:
+            log(self.cfg, f"[CLOUD] _ensure_global_ach after restore failed (non-critical): {_e}", "WARN")
+
         parts = ["Achievement data"]
         if vps_mapping_restored:
             parts.append("VPS ID mapping")
