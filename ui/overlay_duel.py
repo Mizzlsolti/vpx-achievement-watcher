@@ -240,6 +240,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
         accent_color = QColor(self._accent_color())
         bg_color = _theme_bg_qcolor(self.parent_gui.cfg, 245)
         border_color = QColor(get_theme_color(self.parent_gui.cfg, "border"))
+        primary_color = QColor(get_theme_color(self.parent_gui.cfg, "primary"))
 
         W, H = self._fixed_W, self._fixed_H
         text_area_w = max(100, W - _DUEL_PAD_W)
@@ -284,15 +285,15 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
 
             # ── Effect: Breathing Glow Border ────────────────────────────
             if self._is_fx_enabled("fx_duel_breathing_glow"):
-                self._breathing.draw(p, 1, 1, W - 2, H - 2, self._radius, accent_color, width=4)
+                self._breathing.draw(p, 1, 1, W - 2, H - 2, self._radius, primary_color, width=4)
 
             # ── Effect: Energy Flash ──────────────────────────────────────
             if self._is_fx_enabled("fx_duel_energy_flash") and self._flash.is_active():
-                self._flash.draw(p, W, H, self._radius, accent_color)
+                self._flash.draw(p, W, H, self._radius, primary_color)
 
             # ── Effect: Glow Sweep ────────────────────────────────────────
             if self._is_fx_enabled("fx_duel_glow_sweep") and self._glow_sweep.is_active():
-                self._glow_sweep.draw(p, W, H, self._radius, accent_color)
+                self._glow_sweep.draw(p, W, H, self._radius, primary_color)
 
         finally:
             p.end()

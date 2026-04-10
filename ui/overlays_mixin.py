@@ -28,7 +28,15 @@ class OverlaysMixin:
             "</div>",
             "#FF7F00"
         ),
-        ("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to Popper.", "#FF7F00"),
+        (
+            "<div style='text-align:center'>"
+            "⚔️ Duel active against <b>xPinballWizard</b>!<br>"
+            "🎰 <b>Medieval Madness</b><br>"
+            "⚠️ One game only — restarting in-game will abort the duel!<br>"
+            "🔙 After the duel, close VPX or return to Popper."
+            "</div>",
+            "#FF7F00"
+        ),
         ("🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
         ("💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
         ("🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000", "#FF7F00"),
@@ -37,6 +45,12 @@ class OverlaysMixin:
         ("⚠️ Duel aborted: Session too short.", "#FFAA00"),
         ("✅ 'xPinballWizard' accepted your duel on Medieval Madness!", "#00E500"),
         ("❌ 'xPinballWizard' declined your duel on Medieval Madness.", "#CC0000"),
+        ("⏰ Your duel invitation on Medieval Madness expired (not accepted).", "#888888"),
+        ("🚫 Your duel on Medieval Madness was cancelled.", "#888888"),
+        ("Cannot accept duel while VPX is running.", "#CC5500"),
+        ("❌ Duel cancelled – Table 'Medieval Madness' is not available.", "#CC2200"),
+        ("⚠️ Duel aborted: VPX restarted during active duel. Only one attempt allowed!", "#FF3B30"),
+        ("⚠️ Duel aborted: Multiple games detected in single VPX session. Only one game per duel allowed!", "#FF3B30"),
     ]
 
     _STATUS_TEST_MESSAGES = [
