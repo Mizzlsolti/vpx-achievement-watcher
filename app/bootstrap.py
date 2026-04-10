@@ -141,8 +141,6 @@ def main():
                 win._lock_player_identity_fields(True)
         except Exception:
             pass
-        # After wizard completes, minimize to system tray
-        win.hide()
     code = app.exec()
     cfg.save()
     sys.exit(code)
