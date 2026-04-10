@@ -228,7 +228,7 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
             inner = f"<span style='color:{msg_color};'>{safe}</span>"
 
         return (
-            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:center;'>"
+            f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:center;color:{msg_color};'>"
             f"{inner}"
             f"{countdown}"
             f"</div>"

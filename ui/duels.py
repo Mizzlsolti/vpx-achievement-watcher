@@ -1170,7 +1170,7 @@ class DuelsMixin:
             # Show the notification overlay with no auto-hide (stays until player acts).
             try:
                 msg = self._duel_invite_notify_text(0)
-                self._get_duel_overlay().show_info(msg, seconds=0, color_hex="#FF7F00")
+                self._get_duel_overlay().show_info(msg, seconds=0)
                 # Force the overlay above the desktop/taskbar; a delayed retry
                 # handles cases where the shell repaints on top right after show().
                 try:
@@ -1236,7 +1236,7 @@ class DuelsMixin:
             return
         try:
             msg = self._duel_invite_notify_text(state.get("focused", 0))
-            self._get_duel_overlay().update_message(msg, "#FF7F00")
+            self._get_duel_overlay().update_message(msg)
         except Exception:
             pass
 
@@ -2055,7 +2055,7 @@ class DuelsMixin:
             if detected:
                 time.sleep(3)  # extra wait so the table finishes rendering
             try:
-                self.bridge.duel_info_show.emit(msg, 20, "#FF7F00")
+                self.bridge.duel_info_show.emit(msg, 20, "")
             except Exception:
                 pass
 
@@ -2200,7 +2200,7 @@ class DuelsMixin:
                 waiting_msg = "⏳ Score submitted! Waiting for opponent's score..."
                 try:
                     ov = self._get_duel_overlay()
-                    ov.show_info(waiting_msg, seconds=10, color_hex="#FF7F00")
+                    ov.show_info(waiting_msg, seconds=10)
                     # Ensure overlay stays above the desktop after VPX closes.
                     try:
                         from ui.overlay_base import _force_topmost

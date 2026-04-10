@@ -342,7 +342,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             return False
 
     @pyqtSlot(str, int, str)
-    def _on_duel_info_show(self, message: str, seconds: int = 6, color_hex: str = "#FF7F00") -> None:
+    def _on_duel_info_show(self, message: str, seconds: int = 6, color_hex: str = "") -> None:
         """Show an in-game duel notification as a standalone overlay window over VPX."""
         try:
             if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
