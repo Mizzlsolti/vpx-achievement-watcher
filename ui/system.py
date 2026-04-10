@@ -217,6 +217,23 @@ class SystemMixin:
         layout.addWidget(grp_feedback)
 
         layout.addStretch(1)
+
+        # ── Admin Login button (bottom-right, System tab) ──────────────────
+        admin_row = QHBoxLayout()
+        admin_row.addStretch(1)
+        self._btn_admin_login = QPushButton("🔑 Admin Login")
+        self._btn_admin_login.setFixedHeight(28)
+        self._btn_admin_login.setToolTip("Log in as chat moderator (admin only)")
+        self._btn_admin_login.setStyleSheet(
+            "QPushButton { background-color:#1a1a1a; color:#888; border:1px solid #555;"
+            " border-radius:5px; font-weight:bold; padding:0 14px; }"
+            "QPushButton:hover { background-color:#333; color:#DDD; }"
+            "QPushButton[adminActive=true] { color:#FF7F00; border-color:#FF7F00; }"
+        )
+        self._btn_admin_login.clicked.connect(self._on_admin_login_clicked)
+        admin_row.addWidget(self._btn_admin_login)
+        layout.addLayout(admin_row)
+
         self._add_tab_help_button(layout, "system_general")
         system_subtabs.addTab(general_tab, "⚙️ General")
 
@@ -518,6 +535,43 @@ class SystemMixin:
                 overlay.raise_()
             else:
                 overlay.hide()
+
+    # ── Admin Login (chat moderation) ─────────────────────────────────────────
+
+    def _on_admin_login_clicked(self) -> None:
+        """Toggle admin session: show login dialog or log out."""
+        from .chat import get_admin_uid, set_admin_session, AdminLoginDialog
+        if get_admin_uid():
+            # Already logged in – offer to log out
+            from PyQt6.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self, "Admin Logout",
+                "You are currently logged in as admin.\nLog out of the admin session?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                set_admin_session(None)
+                self._update_admin_button_state()
+        else:
+            dlg = AdminLoginDialog(self.cfg, self)
+            dlg.exec()
+            self._update_admin_button_state()
+
+    def _update_admin_button_state(self) -> None:
+        """Refresh the Admin Login button label to reflect current admin status."""
+        from .chat import get_admin_uid
+        btn = getattr(self, "_btn_admin_login", None)
+        if btn is None:
+            return
+        if get_admin_uid():
+            btn.setText("🔑 Admin: Active")
+            btn.setProperty("adminActive", True)
+        else:
+            btn.setText("🔑 Admin Login")
+            btn.setProperty("adminActive", False)
+        btn.style().unpolish(btn)
+        btn.style().polish(btn)
 
     def _restore_achievements_from_cloud(self):
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
