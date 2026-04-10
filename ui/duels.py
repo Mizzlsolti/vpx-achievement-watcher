@@ -1977,7 +1977,7 @@ class DuelsMixin:
         # player window is actually visible (same retry pattern as the "No NVRAM
         # map" notification in ui_challenges.py).
         duel = matching[0]
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         is_challenger = (duel.challenger == my_id)
         opponent_name = (duel.opponent_name if is_challenger else duel.challenger_name) or "Opponent"
         table_display = _get_duel_table_display(duel, getattr(self, "watcher", None))
@@ -2172,7 +2172,7 @@ class DuelsMixin:
                     continue
                 result = self._duel_engine.submit_result(duel.duel_id, score)
                 if result:
-                    my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+                    my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
                     is_challenger = (duel.challenger == my_id)
                     my_score = duel.challenger_score if is_challenger else duel.opponent_score
                     their_score = duel.opponent_score if is_challenger else duel.challenger_score
@@ -2259,7 +2259,7 @@ class DuelsMixin:
         for duel in active:
             if duel.status != DuelStatus.ACTIVE:
                 continue
-            my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
             is_challenger = (duel.challenger == my_id)
             my_score = duel.challenger_score if is_challenger else duel.opponent_score
             if my_score == SCORE_NOT_SUBMITTED:
@@ -2296,7 +2296,7 @@ class DuelsMixin:
         # submitted but the opponent's score is still missing.
         try:
             active_now = self._duel_engine.get_active_duels()
-            my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+            my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
             still_pending = []
             for d in active_now:
                 if d.status != DuelStatus.ACTIVE:
