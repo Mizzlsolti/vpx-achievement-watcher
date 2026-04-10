@@ -44,6 +44,11 @@ ACTIVE_DUEL_TTL_SECONDS = 172_800
 # Sentinel value indicating a score has not yet been submitted.
 SCORE_NOT_SUBMITTED = -1
 
+# Duel statuses that represent a finished duel (no further transitions).
+_TERMINAL_STATUSES = (
+    "won", "lost", "tie", "expired", "declined", "cancelled",
+)
+
 
 @dataclass
 class Duel:
@@ -174,8 +179,7 @@ class DuelEngine:
         if not self._cfg.CLOUD_ENABLED:
             return False
         node = self._cloud_node_for_duel(duel.duel_id)
-        terminal = (DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE,
-                    DuelStatus.EXPIRED, DuelStatus.DECLINED, DuelStatus.CANCELLED)
+        terminal = _TERMINAL_STATUSES
         if duel.status in terminal:
             # Terminal states: delete from cloud to keep duels/ node small.
             # The duel is already saved in local duel_history.json.
@@ -230,6 +234,7 @@ class DuelEngine:
         if not opponent_id:
             log(self._cfg, "[DUEL] send_invitation: opponent_id is empty.", "WARN")
             return "no_opponent"
+        opponent_id = opponent_id.lower().strip()
 
         # Triple-condition validation when maps_cache is provided.
         if maps_cache is not None:
@@ -245,7 +250,7 @@ class DuelEngine:
                 if (existing.table_rom == norm_rom
                         and existing.status in (DuelStatus.PENDING, DuelStatus.ACCEPTED, DuelStatus.ACTIVE)):
                     # Block if same opponent (either direction).
-                    if existing.opponent.lower() == opponent_id.lower() or existing.challenger.lower() == opponent_id.lower():
+                    if existing.opponent.lower() == opponent_id or existing.challenger.lower() == opponent_id:
                         log(self._cfg, "[DUEL] send_invitation: duplicate – an active duel for this opponent/table already exists.", "WARN")
                         return "duplicate"
 
@@ -254,7 +259,7 @@ class DuelEngine:
                 duel_id=str(uuid.uuid4()),
                 challenger=my_id,
                 challenger_name=self._my_player_name(),
-                opponent=opponent_id.lower().strip(),
+                opponent=opponent_id,
                 opponent_name=opponent_name,
                 table_rom=table_rom.lower().strip(),
                 table_name=table_name or table_rom,
