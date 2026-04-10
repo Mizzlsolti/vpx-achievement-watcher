@@ -724,6 +724,10 @@ class SystemMixin:
         except Exception as _e:
             log(self.cfg, f"[CLOUD] _ensure_global_ach after restore failed (non-critical): {_e}", "WARN")
 
+        # Reset the duel-rules-seen flag so the popup fires again on this PC.
+        self.cfg.OVERLAY["duel_rules_seen"] = False
+        self.cfg.save()
+
         parts = ["Achievement data"]
         if vps_mapping_restored:
             parts.append("VPS ID mapping")

@@ -224,7 +224,6 @@ class TournamentWidget(QWidget):
         lay_h.addWidget(self._tbl_history)
 
         left_col.addWidget(grp_hist)
-        left_col.addStretch(1)
 
         # ── Chat panel (below tournament content) ─────────────────────────
         self._chat_widget = ChatWidget(self._cfg)
@@ -232,7 +231,7 @@ class TournamentWidget(QWidget):
 
         # Compose the vertical layout: tournament content on top, chat below
         root.addLayout(left_col, 1)
-        root.addWidget(self._chat_widget)
+        root.addWidget(self._chat_widget, 1)
 
         # ── Bottom bar ─────────────────────────────────────────────────────
         bottom = QHBoxLayout()
