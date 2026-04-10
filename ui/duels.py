@@ -624,15 +624,52 @@ class DuelsMixin:
             self._update_duel_cloud_overlays()
 
     def _update_duel_cloud_overlays(self) -> None:
-        """Show or hide the cloud-lock hazard overlays based on Cloud Sync state."""
-        cloud_on = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
+        """Show or hide the cloud-lock hazard overlays based on all Setup Status checks."""
+        # ── Check 1: Player Name ──────────────────────────────────────────────
+        pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
+        check1_ok = bool(pname and pname.lower() != "player")
+
+        # ── Check 2: Cloud Sync ───────────────────────────────────────────────
+        cloud_ok = bool(
+            getattr(self.cfg, "CLOUD_ENABLED", False)
+            and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        )
+
+        # ── Check 3: VPS-ID assignments ───────────────────────────────────────
+        try:
+            from ui.vps import _load_vps_mapping
+            mapping = _load_vps_mapping(self.cfg)
+            vps_count = len(mapping)
+        except Exception:
+            vps_count = 0
+        check3_ok = vps_count > 0
+
+        # ── Check 4: Available Maps loaded ────────────────────────────────────
+        maps_cache = getattr(self, "_all_maps_cache", None)
+        maps_ok = isinstance(maps_cache, list) and len(maps_cache) > 0
+
+        all_ok = check1_ok and cloud_ok and check3_ok and maps_ok
+
+        # Determine which check is failing to show a descriptive message.
+        if all_ok:
+            lock_msg = ""
+        elif not check1_ok:
+            lock_msg = "🔒 Player Name not set – set in System tab"
+        elif not cloud_ok:
+            lock_msg = "🔒 Cloud Sync required – enable in System tab"
+        elif not check3_ok:
+            lock_msg = "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+        else:
+            lock_msg = "🔒 Available Maps not loaded – load maps first"
+
         for overlay_attr in ("_duel_start_lock_overlay", "_duel_automatch_lock_overlay"):
             overlay = getattr(self, overlay_attr, None)
             if overlay is None:
                 continue
-            if cloud_on:
+            if all_ok:
                 overlay.hide()
             else:
+                overlay.set_text(lock_msg)
                 overlay.show()
                 overlay.raise_()
 
