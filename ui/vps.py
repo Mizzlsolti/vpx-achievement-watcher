@@ -136,6 +136,50 @@ def _save_vps_mapping(cfg, mapping: dict):
         json.dump(mapping, f, indent=2)
 
 
+def _filter_vps_mapping_by_nvram(cfg, vps_mapping: dict, maps_cache: list = None) -> dict:
+    """Filter *vps_mapping* to only include ROMs that have an NVRAM map
+    (or are enabled CAT tables).
+
+    This ensures that matchmaking / tournament queue entries only advertise
+    tables that are actually playable (consistent with the triple-condition
+    validation in ``DuelEngine.validate_table_for_duel()`` and the manual
+    duel table dropdown in ``ui/duels.py``).
+
+    Parameters
+    ----------
+    cfg : AppConfig
+        Application configuration (used to locate ``index.json``).
+    vps_mapping : dict
+        ROM → VPS-ID mapping as returned by :func:`_load_vps_mapping`.
+    maps_cache : list, optional
+        The ``_all_maps_cache`` list.  When provided, ROMs with
+        ``cat_enabled == True`` are also retained.
+
+    Returns
+    -------
+    dict
+        Filtered ROM → VPS-ID mapping.
+    """
+    try:
+        from core.config import f_index
+        from core.watcher_core import load_json
+        nvram_index = set(k.lower() for k in (load_json(f_index(cfg), {}) or {}))
+    except Exception:
+        return vps_mapping  # on error, return unfiltered
+
+    # Collect ROMs that are enabled CAT tables (from maps_cache if available).
+    cat_roms: set = set()
+    if maps_cache:
+        for entry in maps_cache:
+            if isinstance(entry, dict) and entry.get("cat_enabled", False):
+                rom = entry.get("rom", "").lower().strip()
+                if rom:
+                    cat_roms.add(rom)
+
+    return {rom: vid for rom, vid in vps_mapping.items()
+            if rom.lower() in nvram_index or rom.lower() in cat_roms}
+
+
 def _normalize_term(term: str) -> str:
     """Normalize a search term the same way VPin Studio does."""
     term = re.sub(r"[_'\-\.]+", " ", term)
