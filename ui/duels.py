@@ -1652,7 +1652,7 @@ class DuelsMixin:
         if not hasattr(self, "_tbl_duel_inbox"):
             return
         duels = self._duel_engine.get_active_duels()
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         now = time.time()
         tbl = self._tbl_duel_inbox
         tbl.setRowCount(0)
@@ -1732,7 +1732,7 @@ class DuelsMixin:
         duels = self._duel_engine.get_active_duels()
         tbl = self._tbl_active_duels
         tbl.setRowCount(0)
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         now = time.time()
         from core.duel_engine import ACTIVE_DUEL_TTL_SECONDS
         for duel in duels:
@@ -1822,7 +1822,7 @@ class DuelsMixin:
         history = self._duel_engine.get_duel_history()
         tbl = self._tbl_duel_history
         tbl.setRowCount(0)
-        my_id = self.cfg.OVERLAY.get("player_id", "").strip()
+        my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         for duel in history:
             row = tbl.rowCount()
             tbl.insertRow(row)
