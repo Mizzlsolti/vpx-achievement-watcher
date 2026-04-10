@@ -665,7 +665,7 @@ class TournamentWidget(QWidget):
         try:
             from ui.overlay_base import _force_topmost
             ov = self._main_window._get_duel_overlay()
-            ov.show_info(msg, seconds=0, color_hex="#FF7F00")
+            ov.show_info(msg, seconds=0)
             _force_topmost(ov)
             QTimer.singleShot(200, lambda: _force_topmost(ov))
         except Exception:

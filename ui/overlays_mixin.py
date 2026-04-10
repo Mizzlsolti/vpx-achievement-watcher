@@ -26,7 +26,7 @@ class OverlaysMixin:
             "<b>[✅ Accept]</b> / Decline<br>"
             "<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
         (
             "<div style='text-align:center'>"
@@ -35,13 +35,13 @@ class OverlaysMixin:
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
             "🔙 After the duel, close VPX or return to Popper."
             "</div>",
-            "#FF7F00"
+            None
         ),
         ("🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
         ("💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
         ("🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000", "#FF7F00"),
         ("⏰ Duel expired — no response received.", "#888888"),
-        ("⏳ Score submitted! Waiting for opponent's score...", "#FF7F00"),
+        ("⏳ Score submitted! Waiting for opponent's score...", None),
         ("⚠️ Duel aborted: Session too short.", "#FFAA00"),
         ("✅ 'xPinballWizard' accepted your duel on Medieval Madness!", "#00E500"),
         ("❌ 'xPinballWizard' declined your duel on Medieval Madness.", "#CC0000"),
@@ -59,7 +59,7 @@ class OverlaysMixin:
             "⏳ You have 2 hours to play<br><br>"
             "<small>Press left [← Duel Accept] to confirm</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
         (
             "<div style='text-align:center'>"
@@ -69,7 +69,7 @@ class OverlaysMixin:
             "Your score: 38,500,000<br><br>"
             "<small>Press left [← Duel Accept] to confirm</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
         (
             "<div style='text-align:center'>"
@@ -79,7 +79,7 @@ class OverlaysMixin:
             "⏳ You have 2 hours to play<br><br>"
             "<small>Press left [← Duel Accept] to confirm</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
         (
             "<div style='text-align:center'>"
@@ -88,7 +88,7 @@ class OverlaysMixin:
             "You won the tournament!<br><br>"
             "<small>Press left [← Duel Accept] to confirm</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
         (
             "<div style='text-align:center'>"
@@ -98,7 +98,7 @@ class OverlaysMixin:
             "Your score: 38,500,000<br><br>"
             "<small>Press left [← Duel Accept] to confirm</small>"
             "</div>",
-            "#FF7F00"
+            None
         ),
     ]
 
