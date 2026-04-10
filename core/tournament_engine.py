@@ -134,7 +134,7 @@ class TournamentEngine:
     # ── Player helpers ────────────────────────────────────────────────────────
 
     def _my_player_id(self) -> str:
-        return str(self._cfg.OVERLAY.get("player_id", "")).strip()
+        return str(self._cfg.OVERLAY.get("player_id", "")).strip().lower()
 
     def _my_player_name(self) -> str:
         return str(self._cfg.OVERLAY.get("player_name", "Player")).strip()
