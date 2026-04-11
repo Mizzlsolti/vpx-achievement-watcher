@@ -19,11 +19,9 @@ class OverlaysMixin:
     _DUEL_TEST_MESSAGES = [
         (
             "<div style='text-align:center'>"
-            "⚔️ Duel from <b>xPinballWizard</b><br>"
+            "⚔️ Duel invite from <b>xPinballWizard</b><br>"
             "🎰 <b>Medieval Madness</b><br>"
-            "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper.<br>"
-            "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
+            "←  <b>[✅ Accept]</b>  /  ❌ Decline  →"
             "</div>",
             None
         ),
@@ -456,14 +454,21 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_right ingame duel later failed: {e}", "WARN")
             except Exception:
                 pass
-        # If a duel invite notification is showing in the duel overlay, Right = "Later" (dismiss without declining).
-        # The invitation stays PENDING and the overlay reappears on the next poll cycle.
+        # If a duel invite notification is showing in the duel overlay, Right = "Decline" (actually decline the duel).
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
+                duel_id = state.get("duel_id")
+                if not hasattr(self, "_duel_invite_handled_ids"):
+                    self._duel_invite_handled_ids = set()
+                self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
                     self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+                try:
+                    self._on_inbox_decline(duel_id)
                 except Exception:
                     pass
                 return
