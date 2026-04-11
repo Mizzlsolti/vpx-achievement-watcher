@@ -45,8 +45,6 @@ class OverlaysMixin:
         ("❌ 'xPinballWizard' declined your duel\non Medieval Madness.", "#CC0000"),
         ("⏰ Your duel invitation on Medieval Madness expired (not accepted).", "#888888"),
         ("🚫 Your duel on Medieval Madness was cancelled.", "#888888"),
-        ("Cannot accept duel while VPX is running.", "#CC5500"),
-        ("❌ Duel cancelled – Table 'Medieval Madness' is not available.", "#CC2200"),
         ("⚠️ Duel aborted:\nVPX restarted during active duel. Only one attempt allowed!", "#FF3B30"),
         ("⚠️ Duel aborted:\nMultiple games detected in single VPX session. Only one game per duel allowed!", "#FF3B30"),
         (
