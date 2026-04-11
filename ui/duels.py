@@ -1225,7 +1225,7 @@ class DuelsMixin:
                 f"🎰 <b>{_html_escape(table_display)}</b><br>"
                 f"⚔️ Opponent: <b>{_html_escape(opponent)}</b><br>"
                 f"⚠️ One game only — restarting in-game will abort the duel!<br>"
-                f"🔙 After the duel, close VPX or return to Popper.<br><br>"
+                f"🔙 After the duel, close VPX or return to your Frontend.<br><br>"
                 f"<small>Press left ← to confirm</small>"
                 "</div>"
             )
@@ -2058,7 +2058,7 @@ class DuelsMixin:
             f"⚔️ Duel against <b>{_html_escape(opponent_name)}</b><br>"
             f"🎰 <b>{_html_escape(table_display)}</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper.<br>"
+            "🔙 After the duel, close VPX or return to your Frontend.<br>"
             "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
             "</div>"
         )

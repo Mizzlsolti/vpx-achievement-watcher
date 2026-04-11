@@ -278,7 +278,7 @@ class AutoMatchWidget(QWidget):
                         f"🎰 <b>{_html_escape(table)}</b><br>"
                         f"⚔️ Opponent: <b>{_html_escape(opponent)}</b><br>"
                         f"⚠️ One game only — restarting in-game will abort the duel!<br>"
-                        f"🔙 After the duel, close VPX or return to Popper.<br><br>"
+                        f"🔙 After the duel, close VPX or return to your Frontend.<br><br>"
                         f"<small>Press left ← to confirm</small>"
                         "</div>"
                     )
