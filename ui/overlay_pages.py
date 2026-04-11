@@ -809,6 +809,31 @@ class OverlayPagesMixin:
     _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
     _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
 
+    def _overlay_page6_check_prerequisites(self) -> str:
+        """Return '' if all Score Duels prerequisites pass, else the first lock message."""
+        # Check 1: Player Name
+        pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
+        if not (pname and pname.lower() != "player"):
+            return "🔒 Player Name not set – set in System tab"
+        # Check 2: Cloud Sync
+        if not (
+            getattr(self.cfg, "CLOUD_ENABLED", False)
+            and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        ):
+            return "🔒 Cloud Sync required – enable in System tab"
+        # Check 3: VPS-ID assignments
+        try:
+            from ui.vps import _load_vps_mapping
+            if not _load_vps_mapping(self.cfg):
+                return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+        except Exception:
+            return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+        # Check 4: Available Maps loaded
+        maps_cache = getattr(self, "_all_maps_cache", None)
+        if not (isinstance(maps_cache, list) and len(maps_cache) > 0):
+            return "🔒 Available Maps not loaded – load maps first"
+        return ""
+
     def _overlay_page6_build_html(self) -> str:
         """Build and return the full HTML string for Page 5 (Score Duels Auto-Match)."""
         state = getattr(self, "_p6_state", "IDLE")
@@ -844,6 +869,24 @@ class OverlayPagesMixin:
         )
 
         if state == "IDLE":
+            # ── Prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
+            _lock_msg = self._overlay_page6_check_prerequisites()
+
+            if not _lock_msg:
+                _action_line = (
+                    f"<tr><td align='center' style='padding:6px 0 6px 0;"
+                    f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
+                    f"◀ Start Search"
+                    f"</td></tr>"
+                )
+            else:
+                _action_line = (
+                    f"<tr><td align='center' style='padding:6px 0 6px 0;"
+                    f" font-size:{fs_action}pt; color:#FF3B30; font-weight:bold;'>"
+                    f"{_lock_msg}"
+                    f"</td></tr>"
+                )
+
             body = (
                 f"<tr><td align='center' style='padding:12px 0 8px 0;"
                 f" color:{_tc_accent}; font-size:{fs_status}pt; font-weight:bold;'>"
@@ -853,10 +896,15 @@ class OverlayPagesMixin:
                 f" color:#CCCCCC; font-size:{fs_body + 2}pt;'>"
                 f"Find an opponent on a shared table automatically."
                 f"</td></tr>"
-                f"<tr><td align='center' style='padding:6px 0 6px 0;"
-                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
-                f"◀ Start Search"
+                f"<tr><td align='center' style='padding:4px 0 2px 0;"
+                f" color:#FFAA00; font-size:{fs_body}pt; font-style:italic;'>"
+                f"⚠️ One game only — restarting in-game will abort the duel!"
                 f"</td></tr>"
+                f"<tr><td align='center' style='padding:2px 0 6px 0;"
+                f" color:#FFAA00; font-size:{fs_body}pt; font-style:italic;'>"
+                f"🔙 After the duel, close VPX or return to Popper."
+                f"</td></tr>"
+                f"{_action_line}"
                 f"<tr><td align='center' style='padding:8px 0 4px 0;"
                 f" font-size:{fs_body}pt; color:#888; font-style:italic;'>"
                 f"Use your configured Left / Right keys from Tab Controls to navigate."
@@ -956,10 +1004,6 @@ class OverlayPagesMixin:
             f"<div style='background:{_tc_bg}; padding:8px; border-radius:8px;"
             f" border:1px solid {_tc_border};'>"
             f"{header}{body}"
-            f"<tr><td align='center' style='padding:4px 8px;"
-            f" color:#FFAA00; font-size:{fs_hint}pt; font-style:italic;'>"
-            f"⚠️ One game only per duel — restarting (F3) will abort the duel! (NVRAM tracking)"
-            f"</td></tr>"
             f"</table>"
             f"</div>"
         )
@@ -1008,30 +1052,19 @@ class OverlayPagesMixin:
 
     def _overlay_page6_start_search(self):
         """Join matchmaking queue and enter SEARCHING state."""
-        _CLOUD_REQUIRED_MSG = "Score Duels not available — Cloud Sync required"
-        # Validate prerequisites
-        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+        # ── Prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
+        _lock_msg = self._overlay_page6_check_prerequisites()
+        if _lock_msg:
             try:
-                self._on_mini_info_message(_CLOUD_REQUIRED_MSG, 3, "#FF3B30")
+                self._on_mini_info_message(_lock_msg, 3, "#FF3B30")
             except Exception:
                 pass
             return
+
         duel_engine = getattr(self, "_duel_engine", None)
         if duel_engine is None:
             try:
-                self._on_mini_info_message(_CLOUD_REQUIRED_MSG, 3, "#FF3B30")
-            except Exception:
-                pass
-            return
-        # Validate: player must have at least one VPS-ID.
-        try:
-            from .vps import _load_vps_mapping
-            vps_mapping = _load_vps_mapping(self.cfg)
-        except Exception:
-            vps_mapping = {}
-        if not vps_mapping:
-            try:
-                self._on_mini_info_message("No tables with VPS-ID found", 3, "#FFAA00")
+                self._on_mini_info_message("Score Duels not available — Cloud Sync required", 3, "#FF3B30")
             except Exception:
                 pass
             return
