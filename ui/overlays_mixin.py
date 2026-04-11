@@ -30,7 +30,7 @@ class OverlaysMixin:
             "⚔️ Duel against <b>xPinballWizard</b><br>"
             "🎰 <b>Medieval Madness</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper.<br>"
+            "🔙 After the duel, close VPX or return to your Frontend.<br>"
             "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
             "</div>",
             None
@@ -41,7 +41,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br>"
             "⚔️ Opponent: <b>xPinballWizard</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper.<br><br>"
+            "🔙 After the duel, close VPX or return to your Frontend.<br><br>"
             "<small>Press left ← to confirm</small>"
             "</div>",
             None

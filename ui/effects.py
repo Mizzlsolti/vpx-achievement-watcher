@@ -532,7 +532,7 @@ class EffectsMixin:
                 if not hasattr(self, "_duel_overlay") or self._duel_overlay is None:
                     self._duel_overlay = DuelInfoOverlay(self)
                 win = self._duel_overlay
-                win.show_info("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to Popper.", seconds=6)
+                win.show_info("⚔️ Duel active against xPinballWizard!\n🎰 Medieval Madness\n⚠️ One game only — restarting in-game will abort the duel!\n🔙 After the duel, close VPX or return to your Frontend.", seconds=6)
 
             elif overlay_type == "main":
                 # Main overlay: show the existing overlay window with demo triggers

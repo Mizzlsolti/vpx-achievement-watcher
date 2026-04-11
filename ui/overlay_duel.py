@@ -33,8 +33,8 @@ _DUEL_MAX_TEXT_W = 520
 # Candidate messages used for size computation — kept in sync with the picker.
 _DUEL_CANDIDATE_MESSAGES = [
     "⚔️ Duel invite from <b>xPinballWizard</b><br>🎰 <b>Medieval Madness</b><br>←  <b>[✅ Accept]</b>  /  ❌ Decline  →",
-    "⚔️ Duel against <b>xPinballWizard</b><br>🎰 <b>Medieval Madness</b><br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>←  <b>[✅ Accept]</b>  /  ⏰ Later  →",
-    "⚔️ Auto-Match found!<br>🎰 <b>Medieval Madness</b><br>⚔️ Opponent: <b>xPinballWizard</b><br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br><br><small>Press left ← to confirm</small>",
+    "⚔️ Duel against <b>xPinballWizard</b><br>🎰 <b>Medieval Madness</b><br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to your Frontend.<br>←  <b>[✅ Accept]</b>  /  ⏰ Later  →",
+    "⚔️ Auto-Match found!<br>🎰 <b>Medieval Madness</b><br>⚔️ Opponent: <b>xPinballWizard</b><br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to your Frontend.<br><br><small>Press left ← to confirm</small>",
     "🏆 DUEL WON!<br>You: 42,069,000 vs Opponent: 38,500,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "💀 DUEL LOST.<br>You: 38,500,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "🤝 TIE!<br>You: 42,069,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
