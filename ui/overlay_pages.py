@@ -809,6 +809,31 @@ class OverlayPagesMixin:
     _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
     _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
 
+    def _overlay_page6_check_prerequisites(self) -> str:
+        """Return '' if all Score Duels prerequisites pass, else the first lock message."""
+        # Check 1: Player Name
+        pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
+        if not (pname and pname.lower() != "player"):
+            return "🔒 Player Name not set – set in System tab"
+        # Check 2: Cloud Sync
+        if not (
+            getattr(self.cfg, "CLOUD_ENABLED", False)
+            and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
+        ):
+            return "🔒 Cloud Sync required – enable in System tab"
+        # Check 3: VPS-ID assignments
+        try:
+            from ui.vps import _load_vps_mapping
+            if not _load_vps_mapping(self.cfg):
+                return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+        except Exception:
+            return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+        # Check 4: Available Maps loaded
+        maps_cache = getattr(self, "_all_maps_cache", None)
+        if not (isinstance(maps_cache, list) and len(maps_cache) > 0):
+            return "🔒 Available Maps not loaded – load maps first"
+        return ""
+
     def _overlay_page6_build_html(self) -> str:
         """Build and return the full HTML string for Page 5 (Score Duels Auto-Match)."""
         state = getattr(self, "_p6_state", "IDLE")
@@ -844,39 +869,10 @@ class OverlayPagesMixin:
         )
 
         if state == "IDLE":
-            # ── 4 prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
-            pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
-            _check1_ok = bool(pname and pname.lower() != "player")
+            # ── Prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
+            _lock_msg = self._overlay_page6_check_prerequisites()
 
-            _cloud_ok = bool(
-                getattr(self.cfg, "CLOUD_ENABLED", False)
-                and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
-            )
-
-            try:
-                from ui.vps import _load_vps_mapping
-                _vps_count = len(_load_vps_mapping(self.cfg))
-            except Exception:
-                _vps_count = 0
-            _check3_ok = _vps_count > 0
-
-            _maps_cache = getattr(self, "_all_maps_cache", None)
-            _maps_ok = isinstance(_maps_cache, list) and len(_maps_cache) > 0
-
-            _all_ok = _check1_ok and _cloud_ok and _check3_ok and _maps_ok
-
-            if not _check1_ok:
-                _lock_msg = "🔒 Player Name not set – set in System tab"
-            elif not _cloud_ok:
-                _lock_msg = "🔒 Cloud Sync required – enable in System tab"
-            elif not _check3_ok:
-                _lock_msg = "🔒 No VPS-IDs assigned – assign in Available Maps tab"
-            elif not _maps_ok:
-                _lock_msg = "🔒 Available Maps not loaded – load maps first"
-            else:
-                _lock_msg = ""
-
-            if _all_ok:
+            if not _lock_msg:
                 _action_line = (
                     f"<tr><td align='center' style='padding:6px 0 6px 0;"
                     f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
@@ -1056,36 +1052,8 @@ class OverlayPagesMixin:
 
     def _overlay_page6_start_search(self):
         """Join matchmaking queue and enter SEARCHING state."""
-        # ── 4 prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
-        pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
-        _check1_ok = bool(pname and pname.lower() != "player")
-
-        _cloud_ok = bool(
-            getattr(self.cfg, "CLOUD_ENABLED", False)
-            and str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
-        )
-
-        try:
-            from .vps import _load_vps_mapping
-            _vps_count = len(_load_vps_mapping(self.cfg))
-        except Exception:
-            _vps_count = 0
-        _check3_ok = _vps_count > 0
-
-        _maps_cache = getattr(self, "_all_maps_cache", None)
-        _maps_ok = isinstance(_maps_cache, list) and len(_maps_cache) > 0
-
-        if not _check1_ok:
-            _lock_msg = "🔒 Player Name not set – set in System tab"
-        elif not _cloud_ok:
-            _lock_msg = "🔒 Cloud Sync required – enable in System tab"
-        elif not _check3_ok:
-            _lock_msg = "🔒 No VPS-IDs assigned – assign in Available Maps tab"
-        elif not _maps_ok:
-            _lock_msg = "🔒 Available Maps not loaded – load maps first"
-        else:
-            _lock_msg = ""
-
+        # ── Prerequisite checks (same as GUI _update_duel_cloud_overlays) ──
+        _lock_msg = self._overlay_page6_check_prerequisites()
         if _lock_msg:
             try:
                 self._on_mini_info_message(_lock_msg, 3, "#FF3B30")
