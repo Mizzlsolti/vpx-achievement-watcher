@@ -934,13 +934,17 @@ class OverlayPagesMixin:
                 f" color:{_tc_accent}; font-size:{fs_value}pt; font-weight:bold;'>"
                 f"{table}"
                 f"</td></tr>"
-                f"<tr><td align='center' style='padding:6px 0 2px 0;"
-                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
-                f"◀ Accept"
+                f"<tr><td align='center' style='padding:4px 0 2px 0;"
+                f" color:#FFAA00; font-size:{fs_body}pt; font-style:italic;'>"
+                f"⚠️ One game only — restarting in-game will abort the duel!"
                 f"</td></tr>"
                 f"<tr><td align='center' style='padding:2px 0 6px 0;"
-                f" font-size:{fs_action}pt; color:#888;'>"
-                f"Decline ▶"
+                f" color:#FFAA00; font-size:{fs_body}pt; font-style:italic;'>"
+                f"🔙 After the duel, close VPX or return to Popper."
+                f"</td></tr>"
+                f"<tr><td align='center' style='padding:6px 0 2px 0;"
+                f" font-size:{fs_action}pt; color:{_tc_accent}; font-weight:bold;'>"
+                f"◀ Confirm"
                 f"</td></tr>"
                 f"<tr><td align='center' style='padding:8px 0 4px 0;"
                 f" font-size:{fs_body}pt; color:#888; font-style:italic;'>"
@@ -1161,45 +1165,26 @@ class OverlayPagesMixin:
             _threading.Thread(target=duel_engine.leave_matchmaking, daemon=True).start()
 
     def _overlay_page6_accept(self):
-        """Accept the matched duel (MATCH_FOUND state → Left hotkey)."""
+        """Confirm the auto-matched duel (MATCH_FOUND state → Left hotkey).
+
+        The duel is already auto-accepted by poll_matchmaking(), so this
+        just dismisses the info display and returns to IDLE.
+        """
         if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
             return
-        duel_id    = getattr(self, "_p6_duel_id", "")
         self._p6_state = "IDLE"
-        if duel_id:
-            try:
-                self._on_inbox_accept(duel_id)
-            except Exception:
-                try:
-                    duel_engine = getattr(self, "_duel_engine", None)
-                    if duel_engine:
-                        duel_engine.accept_duel(duel_id)
-                except Exception:
-                    pass
-            try:
-                from core.sound import play_sound
-                play_sound(self.cfg, "duel_accepted")
-            except Exception:
-                pass
         if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 
     def _overlay_page6_decline(self):
-        """Decline the matched duel (MATCH_FOUND state → Right hotkey)."""
+        """Confirm/dismiss the auto-matched duel (MATCH_FOUND state → Right hotkey).
+
+        Same as accept — the duel is already auto-accepted, so Right also
+        just dismisses the info display and returns to IDLE.
+        """
         if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
             return
-        duel_id    = getattr(self, "_p6_duel_id", "")
         self._p6_state = "IDLE"
-        if duel_id:
-            try:
-                self._on_inbox_decline(duel_id)
-            except Exception:
-                try:
-                    duel_engine = getattr(self, "_duel_engine", None)
-                    if duel_engine:
-                        duel_engine.decline_duel(duel_id)
-                except Exception:
-                    pass
         if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 

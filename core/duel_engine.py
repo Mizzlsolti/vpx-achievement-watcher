@@ -972,10 +972,12 @@ class DuelEngine:
                                           opponent_name=opponent_name)
             if isinstance(result, Duel):
                 duel_id = result.duel_id
+                # Auto-accept: the challenger auto-accepts since they joined the queue voluntarily.
+                self.accept_duel(duel_id)
                 # Remove both queue entries.
                 CloudSync.set_node(self._cfg, f"duels/matchmaking/{my_id}", None)
                 CloudSync.set_node(self._cfg, f"duels/matchmaking/{pid}", None)
-                log(self._cfg, f"[DUEL] Auto-Match: duel created against {opponent_name} on {table_name}.")
+                log(self._cfg, f"[DUEL] Auto-Match: duel created and auto-accepted against {opponent_name} on {table_name}.")
                 return {"opponent_name": opponent_name, "table_name": table_name, "duel_id": duel_id}
         return {"queue_count": queue_count, "shared_tables": max_shared}
 

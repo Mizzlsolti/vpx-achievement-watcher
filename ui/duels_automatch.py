@@ -264,9 +264,33 @@ class AutoMatchWidget(QWidget):
                 except Exception:
                     pass
             self._show_result(
-                f"✅ Match found! Duel invitation sent to {opponent} on {table}",
+                f"⚔️ Auto-Match! vs {opponent} on {table}",
                 "#00E500",
             )
+            # Show systray info-only overlay when GUI is hidden.
+            try:
+                gui_visible = self._mw.isVisible() and not self._mw.isMinimized()
+                if not gui_visible:
+                    from html import escape as _html_escape
+                    msg = (
+                        "<div style='text-align:center'>"
+                        f"⚔️ Auto-Match found!<br>"
+                        f"🎰 <b>{_html_escape(table)}</b><br>"
+                        f"⚔️ Opponent: <b>{_html_escape(opponent)}</b><br>"
+                        f"⚠️ One game only — restarting in-game will abort the duel!<br>"
+                        f"🔙 After the duel, close VPX or return to Popper.<br><br>"
+                        f"<small>Press left ← to confirm</small>"
+                        "</div>"
+                    )
+                    ov = self._mw._get_duel_overlay()
+                    ov.show_info(msg, seconds=0)
+                    from ui.overlay_base import _force_topmost
+                    _force_topmost(ov)
+                    from PyQt6.QtCore import QTimer
+                    QTimer.singleShot(200, lambda: _force_topmost(ov))
+                    self._mw._automatch_notify_state = {"duel_id": duel_id}
+            except Exception:
+                pass
             # Notify Trophie.
             try:
                 trophie = getattr(self._mw, "_trophie_gui", None)
