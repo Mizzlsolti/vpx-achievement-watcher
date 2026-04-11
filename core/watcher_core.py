@@ -121,6 +121,56 @@ TABLE_EMOJI_KEYWORDS: dict[str, str] = {
     "junk":        "♻️",  "wreck":      "💥",
     "cat":         "🐱",  "panther":    "🐆",
     "whirlwind":   "🌪️",  "storm":      "⛈️",  "tornado":   "🌪️",
+    # Superhero / Comics
+    "batman":      "🦇",  "spider":     "🕷️",  "superman":  "🦸",
+    "hulk":        "💪",  "avenger":    "🦸",  "deadpool":  "💀",
+    "iron man":    "🤖",  "x-men":      "⚡",  "wolverine": "🐺",
+    "joker":       "🃏",
+    # Sci-Fi / Film
+    "jurassic":    "🦕",  "dino":       "🦖",  "tron":      "🕹️",
+    "trek":        "🖖",  "wars":       "⚔️",  "godzilla":  "🦎",
+    "movie":       "🎬",  "hollywood":  "🌟",
+    # Horror / Dark
+    "zombie":      "🧟",  "walking dead":"🧟", "freddy":    "🔪",
+    "frankenstein":"🧪",  "creature":   "🐊",  "swamp":     "🌿",
+    "witch":       "🧹",  "devil":      "😈",  "demon":     "😈",
+    "skull":       "💀",
+    # Sport
+    "baseball":    "⚾",  "golf":       "⛳",  "tennis":    "🎾",
+    "boxing":      "🥊",  "wrestl":     "🤼",  "hockey":    "🏒",
+    "bowling":     "🎳",  "soccer":     "⚽",  "olympic":   "🏅",
+    "champion":    "🏆",
+    # Animals
+    "eagle":       "🦅",  "bird":       "🐦",  "wolf":      "🐺",
+    "bear":        "🐻",  "horse":      "🐎",  "bull":      "🐂",
+    "snake":       "🐍",  "lion":       "🦁",  "tiger":     "🐅",
+    "monkey":      "🐒",
+    # Nature / Elements
+    "water":       "💧",  "ice":        "❄️",  "snow":      "❄️",
+    "moon":        "🌙",  "sun":        "☀️",  "night":     "🌙",
+    "volcano":     "🌋",  "lava":       "🌋",  "river":     "🌊",
+    "thunder":     "⚡",  "lightning":  "⚡",
+    # War / Action / Military
+    "army":        "🪖",  "soldier":    "🪖",  "war":       "⚔️",
+    "bomb":        "💣",  "gun":        "🔫",  "fighter":   "✈️",
+    "sword":       "🗡️",  "ninja":      "🥷",  "samurai":   "⚔️",
+    # Royalty / Classic
+    "king":        "👑",  "queen":      "👸",  "crown":     "👑",
+    "diamond":     "💎",  "jewel":      "💎",  "crystal":   "🔮",
+    "ruby":        "💎",  "pharaoh":    "🏛️",  "egypt":     "🏛️",
+    "pyramid":     "🔺",  "roman":      "🏛️",  "gladiator": "⚔️",
+    # Entertainment / Show
+    "theater":     "🎭",  "theatre":    "🎭",  "show":      "🎪",
+    "dance":       "💃",  "disco":      "🕺",
+    # Transport
+    "train":       "🚂",  "airplane":   "✈️",  "flight":    "✈️",
+    "ship":        "🚢",  "submarine":  "🤿",  "boat":      "⛵",
+    # Miscellaneous
+    "prison":      "🔒",  "jail":       "🔒",  "money":     "💵",
+    "bank":        "🏦",  "tower":      "🗼",  "bridge":    "🌉",
+    "christmas":   "🎄",  "halloween":  "🎃",  "love":      "❤️",
+    "heart":       "❤️",  "pinbot":     "🤖",  "pool":      "🎱",
+    "bounty":      "🤠",  "hunter":     "🏹",
 }
 
 MANUFACTURER_EMOJI: dict[str, str] = {
