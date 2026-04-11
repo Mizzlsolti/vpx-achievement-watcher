@@ -48,11 +48,11 @@ _DUEL_CANDIDATE_MESSAGES = [
     "🚫 Your duel on Medieval Madness was cancelled.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "Cannot accept duel while VPX is running.<br><span style='color:#DDDDDD;'>closing in 5…</span>",
     "❌ Duel cancelled – Table 'Medieval Madness' is not available.<br><span style='color:#DDDDDD;'>closing in 6…</span>",
-    "🏆 Tournament started!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your first match: against <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left [← Duel Accept] to confirm</small>",
-    "💀 Eliminated in the semifinal<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left [← Duel Accept] to confirm</small>",
-    "🏆 FINAL!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your opponent: <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left [← Duel Accept] to confirm</small>",
-    "🏆 TOURNAMENT CHAMPION!<br>🎰 <b>Medieval Madness</b><br><br>You won the tournament!<br><br><small>Press left [← Duel Accept] to confirm</small>",
-    "💀 Final lost – Place #2<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left [← Duel Accept] to confirm</small>",
+    "🏆 Tournament started!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your first match: against <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left ← to confirm</small>",
+    "💀 Eliminated in the semifinal<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left ← to confirm</small>",
+    "🏆 FINAL!<br>🎰 <b>Medieval Madness</b><br><br>⚔️ Your opponent: <b>xPinballWizard</b><br>⏳ You have 2 hours to play<br><br><small>Press left ← to confirm</small>",
+    "🏆 TOURNAMENT CHAMPION!<br>🎰 <b>Medieval Madness</b><br><br>You won the tournament!<br><br><small>Press left ← to confirm</small>",
+    "💀 Final lost – Place #2<br>🎰 <b>Medieval Madness</b><br><br><b>xPinballWizard</b> wins with 42,069,000<br>Your score: 38,500,000<br><br><small>Press left ← to confirm</small>",
 ]
 
 

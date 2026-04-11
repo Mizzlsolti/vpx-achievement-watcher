@@ -52,7 +52,7 @@ TOURNAMENT_MATCH_TTL = 7200   # 2 hours  – per-match duel lifetime
 TOURNAMENT_SIZE      = 4      # fixed 4-player bracket
 TOURNAMENT_TTL       = 14400  # 4 hours  – active tournament lifetime (2h SF + 2h final)
 
-_CONFIRM_HINT = "<small>Press left [← Duel Accept] to confirm</small>"
+_CONFIRM_HINT = "<small>Press left ← to confirm</small>"
 
 
 def _clean_table_name(raw: str) -> str:

@@ -57,7 +57,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br><br>"
             "⚔️ Your first match: against <b>xPinballWizard</b><br>"
             "⏳ You have 2 hours to play<br><br>"
-            "<small>Press left [← Duel Accept] to confirm</small>"
+            "<small>Press left ← to confirm</small>"
             "</div>",
             None
         ),
@@ -67,7 +67,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br><br>"
             "<b>xPinballWizard</b> wins with 42,069,000<br>"
             "Your score: 38,500,000<br><br>"
-            "<small>Press left [← Duel Accept] to confirm</small>"
+            "<small>Press left ← to confirm</small>"
             "</div>",
             None
         ),
@@ -77,7 +77,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br><br>"
             "⚔️ Your opponent: <b>xPinballWizard</b><br>"
             "⏳ You have 2 hours to play<br><br>"
-            "<small>Press left [← Duel Accept] to confirm</small>"
+            "<small>Press left ← to confirm</small>"
             "</div>",
             None
         ),
@@ -86,7 +86,7 @@ class OverlaysMixin:
             "🏆 TOURNAMENT CHAMPION!<br>"
             "🎰 <b>Medieval Madness</b><br><br>"
             "You won the tournament!<br><br>"
-            "<small>Press left [← Duel Accept] to confirm</small>"
+            "<small>Press left ← to confirm</small>"
             "</div>",
             None
         ),
@@ -96,7 +96,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br><br>"
             "<b>xPinballWizard</b> wins with 42,069,000<br>"
             "Your score: 38,500,000<br><br>"
-            "<small>Press left [← Duel Accept] to confirm</small>"
+            "<small>Press left ← to confirm</small>"
             "</div>",
             None
         ),
