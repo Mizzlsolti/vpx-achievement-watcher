@@ -29,10 +29,11 @@ class OverlaysMixin:
         ),
         (
             "<div style='text-align:center'>"
-            "⚔️ Duel active against <b>xPinballWizard</b>!<br>"
+            "⚔️ Duel against <b>xPinballWizard</b><br>"
             "🎰 <b>Medieval Madness</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper."
+            "🔙 After the duel, close VPX or return to Popper.<br>"
+            "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
             "</div>",
             None
         ),
@@ -260,6 +261,17 @@ class OverlaysMixin:
                 self._status_overlay.hide()
         except Exception:
             pass
+        # Clear any pending in-game duel Accept/Later overlay so the duel stays
+        # ACCEPTED and the overlay reappears on the next VPX start.
+        try:
+            if getattr(self, "_duel_ingame_notify_state", None) is not None:
+                self._duel_ingame_notify_state = None
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _nav_binding_label_text(self, kind: str) -> str:
         if kind == "left":
@@ -303,6 +315,56 @@ class OverlaysMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
+        # If an in-game duel Accept/Later overlay is showing, Left = Accept.
+        try:
+            ig_state = getattr(self, "_duel_ingame_notify_state", None)
+            if ig_state is not None:
+                rom = ig_state.get("rom", "")
+                duel = ig_state.get("duel")
+                # Activate the duel session.
+                try:
+                    w = getattr(self, "watcher", None)
+                    if w is not None:
+                        w.duel_active_for_current_table = True
+                except Exception:
+                    pass
+                # Capture NVRAM "Games Started" baseline.
+                try:
+                    w = getattr(self, "watcher", None)
+                    if w and rom:
+                        baseline_gs = -1
+                        _ba, _, _ = w.read_nvram_audits_with_autofix(rom)
+                        for _k in self._DUEL_GAMES_STARTED_KEYS:
+                            _v = w._nv_get_int_ci(_ba, _k, -1)
+                            if _v >= 0:
+                                baseline_gs = _v
+                                break
+                        self._duel_baseline_games_started = baseline_gs
+                        self._duel_baseline_rom = rom
+                except Exception:
+                    self._duel_baseline_games_started = -1
+                    self._duel_baseline_rom = rom
+                # Record session start timestamp.
+                import time as _t
+                self._duel_session_start_ts = _t.time()
+                # Mark the duel as started for restart detection.
+                if not hasattr(self, "_duel_games_played"):
+                    self._duel_games_played = {}
+                duel_id = ig_state.get("duel_id", "")
+                self._duel_games_played[duel_id] = 1
+                # Clear state and hide overlay.
+                self._duel_ingame_notify_state = None
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left ingame duel accept failed: {e}", "WARN")
+            except Exception:
+                pass
         # If a duel invite notification is showing in the duel overlay, Left = Accept directly.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
@@ -383,6 +445,22 @@ class OverlaysMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
+        # If an in-game duel Accept/Later overlay is showing, Right = Later (dismiss).
+        try:
+            ig_state = getattr(self, "_duel_ingame_notify_state", None)
+            if ig_state is not None:
+                self._duel_ingame_notify_state = None
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_right ingame duel later failed: {e}", "WARN")
+            except Exception:
+                pass
         # If a duel invite notification is showing in the duel overlay, Right = "Later" (dismiss without declining).
         # The invitation stays PENDING and the overlay reappears on the next poll cycle.
         try:
