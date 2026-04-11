@@ -1,6 +1,8 @@
 """ui/overlay_duel.py – DuelInfoOverlay: dedicated overlay for all duel/tournament messages."""
 from __future__ import annotations
 
+import re
+
 from PyQt6.QtWidgets import QApplication, QWidget, QLabel
 from PyQt6.QtCore import Qt, QTimer, QRect, QPoint
 from PyQt6.QtGui import (
@@ -31,17 +33,17 @@ _DUEL_MAX_TEXT_W = 520
 # Candidate messages used for size computation — kept in sync with the picker.
 _DUEL_CANDIDATE_MESSAGES = [
     "⚔️ Duel active against xPinballWizard!<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br><span style='color:#DDDDDD;'>closing in 20…</span>",
-    "⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>[✅ Accept] / Decline<br><small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>",
-    "🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>←  [✅ Accept]  /  ⏰ Later  →",
+    "🏆 DUEL WON!<br>You: 42,069,000 vs Opponent: 38,500,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "💀 DUEL LOST.<br>You: 38,500,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "🤝 TIE!<br>You: 42,069,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "⏰ Duel expired — no response received.<br><span style='color:#DDDDDD;'>closing in 6…</span>",
-    "⏳ Score submitted! Waiting for opponent's score...<br><span style='color:#DDDDDD;'>closing in 10…</span>",
-    "⚠️ Duel aborted: Session too short.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "⚠️ Duel aborted: VPX restarted during active duel. Only one attempt allowed!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "⚠️ Duel aborted: Multiple games detected in single VPX session. Only one game per duel allowed!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "✅ 'xPinballWizard' accepted your duel on Medieval Madness!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
-    "❌ 'xPinballWizard' declined your duel on Medieval Madness.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "⏳ Score submitted!<br>Waiting for opponent's score...<br><span style='color:#DDDDDD;'>closing in 10…</span>",
+    "⚠️ Duel aborted:<br>Session too short.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "⚠️ Duel aborted:<br>VPX restarted during active duel. Only one attempt allowed!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "⚠️ Duel aborted:<br>Multiple games detected in single VPX session. Only one game per duel allowed!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "✅ 'xPinballWizard' accepted your duel<br>on Medieval Madness!<br><span style='color:#DDDDDD;'>closing in 8…</span>",
+    "❌ 'xPinballWizard' declined your duel<br>on Medieval Madness.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "⏰ Your duel invitation on Medieval Madness expired (not accepted).<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "🚫 Your duel on Medieval Madness was cancelled.<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "Cannot accept duel while VPX is running.<br><span style='color:#DDDDDD;'>closing in 5…</span>",
@@ -196,7 +198,10 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
             .replace(";", "").replace("<", "").replace(">", "")
         )
 
-        # Determine message colour (may animate via ColorMorph)
+        # Theme accent colour — always used for the first line (title)
+        accent = get_theme_color(self.parent_gui.cfg, "accent")
+
+        # Determine body message colour (may animate via ColorMorph)
         if self._is_fx_enabled("fx_duel_color_morph") and self._color_morph.is_active():
             msg_color = self._color_morph.current_color()
         else:
@@ -220,12 +225,31 @@ class DuelInfoOverlay(_OverlayFxMixin, QWidget):
             _stripped.startswith("<div") or _stripped.startswith("<p") or _stripped.startswith("<span")
         ) and ("</" in msg or "<br" in msg)
         if _is_html:
-            # Already HTML – use as-is; apply font/size via the outer div only
-            inner = msg
+            # Already HTML — colour the first line (before the first <br>) in accent.
+            # Insert accent span inside the opening tag, wrapping only the title text.
+            br_match = re.search(r"<br\s*/?>", msg)
+            if br_match:
+                tag_end_idx = msg.find(">") + 1
+                title_part = msg[tag_end_idx:br_match.start()]
+                inner = (
+                    msg[:tag_end_idx]
+                    + f"<span style='color:{accent};'>{title_part}</span>"
+                    + msg[br_match.start():]
+                )
+            else:
+                inner = f"<span style='color:{accent};'>{msg}</span>"
         else:
-            # Plain text – convert newlines and apply colour
-            safe = msg.replace("\n", "<br>")
-            inner = f"<span style='color:{msg_color};'>{safe}</span>"
+            # Plain text — split at first newline; title in accent, rest in msg_color
+            if "\n" in msg:
+                first_line, rest = msg.split("\n", 1)
+                safe_rest = rest.replace("\n", "<br>")
+                inner = (
+                    f"<span style='color:{accent};'>{first_line}</span><br>"
+                    f"<span style='color:{msg_color};'>{safe_rest}</span>"
+                )
+            else:
+                # Single line — entire message in accent
+                inner = f"<span style='color:{accent};'>{msg}</span>"
 
         return (
             f"<div style='font-size:{pt}pt;font-family:\"{fam}\";text-align:center;color:{msg_color};'>"

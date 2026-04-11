@@ -1318,13 +1318,13 @@ class DuelsMixin:
         """
         try:
             if result == "won":
-                msg = f"🏆 DUEL WON! You: {your_score:,} vs Opponent: {their_score:,}"
+                msg = f"🏆 DUEL WON!\nYou: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#00CC44"
             elif result == "lost":
-                msg = f"💀 DUEL LOST. You: {your_score:,} vs Opponent: {their_score:,}"
+                msg = f"💀 DUEL LOST.\nYou: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#CC2200"
             elif result == "tie":
-                msg = f"🤝 TIE! You: {your_score:,} vs Opponent: {their_score:,}"
+                msg = f"🤝 TIE!\nYou: {your_score:,} vs Opponent: {their_score:,}"
                 color = "#FF7F00"
             else:
                 msg = "⏰ Duel expired \u2014 no response received."
@@ -1512,10 +1512,10 @@ class DuelsMixin:
                     )
                 for duel in changed_duels:
                     if duel.status == DuelStatus.ACCEPTED:
-                        msg = f"✅ '{duel.opponent_name or 'Opponent'}' accepted your duel on {_get_duel_table_display(duel)}!"
+                        msg = f"✅ '{duel.opponent_name or 'Opponent'}' accepted your duel\non {_get_duel_table_display(duel)}!"
                         color = "#00E500"
                     elif duel.status == DuelStatus.DECLINED:
-                        msg = f"❌ '{duel.opponent_name or 'Opponent'}' declined your duel on {_get_duel_table_display(duel)}."
+                        msg = f"❌ '{duel.opponent_name or 'Opponent'}' declined your duel\non {_get_duel_table_display(duel)}."
                         color = "#CC0000"
                     elif duel.status == DuelStatus.EXPIRED:
                         msg = f"⏰ Your duel invitation on {_get_duel_table_display(duel)} expired (not accepted)."
@@ -1955,7 +1955,7 @@ class DuelsMixin:
                     w = getattr(self, "watcher", None)
                     if w:
                         w.bridge.duel_info_show.emit(
-                            "⚠️ Duel aborted: VPX restarted during active duel. Only one attempt allowed!",
+                            "⚠️ Duel aborted:\nVPX restarted during active duel. Only one attempt allowed!",
                             8, "#FF3B30",
                         )
                 except Exception:
@@ -2106,7 +2106,7 @@ class DuelsMixin:
                 except Exception:
                     pass
             self._duel_notify(
-                "⚠️ Duel aborted: Session too short.",
+                "⚠️ Duel aborted:\nSession too short.",
                 "#FFAA00", 8,
             )
             self._notify_trophies_duel_aborted()
@@ -2151,7 +2151,7 @@ class DuelsMixin:
                             except Exception:
                                 pass
                         self._duel_notify(
-                            "⚠️ Duel aborted: Multiple games detected in single VPX session."
+                            "⚠️ Duel aborted:\nMultiple games detected in single VPX session."
                             " Only one game per duel allowed!",
                             "#FF3B30", 8,
                         )
@@ -2197,7 +2197,7 @@ class DuelsMixin:
             if pending:
                 # Inform the player — use DuelInfoOverlay directly so the
                 # message shows even though VPX is no longer running.
-                waiting_msg = "⏳ Score submitted! Waiting for opponent's score..."
+                waiting_msg = "⏳ Score submitted!\nWaiting for opponent's score..."
                 try:
                     ov = self._get_duel_overlay()
                     ov.show_info(waiting_msg, seconds=10)
@@ -2278,13 +2278,13 @@ class DuelsMixin:
                 # Show result notification via DuelInfoOverlay (suppressed when VPX is running)
                 try:
                     if result == "won":
-                        res_msg = f"🏆 DUEL WON! You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_msg = f"🏆 DUEL WON!\nYou: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#00CC44"
                     elif result == "tie":
-                        res_msg = f"🤝 TIE! You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_msg = f"🤝 TIE!\nYou: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#FF7F00"
                     else:
-                        res_msg = f"💀 DUEL LOST. You: {my_score:,} vs Opponent: {opp_score:,}"
+                        res_msg = f"💀 DUEL LOST.\nYou: {my_score:,} vs Opponent: {opp_score:,}"
                         res_color = "#CC2200"
                     self._duel_notify(res_msg, res_color, seconds=10, skip_vpx_check=True)
                 except Exception:
