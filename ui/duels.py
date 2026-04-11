@@ -1921,9 +1921,8 @@ class DuelsMixin:
         """Called when VPX starts a game session.
 
         Checks whether an ACCEPTED or ACTIVE duel exists for the current ROM.
-        If so, sets ``watcher.duel_active_for_current_table = True`` to block
-        achievements, challenges and the main overlay for this session, and
-        shows a brief in-game notification via DuelInfoOverlay.
+        If so, shows a persistent interactive overlay (Accept / Later) and
+        waits for the user to press Accept before activating the duel.
         """
         if not rom:
             return
@@ -1940,41 +1939,38 @@ class DuelsMixin:
             return
 
         # Track how many times each duel has been started; abort on restart.
+        # Only count restarts for duels that were previously accepted in-game.
         if not hasattr(self, "_duel_games_played"):
             self._duel_games_played = {}
         for duel in list(matching):
-            count = self._duel_games_played.get(duel.duel_id, 0) + 1
-            self._duel_games_played[duel.duel_id] = count
-            if count > 1:
-                try:
-                    self._duel_engine.abort_duel(duel.duel_id, reason="multiple_restarts")
-                except Exception:
-                    pass
-                try:
-                    w = getattr(self, "watcher", None)
-                    if w:
-                        w.bridge.duel_info_show.emit(
-                            "⚠️ Duel aborted:\nVPX restarted during active duel. Only one attempt allowed!",
-                            8, "#FF3B30",
-                        )
-                except Exception:
-                    pass
-                matching = [d for d in matching if d.duel_id != duel.duel_id]
+            count = self._duel_games_played.get(duel.duel_id, 0)
+            if count > 0:
+                # This duel was previously accepted — increment and check.
+                count += 1
+                self._duel_games_played[duel.duel_id] = count
+                if count > 1:
+                    try:
+                        self._duel_engine.abort_duel(duel.duel_id, reason="multiple_restarts")
+                    except Exception:
+                        pass
+                    try:
+                        w = getattr(self, "watcher", None)
+                        if w:
+                            w.bridge.duel_info_show.emit(
+                                "⚠️ Duel aborted:\nVPX restarted during active duel. Only one attempt allowed!",
+                                8, "#FF3B30",
+                            )
+                    except Exception:
+                        pass
+                    matching = [d for d in matching if d.duel_id != duel.duel_id]
 
         if not matching:
             return
 
-        # Flag the watcher so achievements/overlay are suppressed this session.
-        try:
-            w = getattr(self, "watcher", None)
-            if w is not None:
-                w.duel_active_for_current_table = True
-        except Exception:
-            pass
+        # Do NOT set duel_active_for_current_table here — wait for user to
+        # press Accept in the overlay.
 
-        # Show in-game notification via DuelInfoOverlay — but wait until the VP
-        # player window is actually visible (same retry pattern as the "No NVRAM
-        # map" notification in ui_challenges.py).
+        # Prepare the interactive overlay (same style as the invite overlay).
         duel = matching[0]
         my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
         is_challenger = (duel.challenger == my_id)
@@ -1982,30 +1978,25 @@ class DuelsMixin:
         table_display = _get_duel_table_display(duel, getattr(self, "watcher", None))
         msg = (
             "<div style='text-align:center'>"
-            f"⚔️ Duel active against {opponent_name}!<br>"
-            f"🎰 {table_display}<br>"
+            f"⚔️ Duel against <b>{_html_escape(opponent_name)}</b><br>"
+            f"🎰 <b>{_html_escape(table_display)}</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
-            "🔙 After the duel, close VPX or return to Popper."
+            "🔙 After the duel, close VPX or return to Popper.<br>"
+            "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
             "</div>"
         )
 
-        # Capture NVRAM "Games Started" baseline so we can detect in-game
-        # restarts (F3 / VPX menu) at session end.
-        baseline_gs = -1
-        try:
-            w = getattr(self, "watcher", None)
-            if w:
-                _ba, _, _ = w.read_nvram_audits_with_autofix(rom)
-                for _k in self._DUEL_GAMES_STARTED_KEYS:
-                    _v = w._nv_get_int_ci(_ba, _k, -1)
-                    if _v >= 0:
-                        baseline_gs = _v
-                        break
-        except Exception:
-            pass
-        self._duel_baseline_games_started = baseline_gs
-        self._duel_baseline_rom = rom
+        # Store pending state so the nav handlers can activate or dismiss.
+        self._duel_ingame_notify_state = {
+            "duel_id":       duel.duel_id,
+            "duel":          duel,
+            "rom":           rom,
+            "opponent_name": opponent_name,
+            "table_display": table_display,
+            "msg":           msg,
+        }
 
+        # Show the overlay after VPX player window appears.
         def _duel_notify_worker():
             try:
                 import win32gui
@@ -2053,15 +2044,13 @@ class DuelsMixin:
 
             if detected:
                 time.sleep(3)  # extra wait so the table finishes rendering
+            # Show persistent overlay (seconds=0) — no auto-close.
             try:
-                self.bridge.duel_info_show.emit(msg, 20, "")
+                self.bridge.duel_info_show.emit(msg, 0, "")
             except Exception:
                 pass
 
         threading.Thread(target=_duel_notify_worker, daemon=True, name="DuelStartNotify").start()
-
-        # Capture session start timestamp.
-        self._duel_session_start_ts = time.time()
 
     # ── Session-ended hook: submit duel scores ─────────────────────────────────
 
@@ -2084,6 +2073,17 @@ class DuelsMixin:
         """
         if not rom:
             return
+
+        # If the user never pressed Accept (or pressed Later), this is not a
+        # duel session — skip all duel score submission logic.
+        try:
+            w = getattr(self, "watcher", None)
+            if w is not None and not getattr(w, "duel_active_for_current_table", False):
+                # Clear any lingering in-game overlay state.
+                self._duel_ingame_notify_state = None
+                return
+        except Exception:
+            pass
         rom_lower = rom.lower().strip()
         try:
             active = self._duel_engine.get_active_duels()
