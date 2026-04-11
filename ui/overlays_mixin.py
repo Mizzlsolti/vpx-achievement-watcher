@@ -263,15 +263,12 @@ class OverlaysMixin:
             pass
         # Clear any pending in-game duel Accept/Later overlay so the duel stays
         # ACCEPTED and the overlay reappears on the next VPX start.
-        try:
-            if getattr(self, "_duel_ingame_notify_state", None) is not None:
-                self._duel_ingame_notify_state = None
-                try:
-                    self._get_duel_overlay().hide()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        if getattr(self, "_duel_ingame_notify_state", None) is not None:
+            self._duel_ingame_notify_state = None
+            try:
+                self._get_duel_overlay().hide()
+            except Exception:
+                pass
 
     def _nav_binding_label_text(self, kind: str) -> str:
         if kind == "left":
@@ -320,17 +317,15 @@ class OverlaysMixin:
             ig_state = getattr(self, "_duel_ingame_notify_state", None)
             if ig_state is not None:
                 rom = ig_state.get("rom", "")
-                duel = ig_state.get("duel")
                 # Activate the duel session.
+                w = getattr(self, "watcher", None)
                 try:
-                    w = getattr(self, "watcher", None)
                     if w is not None:
                         w.duel_active_for_current_table = True
                 except Exception:
                     pass
                 # Capture NVRAM "Games Started" baseline.
                 try:
-                    w = getattr(self, "watcher", None)
                     if w and rom:
                         baseline_gs = -1
                         _ba, _, _ = w.read_nvram_audits_with_autofix(rom)
