@@ -31,7 +31,7 @@ _DUEL_MAX_TEXT_W = 520
 # Candidate messages used for size computation — kept in sync with the picker.
 _DUEL_CANDIDATE_MESSAGES = [
     "⚔️ Duel active against xPinballWizard!<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br><span style='color:#DDDDDD;'>closing in 20…</span>",
-    "⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>[✅ Accept] / Decline<br><small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>",
+    "⚔️ Duel from xPinballWizard<br>🎰 Medieval Madness<br>⚠️ One game only — restarting in-game will abort the duel!<br>🔙 After the duel, close VPX or return to Popper.<br>←  [✅ Accept]  /  ⏰ Later  →",
     "🏆 DUEL WON! You: 42,069,000 vs Opponent: 38,500,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "💀 DUEL LOST. You: 38,500,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
     "🤝 TIE! You: 42,069,000 vs Opponent: 42,069,000<br><span style='color:#DDDDDD;'>closing in 8…</span>",
