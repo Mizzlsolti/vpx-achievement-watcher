@@ -1167,8 +1167,9 @@ class OverlayPagesMixin:
     def _overlay_page6_accept(self):
         """Confirm the auto-matched duel (MATCH_FOUND state → Left hotkey).
 
-        The duel is already auto-accepted by poll_matchmaking(), so this
-        just dismisses the info display and returns to IDLE.
+        The duel is already auto-accepted (by poll_matchmaking() for the
+        challenger, or by _poll_duel_invitations() for the receiver), so
+        this just dismisses the info display and returns to IDLE.
         """
         if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
             return

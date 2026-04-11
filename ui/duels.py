@@ -1529,7 +1529,10 @@ class DuelsMixin:
                 if automatch_active:
                     # Auto-accept all new duels (player voluntarily joined the queue).
                     for duel in new_duels:
-                        self._duel_engine.accept_duel(duel.duel_id)
+                        try:
+                            self._duel_engine.accept_duel(duel.duel_id)
+                        except Exception:
+                            pass
                     # Stop the automatch search.
                     try:
                         if automatch_gui and aw is not None:
