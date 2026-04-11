@@ -1197,7 +1197,7 @@ class DuelsMixin:
         Parameters
         ----------
         focused : int
-            ``0`` to visually highlight *Accept*, ``1`` to highlight *Decline*.
+            ``0`` to visually highlight *Accept*, ``1`` to highlight *Later*.
         """
         state = getattr(self, "_duel_invite_notify_state", None)
         if state is None:
@@ -1213,19 +1213,18 @@ class DuelsMixin:
         except Exception:
             pass
         if focused == 0:
-            accept_part  = "<b>[✅ Accept]</b>"
-            decline_part = "Decline"
+            accept_part = "<b>[✅ Accept]</b>"
+            later_part  = "⏰ Later"
         else:
-            accept_part  = "Accept"
-            decline_part = "<b>[❌ Decline]</b>"
+            accept_part = "✅ Accept"
+            later_part  = "<b>[⏰ Later]</b>"
         return (
             "<div style='text-align:center'>"
             f"⚔️ Duel from <b>{opponent}</b><br>"
             f"🎰 <b>{table}</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
             "🔙 After the duel, close VPX or return to Popper.<br>"
-            f"{accept_part} / {decline_part}<br>"
-            f"<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
+            f"←  {accept_part}  /  {later_part}  →"
             "</div>"
         )
 

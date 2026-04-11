@@ -23,8 +23,7 @@ class OverlaysMixin:
             "🎰 <b>Medieval Madness</b><br>"
             "⚠️ One game only — restarting in-game will abort the duel!<br>"
             "🔙 After the duel, close VPX or return to Popper.<br>"
-            "<b>[✅ Accept]</b> / Decline<br>"
-            "<small>Use your Duel Accept / Decline keys bound in the Controls tab.</small>"
+            "←  <b>[✅ Accept]</b>  /  ⏰ Later  →"
             "</div>",
             None
         ),
@@ -384,27 +383,16 @@ class OverlaysMixin:
             self._last_ch_nav_ts = now
         except Exception:
             pass
-        # If a duel invite notification is showing in the duel overlay, Right = Decline directly.
+        # If a duel invite notification is showing in the duel overlay, Right = "Later" (dismiss without declining).
+        # The invitation stays PENDING and the overlay reappears on the next poll cycle.
         try:
             state = getattr(self, "_duel_invite_notify_state", None)
             if state is not None:
-                duel_id = state.get("duel_id")
-                if not hasattr(self, "_duel_invite_handled_ids"):
-                    self._duel_invite_handled_ids = set()
-                self._duel_invite_handled_ids.add(duel_id)
                 self._duel_invite_notify_cancel()
                 try:
                     self._get_duel_overlay().hide()
                 except Exception:
                     pass
-                try:
-                    self._on_inbox_decline(duel_id)
-                except Exception as e:
-                    try:
-                        from core.watcher_core import log
-                        log(self.cfg, f"[NAV] _on_nav_right inbox decline failed: {e}", "WARN")
-                    except Exception:
-                        pass
                 return
         except Exception as e:
             try:
