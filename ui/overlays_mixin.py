@@ -35,6 +35,17 @@ class OverlaysMixin:
             "</div>",
             None
         ),
+        (
+            "<div style='text-align:center'>"
+            "⚔️ Auto-Match found!<br>"
+            "🎰 <b>Medieval Madness</b><br>"
+            "⚔️ Opponent: <b>xPinballWizard</b><br>"
+            "⚠️ One game only — restarting in-game will abort the duel!<br>"
+            "🔙 After the duel, close VPX or return to Popper.<br><br>"
+            "<small>Press left ← to confirm</small>"
+            "</div>",
+            None
+        ),
         ("🏆 DUEL WON!\nYou: 42,069,000 vs Opponent: 38,500,000", "#00CC44"),
         ("💀 DUEL LOST.\nYou: 38,500,000 vs Opponent: 42,069,000", "#CC2200"),
         ("🤝 TIE!\nYou: 42,069,000 vs Opponent: 42,069,000", "#FF7F00"),
@@ -405,6 +416,22 @@ class OverlaysMixin:
             try:
                 from core.watcher_core import log
                 log(self.cfg, f"[NAV] _on_nav_left tournament notify handling failed: {e}", "WARN")
+            except Exception:
+                pass
+        # If an automatch notification is showing, Left = confirm/dismiss (info-only).
+        try:
+            am_state = getattr(self, "_automatch_notify_state", None)
+            if am_state is not None:
+                self._automatch_notify_state = None
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[NAV] _on_nav_left automatch notify handling failed: {e}", "WARN")
             except Exception:
                 pass
         # Page 5 (Score Duels): intercept Left for duel actions.

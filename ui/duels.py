@@ -1191,6 +1191,62 @@ class DuelsMixin:
 
     # ── Helpers: duel invite notification overlay ─────────────────────────────
 
+    @pyqtSlot(str, str, str)
+    def _on_automatch_received(self, opponent: str, table_name: str, duel_id: str) -> None:
+        """Handle an auto-matched duel (already accepted).
+
+        Shows an info-only notification (no Accept/Decline) since the player
+        voluntarily joined the queue.  GUI visible → status label,
+        GUI in systray → persistent DuelInfoOverlay with ← Confirm.
+        """
+        # Refresh tables so the new duel appears.
+        self._refresh_invitation_inbox()
+        self._refresh_active_duels()
+
+        # Resolve clean table display name.
+        table_display = table_name
+        try:
+            for d in self._duel_engine.get_active_duels():
+                if d.duel_id == duel_id:
+                    table_display = _get_duel_table_display(d, getattr(self, "watcher", None))
+                    break
+        except Exception:
+            pass
+
+        gui_visible = self.isVisible() and not self.isMinimized()
+        if gui_visible:
+            self._lbl_duel_status.setText(f"⚔️ Auto-Match! vs {opponent} on {table_display}")
+            self._lbl_duel_status.setStyleSheet("color:#00E500; font-style:italic;")
+        else:
+            # Persistent info overlay with ← Confirm (same pattern as Tournament).
+            msg = (
+                "<div style='text-align:center'>"
+                f"⚔️ Auto-Match found!<br>"
+                f"🎰 <b>{_html_escape(table_display)}</b><br>"
+                f"⚔️ Opponent: <b>{_html_escape(opponent)}</b><br>"
+                f"⚠️ One game only — restarting in-game will abort the duel!<br>"
+                f"🔙 After the duel, close VPX or return to Popper.<br><br>"
+                f"<small>Press left ← to confirm</small>"
+                "</div>"
+            )
+            try:
+                ov = self._get_duel_overlay()
+                ov.show_info(msg, seconds=0)
+                from ui.overlay_base import _force_topmost
+                _force_topmost(ov)
+                QTimer.singleShot(200, lambda: _force_topmost(ov))
+            except Exception:
+                pass
+            # Store state so _on_nav_left can dismiss it (same pattern as tournament).
+            self._automatch_notify_state = {"duel_id": duel_id}
+
+        # Play match-found sound.
+        try:
+            from core.sound import play_sound
+            play_sound(self.cfg, "duel_received")
+        except Exception:
+            pass
+
     def _duel_invite_notify_text(self, focused: int) -> str:
         """Return the HTML message string for the duel invite notification.
 
@@ -1464,24 +1520,47 @@ class DuelsMixin:
             changed_duels = self._duel_engine.sync_active_duel_states()
             from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
             if new_duels:
-                # If automatch widget is searching, stop it (received invitation = match found by other side).
-                try:
-                    aw = getattr(self, "_automatch_widget", None)
-                    if aw is not None and getattr(aw, "_searching", False):
+                # Check if automatch is active (GUI widget or overlay page 6).
+                aw = getattr(self, "_automatch_widget", None)
+                automatch_gui = aw is not None and getattr(aw, "_searching", False)
+                automatch_overlay = getattr(self, "_p6_state", "IDLE") == "SEARCHING"
+                automatch_active = automatch_gui or automatch_overlay
+
+                if automatch_active:
+                    # Auto-accept all new duels (player voluntarily joined the queue).
+                    for duel in new_duels:
+                        try:
+                            self._duel_engine.accept_duel(duel.duel_id)
+                        except Exception:
+                            pass
+                    # Stop the automatch search.
+                    try:
+                        if automatch_gui and aw is not None:
+                            QMetaObject.invokeMethod(
+                                aw, "_on_stop_clicked",
+                                Qt.ConnectionType.QueuedConnection,
+                            )
+                    except Exception:
+                        pass
+                    # Show info-only notification for each auto-matched duel.
+                    for duel in new_duels:
                         QMetaObject.invokeMethod(
-                            aw, "_on_stop_clicked",
+                            self, "_on_automatch_received",
                             Qt.ConnectionType.QueuedConnection,
+                            Q_ARG(str, duel.challenger_name or duel.challenger),
+                            Q_ARG(str, duel.table_name or duel.table_rom),
+                            Q_ARG(str, duel.duel_id),
                         )
-                except Exception:
-                    pass
-                for duel in new_duels:
-                    QMetaObject.invokeMethod(
-                        self, "_on_duel_invitation_received",
-                        Qt.ConnectionType.QueuedConnection,
-                        Q_ARG(str, duel.challenger_name or duel.challenger),
-                        Q_ARG(str, duel.table_name or duel.table_rom),
-                        Q_ARG(str, duel.duel_id),
-                    )
+                else:
+                    # Normal flow: show invitation overlay.
+                    for duel in new_duels:
+                        QMetaObject.invokeMethod(
+                            self, "_on_duel_invitation_received",
+                            Qt.ConnectionType.QueuedConnection,
+                            Q_ARG(str, duel.challenger_name or duel.challenger),
+                            Q_ARG(str, duel.table_name or duel.table_rom),
+                            Q_ARG(str, duel.duel_id),
+                        )
                 QMetaObject.invokeMethod(
                     self, "_refresh_active_duels",
                     Qt.ConnectionType.QueuedConnection,
