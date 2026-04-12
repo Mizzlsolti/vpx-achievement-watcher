@@ -371,8 +371,8 @@ private fun SendDuelDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val opp = selectedOpponent!!
-                    val tbl = selectedTable!!
+                    val opp = selectedOpponent ?: return@Button
+                    val tbl = selectedTable ?: return@Button
                     onSend(opp.second, opp.first, tbl.second, tbl.first)
                 },
                 enabled = selectedOpponent != null && selectedTable != null,

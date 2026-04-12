@@ -13,6 +13,12 @@ class DuelRepository {
 
     private val json = FirebaseClient.json
 
+    companion object {
+        /** Same romnames.json source used by the desktop Watcher (pinmame-nvram-maps). */
+        private const val ROMNAMES_URL =
+            "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
+    }
+
     /** Fetch all duels from the cloud. */
     suspend fun fetchAllDuels(): List<Duel> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
@@ -247,8 +253,7 @@ class DuelRepository {
      * Uses the same GitHub source as the desktop Watcher.
      */
     suspend fun fetchRomNames(): Map<String, String> {
-        val romNamesUrl = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
-        val raw = FirebaseClient.fetchUrl(romNamesUrl) ?: return emptyMap()
+        val raw = FirebaseClient.fetchUrl(ROMNAMES_URL) ?: return emptyMap()
         return parseStringMap(raw)
     }
 
