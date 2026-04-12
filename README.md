@@ -10,14 +10,16 @@ A companion app for Visual Pinball X (VPX) that adds modern achievements, live o
 
 Your control center at a glance:
 - **System Status**: Is the watcher running? Is VPX active?
-- **Session Summary**: Last table played, score, and achievements
-- **Run Status**: Table detection, session, cloud, and leaderboard connection (green/yellow/red indicators)
-- **Notifications**: Clickable alerts for leaderboard ranks, beaten records, missing VPS-IDs, and available updates
+- **Session Summary**: Two cards side by side:
+  - **Last Run**: Last table played, score, achievements unlocked, and date
+  - **Run Status**: Live status indicators (green/yellow/red) for Table, Session, Cloud, and Leaderboard connection
+- **📬 Notifications**: Clickable feed with alerts for leaderboard ranks, beaten achievement records, missing VPS-IDs, and available updates. Unread count shown on tab badge. Clear All button to dismiss
+- **📋 Setup Status**: Checklist that verifies your setup is complete — Player Name set, Cloud Sync enabled, VPS-IDs assigned, Maps loaded, Overlays configured, and Widget Controls bound. Red/yellow/green indicators with direct links to fix missing items. Shows "✅ All set!" when everything passes
 - **Quick Actions**: Restart Engine, Minimize to Tray, Quit
 
 ---
 
-### 👤 Player Tab
+### 👤 Player
 
 Your personal player profile and summary:
 - **Player Level**: Current level and XP progress bar based on unlocked achievements
@@ -28,58 +30,123 @@ Your personal player profile and summary:
 
 ---
 
-### 🏆 Achievement Progress & System
-
-The tool recognizes game actions (e.g., ramps hit, multiballs activated, jackpots) and automatically unlocks achievements — either for the current game session or globally as long-term motivation.
-
----
-
-### 📊 Highlights & Overlays
-
-After a game (or at the touch of a button on the keyboard/controller), transparent info windows appear directly above the pinball machine. These show the best actions of the game and statistics. Supports portrait mode specifically for pinball cabinets.
-
----
-
-### ⚔️ Score Duels
-
-Challenge other players to direct score duels on the same table! Compete head-to-head with Auto-Match or invite friends. Includes a global feed of active duels.
-
----
-
 ### 📈 Progress
 
-Track your overall achievement progress per table:
-- Completion percentage for each table
-- Which achievements are still locked / unlocked (✅ / 🔒)
-- Overall progress across all tables
+Track your achievement progress per table:
+- **Select Table**: Dropdown with all played tables (ROM-based and custom/non-ROM tables)
+- **Global Achievements**: Cross-table achievements like total playtime, tables played, manufacturer milestones — with progress bars (e.g. 12/25)
+- **Per-Table Achievements**: Each achievement listed with status (✅ unlocked / 🔒 locked)
+- **ℹ️ Info Links**: Click the info icon on any achievement to see its unlock condition, VPS table info, and unlock timestamp
+- **Rarity Tiers**: Common, Uncommon, Rare, Epic, Legendary — color-coded based on how many cloud players have unlocked each one. Rarity legend shown below progress bar
+- **Custom Table Progress**: AWEditor-created achievements are tracked separately with their own progress view
 
 ---
 
-### 🔔 Feedback
+### 📊 Records & Stats
 
-Displays small pop-up notifications (toasts) directly after the game when you achieve a success.
-
----
-
-### 💾 Statistics & Records
-
-Records every round played, the duration of the game, and the points scored in the background. These can be conveniently evaluated in the user interface (GUI):
-- **Global NVRAM Dumps**: Full data overview per table
-- **Player Session Deltas**: Actions and changes from your sessions
+Records every round played, session duration, and scores in the background:
+- **🌍 Global NVRAM Dumps**: Full raw NVRAM data overview per table — all fields and values in a multi-column table
+- **👤 Player Session Deltas**: What changed during your session — actions, score differences, playtime, and field-by-field changes (only shows values > 0)
 
 ---
 
-### ☁️ Leaderboards
+### ☁️ Cloud
 
-Compete with the community! The tool uploads your challenge scores and achievement progress (in %) to the cloud (if desired).
+Global cloud leaderboard for achievement progress:
+- **Category**: Achievement Progress leaderboard per table
+- **Search**: Enter a table or ROM name with autocomplete (resolves table titles to ROM keys)
+- **Fetch**: Load the leaderboard — ranked list with progress bars, medals (🏆🥈🥉), player badges, date, and ℹ️ VPS info links
+- **VPS Info Dialog**: Click ℹ️ on any leaderboard entry to see linked VPS table details and achievement breakdown
 
 > 💡 **Tip**: You can find your personal 4-digit player ID in the "System" tab. Make a note of it! If you ever install Watcher on a new PC, you can use it to restore your cloud progress.
 
 ---
 
-### 🛡️ Fair Play & Anti-Cheat
+### ⚔️ Score Duels
 
-To keep the leaderboards fair, local saves and scores are protected by hash signatures.
+Challenge other players to direct score duels on the same table!
+
+The Score Duels tab is organized into **4 sub-tabs**:
+
+#### 🎯 My Duels
+- **📬 Incoming Invitations**: Inbox for duel challenges from other players — accept or decline with one click
+- **🔕 Do Not Disturb**: Toggle to stop receiving new duel invitations
+- **⚔️ Start New Duel**: Pick an opponent and table, then send a challenge
+- **🔀 Auto-Match**: Join the matchmaking queue — automatically matched with a player who shares at least one table (by VPS-ID). Search times out after 5 minutes
+- **🟢 Active Duels**: Overview of all running duels with status, time remaining, and cancel option
+- **📜 Duel History**: Past duel results with opponent, table, scores, and date
+
+#### 🌍 Global Feed
+Live feed of all active and recently completed duels across all players.
+
+#### 🏆 Leaderboard
+Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and Win Rate (%). Players need at least 3 completed duels to qualify. Your own row is highlighted with a ★. Medals for top 3: 🥇🥈🥉.
+
+#### 🏆 Tournament
+4-player single-elimination knockout tournaments:
+- **Join Queue**: Enter the tournament matchmaking queue (30 min timeout)
+- **Auto-Matching**: When 4 players sharing at least one table are queued, a tournament is automatically created
+- **Bracket**: 2 Semifinals → 1 Final, all played on the same randomly selected table
+- **2 hours per match** — each duel has a 2-hour time limit
+- **Notifications**: In-app alerts for tournament start, elimination, final reached, and final result
+- **History**: Completed tournaments are saved locally with your placement (🏆 Winner, #2, #3-4)
+
+**💬 Tournament Chat**: Live chat for tournament participants — real-time messagesy
+
+---
+
+### 🎨 Appearance
+
+Customize the look and feel of the entire application, organized into **5 sub-tabs**:
+
+#### 🖼 Overlay
+- **Global Styling**: Font family, base font size, and overlay scale slider (30–300%)
+- **Widget Placement & Orientation**: Place and save screen positions for each overlay independently. Each widget has Portrait Mode (90°), Rotate CCW, Place, and Test buttons:
+  - Main Stats Overlay (with auto-close option)
+  - Achievement Toasts
+  - System Notifications
+  - Status Overlay (cloud/leaderboard feedback, can be disabled)
+  - ⚔️ Duel Notifications
+- **🔄 Switch All → Portrait/Landscape**: Toggle all overlay orientations at once
+- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard), Page 4 (VPC Leaderboard), Page 5 (Score Duels) can be toggled
+- **Custom Background**: Place an `overlay_bg.jpg/png` next to the executable for a custom overlay background
+
+#### 🎨 Theme
+- **Active Theme**: Select and apply a color theme from the dropdown
+- **Color Preview**: Live preview of Primary, Accent, Border, and BG colors
+- **Overlay Preview / Test**: Test Main Stats Overlay and Achievement Toast with the current theme
+- **Available Themes**: Full list of all themes with icon, name, and description
+
+#### 🔊 Sound
+- **Enable/Disable**: Master toggle for sound effects
+- **Volume**: Slider (0–100%)
+- **Sound Pack**: Choose from multiple packs (Zaptron, Vex Machina, Retro, etc.)
+- **Events Table**: Per-event enable/disable toggle and preview button for each sound event
+
+#### ✨ Effects
+- GPU-accelerated visual effects with automatic CPU fallback
+
+#### 🐾 Mascots
+- **🏆 Trophie** (GUI Mascot): Lives in the bottom-left corner of the main window
+- **🎱 Steely** (Desktop Overlay Mascot): A metallic chrome pinball that lives on your desktop as an always-on-top overlay. Reacts to game events
+- **Skins**: Multiple visual skins for both mascots
+- **Personality**: Unique speech bubbles, reactions, memory, and a "bickering" system between them
+- **Portrait Mode**: Steely supports 90° rotation for cabinet screens
+
+---
+
+### 📺 VPC Weekly Challenge
+
+View Discord's Weekly Challenge directly on the overlay (view only).
+
+---
+
+### 🕹️ Controls
+
+Configure hotkeys and input bindings for the overlay and challenges:
+- Supports keyboard keys and joystick buttons
+- Bindings for overlay toggle, duel accept (left), duel decline (right), and system tray show/hide
+- 💡 Flipper buttons or MagnaSave buttons work best
 
 ---
 
@@ -105,47 +172,29 @@ Create custom achievements for tables that don't use VPinMAME ROMs (Non-ROM / Or
 
 ---
 
-### 🏆 Mascots — Trophie & Steely
-
-Two animated companion mascots that react to your gameplay:
-
-- **🏆 Trophie** (GUI Mascot): Lives in the bottom-left corner of the main window.
-- **🎱 Steely** (Desktop Overlay Mascot): A metallic chrome pinball that lives on your desktop as an always-on-top overlay. Reacts to game events.
-- **Skins**: Multiple visual skins for both mascots (configurable in the Appearance tab)
-- **Personality**: Both mascots have unique speech bubbles, reactions, memory, and even a "bickering" system between them
-- **Portrait Mode**: Steely supports 90° rotation for cabinet screens
-
----
-
-### 🎨 Appearance — Themes, Sound & Effects
-
-Customize the look and feel of the entire application:
-
-- **🎨 Themes**: Multiple color themes (Neon Blue, Retro, etc.) affecting all windows, overlays, toasts, and challenge UI
-- **🔊 Sound Effects**: Configurable sound effects for achievement unlocks, challenges, and events — with multiple sound packs (Zaptron, Vex Machina, Retro, etc.), per-event enable/disable, volume control, and preview buttons
-- **✨ Visual Effects**: GPU-accelerated visual effects with automatic CPU fallback
-- **Overlay Placement**: Position every overlay element (stats, toasts, challenge menu, timer, flip counter, heat bar, mini info, status) independently on screen
-
----
-
-### 📺 VPC Weekly Challenge
-
-View Discord's Weekly Challenge directly on the overlay (view only).
-
----
-
-### 🕹️ Controls
-
-Configure hotkeys and input bindings for the overlay and challenges. Supports keyboard keys and joystick buttons.
-
----
-
 ### ⚙️ System
 
-- **Player Profile**: Set your player name and view your 4-digit player ID
-- **Directory Setup**: Configure BASE, NVRAM, and Tables directories
-- **Maintenance & Updates**: Repair data folders, force cache NVRAM maps, check for updates
-- **Cloud Settings**: Enable/disable cloud sync, restore progress with player ID
+The System tab has **2 sub-tabs**:
+
+#### ⚙️ General
+- **👤 Player Profile**: Set your display name and 4-character player ID. Identity fields are locked while Cloud Sync is active
+- **☁️ Cloud Sync & Backup**: Enable/disable Cloud Sync (validates player name and ID against cloud for uniqueness). Auto-Backup toggle, manual Backup to Cloud, and Restore from Cloud (restores achievements, VPS mapping, and CAT progress)
+- **🐛 Feedback & Bug Reports**: Report bugs or suggestions directly from the app
+- **🔑 Admin Login**: Log in as chat moderator for Tournament Chat moderation (admin only)
+
+#### 🔧 Maintenance
+- **📁 Directory Setup**: Configure BASE, NVRAM, and Tables directories
+- **Repair Data Folders**: Fix broken or missing data directories
+- **Force Cache NVRAM Maps**: Re-download and cache all NVRAM map files
+- **🔄 Update Databases**: Force re-download of index.json, romnames.json, vpsdb.json, and VPXTool
+- **⬆️ Watcher Update**: Check GitHub for newer releases — downloads and installs the Setup automatically with release notes preview
+
+---
+
+### 🛡️ Fair Play & Anti-Cheat
+
+To keep the leaderboards fair, local saves and scores are protected by hash signatures.
+Matches and tournaments use a feature called NVRAM tracking. Restarting from Ball 1, pressing F3, or restarting the VPX Player will result in disqualification.
 
 ---
 
@@ -162,4 +211,3 @@ Thanks to this people:
 | **VPC Data** by emb417 | [vpc-data](https://github.com/emb417/vpc-data) |
 | **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
 | **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |
-
