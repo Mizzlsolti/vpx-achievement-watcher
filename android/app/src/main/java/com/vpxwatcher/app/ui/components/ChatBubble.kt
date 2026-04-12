@@ -67,6 +67,6 @@ fun ChatBubble(message: ChatMessage, isOwn: Boolean) {
 
 private fun formatTime(timestamp: Long): String {
     if (timestamp <= 0) return ""
-    val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
 }

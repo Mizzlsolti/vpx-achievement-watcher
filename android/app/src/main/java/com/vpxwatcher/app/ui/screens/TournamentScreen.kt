@@ -17,6 +17,7 @@ import com.vpxwatcher.app.data.models.Tournament
 import com.vpxwatcher.app.data.models.TournamentStatus
 import com.vpxwatcher.app.ui.components.BracketView
 import com.vpxwatcher.app.ui.theme.Primary
+import com.vpxwatcher.app.util.TableNameUtils
 import com.vpxwatcher.app.viewmodel.TournamentViewModel
 
 @Composable
@@ -188,7 +189,7 @@ private fun TournamentCard(tournament: Tournament) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "🎰 ${tournament.table_name}",
+                    text = "🎰 ${TableNameUtils.cleanTableName(tournament.table_name)}",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )

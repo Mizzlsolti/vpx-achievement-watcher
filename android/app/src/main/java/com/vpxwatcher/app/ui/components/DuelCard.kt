@@ -12,6 +12,7 @@ import com.vpxwatcher.app.data.PrefsManager
 import com.vpxwatcher.app.data.models.Duel
 import com.vpxwatcher.app.data.models.DuelStatus
 import com.vpxwatcher.app.ui.theme.Error
+import com.vpxwatcher.app.util.TableNameUtils
 import com.vpxwatcher.app.ui.theme.Primary
 import com.vpxwatcher.app.ui.theme.Success
 import java.text.SimpleDateFormat
@@ -59,7 +60,7 @@ fun DuelCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "🎰 ${duel.table_name.ifEmpty { duel.table_rom }}",
+                        text = "🎰 ${TableNameUtils.cleanTableName(duel.table_name.ifEmpty { duel.table_rom })}",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface
@@ -88,10 +89,16 @@ fun DuelCard(
                 )
             }
 
-            // Timestamp
+            // Timestamp — show completed_at for terminal statuses (like the Watcher),
+            // fall back to created_at for pending/accepted/active or when completed_at is 0.
+            val isTerminal = duel.status in listOf(
+                DuelStatus.WON, DuelStatus.LOST, DuelStatus.TIE,
+                DuelStatus.EXPIRED, DuelStatus.DECLINED, DuelStatus.CANCELLED
+            )
+            val displayTs = if (isTerminal && duel.completed_at > 0) duel.completed_at else duel.created_at
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = formatTimestamp(duel.created_at),
+                text = formatTimestamp(displayTs),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
