@@ -18,8 +18,6 @@ class ProfileViewModel : ViewModel() {
         private set
     var playerId by mutableStateOf(PrefsManager.playerId)
         private set
-    var cloudUrl by mutableStateOf(PrefsManager.cloudUrl)
-        private set
     var duelWins by mutableStateOf(0)
         private set
     var duelLosses by mutableStateOf(0)
@@ -36,7 +34,6 @@ class ProfileViewModel : ViewModel() {
     fun refresh() {
         playerName = PrefsManager.playerName
         playerId = PrefsManager.playerId
-        cloudUrl = PrefsManager.cloudUrl
 
         viewModelScope.launch {
             try {
@@ -66,7 +63,7 @@ class ProfileViewModel : ViewModel() {
     }
 
     private suspend fun fetchProfileFromCloud() {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         val pid = PrefsManager.playerId.lowercase()
         if (url.isBlank() || pid.isBlank()) return
 

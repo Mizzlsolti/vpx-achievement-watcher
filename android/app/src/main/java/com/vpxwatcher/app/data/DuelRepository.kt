@@ -15,7 +15,7 @@ class DuelRepository {
 
     /** Fetch all duels from the cloud. */
     suspend fun fetchAllDuels(): List<Duel> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptyList()
         val raw = FirebaseClient.getNode(url, "duels") ?: return emptyList()
         return parseDuels(raw)
@@ -56,7 +56,7 @@ class DuelRepository {
 
     /** Accept a pending duel. PATCH status to accepted. */
     suspend fun acceptDuel(duelId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val now = System.currentTimeMillis() / 1000.0
         val patch = buildJsonObject {
@@ -68,7 +68,7 @@ class DuelRepository {
 
     /** Decline a pending duel. PUT full duel with status declined. */
     suspend fun declineDuel(duelId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         // Fetch the existing duel first
         val raw = FirebaseClient.getNode(url, "duels/$duelId") ?: return false
@@ -82,7 +82,7 @@ class DuelRepository {
 
     /** Cancel a duel (pending or accepted, user is participant). */
     suspend fun cancelDuel(duelId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val raw = FirebaseClient.getNode(url, "duels/$duelId") ?: return false
         val duelObj = try { json.parseToJsonElement(raw).jsonObject } catch (_: Exception) { return false }
@@ -102,7 +102,7 @@ class DuelRepository {
         tableRom: String,
         tableName: String
     ): String? {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return null
         val duelId = UUID.randomUUID().toString()
         val now = System.currentTimeMillis() / 1000.0
@@ -129,7 +129,7 @@ class DuelRepository {
 
     /** Join the matchmaking queue. */
     suspend fun joinMatchmaking(playerId: String, playerName: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val now = System.currentTimeMillis() / 1000.0
         val entry = buildJsonObject {
@@ -144,7 +144,7 @@ class DuelRepository {
 
     /** Leave the matchmaking queue. */
     suspend fun leaveMatchmaking(playerId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         return FirebaseClient.setNode(url, "duels/matchmaking/${playerId.lowercase()}", "null")
     }
@@ -181,7 +181,7 @@ class DuelRepository {
 
     /** Write an app_signal for overlay dismiss on the desktop Watcher. */
     suspend fun writeAppSignal(playerId: String, action: String, duelId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val signalId = UUID.randomUUID().toString()
         val signal = buildJsonObject {

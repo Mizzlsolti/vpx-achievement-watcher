@@ -14,7 +14,7 @@ class TournamentRepository {
 
     /** Join the tournament queue. */
     suspend fun joinQueue(playerId: String, playerName: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val now = System.currentTimeMillis() / 1000.0
         val entry = buildJsonObject {
@@ -29,14 +29,14 @@ class TournamentRepository {
 
     /** Leave the tournament queue. */
     suspend fun leaveQueue(playerId: String): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         return FirebaseClient.setNode(url, "tournaments/queue/${playerId.lowercase()}", "null")
     }
 
     /** Fetch current queue entries. */
     suspend fun fetchQueue(): List<Participant> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptyList()
         val raw = FirebaseClient.getNode(url, "tournaments/queue") ?: return emptyList()
         return try {
@@ -61,7 +61,7 @@ class TournamentRepository {
 
     /** Fetch active tournaments where the player is a participant. */
     suspend fun fetchActiveTournaments(playerId: String): List<Tournament> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptyList()
         val raw = FirebaseClient.getNode(url, "tournaments/active") ?: return emptyList()
         val pid = playerId.trim().lowercase()
@@ -72,7 +72,7 @@ class TournamentRepository {
 
     /** Fetch tournament history (completed). */
     suspend fun fetchHistory(playerId: String): List<Tournament> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptyList()
         val raw = FirebaseClient.getNode(url, "tournaments/active") ?: return emptyList()
         val pid = playerId.trim().lowercase()

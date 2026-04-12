@@ -25,7 +25,7 @@ class ChatRepository {
         playerName: String,
         text: String
     ): Boolean {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank() || text.isBlank()) return false
 
         val ts = System.currentTimeMillis()
@@ -43,7 +43,7 @@ class ChatRepository {
 
     /** Fetch the banned player IDs set. */
     suspend fun fetchBannedIds(): Set<String> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptySet()
         val raw = FirebaseClient.getNode(url, "tournament_chat/banned") ?: return emptySet()
         return try {
@@ -54,7 +54,7 @@ class ChatRepository {
 
     /** Fetch timeout map (playerId -> until_ms). */
     suspend fun fetchTimeouts(): Map<String, Long> {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return emptyMap()
         val raw = FirebaseClient.getNode(url, "tournament_chat/timeouts") ?: return emptyMap()
         return try {

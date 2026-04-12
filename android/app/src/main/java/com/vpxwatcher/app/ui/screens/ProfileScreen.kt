@@ -105,22 +105,6 @@ fun ProfileScreen(viewModel: ProfileViewModel = viewModel()) {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Cloud URL
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("☁️ Cloud", fontWeight = FontWeight.Bold, color = Primary)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = viewModel.cloudUrl,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         Spacer(modifier = Modifier.height(24.dp))
 
         // Logout

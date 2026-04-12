@@ -36,7 +36,7 @@ class ChatViewModel : ViewModel() {
 
     /** Start the SSE stream and moderation checks. */
     fun startStream() {
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return
 
         // Start moderation cache refresh
@@ -53,7 +53,7 @@ class ChatViewModel : ViewModel() {
 
     private fun connectSse() {
         sseSource?.cancel()
-        val url = PrefsManager.cloudUrl
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return
 
         sseSource = FirebaseClient.openSseStream(

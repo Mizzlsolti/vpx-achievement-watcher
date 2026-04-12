@@ -11,8 +11,6 @@ object PrefsManager {
     private const val PREFS_NAME = "vpx_watcher_prefs"
     private const val KEY_PLAYER_ID = "player_id"
     private const val KEY_PLAYER_NAME = "player_name"
-    private const val KEY_CLOUD_URL = "cloud_url"
-
     const val DEFAULT_CLOUD_URL = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
 
     private lateinit var prefs: SharedPreferences
@@ -28,10 +26,6 @@ object PrefsManager {
     var playerName: String
         get() = prefs.getString(KEY_PLAYER_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_PLAYER_NAME, value).apply()
-
-    var cloudUrl: String
-        get() = prefs.getString(KEY_CLOUD_URL, DEFAULT_CLOUD_URL) ?: DEFAULT_CLOUD_URL
-        set(value) = prefs.edit().putString(KEY_CLOUD_URL, value).apply()
 
     /** True when all required login fields are set. */
     val isLoggedIn: Boolean
