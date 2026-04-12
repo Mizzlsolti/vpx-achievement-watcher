@@ -830,7 +830,13 @@ class TournamentEngine:
         tournament["bracket"] = bracket
 
         tid = tournament.get("tournament_id", "")
-        CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", tournament)
+        ok = CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", tournament)
+        if not ok:
+            log(self._cfg, f"[TOURNAMENT] _maybe_advance_to_final: cloud write failed for {tid}. Rolling back to semifinal.", "WARN")
+            tournament["status"] = "semifinal"
+            bracket.pop("final", None)
+            tournament["bracket"] = bracket
+            return tournament
         log(self._cfg, f"[TOURNAMENT] Advanced to final. Duel: {final_duel_id}")
         return tournament
 
@@ -862,7 +868,14 @@ class TournamentEngine:
         tournament["bracket"]      = bracket
 
         tid = tournament.get("tournament_id", "")
-        CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", tournament)
+        ok = CloudSync.set_node(self._cfg, f"tournaments/active/{tid}", tournament)
+        if not ok:
+            log(self._cfg, f"[TOURNAMENT] _maybe_complete_tournament: cloud write failed for {tid}. Rolling back to final.", "WARN")
+            tournament["status"]       = "final"
+            tournament["winner"]       = ""
+            tournament["winner_name"]  = ""
+            tournament["completed_at"] = 0.0
+            return tournament
 
         # Save to local history (dedup by tournament_id).
         with self._lock:
