@@ -76,7 +76,7 @@ fun LoginScreen(
             value = viewModel.playerId,
             onValueChange = { viewModel.onPlayerIdChanged(it) },
             label = { Text("🔑 Player ID") },
-            placeholder = { Text("Enter your 4-character Player ID from the desktop Watcher (System tab)") },
+            placeholder = { Text("Your 4-char ID (from Watcher System tab)") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             textStyle = LocalTextStyle.current.copy(
