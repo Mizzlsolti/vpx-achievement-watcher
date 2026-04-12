@@ -57,10 +57,58 @@ class OverlayPagesMixin:
         except Exception:
             return False
 
+    # ── Content check ────────────────────────────────────────────────────────
+
+    def _overlay_page_has_content(self, page_idx: int) -> bool:
+        """Return True if *page_idx* has meaningful content to display.
+
+        Pages 3 (VPC Weekly) and 4 (Score Duels) always have content.
+        Page 0 (Highlight Stats) has content when ``_prepare_overlay_sections()``
+        produced at least one section.
+        Page 1 (Achievement Progress) has content when a last-played ROM exists
+        OR custom achievements are available for the last table.
+        Page 2 (Cloud Leaderboard) has content when a last-played ROM exists
+        AND cloud sync is enabled.
+        """
+        if page_idx in (3, 4):
+            return True
+        if page_idx == 0:
+            return bool(self._overlay_cycle.get("sections"))
+        if page_idx == 1:
+            rom = self._get_last_played_rom()
+            if rom:
+                return True
+            # No ROM – check for custom achievements on the last table
+            try:
+                last_table = ""
+                summary_path = os.path.join(
+                    self.cfg.BASE, "session_stats", "Highlights",
+                    "session_latest.summary.json",
+                )
+                if os.path.isfile(summary_path):
+                    with open(summary_path, "r", encoding="utf-8") as f:
+                        last_table = str(json.load(f).get("table", "") or "")
+                if not last_table:
+                    last_table = getattr(self.watcher, "current_table", "") or ""
+                if last_table:
+                    custom_json = os.path.join(
+                        p_aweditor(self.cfg), f"{last_table}.custom.json"
+                    )
+                    if os.path.isfile(custom_json):
+                        return True
+            except Exception:
+                pass
+            return False
+        if page_idx == 2:
+            return bool(self._get_last_played_rom()) and bool(
+                getattr(self.cfg, "CLOUD_ENABLED", False)
+            )
+        return True
+
     # ── Overlay page navigation core ─────────────────────────────────────────
 
     def _navigate_overlay_page(self, direction: int):
-        """Cycle to the next/previous overlay page, skipping disabled pages."""
+        """Cycle to the next/previous overlay page, skipping disabled and empty pages."""
         ov = self.cfg.OVERLAY or {}
         enabled_pages = [0]
         if ov.get("overlay_page2_enabled", True):
@@ -74,6 +122,11 @@ class OverlayPagesMixin:
 
         if not enabled_pages:
             enabled_pages = [0]
+
+        # Additionally filter out pages that have no content to display.
+        with_content = [p for p in enabled_pages if self._overlay_page_has_content(p)]
+        if with_content:
+            enabled_pages = with_content
 
         current = int(getattr(self, "_overlay_page", 0))
         if current in enabled_pages:

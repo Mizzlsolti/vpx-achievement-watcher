@@ -282,10 +282,42 @@ class OverlayCtrlMixin:
                     self._prepare_overlay_sections()
                     secs = self._overlay_cycle.get("sections", [])
                     if not secs:
-                        self._msgbox_topmost("info", "Overlay", "No contents available (Global/Player).")
-                        return
-                    self._overlay_cycle["idx"] = 0
-                    self._show_overlay_section(secs[0])
+                        # Page 0 has no content – try to find the first
+                        # enabled page that does have content instead of
+                        # blocking with a messagebox.
+                        _ov_cfg = self.cfg.OVERLAY or {}
+                        _candidates = []
+                        if _ov_cfg.get("overlay_page2_enabled", True):
+                            _candidates.append(1)
+                        if _ov_cfg.get("overlay_page3_enabled", True):
+                            _candidates.append(2)
+                        if _ov_cfg.get("overlay_page4_enabled", True):
+                            _candidates.append(3)
+                        if _ov_cfg.get("overlay_page5_enabled", True):
+                            _candidates.append(4)
+                        _first = next(
+                            (p for p in _candidates if self._overlay_page_has_content(p)),
+                            None,
+                        )
+                        if _first is not None:
+                            self._overlay_page = _first
+                            self._show_overlay_page(_first)
+                        else:
+                            # No page has content – show mini-info instead of
+                            # a blocking messagebox.
+                            try:
+                                if not hasattr(self, "_mini_overlay") or self._mini_overlay is None:
+                                    self._mini_overlay = MiniInfoOverlay(self)
+                                self._mini_overlay.show_info(
+                                    "No overlay content available", seconds=3,
+                                    color_hex="#FF3B30",
+                                )
+                            except Exception:
+                                pass
+                            return
+                    else:
+                        self._overlay_cycle["idx"] = 0
+                        self._show_overlay_section(secs[0])
             else:
                 # Overlay already visible – cycle to next enabled page, close after last.
                 # Page 0 is skipped for CAT tables.
@@ -304,6 +336,10 @@ class OverlayCtrlMixin:
                     enabled_pages.append(4)
                 if not enabled_pages:
                     enabled_pages = [1] if self._is_active_cat_table() else [0]
+                # Filter out pages without content.
+                with_content = [p for p in enabled_pages if self._overlay_page_has_content(p)]
+                if with_content:
+                    enabled_pages = with_content
                 current = int(getattr(self, "_overlay_page", 0))
                 if current in enabled_pages:
                     current_idx = enabled_pages.index(current)
@@ -356,9 +392,30 @@ class OverlayCtrlMixin:
                     self._show_overlay_page(1)
                 else:
                     if not secs:
-                        return
-                    self._overlay_page = 0
-                    self._show_overlay_section(secs[0])
+                        # Page 0 has no sections – try to find the first
+                        # enabled page that has content.
+                        _ov_cfg = self.cfg.OVERLAY or {}
+                        _candidates = [0]
+                        if _ov_cfg.get("overlay_page2_enabled", True):
+                            _candidates.append(1)
+                        if _ov_cfg.get("overlay_page3_enabled", True):
+                            _candidates.append(2)
+                        if _ov_cfg.get("overlay_page4_enabled", True):
+                            _candidates.append(3)
+                        if _ov_cfg.get("overlay_page5_enabled", True):
+                            _candidates.append(4)
+                        _first = next(
+                            (p for p in _candidates if self._overlay_page_has_content(p)),
+                            None,
+                        )
+                        if _first is not None:
+                            self._overlay_page = _first
+                            self._show_overlay_page(_first)
+                        else:
+                            return
+                    else:
+                        self._overlay_page = 0
+                        self._show_overlay_section(secs[0])
                 try:
                     self._overlay_last_action = _time.monotonic()
                 except Exception:
