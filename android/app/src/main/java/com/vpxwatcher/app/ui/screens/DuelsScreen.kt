@@ -110,6 +110,7 @@ fun DuelsScreen(viewModel: DuelViewModel = viewModel()) {
 
     if (showSendDialog) {
         SendDuelDialog(
+            viewModel = viewModel,
             onDismiss = { showSendDialog = false },
             onSend = { opponentId, opponentName, tableRom, tableName ->
                 viewModel.sendDuel(opponentId, opponentName, tableRom, tableName)
@@ -211,58 +212,170 @@ private fun LeaderboardTab(viewModel: DuelViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SendDuelDialog(
+    viewModel: DuelViewModel,
     onDismiss: () -> Unit,
     onSend: (String, String, String, String) -> Unit
 ) {
-    var opponentId by remember { mutableStateOf("") }
-    var opponentName by remember { mutableStateOf("") }
-    var tableRom by remember { mutableStateOf("") }
-    var tableName by remember { mutableStateOf("") }
+    // Selected opponent state
+    var selectedOpponent by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var opponentQuery by remember { mutableStateOf("") }
+    var opponentExpanded by remember { mutableStateOf(false) }
+
+    // Selected table state
+    var selectedTable by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var tableQuery by remember { mutableStateOf("") }
+    var tableExpanded by remember { mutableStateOf(false) }
+
+    // Fetch players when dialog opens
+    LaunchedEffect(Unit) {
+        viewModel.fetchPlayers()
+    }
+
+    val filteredPlayers = remember(viewModel.players, opponentQuery) {
+        if (opponentQuery.isBlank()) viewModel.players
+        else viewModel.players.filter { it.first.contains(opponentQuery, ignoreCase = true) }
+    }
+
+    val filteredTables = remember(viewModel.sharedTables, tableQuery) {
+        if (tableQuery.isBlank()) viewModel.sharedTables
+        else viewModel.sharedTables.filter { it.first.contains(tableQuery, ignoreCase = true) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("📨 Send New Duel", color = Primary) },
         text = {
             Column {
-                OutlinedTextField(
-                    value = opponentId,
-                    onValueChange = { opponentId = it.uppercase().take(4) },
-                    label = { Text("Opponent ID") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = opponentName,
-                    onValueChange = { opponentName = it },
-                    label = { Text("Opponent Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = tableRom,
-                    onValueChange = { tableRom = it },
-                    label = { Text("Table ROM") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = tableName,
-                    onValueChange = { tableName = it },
-                    label = { Text("Table Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // ── Opponent Dropdown ──
+                Text("Opponent", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+                if (viewModel.isLoadingPlayers) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Loading players…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    ExposedDropdownMenuBox(
+                        expanded = opponentExpanded,
+                        onExpandedChange = { opponentExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = opponentQuery,
+                            onValueChange = {
+                                opponentQuery = it
+                                selectedOpponent = null
+                                selectedTable = null
+                                opponentExpanded = true
+                            },
+                            placeholder = {
+                                Text(
+                                    if (viewModel.players.isEmpty()) "(No players found)"
+                                    else "Select opponent…"
+                                )
+                            },
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = opponentExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = opponentExpanded && filteredPlayers.isNotEmpty(),
+                            onDismissRequest = { opponentExpanded = false }
+                        ) {
+                            filteredPlayers.forEach { (name, id) ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = {
+                                        selectedOpponent = Pair(name, id)
+                                        opponentQuery = name
+                                        opponentExpanded = false
+                                        // Reset table selection and fetch shared tables
+                                        selectedTable = null
+                                        tableQuery = ""
+                                        viewModel.fetchSharedTables(id)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── Table Dropdown ──
+                Text("Table", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(4.dp))
+                if (viewModel.isLoadingTables) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Loading shared tables…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else if (selectedOpponent == null) {
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        enabled = false,
+                        placeholder = { Text("Select an opponent first") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else if (viewModel.sharedTables.isEmpty()) {
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        enabled = false,
+                        placeholder = { Text("(No shared tables with this opponent)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    ExposedDropdownMenuBox(
+                        expanded = tableExpanded,
+                        onExpandedChange = { tableExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = tableQuery,
+                            onValueChange = {
+                                tableQuery = it
+                                selectedTable = null
+                                tableExpanded = true
+                            },
+                            placeholder = { Text("Select table…") },
+                            singleLine = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = tableExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = tableExpanded && filteredTables.isNotEmpty(),
+                            onDismissRequest = { tableExpanded = false }
+                        ) {
+                            filteredTables.forEach { (name, rom) ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = {
+                                        selectedTable = Pair(name, rom)
+                                        tableQuery = name
+                                        tableExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSend(opponentId, opponentName, tableRom, tableName) },
-                enabled = opponentId.length == 4 && tableRom.isNotBlank(),
+                onClick = {
+                    val opp = selectedOpponent ?: return@Button
+                    val tbl = selectedTable ?: return@Button
+                    onSend(opp.second, opp.first, tbl.second, tbl.first)
+                },
+                enabled = selectedOpponent != null && selectedTable != null,
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) { Text("Send") }
         },

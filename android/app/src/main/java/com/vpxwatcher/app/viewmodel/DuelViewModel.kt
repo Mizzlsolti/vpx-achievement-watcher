@@ -29,6 +29,17 @@ class DuelViewModel : ViewModel() {
     var statusMessage by mutableStateOf("")
         private set
 
+    /** List of (playerName, playerId) pairs for the opponent dropdown. */
+    var players by mutableStateOf<List<Pair<String, String>>>(emptyList())
+        private set
+    /** List of (tableName, tableRom) pairs for the table dropdown. */
+    var sharedTables by mutableStateOf<List<Pair<String, String>>>(emptyList())
+        private set
+    var isLoadingPlayers by mutableStateOf(false)
+        private set
+    var isLoadingTables by mutableStateOf(false)
+        private set
+
     /** Start polling every 5 seconds (matching Watcher's _duel_poll_timer interval). */
     fun startPolling() {
         viewModelScope.launch {
@@ -134,6 +145,54 @@ class DuelViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 statusMessage = "❌ Error: ${e.message}"
+            }
+        }
+    }
+
+    /** Fetch all available opponents from the cloud. */
+    fun fetchPlayers() {
+        viewModelScope.launch {
+            try {
+                isLoadingPlayers = true
+                players = repository.fetchPlayerList()
+            } catch (_: Exception) {
+                players = emptyList()
+            } finally {
+                isLoadingPlayers = false
+            }
+        }
+    }
+
+    /** Fetch shared tables between the current user and the selected opponent. */
+    fun fetchSharedTables(opponentId: String) {
+        viewModelScope.launch {
+            try {
+                isLoadingTables = true
+                sharedTables = emptyList()
+                // 1. Fetch both VPS mappings
+                val opponentVps = repository.fetchOpponentVpsMapping(opponentId)
+                val ownVps = repository.fetchOwnVpsMapping()
+                // 2. Compute VPS-ID intersection
+                val opponentVpsIds = opponentVps.values.filter { it.isNotBlank() }.toSet()
+                val sharedRoms = ownVps.filter { (_, vpsId) ->
+                    vpsId.isNotBlank() && vpsId in opponentVpsIds
+                }
+                if (sharedRoms.isEmpty()) {
+                    sharedTables = emptyList()
+                    return@launch
+                }
+                // 3. Resolve ROM names to human-readable table names
+                val romNames = repository.fetchRomNames()
+                sharedTables = sharedRoms.keys
+                    .map { rom ->
+                        val displayName = romNames[rom]?.takeIf { it.isNotBlank() } ?: rom
+                        Pair(displayName, rom)
+                    }
+                    .sortedBy { it.first.lowercase() }
+            } catch (_: Exception) {
+                sharedTables = emptyList()
+            } finally {
+                isLoadingTables = false
             }
         }
     }
