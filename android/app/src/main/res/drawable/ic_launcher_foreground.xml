@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Pinball-themed trophy icon -->
+    <path
+        android:fillColor="#FF7F00"
+        android:pathData="M54,24 L62,40 L78,42 L66,54 L69,70 L54,62 L39,70 L42,54 L30,42 L46,40 Z"/>
+    <path
+        android:fillColor="#DDDDDD"
+        android:pathData="M48,70 L60,70 L60,78 L48,78 Z"/>
+    <path
+        android:fillColor="#DDDDDD"
+        android:pathData="M44,78 L64,78 L64,82 L44,82 Z"/>
+</vector>
