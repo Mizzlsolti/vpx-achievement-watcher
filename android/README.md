@@ -18,21 +18,17 @@
 ## Prerequisites
 
 - **Android 8.0+** (API 26)
-- **Firebase Realtime Database URL** from your desktop Watcher configuration
 - **Player ID** and **Player Name** from your desktop Watcher setup
 
 ## Setup
 
-1. **Get your Cloud URL** from the desktop Watcher:
-   - Open the Watcher → System tab → Cloud Sync section
-   - Copy the Firebase URL (e.g., `https://your-database.firebaseio.com`)
-
-2. **Get your Player ID and Name**:
+1. **Get your Player ID and Name**:
    - These are set during the Watcher's first-run setup wizard
    - Player ID is a 4-character code (e.g., `AB23`)
    - If you don't have one, the app can generate a new one
 
-3. **Install the app** and enter your Cloud URL, Player Name, and Player ID on the login screen
+2. **Install the app** and enter your Player Name and Player ID on the login screen
+   - The Firebase Realtime Database URL is built into the app — no manual configuration needed
 
 ## Build Instructions
 
