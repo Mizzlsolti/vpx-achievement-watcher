@@ -179,6 +179,91 @@ class DuelRepository {
         return stats.values.sortedByDescending { it.wins }.take(50)
     }
 
+    /**
+     * Fetch all player names from the cloud — mirrors the Watcher's _fetch_duel_opponents().
+     * Returns a sorted list of (displayName, playerId) pairs, excluding the current user,
+     * empty names, and the reserved "Player" default name.
+     */
+    suspend fun fetchPlayerList(): List<Pair<String, String>> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        if (url.isBlank()) return emptyList()
+        val myId = PrefsManager.playerId.trim().lowercase()
+        val myName = PrefsManager.playerName.trim()
+
+        // 1. Shallow fetch to get all player IDs
+        val rawIds = FirebaseClient.getNodeShallow(url, "players") ?: return emptyList()
+        val playerIds = try {
+            val root = json.parseToJsonElement(rawIds)
+            if (root is JsonObject) root.keys.toList() else emptyList()
+        } catch (_: Exception) { emptyList() }
+
+        val otherIds = playerIds.filter { it.trim().lowercase() != myId }
+        if (otherIds.isEmpty()) return emptyList()
+
+        // 2. For each player ID, fetch the name from achievements/name
+        val players = mutableListOf<Pair<String, String>>()
+        for (pid in otherIds) {
+            try {
+                val rawName = FirebaseClient.getNode(url, "players/$pid/achievements/name")
+                val name = try {
+                    val el = json.parseToJsonElement(rawName ?: "null")
+                    if (el is JsonPrimitive && el.isString) el.content.trim() else ""
+                } catch (_: Exception) { "" }
+
+                if (name.isNotEmpty() && !name.equals("Player", ignoreCase = true)) {
+                    // Skip if the name matches the current user's name
+                    if (myName.isNotEmpty() && name.equals(myName, ignoreCase = true)) continue
+                    players.add(Pair(name, pid))
+                }
+            } catch (_: Exception) {
+                // Skip players that can't be fetched
+            }
+        }
+
+        // 3. Sort alphabetically by name
+        return players.sortedBy { it.first.lowercase() }
+    }
+
+    /** Fetch the VPS-ID mapping for a given opponent from the cloud. */
+    suspend fun fetchOpponentVpsMapping(opponentId: String): Map<String, String> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        if (url.isBlank()) return emptyMap()
+        val raw = FirebaseClient.getNode(url, "players/$opponentId/vps_mapping") ?: return emptyMap()
+        return parseStringMap(raw)
+    }
+
+    /** Fetch the current user's VPS-ID mapping from the cloud. */
+    suspend fun fetchOwnVpsMapping(): Map<String, String> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        if (url.isBlank()) return emptyMap()
+        val myId = PrefsManager.playerId.trim().lowercase()
+        if (myId.isBlank()) return emptyMap()
+        val raw = FirebaseClient.getNode(url, "players/$myId/vps_mapping") ?: return emptyMap()
+        return parseStringMap(raw)
+    }
+
+    /**
+     * Fetch romnames.json to resolve ROM keys to human-readable table names.
+     * Uses the same GitHub source as the desktop Watcher.
+     */
+    suspend fun fetchRomNames(): Map<String, String> {
+        val romNamesUrl = "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
+        val raw = FirebaseClient.fetchUrl(romNamesUrl) ?: return emptyMap()
+        return parseStringMap(raw)
+    }
+
+    /** Parse a JSON object into a simple String→String map. */
+    private fun parseStringMap(raw: String): Map<String, String> {
+        return try {
+            val root = json.parseToJsonElement(raw)
+            if (root is JsonObject) {
+                root.entries.associate { (key, value) ->
+                    key to (if (value is JsonPrimitive && value.isString) value.content else value.toString().trim('"'))
+                }
+            } else emptyMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
     /** Write an app_signal for overlay dismiss on the desktop Watcher. */
     suspend fun writeAppSignal(playerId: String, action: String, duelId: String): Boolean {
         val url = PrefsManager.DEFAULT_CLOUD_URL

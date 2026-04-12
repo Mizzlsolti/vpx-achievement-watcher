@@ -160,6 +160,28 @@ object FirebaseClient {
         }
     }
 
+    /** Fetch a raw URL (non-Firebase). Returns the body string or null. */
+    suspend fun fetchUrl(url: String): String? = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "VpxWatcherAndroid/1.0")
+            .get()
+            .build()
+        suspendCancellableCoroutine { cont ->
+            val call = client.newCall(request)
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (cont.isActive) cont.resume(null)
+                }
+                override fun onResponse(call: Call, response: Response) {
+                    val body = response.body?.string()
+                    if (cont.isActive) cont.resume(body)
+                }
+            })
+        }
+    }
+
     /**
      * Open an SSE (Server-Sent Events) stream to a Firebase path.
      * Calls [onEvent] with event type and data for each SSE event.
