@@ -85,7 +85,7 @@ private fun QueueTab(viewModel: TournamentViewModel) {
                 Text("Players in Queue: ${viewModel.queue.size}/4", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { viewModel.queue.size / 4f },
+                    progress = viewModel.queue.size / 4f,
                     modifier = Modifier.fillMaxWidth().height(8.dp),
                     color = Primary,
                     trackColor = MaterialTheme.colorScheme.surface,
