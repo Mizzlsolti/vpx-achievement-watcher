@@ -1328,6 +1328,31 @@ class DuelsMixin:
             pass
         self._duel_invite_notify_state = None
 
+    @pyqtSlot(str)
+    def _dismiss_overlay_for_duel(self, duel_id: str) -> None:
+        """Dismiss the duel overlay if it is currently showing a notification for this duel."""
+        try:
+            state = getattr(self, "_duel_invite_notify_state", None)
+            if state is not None and state.get("duel_id") == duel_id:
+                self._duel_invite_notify_cancel()
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # Also check automatch notification state
+        try:
+            am_state = getattr(self, "_automatch_notify_state", None)
+            if am_state is not None and am_state.get("duel_id") == duel_id:
+                self._automatch_notify_state = None
+                try:
+                    self._get_duel_overlay().hide()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def _on_duel_invitation_timeout(self) -> None:
         """Legacy no-op: countdown timer removed. Kept to avoid AttributeError."""
         pass
@@ -1616,6 +1641,29 @@ class DuelsMixin:
                         Q_ARG(str, color),
                         Q_ARG(int, 8),
                     )
+            # Check for app signals (from Android companion app)
+            try:
+                from core.cloud_sync import CloudSync
+                my_id = self.cfg.OVERLAY.get("player_id", "").strip().lower()
+                if my_id:
+                    signals = CloudSync.fetch_node(self.cfg, f"players/{my_id}/app_signals")
+                    if isinstance(signals, dict) and signals:
+                        for sig_id, sig in signals.items():
+                            if not isinstance(sig, dict):
+                                continue
+                            action = sig.get("action", "")
+                            duel_id = sig.get("duel_id", "")
+                            if action in ("duel_accepted", "duel_declined", "duel_cancelled"):
+                                # Dismiss overlay if it's showing this duel
+                                QMetaObject.invokeMethod(
+                                    self, "_dismiss_overlay_for_duel",
+                                    Qt.ConnectionType.QueuedConnection,
+                                    Q_ARG(str, duel_id),
+                                )
+                        # Clear processed signals
+                        CloudSync.set_node(self.cfg, f"players/{my_id}/app_signals", None)
+            except Exception:
+                pass
         threading.Thread(target=_poll, daemon=True).start()
 
     # ── Polling: periodic refresh ──────────────────────────────────────────────

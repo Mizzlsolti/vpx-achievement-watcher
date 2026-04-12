@@ -1,0 +1,25 @@
+name: Build Android APK
+on:
+  push:
+    paths: ['android/**']
+  pull_request:
+    paths: ['android/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpx-watcher-debug
+          path: android/app/build/outputs/apk/debug/*.apk
