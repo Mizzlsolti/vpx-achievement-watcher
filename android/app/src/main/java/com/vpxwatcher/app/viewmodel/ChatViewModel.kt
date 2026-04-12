@@ -11,6 +11,8 @@ import com.vpxwatcher.app.data.PrefsManager
 import com.vpxwatcher.app.data.models.ChatMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.sse.EventSource
 
 class ChatViewModel : ViewModel() {
