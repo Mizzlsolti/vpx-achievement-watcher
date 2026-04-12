@@ -8,7 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,7 +53,7 @@ fun LoginScreen(
             value = viewModel.playerName,
             onValueChange = { viewModel.onPlayerNameChanged(it) },
             label = { Text("👤 Player Name") },
-            placeholder = { Text("Enter your player name") },
+            placeholder = { Text("Enter your player name from the desktop Watcher") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -72,49 +71,28 @@ fun LoginScreen(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Player ID
-        Row(
+        // Player ID (full-width, no Generate button)
+        OutlinedTextField(
+            value = viewModel.playerId,
+            onValueChange = { viewModel.onPlayerIdChanged(it) },
+            label = { Text("🔑 Player ID") },
+            placeholder = { Text("Your 4-char ID (from Watcher System tab)") },
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = viewModel.playerId,
-                onValueChange = { viewModel.onPlayerIdChanged(it) },
-                label = { Text("🔑 Player ID") },
-                placeholder = { Text("4 chars") },
-                modifier = Modifier.width(120.dp),
-                singleLine = true,
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 18.sp,
-                    letterSpacing = 2.sp
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedLabelColor = Primary,
-                )
+            singleLine = true,
+            textStyle = LocalTextStyle.current.copy(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 18.sp,
+                letterSpacing = 2.sp
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                focusedLabelColor = Primary,
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Button(
-                onClick = { viewModel.generatePlayerId() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Text("🎲 Generate")
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "⚠\uFE0F Write this down! This ID restores your progress on a new device.",
-            fontSize = 11.sp,
-            color = Color(0xFFFF7F00),
-            modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "🔄 Returning player? Enter your old ID. Name must match.",
+            text = "💡 You need to set up your player in the desktop Watcher first before using this app.",
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth()
