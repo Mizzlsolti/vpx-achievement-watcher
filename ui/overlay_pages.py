@@ -57,6 +57,57 @@ class OverlayPagesMixin:
         except Exception:
             return False
 
+    # ── Content check helper ─────────────────────────────────────────────────
+
+    def _overlay_page_has_content(self, page_idx: int) -> bool:
+        """Return True if *page_idx* has meaningful content to display.
+
+        Used by ``_cycle_overlay_button()`` to skip empty pages during cycling.
+        """
+        if page_idx == 0:
+            # Page 0 (Highlight Stats / Session Overview): has content when
+            # _prepare_overlay_sections() produced at least one section.
+            secs = getattr(self, "_overlay_cycle", {}).get("sections", [])
+            return bool(secs)
+
+        if page_idx == 1:
+            # Page 1 (Achievement Progress): has content when there is a
+            # last-played ROM **or** custom achievements exist for the last table.
+            rom = self._get_last_played_rom()
+            if rom:
+                return True
+            # No ROM – check for custom achievements on the last table
+            try:
+                last_table = getattr(self.watcher, "current_table", "") or ""
+                if not last_table:
+                    summary_path = os.path.join(
+                        self.cfg.BASE, "session_stats", "Highlights",
+                        "session_latest.summary.json",
+                    )
+                    if os.path.isfile(summary_path):
+                        with open(summary_path, "r", encoding="utf-8") as f:
+                            last_table = str(json.load(f).get("table", "") or "")
+                if last_table:
+                    custom_json = os.path.join(
+                        p_aweditor(self.cfg), f"{last_table}.custom.json",
+                    )
+                    if os.path.isfile(custom_json):
+                        return True
+            except Exception:
+                pass
+            return False
+
+        if page_idx == 2:
+            # Page 2 (Cloud Leaderboard): has content when there IS a
+            # last-played ROM **and** cloud sync is enabled.
+            rom = self._get_last_played_rom()
+            if not rom or not getattr(self.cfg, "CLOUD_ENABLED", False):
+                return False
+            return True
+
+        # Pages 3 (VPC Weekly) and 4 (Score Duels) always have content.
+        return True
+
     # ── Overlay page navigation core ─────────────────────────────────────────
 
     def _navigate_overlay_page(self, direction: int):

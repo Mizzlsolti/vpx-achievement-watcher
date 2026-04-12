@@ -282,7 +282,27 @@ class OverlayCtrlMixin:
                     self._prepare_overlay_sections()
                     secs = self._overlay_cycle.get("sections", [])
                     if not secs:
-                        self._msgbox_topmost("info", "Overlay", "No contents available (Global/Player).")
+                        # Page 0 has no content – try to open the first
+                        # enabled page that has content instead.
+                        _ov_cfg = self.cfg.OVERLAY or {}
+                        _fallback_pages = []
+                        if _ov_cfg.get("overlay_page2_enabled", True):
+                            _fallback_pages.append(1)
+                        if _ov_cfg.get("overlay_page3_enabled", True):
+                            _fallback_pages.append(2)
+                        if _ov_cfg.get("overlay_page4_enabled", True):
+                            _fallback_pages.append(3)
+                        if _ov_cfg.get("overlay_page5_enabled", True):
+                            _fallback_pages.append(4)
+                        _fallback_pages = [
+                            p for p in _fallback_pages
+                            if self._overlay_page_has_content(p)
+                        ]
+                        if _fallback_pages:
+                            self._overlay_page = _fallback_pages[0]
+                            self._show_overlay_page(_fallback_pages[0])
+                        else:
+                            self._msgbox_topmost("info", "Overlay", "No contents available (Global/Player).")
                         return
                     self._overlay_cycle["idx"] = 0
                     self._show_overlay_section(secs[0])
@@ -302,8 +322,14 @@ class OverlayCtrlMixin:
                     enabled_pages.append(3)
                 if ov.get("overlay_page5_enabled", True):
                     enabled_pages.append(4)
+                # Additionally skip pages that have no content to display.
+                enabled_pages = [
+                    p for p in enabled_pages
+                    if self._overlay_page_has_content(p)
+                ]
                 if not enabled_pages:
-                    enabled_pages = [1] if self._is_active_cat_table() else [0]
+                    self._hide_overlay()
+                    return
                 current = int(getattr(self, "_overlay_page", 0))
                 if current in enabled_pages:
                     current_idx = enabled_pages.index(current)
