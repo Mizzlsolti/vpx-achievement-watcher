@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VPX Watcher</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_duels">Duels</string>
+    <string name="nav_tournaments">Tournaments</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_profile">Profile</string>
+</resources>
