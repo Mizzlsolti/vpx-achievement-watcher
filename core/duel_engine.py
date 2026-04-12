@@ -514,6 +514,9 @@ class DuelEngine:
         Fetches the opponent's score from the cloud, determines the winner,
         plays the appropriate sound, and moves the duel to history.
 
+        Uses a 3-phase lock pattern (same as ``sync_active_duel_states``) to
+        keep network I/O outside the lock and minimise blocking time.
+
         Parameters
         ----------
         duel_id : str
@@ -530,6 +533,7 @@ class DuelEngine:
             When the duel is not found (``duel_id`` is unknown) or when the
             opponent's score is not yet available (waiting for opponent to play).
         """
+        # Phase 1: Find duel and set own score under lock.
         with self._lock:
             duel = self._find_active(duel_id)
             if duel is None:
@@ -544,10 +548,17 @@ class DuelEngine:
             else:
                 duel.opponent_score = score
 
-            # Try to fetch the opponent's score from the cloud.
-            cloud_data = None
-            if self._cfg.CLOUD_ENABLED:
-                cloud_data = CloudSync.fetch_node(self._cfg, self._cloud_node_for_duel(duel_id))
+        # Phase 2: Fetch opponent score from cloud (outside lock – network I/O).
+        cloud_data = None
+        if self._cfg.CLOUD_ENABLED:
+            cloud_data = CloudSync.fetch_node(self._cfg, self._cloud_node_for_duel(duel_id))
+
+        # Phase 3: Apply cloud data and determine result under lock.
+        with self._lock:
+            # Guard: duel may have been removed by another thread during cloud fetch.
+            if duel not in self._active:
+                log(self._cfg, f"[DUEL] submit_result: duel {duel_id} removed during cloud fetch.", "WARN")
+                return None
 
             if isinstance(cloud_data, dict):
                 if is_challenger:
@@ -560,27 +571,40 @@ class DuelEngine:
             # Only determine winner if both scores have been submitted.
             both_submitted = (duel.challenger_score != SCORE_NOT_SUBMITTED
                               and duel.opponent_score != SCORE_NOT_SUBMITTED)
-            if both_submitted:
+            if not both_submitted:
+                # Score not yet available from the other side – mark ACTIVE and wait.
+                duel.status = DuelStatus.ACTIVE
+                self._save_active()
+            else:
                 if duel.challenger_score > duel.opponent_score:
                     result = DuelStatus.WON if is_challenger else DuelStatus.LOST
                 elif duel.challenger_score < duel.opponent_score:
                     result = DuelStatus.LOST if is_challenger else DuelStatus.WON
                 else:
                     result = DuelStatus.TIE
-            else:
-                # Score not yet available from the other side – mark ACTIVE and wait.
-                duel.status = DuelStatus.ACTIVE
-                self._save_active()
-                self._upload_duel(duel)
-                log(self._cfg, f"[DUEL] Score submitted for {duel_id}; waiting for opponent score.")
-                return None
 
-            duel.status = result
-            duel.completed_at = time.time()
-            self._active.remove(duel)
-            self._history.append(duel)
-            self._save_active()
-            self._save_history()
+                duel.status = result
+                duel.completed_at = time.time()
+                self._active.remove(duel)
+                self._history.append(duel)
+                self._save_active()
+                self._save_history()
+
+        # Cloud upload outside lock.
+        if not both_submitted:
+            # PATCH only own score + status to avoid clobbering the opponent's
+            # score on concurrent submission (Fix #14).
+            if self._cfg.CLOUD_ENABLED:
+                patch_data = {"status": DuelStatus.ACTIVE}
+                if is_challenger:
+                    patch_data["challenger_score"] = score
+                else:
+                    patch_data["opponent_score"] = score
+                CloudSync.patch_node(self._cfg, self._cloud_node_for_duel(duel_id), patch_data)
+            log(self._cfg, f"[DUEL] Score submitted for {duel_id}; waiting for opponent score.")
+            return None
+
+        # Full upload is OK – the duel is terminal (no concurrent score writes).
         self._upload_duel(duel)
         log(self._cfg, f"[DUEL] Duel {duel_id} result: {result} (challenger={duel.challenger_score}, opponent={duel.opponent_score})")
 
@@ -604,48 +628,83 @@ class DuelEngine:
         ACCEPTED and ACTIVE duels expire after ``ACTIVE_DUEL_TTL_SECONDS``
         (2 days) from acceptance to prevent them from staying forever.
 
+        Uses a 3-phase lock pattern (same as ``sync_active_duel_states``) to
+        keep network I/O outside the lock and minimise blocking time.
+
         Returns a list of duels that were expired in this call.
         """
         now = time.time()
         expired: List[Duel] = []
+
+        # Phase 1: Snapshot expiry candidates under lock.
+        pending_to_check: List[Duel] = []   # PENDING duels that need a cloud check
+        direct_expire: List[Duel] = []      # ACCEPTED/ACTIVE duels past TTL
         with self._lock:
             for duel in list(self._active):
-                should_expire = False
                 if duel.status == DuelStatus.PENDING and duel.expires_at > 0 and now > duel.expires_at:
-                    # Before expiring, check cloud state – the opponent may have accepted
-                    # just before we run expiry (race condition guard).
-                    if self._cfg.CLOUD_ENABLED:
-                        try:
-                            cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
-                            if isinstance(cloud_data, dict):
-                                cloud_status = cloud_data.get("status")
-                                if cloud_status == DuelStatus.ACCEPTED:
-                                    # Opponent accepted in the cloud – update local state.
-                                    duel.status = DuelStatus.ACCEPTED
-                                    duel.accepted_at = float(cloud_data.get("accepted_at", now))
-                                    self._save_active()
-                                    log(self._cfg, f"[DUEL] check_expiry: duel {duel.duel_id} was accepted in cloud – skipping expiry.")
-                                    continue
-                        except Exception:
-                            pass
-                    should_expire = True
+                    pending_to_check.append(duel)
                 elif duel.status in (DuelStatus.ACCEPTED, DuelStatus.ACTIVE):
                     # Accepted/active duels expire after 2 days from acceptance.
                     ref_time = duel.accepted_at if duel.accepted_at > 0 else duel.created_at
                     if ref_time > 0 and now > ref_time + ACTIVE_DUEL_TTL_SECONDS:
-                        should_expire = True
+                        direct_expire.append(duel)
 
-                if should_expire:
-                    duel.status = DuelStatus.EXPIRED
-                    duel.completed_at = now
-                    self._active.remove(duel)
-                    self._history.append(duel)
-                    expired.append(duel)
-                    log(self._cfg, f"[DUEL] Duel {duel.duel_id} expired.")
-                    try:
-                        sound.play("duel_expired")
-                    except Exception:
-                        pass
+        # Phase 2: Cloud-fetch for each expired PENDING duel (outside lock – network I/O).
+        # Race-condition guard: the opponent may have accepted just before expiry.
+        cloud_results: dict = {}
+        if self._cfg.CLOUD_ENABLED:
+            for duel in pending_to_check:
+                try:
+                    cloud_data = CloudSync.fetch_node(self._cfg, f"duels/{duel.duel_id}")
+                    cloud_results[duel.duel_id] = cloud_data
+                except Exception:
+                    pass
+
+        # Phase 3: Apply expiry under lock.
+        with self._lock:
+            # Process PENDING duels that had their cloud state checked.
+            for duel in pending_to_check:
+                # Guard: duel may have been removed by another thread.
+                if duel not in self._active:
+                    continue
+                # Check if opponent accepted in the cloud.
+                cloud_data = cloud_results.get(duel.duel_id)
+                if isinstance(cloud_data, dict):
+                    cloud_status = cloud_data.get("status")
+                    if cloud_status == DuelStatus.ACCEPTED:
+                        # Opponent accepted in the cloud – update local state.
+                        duel.status = DuelStatus.ACCEPTED
+                        duel.accepted_at = float(cloud_data.get("accepted_at", now))
+                        self._save_active()
+                        log(self._cfg, f"[DUEL] check_expiry: duel {duel.duel_id} was accepted in cloud – skipping expiry.")
+                        continue
+                # Not accepted – expire it.
+                duel.status = DuelStatus.EXPIRED
+                duel.completed_at = now
+                self._active.remove(duel)
+                self._history.append(duel)
+                expired.append(duel)
+                log(self._cfg, f"[DUEL] Duel {duel.duel_id} expired.")
+                try:
+                    sound.play("duel_expired")
+                except Exception:
+                    pass
+
+            # Process ACCEPTED/ACTIVE duels that exceeded the TTL.
+            for duel in direct_expire:
+                # Guard: duel may have been removed by another thread.
+                if duel not in self._active:
+                    continue
+                duel.status = DuelStatus.EXPIRED
+                duel.completed_at = now
+                self._active.remove(duel)
+                self._history.append(duel)
+                expired.append(duel)
+                log(self._cfg, f"[DUEL] Duel {duel.duel_id} expired.")
+                try:
+                    sound.play("duel_expired")
+                except Exception:
+                    pass
 
             if expired:
                 self._save_active()
