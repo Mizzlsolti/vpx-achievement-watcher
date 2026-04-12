@@ -20,8 +20,6 @@ class LoginViewModel : ViewModel() {
         private const val SAFE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
     }
 
-    var cloudUrl by mutableStateOf(PrefsManager.cloudUrl)
-        private set
     var playerName by mutableStateOf(PrefsManager.playerName)
         private set
     var playerId by mutableStateOf(PrefsManager.playerId)
@@ -31,7 +29,6 @@ class LoginViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
         private set
 
-    fun onCloudUrlChanged(value: String) { cloudUrl = value }
     fun onPlayerNameChanged(value: String) { playerName = value }
     fun onPlayerIdChanged(value: String) { playerId = value.uppercase().take(4) }
 
@@ -42,15 +39,11 @@ class LoginViewModel : ViewModel() {
 
     /** Validate and login. Matches validate_player_identity() logic exactly. */
     fun login(onSuccess: () -> Unit) {
-        val url = cloudUrl.trim()
+        val url = PrefsManager.DEFAULT_CLOUD_URL
         val name = playerName.trim()
         val id = playerId.trim().uppercase()
 
         // Local validation
-        if (url.isEmpty()) {
-            errorMessage = "⛔ Please enter your Firebase Cloud URL."
-            return
-        }
         if (name.isEmpty()) {
             errorMessage = "⛔ Please enter a player name."
             return
@@ -77,7 +70,6 @@ class LoginViewModel : ViewModel() {
                 val result = validateWithCloud(url, id, name)
                 if (result.first) {
                     // Save to prefs
-                    PrefsManager.cloudUrl = url
                     PrefsManager.playerName = name
                     PrefsManager.playerId = id
                     // Upload name to cloud

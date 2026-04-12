@@ -85,7 +85,6 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun logout(onLogout: () -> Unit) {
-        PrefsManager.cloudUrl = ""
         PrefsManager.playerName = ""
         PrefsManager.playerId = ""
         onLogout()

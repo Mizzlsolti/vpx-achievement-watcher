@@ -49,29 +49,6 @@ fun LoginScreen(
         )
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Cloud URL
-        OutlinedTextField(
-            value = viewModel.cloudUrl,
-            onValueChange = { viewModel.onCloudUrlChanged(it) },
-            label = { Text("☁️ Firebase Cloud URL") },
-            placeholder = { Text("https://your-db.firebaseio.com") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                focusedLabelColor = Primary,
-            )
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Same URL as in your desktop Watcher settings",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Player Name
         OutlinedTextField(
             value = viewModel.playerName,
