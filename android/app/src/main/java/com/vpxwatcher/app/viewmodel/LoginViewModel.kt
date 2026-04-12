@@ -11,13 +11,14 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 
 /**
- * Login validation logic matching CloudSync.validate_player_identity() from core/cloud_sync.py.
+ * Login validation logic — the app is read-only for player identity.
+ * Players must be created in the desktop Watcher first.
  */
 class LoginViewModel : ViewModel() {
 
     companion object {
-        /** Safe character set matching ui/setup_wizard.py _generate_player_id(). */
-        private const val SAFE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+        /** Regex matching allowed player-name characters from ui/setup_wizard.py. */
+        private val NAME_REGEX = Regex("[\\p{L}\\d /\\\\!\"§\$%&()\\-_,.:;]*")
     }
 
     var playerName by mutableStateOf(PrefsManager.playerName)
@@ -30,18 +31,13 @@ class LoginViewModel : ViewModel() {
         private set
 
     fun onPlayerNameChanged(value: String) { playerName = value }
-    fun onPlayerIdChanged(value: String) { playerId = value.uppercase().take(4) }
+    fun onPlayerIdChanged(value: String) { playerId = value.take(4) }
 
-    /** Generate a random 4-character Player ID using the safe character set. */
-    fun generatePlayerId() {
-        playerId = (1..4).map { SAFE_CHARS.random() }.joinToString("")
-    }
-
-    /** Validate and login. Matches validate_player_identity() logic exactly. */
+    /** Validate and login. Only succeeds if the player already exists in the cloud. */
     fun login(onSuccess: () -> Unit) {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         val name = playerName.trim()
-        val id = playerId.trim().uppercase()
+        val id = playerId.trim()
 
         // Local validation
         if (name.isEmpty()) {
@@ -49,16 +45,19 @@ class LoginViewModel : ViewModel() {
             return
         }
         if (name.equals("Player", ignoreCase = true)) {
-            errorMessage = "⛔ Reserved Name — The name 'Player' cannot be used. Please choose a different name."
+            errorMessage = "⚠\uFE0F The name \"Player\" is not allowed. Must be unique."
+            return
+        }
+        if (!NAME_REGEX.matches(name)) {
+            errorMessage = "⛔ Player name contains invalid characters."
             return
         }
         if (id.isEmpty() || id.length != 4) {
             errorMessage = "⛔ Player ID must be exactly 4 characters."
             return
         }
-        // Validate ID characters against safe set
-        if (!id.all { it in SAFE_CHARS }) {
-            errorMessage = "⛔ Player ID contains invalid characters. Allowed: $SAFE_CHARS"
+        if (!id.all { it.isLetterOrDigit() }) {
+            errorMessage = "⛔ Player ID must contain only letters and numbers (A-Z, 0-9)."
             return
         }
 
@@ -67,14 +66,11 @@ class LoginViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val result = validateWithCloud(url, id, name)
+                val result = validateWithCloud(url, id.lowercase(), name)
                 if (result.first) {
-                    // Save to prefs
+                    // Save to prefs (ID stored as lowercase)
                     PrefsManager.playerName = name
-                    PrefsManager.playerId = id
-                    // Upload name to cloud
-                    val nameJson = "\"$name\""
-                    FirebaseClient.setNode(url, "players/${id.lowercase()}/achievements/name", nameJson)
+                    PrefsManager.playerId = id.lowercase()
                     onSuccess()
                 } else {
                     errorMessage = result.second
@@ -88,15 +84,18 @@ class LoginViewModel : ViewModel() {
     }
 
     /**
-     * Cloud validation matching validate_player_identity() from core/cloud_sync.py.
+     * Cloud validation — requires the player ID to already exist in the cloud
+     * with a matching name. The app does not create new players.
      * Returns Pair(success, errorMessage).
      */
     private suspend fun validateWithCloud(url: String, playerId: String, playerName: String): Pair<Boolean, String> {
         val json = FirebaseClient.json
-        val playerIdLower = playerId.lowercase()
 
         // Fetch existing player IDs (shallow)
-        val rawIds = FirebaseClient.getNodeShallow(url, "players") ?: return Pair(true, "")
+        val rawIds = FirebaseClient.getNodeShallow(url, "players")
+            ?: return Pair(false,
+                "⛔ Player ID not found — Please set up your player in the desktop Watcher first."
+            )
         val existingIds = try {
             val root = json.parseToJsonElement(rawIds)
             if (root is JsonObject) root.keys.toList() else emptyList()
@@ -104,39 +103,32 @@ class LoginViewModel : ViewModel() {
 
         val existingIdsLower = existingIds.associateBy { it.lowercase() }
 
-        // Check 1: If this ID already exists, verify the stored name matches
-        if (playerIdLower in existingIdsLower) {
-            val cloudKey = existingIdsLower[playerIdLower]!!
-            val storedNameRaw = FirebaseClient.getNode(url, "players/$cloudKey/achievements/name")
-            val storedName = try {
-                val el = json.parseToJsonElement(storedNameRaw ?: "null")
-                if (el is JsonPrimitive && el.isString) el.content else ""
-            } catch (_: Exception) { "" }
-
-            if (storedName.isNotBlank() && !storedName.trim().equals(playerName, ignoreCase = true)) {
-                return Pair(false,
-                    "⛔ Player ID Conflict — This Player ID is already registered to a " +
-                    "different player name. Please choose a different Player ID or enter " +
-                    "the correct name."
-                )
-            }
+        // The player ID must already exist in the cloud
+        if (playerId !in existingIdsLower) {
+            return Pair(false,
+                "⛔ Player ID not found — Please set up your player in the desktop Watcher first."
+            )
         }
 
-        // Check 2: If the entered name is already used by a different player ID
-        val otherIds = existingIds.filter { it.lowercase() != playerIdLower }
-        for (otherId in otherIds) {
-            val nameRaw = FirebaseClient.getNode(url, "players/$otherId/achievements/name")
-            val otherName = try {
-                val el = json.parseToJsonElement(nameRaw ?: "null")
-                if (el is JsonPrimitive && el.isString) el.content else ""
-            } catch (_: Exception) { "" }
+        // Verify the stored name matches
+        val cloudKey = existingIdsLower[playerId]!!
+        val storedNameRaw = FirebaseClient.getNode(url, "players/$cloudKey/achievements/name")
+        val storedName = try {
+            val el = json.parseToJsonElement(storedNameRaw ?: "null")
+            if (el is JsonPrimitive && el.isString) el.content else ""
+        } catch (_: Exception) { "" }
 
-            if (otherName.isNotBlank() && otherName.trim().equals(playerName, ignoreCase = true)) {
-                return Pair(false,
-                    "⛔ Name Conflict — The name '$playerName' is already used by another " +
-                    "player. Please choose a different name."
-                )
-            }
+        if (storedName.isBlank()) {
+            return Pair(false,
+                "⛔ Player ID not found — Please set up your player in the desktop Watcher first."
+            )
+        }
+
+        if (!storedName.trim().equals(playerName, ignoreCase = true)) {
+            return Pair(false,
+                "⛔ Player ID Conflict — This Player ID is already registered to a " +
+                "different player name. Please enter the correct name."
+            )
         }
 
         return Pair(true, "")
