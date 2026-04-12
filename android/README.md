@@ -28,7 +28,6 @@
    - If you don't have one, the app can generate a new one
 
 2. **Install the app** and enter your Player Name and Player ID on the login screen
-   - The Firebase Realtime Database URL is built into the app — no manual configuration needed
 
 ## Build Instructions
 
