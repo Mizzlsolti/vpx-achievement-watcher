@@ -17,8 +17,16 @@ import kotlinx.serialization.json.*
 class LoginViewModel : ViewModel() {
 
     companion object {
-        /** Regex matching allowed player-name characters from ui/setup_wizard.py. */
-        private val NAME_REGEX = Regex("[\\p{L}\\d /\\\\!\"§\$%&()\\-_,.:;]*")
+        /** Allowed special characters in player names (from ui/setup_wizard.py). */
+        private const val ALLOWED_NAME_SPECIAL = " /\\!\"§\$%&()-_,.:;"
+
+        /**
+         * Android-safe name validation — uses char-by-char check instead of regex
+         * to avoid PatternSyntaxException on Android with \p{L} and special chars.
+         */
+        private fun isValidPlayerName(name: String): Boolean {
+            return name.all { it.isLetter() || it.isDigit() || it in ALLOWED_NAME_SPECIAL }
+        }
     }
 
     var playerName by mutableStateOf(PrefsManager.playerName)
@@ -48,7 +56,7 @@ class LoginViewModel : ViewModel() {
             errorMessage = "⚠\uFE0F The name \"Player\" is not allowed. Must be unique."
             return
         }
-        if (!NAME_REGEX.matches(name)) {
+        if (!isValidPlayerName(name)) {
             errorMessage = "⛔ Player name contains invalid characters."
             return
         }
