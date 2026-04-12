@@ -13,14 +13,14 @@ class TournamentRepository {
     private val json = FirebaseClient.json
 
     /** Join the tournament queue. */
-    suspend fun joinQueue(playerId: String, playerName: String): Boolean {
+    suspend fun joinQueue(playerId: String, playerName: String, vpsIds: List<String>): Boolean {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         if (url.isBlank()) return false
         val now = System.currentTimeMillis() / 1000.0
         val entry = buildJsonObject {
             put("player_id", playerId.lowercase())
             put("player_name", playerName)
-            put("vps_ids", JsonArray(emptyList()))
+            put("vps_ids", JsonArray(vpsIds.map { JsonPrimitive(it) }))
             put("queued_at", now)
             put("expires_at", now + 1800) // 30 minutes
         }

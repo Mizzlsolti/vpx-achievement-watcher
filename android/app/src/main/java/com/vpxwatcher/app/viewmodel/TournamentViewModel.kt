@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vpxwatcher.app.data.DuelRepository
 import com.vpxwatcher.app.data.PrefsManager
 import com.vpxwatcher.app.data.TournamentRepository
 import com.vpxwatcher.app.data.models.Participant
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 class TournamentViewModel : ViewModel() {
 
     private val repository = TournamentRepository()
+    private val duelRepository = DuelRepository()
 
     var queue by mutableStateOf<List<Participant>>(emptyList())
         private set
@@ -29,12 +31,13 @@ class TournamentViewModel : ViewModel() {
     var statusMessage by mutableStateOf("")
         private set
 
-    /** Start polling every 30 seconds (matching Watcher's tournament poll interval). */
+    /** Start polling — 10s when active tournaments exist, 30s otherwise. */
     fun startPolling() {
         viewModelScope.launch {
             while (true) {
                 refresh()
-                delay(30_000) // 30 second poll interval
+                val interval = if (activeTournaments.isNotEmpty()) 10_000L else 30_000L
+                delay(interval)
             }
         }
     }
@@ -59,7 +62,14 @@ class TournamentViewModel : ViewModel() {
     fun joinQueue() {
         viewModelScope.launch {
             try {
-                val success = repository.joinQueue(PrefsManager.playerId, PrefsManager.playerName)
+                // Load own VPS-IDs from the cloud (mirroring the Watcher's validation)
+                val ownVps = duelRepository.fetchOwnVpsMapping()
+                val vpsIds = ownVps.values.filter { it.isNotBlank() }.distinct()
+                if (vpsIds.isEmpty()) {
+                    statusMessage = "⚠️ No tables with VPS-ID found. Assign VPS-IDs in the Watcher first."
+                    return@launch
+                }
+                val success = repository.joinQueue(PrefsManager.playerId, PrefsManager.playerName, vpsIds)
                 statusMessage = if (success) "🏟️ Joined tournament queue!" else "❌ Failed to join queue."
                 refresh()
             } catch (e: Exception) {

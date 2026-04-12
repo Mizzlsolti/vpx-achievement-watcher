@@ -9,6 +9,7 @@ import com.vpxwatcher.app.data.DuelRepository
 import com.vpxwatcher.app.data.LeaderboardEntry
 import com.vpxwatcher.app.data.PrefsManager
 import com.vpxwatcher.app.data.models.Duel
+import com.vpxwatcher.app.util.TableNameUtils
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -40,12 +41,13 @@ class DuelViewModel : ViewModel() {
     var isLoadingTables by mutableStateOf(false)
         private set
 
-    /** Start polling every 5 seconds (matching Watcher's _duel_poll_timer interval). */
+    /** Start polling — 3s when active duels exist, 5s otherwise. */
     fun startPolling() {
         viewModelScope.launch {
             while (true) {
                 refresh()
-                delay(5000) // 5 second poll interval
+                val interval = if (activeDuels.isNotEmpty()) 3000L else 5000L
+                delay(interval)
             }
         }
     }
@@ -185,7 +187,8 @@ class DuelViewModel : ViewModel() {
                 val romNames = repository.fetchRomNames()
                 sharedTables = sharedRoms.keys
                     .map { rom ->
-                        val displayName = romNames[rom]?.takeIf { it.isNotBlank() } ?: rom
+                        val rawName = romNames[rom]?.takeIf { it.isNotBlank() } ?: rom
+                        val displayName = TableNameUtils.cleanTableName(rawName)
                         Pair(displayName, rom)
                     }
                     .sortedBy { it.first.lowercase() }
@@ -200,8 +203,16 @@ class DuelViewModel : ViewModel() {
     fun joinMatchmaking() {
         viewModelScope.launch {
             try {
-                val success = repository.joinMatchmaking(PrefsManager.playerId, PrefsManager.playerName)
+                // Load own VPS-IDs from the cloud (mirroring the Watcher's validation)
+                val ownVps = repository.fetchOwnVpsMapping()
+                val vpsIds = ownVps.values.filter { it.isNotBlank() }.distinct()
+                if (vpsIds.isEmpty()) {
+                    statusMessage = "⚠️ No tables with VPS-ID found. Assign VPS-IDs in the Watcher first."
+                    return@launch
+                }
+                val success = repository.joinMatchmaking(PrefsManager.playerId, PrefsManager.playerName, vpsIds)
                 statusMessage = if (success) "🔍 Joined matchmaking queue." else "❌ Failed to join queue."
+                refresh()
             } catch (e: Exception) {
                 statusMessage = "❌ Error: ${e.message}"
             }
@@ -213,6 +224,7 @@ class DuelViewModel : ViewModel() {
             try {
                 repository.leaveMatchmaking(PrefsManager.playerId)
                 statusMessage = "Left matchmaking queue."
+                refresh()
             } catch (_: Exception) {}
         }
     }
