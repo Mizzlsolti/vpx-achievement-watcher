@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
     QSlider, QApplication,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 from core.theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
@@ -497,6 +497,65 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
+        # 7) Screen Capture / Live View
+        box_screen_capture = QVBoxLayout()
+        box_screen_capture.addWidget(QLabel("<b>🖥️ Screen Capture / Live View</b>"))
+
+        _fps_row = QHBoxLayout()
+        _fps_row.addWidget(QLabel("FPS:"))
+        self.cmb_sc_fps = QComboBox()
+        self.cmb_sc_fps.addItems(["Auto (dynamisch)", "30", "20", "10"])
+        _fps_val_map = {"auto": 0, "30": 1, "20": 2, "10": 3}
+        self.cmb_sc_fps.setCurrentIndex(
+            _fps_val_map.get(str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower(), 0)
+        )
+        self.cmb_sc_fps.currentIndexChanged.connect(self._on_sc_fps_changed)
+        _fps_row.addWidget(self.cmb_sc_fps)
+        _fps_row.addStretch(1)
+        box_screen_capture.addLayout(_fps_row)
+
+        _qual_row = QHBoxLayout()
+        _qual_row.addWidget(QLabel("Quality:"))
+        self.cmb_sc_quality = QComboBox()
+        self.cmb_sc_quality.addItems(["Auto (dynamisch)", "95", "80", "60"])
+        _qual_val_map = {"auto": 0, "95": 1, "80": 2, "60": 3}
+        self.cmb_sc_quality.setCurrentIndex(
+            _qual_val_map.get(str(getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto")).lower(), 0)
+        )
+        self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
+        _qual_row.addWidget(self.cmb_sc_quality)
+        _qual_row.addStretch(1)
+        box_screen_capture.addLayout(_qual_row)
+
+        self.lbl_sc_cpu_warn = QLabel("⚠️ Qualität reduziert: CPU-Auslastung hoch")
+        self.lbl_sc_cpu_warn.setStyleSheet("color: #FF3B30; font-size: 8pt; font-weight: bold;")
+        self.lbl_sc_cpu_warn.setVisible(False)
+        box_screen_capture.addWidget(self.lbl_sc_cpu_warn)
+
+        self.btn_sc_test = QPushButton("🧪 Test")
+        self.btn_sc_test.clicked.connect(self._on_sc_test)
+        box_screen_capture.addWidget(self.btn_sc_test)
+        box_screen_capture.addStretch(1)
+
+        lay_pos.addLayout(box_screen_capture, 3, 1)
+
+        # 8) Duel Picture-in-Picture
+        box_pip = QVBoxLayout()
+        box_pip.addWidget(QLabel("<b>🖥️ Duel Picture-in-Picture</b>"))
+        self.btn_pip_test = QPushButton("🧪 Test Duel PiP")
+        self.btn_pip_test.clicked.connect(self._on_pip_test)
+        box_pip.addWidget(self.btn_pip_test)
+        box_pip.addStretch(1)
+
+        lay_pos.addLayout(box_pip, 4, 0)
+
+        # CPU monitor timer (2 s) — updates the CPU warning label.
+        self._sc_cpu_timer = QTimer(self)
+        from ui.overlays_mixin import CPU_MONITOR_INTERVAL_MS
+        self._sc_cpu_timer.setInterval(CPU_MONITOR_INTERVAL_MS)
+        self._sc_cpu_timer.timeout.connect(self._update_sc_cpu_warning)
+        self._sc_cpu_timer.start()
+
         layout.addWidget(grp_pos)
 
         lbl_overlay_bg_tip = QLabel(
@@ -919,6 +978,136 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             chk.setChecked(should_be_portrait)
         self.cfg.save()
         self._update_switch_all_button_label()
+
+    # ── Screen Capture handlers ───────────────────────────────────────────────
+
+    def _on_sc_fps_changed(self, index: int) -> None:
+        fps_values = ["auto", "30", "20", "10"]
+        self.cfg.SCREEN_CAPTURE_FPS = fps_values[index] if index < len(fps_values) else "auto"
+        self.cfg.save()
+        # Push new value to running server if available.
+        try:
+            w = getattr(self, "watcher", None)
+            scs = getattr(w, "_screen_capture_server", None) if w else None
+            if scs is not None:
+                scs._fps_cfg = self.cfg.SCREEN_CAPTURE_FPS
+        except Exception:
+            pass
+
+    def _on_sc_quality_changed(self, index: int) -> None:
+        quality_values = ["auto", "95", "80", "60"]
+        self.cfg.SCREEN_CAPTURE_QUALITY = quality_values[index] if index < len(quality_values) else "auto"
+        self.cfg.save()
+        # Push new value to running server if available.
+        try:
+            w = getattr(self, "watcher", None)
+            scs = getattr(w, "_screen_capture_server", None) if w else None
+            if scs is not None:
+                scs._quality_cfg = self.cfg.SCREEN_CAPTURE_QUALITY
+        except Exception:
+            pass
+
+    def _update_sc_cpu_warning(self) -> None:
+        """Refresh the CPU warning label visibility and colour."""
+        try:
+            lbl = getattr(self, "lbl_sc_cpu_warn", None)
+            if lbl is None:
+                return
+            try:
+                import psutil
+                cpu = psutil.cpu_percent(interval=None)
+            except Exception:
+                cpu = 0.0
+            if cpu > 90:
+                lbl.setText("⚠️ Qualität reduziert: CPU-Auslastung hoch")
+                lbl.setStyleSheet("color: #FF3B30; font-size: 8pt; font-weight: bold;")
+                lbl.setVisible(True)
+            elif cpu > 80:
+                lbl.setText("⚠️ Qualität reduziert: CPU-Auslastung hoch")
+                lbl.setStyleSheet("color: #FFA500; font-size: 8pt; font-weight: bold;")
+                lbl.setVisible(True)
+            else:
+                lbl.setVisible(False)
+        except Exception:
+            pass
+
+    def _on_sc_test(self) -> None:
+        """Open a preview image from the screen capture stream to verify placement."""
+        try:
+            from core.screen_capture_server import _capture_monitor
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel as _QLabel
+            from PyQt6.QtGui import QPixmap, QImage
+            from PyQt6.QtCore import Qt as _Qt
+
+            jpeg = _capture_monitor(1)
+            if jpeg is None:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, "Screen Capture Test",
+                    "⚠️ Could not capture screen.\n\n"
+                    "Make sure 'mss' and 'Pillow' are installed:\n"
+                    "  pip install mss Pillow",
+                )
+                return
+
+            img = QImage()
+            img.loadFromData(jpeg, "JPEG")
+            pm = QPixmap.fromImage(img)
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle("🖥️ Screen Capture Preview")
+            dlg.setWindowFlags(dlg.windowFlags() | _Qt.WindowType.WindowMaximizeButtonHint)
+            vl = QVBoxLayout(dlg)
+            lbl = _QLabel()
+            lbl.setAlignment(_Qt.AlignmentFlag.AlignCenter)
+            lbl.setPixmap(pm.scaled(800, 450, _Qt.AspectRatioMode.KeepAspectRatio,
+                                    _Qt.TransformationMode.SmoothTransformation))
+            vl.addWidget(lbl)
+            dlg.resize(820, 480)
+            dlg.exec()
+
+            # Mark screen capture as configured.
+            self.cfg.OVERLAY["screen_capture_overlay_configured"] = True
+            self.cfg.save()
+        except Exception as exc:
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Screen Capture Test", f"Error: {exc}")
+            except Exception:
+                pass
+
+    # ── Duel PiP handlers ─────────────────────────────────────────────────────
+
+    def _on_pip_test(self) -> None:
+        """Open the PiP window pointed at our own screen-capture stream for preview."""
+        try:
+            from core.screen_capture_server import _get_local_ip
+            from ui.overlay_pip import DuelPiPOverlay
+
+            w = getattr(self, "watcher", None)
+            scs = getattr(w, "_screen_capture_server", None) if w else None
+            if scs is not None and scs.available:
+                ip = scs.local_ip
+                port = getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876)
+            else:
+                ip = _get_local_ip()
+                port = getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876)
+
+            stream_url = f"http://{ip}:{port}/stream/1"
+            pip = getattr(self, "_pip_test_window", None)
+            if pip is not None:
+                try:
+                    pip.close_pip()
+                except Exception:
+                    pass
+            self._pip_test_window = DuelPiPOverlay(self.cfg, stream_url)
+            self._pip_test_window.open()
+        except Exception as exc:
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Duel PiP Test", f"Error opening PiP:\n{exc}")
+            except Exception:
+                pass
 
     def _init_overlay_tooltips(self):
         tips = {

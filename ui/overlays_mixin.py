@@ -5,6 +5,12 @@ from .overlay import MiniInfoOverlay, StatusOverlay
 from .overlay_duel import DuelInfoOverlay
 import core.sound as sound
 
+# ── PiP exchange constants ────────────────────────────────────────────────────
+_PIP_EXCHANGE_TIMEOUT_SECONDS = 60   # Max seconds to wait for opponent's screen-capture IP
+_PIP_POLL_INTERVAL_SECONDS = 2       # Seconds between Firebase polls for opponent IP
+# ── CPU monitor constant ─────────────────────────────────────────────────────
+CPU_MONITOR_INTERVAL_MS = 2000       # Milliseconds between CPU-load checks in the UI
+
 
 class OverlaysMixin:
     """Mixin that provides mini info, status overlay, and nav (duel accept/decline) handler methods."""
@@ -360,6 +366,12 @@ class OverlaysMixin:
                     self._get_duel_overlay().hide()
                 except Exception:
                     pass
+                # Initiate PiP: publish our screen-capture IP to Firebase and start
+                # polling for the opponent's IP.
+                try:
+                    self._pip_start_exchange(ig_state)
+                except Exception:
+                    pass
                 return
         except Exception as e:
             try:
@@ -524,3 +536,131 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_right page5 handling failed: {e}", "WARN")
             except Exception:
                 pass
+
+    # ── Duel PiP helpers ──────────────────────────────────────────────────────
+
+    def _pip_start_exchange(self, ig_state: dict) -> None:
+        """Publish our screen-capture IP to Firebase and start polling for the opponent's IP.
+
+        Called immediately after the user presses Accept on the in-game duel
+        overlay.  Both sides execute this so the IPs become mutually visible
+        in Firebase under ``duels/{duel_id}/pip_ips/{player_id}``.
+        """
+        import threading as _threading
+
+        duel_id = ig_state.get("duel_id", "")
+        duel = ig_state.get("duel")
+        if not duel_id or duel is None:
+            return
+
+        # Only proceed if cloud sync is available.
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            return
+
+        w = getattr(self, "watcher", None)
+        scs = getattr(w, "_screen_capture_server", None) if w else None
+        if scs is None or not scs.available:
+            return
+
+        my_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+        port = getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876)
+        local_ip = scs.local_ip
+
+        # Determine opponent id.
+        is_challenger = (getattr(duel, "challenger", "").lower() == my_id)
+        opponent_id = (duel.opponent if is_challenger else duel.challenger) or ""
+        opponent_id = opponent_id.strip().lower()
+
+        if not opponent_id:
+            return
+
+        def _exchange_worker():
+            try:
+                from core.cloud_sync import CloudSync
+                from core.watcher_core import log
+
+                # Write our IP.
+                node = f"duels/{duel_id}/pip_ips/{my_id}"
+                CloudSync.set_node(self.cfg, node, {"ip": local_ip, "port": port})
+
+                # Poll for opponent's IP (up to _PIP_EXCHANGE_TIMEOUT_SECONDS).
+                deadline = _time.monotonic() + _PIP_EXCHANGE_TIMEOUT_SECONDS
+                while _time.monotonic() < deadline:
+                    # Abort if game is no longer active.
+                    w2 = getattr(self, "watcher", None)
+                    if w2 and not getattr(w2, "game_active", False) and not w2._vp_player_visible():
+                        break
+                    opp_node = f"duels/{duel_id}/pip_ips/{opponent_id}"
+                    data = CloudSync.fetch_node(self.cfg, opp_node)
+                    if isinstance(data, dict) and data.get("ip"):
+                        opp_ip = data["ip"]
+                        opp_port = int(data.get("port", 9876))
+                        stream_url = f"http://{opp_ip}:{opp_port}/stream/1"
+                        # Open PiP on the main thread via a timer.
+                        try:
+                            from PyQt6.QtCore import QTimer
+                            QTimer.singleShot(0, lambda url=stream_url: self._pip_open(url, duel_id))
+                        except Exception:
+                            pass
+                        break
+                    _time.sleep(_PIP_POLL_INTERVAL_SECONDS)
+            except Exception as exc:
+                try:
+                    from core.watcher_core import log
+                    log(self.cfg, f"[PiP] exchange worker error: {exc}", "WARN")
+                except Exception:
+                    pass
+
+        import time as _time
+        t = _threading.Thread(target=_exchange_worker, daemon=True, name="PiPExchange")
+        t.start()
+
+    def _pip_open(self, stream_url: str, duel_id: str) -> None:
+        """Open (or reuse) the PiP window and start the stream."""
+        try:
+            from ui.overlay_pip import DuelPiPOverlay
+
+            pip = getattr(self, "_duel_pip_overlay", None)
+            if pip is not None:
+                try:
+                    pip.close_pip()
+                except Exception:
+                    pass
+
+            self._duel_pip_overlay = DuelPiPOverlay(self.cfg, stream_url)
+            self._duel_pip_overlay_duel_id = duel_id
+            self._duel_pip_overlay.open()
+        except Exception as exc:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[PiP] open error: {exc}", "WARN")
+            except Exception:
+                pass
+
+    def _pip_close(self) -> None:
+        """Close the PiP window and clean up Firebase IP node."""
+        pip = getattr(self, "_duel_pip_overlay", None)
+        if pip is not None:
+            try:
+                pip.close_pip()
+            except Exception:
+                pass
+            self._duel_pip_overlay = None
+
+        duel_id = getattr(self, "_duel_pip_overlay_duel_id", None)
+        if duel_id and getattr(self.cfg, "CLOUD_ENABLED", False):
+            try:
+                import threading as _threading
+                my_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+
+                def _cleanup():
+                    try:
+                        from core.cloud_sync import CloudSync
+                        CloudSync.set_node(self.cfg, f"duels/{duel_id}/pip_ips/{my_id}", None)
+                    except Exception:
+                        pass
+
+                _threading.Thread(target=_cleanup, daemon=True, name="PiPCleanup").start()
+            except Exception:
+                pass
+        self._duel_pip_overlay_duel_id = None

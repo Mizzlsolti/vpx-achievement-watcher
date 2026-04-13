@@ -517,11 +517,12 @@ class DashboardMixin:
 
         # ── Check 5: Overlay positions saved ─────────────────────────────────
         _OVERLAY_CHECKS = [
-            ("overlay_pos_saved",    None),
-            ("ach_toast_saved",      None),
-            ("notifications_saved",  None),
-            ("duel_overlay_saved",   None),
-            ("status_overlay_saved", "status_overlay_enabled"),
+            ("overlay_pos_saved",                  None),
+            ("ach_toast_saved",                    None),
+            ("notifications_saved",                None),
+            ("duel_overlay_saved",                 None),
+            ("status_overlay_saved",               "status_overlay_enabled"),
+            ("screen_capture_overlay_configured",  None),
         ]
         total_relevant = 0
         total_configured = 0
