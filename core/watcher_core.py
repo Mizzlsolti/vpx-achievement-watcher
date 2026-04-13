@@ -3378,7 +3378,7 @@ class Watcher:
                         for k, v in end_audits.items():
                             try:
                                 _nvram_audits_data[str(k)] = v if isinstance(v, (int, float, str)) else str(v)
-                            except:
+                            except Exception:
                                 pass
                         if _nvram_audits_data:
                             _CS_rec.upload_nvram_stats(self.cfg, self.current_rom, _nvram_audits_data)
@@ -3392,7 +3392,7 @@ class Watcher:
                                 iv = int(v)
                                 if iv > 0:
                                     _deltas_data[str(k)] = iv
-                            except:
+                            except Exception:
                                 pass
                         _play_sec = int(_p1.get("active_play_seconds", 0.0))
                         _deltas_payload = {"deltas": _deltas_data, "playtime_sec": _play_sec}
