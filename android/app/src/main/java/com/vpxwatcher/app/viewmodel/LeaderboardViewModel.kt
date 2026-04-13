@@ -69,9 +69,7 @@ class LeaderboardViewModel : ViewModel() {
     }
 
     fun onSearchChanged(query: String) {
-        try {
-            searchQuery = query
-        } catch (_: Exception) { /* ignore */ }
+        searchQuery = query
     }
 
     fun fetchLeaderboard(rom: String) {
