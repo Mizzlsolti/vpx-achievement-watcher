@@ -78,7 +78,9 @@ class LeaderboardViewModel : ViewModel() {
             isLoading = true
             try {
                 leaderboard = leaderboardRepository.fetchAchievementLeaderboard(rom)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                leaderboard = emptyList()
+            }
             isLoading = false
         }
     }
