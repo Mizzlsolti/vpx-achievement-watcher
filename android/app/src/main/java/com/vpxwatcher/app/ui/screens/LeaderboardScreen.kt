@@ -69,14 +69,6 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                 expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
                 onDismissRequest = { expanded = false },
             ) {
-                DropdownMenuItem(
-                    text = { Text("🌍 Global (All Tables)") },
-                    onClick = {
-                        viewModel.onSearchChanged("")
-                        viewModel.fetchLeaderboard("")
-                        expanded = false
-                    },
-                )
                 filteredRoms.forEach { (rom, cleanName) ->
                     DropdownMenuItem(
                         text = {
@@ -130,7 +122,7 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                         else -> "#${entry.rank}"
                     }
                     val badgeIcon = entry.badgeId?.let {
-                        PlayerRepository.BADGE_MAP[it]?.icon
+                        PlayerRepository.BADGE_MAP[it]?.icon ?: "ℹ️"
                     } ?: ""
 
                     Card(

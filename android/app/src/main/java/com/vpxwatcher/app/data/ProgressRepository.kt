@@ -15,7 +15,7 @@ class ProgressRepository {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         val roms = mutableSetOf<String>()
 
-        // From session achievements
+        // From session achievements (keys are ROM names)
         val rawSession = FirebaseClient.getNodeShallow(url, "players/$playerId/achievements/session")
         if (rawSession != null) {
             try {
@@ -24,12 +24,30 @@ class ProgressRepository {
             } catch (_: Exception) {}
         }
 
-        // From roms_played
-        val rawPlayed = FirebaseClient.getNodeShallow(url, "players/$playerId/achievements/roms_played")
+        // From roms_played — stored as an array of ROM name strings in Firebase,
+        // so we need a full (non-shallow) fetch to get the actual ROM values.
+        val rawPlayed = FirebaseClient.getNode(url, "players/$playerId/achievements/roms_played")
         if (rawPlayed != null) {
             try {
                 val el = json.parseToJsonElement(rawPlayed)
-                if (el is JsonObject) roms.addAll(el.keys)
+                when (el) {
+                    is JsonArray -> {
+                        // Array of ROM name strings: ["mm_109c", "tz_94ch", ...]
+                        el.forEach { item ->
+                            val rom = if (item is JsonPrimitive && item.isString) item.content else null
+                            if (!rom.isNullOrBlank()) roms.add(rom)
+                        }
+                    }
+                    is JsonObject -> {
+                        // Object with values that are ROM name strings (sparse array):
+                        // {"0": "mm_109c", "1": "tz_94ch", ...}
+                        el.values.forEach { v ->
+                            val rom = if (v is JsonPrimitive && v.isString) v.content else null
+                            if (!rom.isNullOrBlank()) roms.add(rom)
+                        }
+                    }
+                    else -> {}
+                }
             } catch (_: Exception) {}
         }
 
@@ -68,7 +86,7 @@ class ProgressRepository {
             val obj = json.parseToJsonElement(raw)
             if (obj is JsonObject) {
                 obj.entries.associate { (key, value) ->
-                    key to parseAchievements(value.toString())
+                    key to parseAchievementsElement(value)
                 }
             } else emptyMap()
         } catch (_: Exception) { emptyMap() }
@@ -167,20 +185,37 @@ class ProgressRepository {
 
     private fun parseAchievements(raw: String): List<AchievementEntry> {
         return try {
-            val arr = json.parseToJsonElement(raw)
-            if (arr is JsonArray) {
-                arr.mapNotNull { e ->
-                    if (e is JsonObject) {
-                        AchievementEntry(
-                            title = e["title"]?.jsonPrimitive?.contentOrNull ?: "",
-                            ts = e["ts"]?.jsonPrimitive?.contentOrNull,
-                            unlocked = true
-                        )
-                    } else if (e is JsonPrimitive) {
-                        AchievementEntry(title = e.contentOrNull ?: "", unlocked = true)
-                    } else null
+            val el = json.parseToJsonElement(raw)
+            parseAchievementsElement(el)
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /** Parse achievements from a JsonElement — handles both arrays and sparse arrays (objects). */
+    private fun parseAchievementsElement(el: JsonElement): List<AchievementEntry> {
+        return try {
+            val items: List<JsonElement> = when (el) {
+                is JsonArray -> el.toList()
+                is JsonObject -> {
+                    // Sparse array from Firebase: {"0": {...}, "2": {...}, ...}
+                    el.entries.sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                        .map { it.value }
                 }
-            } else emptyList()
+                else -> emptyList()
+            }
+            items.mapNotNull { e ->
+                when (e) {
+                    is JsonObject -> AchievementEntry(
+                        title = e["title"]?.jsonPrimitive?.contentOrNull ?: "",
+                        ts = e["ts"]?.jsonPrimitive?.contentOrNull,
+                        unlocked = true
+                    )
+                    is JsonPrimitive -> AchievementEntry(
+                        title = e.contentOrNull ?: "",
+                        unlocked = true
+                    )
+                    else -> null
+                }
+            }
         } catch (_: Exception) { emptyList() }
     }
 }
