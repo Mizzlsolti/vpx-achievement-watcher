@@ -170,7 +170,12 @@ class ProgressViewModel : ViewModel() {
                 if (extra.isNotEmpty()) {
                     achievements = achievements + extra
                 }
-                totalCount = achievements.size
+                // Prefer cloudTotal if available (desktop Watcher is authoritative)
+                totalCount = if (cloudTotal != null && cloudTotal > 0) {
+                    maxOf(cloudTotal, achievements.size)
+                } else {
+                    achievements.size
+                }
                 unlockedCount = achievements.count { it.unlocked }
             } else {
                 // Fallback: use unlocked achievements only

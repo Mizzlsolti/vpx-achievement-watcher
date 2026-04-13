@@ -68,6 +68,7 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
             ExposedDropdownMenu(
                 expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
                 onDismissRequest = { expanded = false },
+                modifier = Modifier.heightIn(max = 300.dp),
             ) {
                 filteredRoms.forEach { (rom, cleanName) ->
                     DropdownMenuItem(

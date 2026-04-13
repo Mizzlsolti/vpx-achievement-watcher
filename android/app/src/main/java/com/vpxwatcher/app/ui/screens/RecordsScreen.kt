@@ -65,8 +65,6 @@ fun RecordsScreen(viewModel: RecordsViewModel = viewModel()) {
 
 @Composable
 private fun GlobalDumpsTab(viewModel: RecordsViewModel) {
-    LaunchedEffect(Unit) { viewModel.loadGlobalRecords() }
-
     if (viewModel.records.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text("No NVRAM records found.", color = MaterialTheme.colorScheme.onSurfaceVariant)

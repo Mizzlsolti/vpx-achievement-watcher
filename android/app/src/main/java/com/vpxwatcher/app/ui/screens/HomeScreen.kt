@@ -26,6 +26,7 @@ fun HomeScreen(
     var lastRunTable by remember { mutableStateOf("") }
     var lastRunScore by remember { mutableStateOf("") }
     var lastRunAchievements by remember { mutableStateOf("") }
+    var lastRunTotal by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         duelViewModel.refresh()
@@ -54,7 +55,8 @@ fun HomeScreen(
                             val romData = obj[latestRom]?.jsonObject
                             lastRunTable = latestRom
                             lastRunScore = romData?.get("score")?.jsonPrimitive?.contentOrNull ?: ""
-                            lastRunAchievements = romData?.get("achievements")?.jsonPrimitive?.contentOrNull ?: "0"
+                            lastRunAchievements = romData?.get("unlocked")?.jsonPrimitive?.contentOrNull ?: "0"
+                            lastRunTotal = romData?.get("total")?.jsonPrimitive?.contentOrNull ?: ""
                         }
                     }
                 }
@@ -97,7 +99,12 @@ fun HomeScreen(
                     if (lastRunScore.isNotEmpty()) {
                         Text("Score: $lastRunScore", color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("Achievements: $lastRunAchievements", color = MaterialTheme.colorScheme.onSurface)
+                    val achDisplay = if (lastRunTotal.isNotEmpty()) {
+                        "$lastRunAchievements/$lastRunTotal"
+                    } else {
+                        lastRunAchievements
+                    }
+                    Text("Achievements: $achDisplay", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

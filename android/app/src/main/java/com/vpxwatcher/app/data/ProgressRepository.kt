@@ -88,12 +88,17 @@ class ProgressRepository {
         val raw = FirebaseClient.getNode(url, "players/$playerId/achievements/global")
             ?: return emptyMap()
         return try {
-            val obj = json.parseToJsonElement(raw)
-            if (obj is JsonObject) {
-                obj.entries.associate { (key, value) ->
-                    key to parseAchievementsElement(value)
+            val el = json.parseToJsonElement(raw)
+            when (el) {
+                // Desktop uploads global as a flat array via __global__
+                is JsonArray -> mapOf("__global__" to parseAchievementsElement(el))
+                is JsonObject -> {
+                    el.entries.associate { (key, value) ->
+                        key to parseAchievementsElement(value)
+                    }
                 }
-            } else emptyMap()
+                else -> emptyMap()
+            }
         } catch (_: Exception) { emptyMap() }
     }
 
@@ -256,21 +261,38 @@ class ProgressRepository {
         return try {
             val obj = json.parseToJsonElement(raw)
             if (obj is JsonObject) {
-                obj.entries.associate { (title, info) ->
-                    title to when {
-                        info is JsonObject -> {
-                            val pct = info["pct"]?.jsonPrimitive?.floatOrNull ?: 0f
-                            val tier = info["tier"]?.jsonPrimitive?.contentOrNull
+                // Handle wrapper format: {"data": [...], "total_players": N, "ts": "..."}
+                val dataArray = obj["data"]
+                if (dataArray is JsonArray) {
+                    dataArray.mapNotNull { entry ->
+                        if (entry is JsonObject) {
+                            val title = entry["title"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                            val pct = entry["pct"]?.jsonPrimitive?.floatOrNull ?: 0f
+                            val tier = entry["tier"]?.jsonPrimitive?.contentOrNull
                                 ?: computeRarityFromPct(pct).tier
-                            val color = info["color"]?.jsonPrimitive?.contentOrNull
+                            val color = entry["color"]?.jsonPrimitive?.contentOrNull
                                 ?: computeRarityFromPct(pct).color
-                            RarityInfo(tier = tier, pct = pct, color = color)
+                            title to RarityInfo(tier = tier, pct = pct, color = color)
+                        } else null
+                    }.toMap()
+                } else {
+                    // Flat object format keyed by title
+                    obj.entries.associate { (title, info) ->
+                        title to when {
+                            info is JsonObject -> {
+                                val pct = info["pct"]?.jsonPrimitive?.floatOrNull ?: 0f
+                                val tier = info["tier"]?.jsonPrimitive?.contentOrNull
+                                    ?: computeRarityFromPct(pct).tier
+                                val color = info["color"]?.jsonPrimitive?.contentOrNull
+                                    ?: computeRarityFromPct(pct).color
+                                RarityInfo(tier = tier, pct = pct, color = color)
+                            }
+                            info is JsonPrimitive -> {
+                                val pct = info.floatOrNull ?: 0f
+                                computeRarityFromPct(pct)
+                            }
+                            else -> RarityInfo("Unknown", 0f, "#888888")
                         }
-                        info is JsonPrimitive -> {
-                            val pct = info.floatOrNull ?: 0f
-                            computeRarityFromPct(pct)
-                        }
-                        else -> RarityInfo("Unknown", 0f, "#888888")
                     }
                 }
             } else emptyMap()
