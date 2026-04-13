@@ -199,6 +199,11 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
                 BadgeGrid(
                     allBadges = PlayerRepository.BADGE_DEFINITIONS,
                     earnedIds = viewModel.earnedBadges,
+                    onBadgeClick = { badge ->
+                        if (badge.id in viewModel.earnedBadges) {
+                            viewModel.selectBadge(badge.id)
+                        }
+                    },
                 )
             }
         }
@@ -238,6 +243,13 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("— None —") },
+                            onClick = {
+                                viewModel.clearBadge()
+                                expanded = false
+                            },
+                        )
                         viewModel.earnedBadges.forEach { badgeId ->
                             val badge = PlayerRepository.BADGE_MAP[badgeId] ?: return@forEach
                             DropdownMenuItem(

@@ -2462,6 +2462,47 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                         CloudSync.upload_full_achievements(self.cfg, state, pname)
                     except Exception:
                         pass
+                elif action == "restore":
+                    try:
+                        CloudSync.restore_from_cloud(self.cfg)
+                    except Exception:
+                        pass
+
+            # Process trigger_backup / trigger_restore from preferences path
+            # (written by the mobile app as a timestamp)
+            trigger_backup_ts = prefs.get("trigger_backup")
+            if trigger_backup_ts:
+                last_ts = getattr(self, "_last_trigger_backup_ts", None)
+                if str(trigger_backup_ts) != str(last_ts):
+                    self._last_trigger_backup_ts = str(trigger_backup_ts)
+                    try:
+                        state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
+                        pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
+                        CloudSync.upload_full_achievements(self.cfg, state, pname)
+                    except Exception:
+                        pass
+                    # Clear the trigger so it doesn't re-fire
+                    try:
+                        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+                        CloudSync.set_node(self.cfg, f"players/{pid}/preferences/trigger_backup", None)
+                    except Exception:
+                        pass
+
+            trigger_restore_ts = prefs.get("trigger_restore")
+            if trigger_restore_ts:
+                last_ts = getattr(self, "_last_trigger_restore_ts", None)
+                if str(trigger_restore_ts) != str(last_ts):
+                    self._last_trigger_restore_ts = str(trigger_restore_ts)
+                    try:
+                        CloudSync.restore_from_cloud(self.cfg)
+                    except Exception:
+                        pass
+                    # Clear the trigger so it doesn't re-fire
+                    try:
+                        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+                        CloudSync.set_node(self.cfg, f"players/{pid}/preferences/trigger_restore", None)
+                    except Exception:
+                        pass
         except Exception:
             pass
 

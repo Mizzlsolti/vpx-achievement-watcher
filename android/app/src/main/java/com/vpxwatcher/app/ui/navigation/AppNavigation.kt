@@ -14,11 +14,11 @@ import kotlinx.coroutines.launch
 import com.vpxwatcher.app.ui.screens.*
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
-    data object Home : Screen("home", "Dashboard", Icons.Default.Home)
+    data object Home : Screen("home", "Home", Icons.Default.Home)
     data object Player : Screen("player", "Player", Icons.Default.Person)
     data object Progress : Screen("progress", "Progress", Icons.Default.TrendingUp)
     data object Leaderboard : Screen("leaderboard", "Cloud", Icons.Default.Cloud)
-    data object Records : Screen("records", "Records", Icons.Default.Assessment)
+    data object Records : Screen("records", "Records & Stats", Icons.Default.Assessment)
     data object Duels : Screen("duels", "Duels", Icons.Default.SportsKabaddi)
     data object Tournaments : Screen("tournaments", "Tournaments", Icons.Default.EmojiEvents)
     data object Chat : Screen("chat", "Chat", Icons.Default.Chat)

@@ -105,9 +105,17 @@ class PlayerRepository {
     /** Evaluate which badges are earned (mirrors core/badges.py). */
     fun evaluateBadges(state: JsonObject): List<String> {
         val earned = mutableListOf<String>()
+        val badgesElement = state["badges"]
         val badges = try {
-            state["badges"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }
-                ?: emptyList()
+            when (badgesElement) {
+                is JsonArray -> badgesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+                is JsonObject -> badgesElement.entries
+                    .filter { (_, v) ->
+                        v is JsonPrimitive && v.booleanOrNull == true
+                    }
+                    .map { it.key }
+                else -> emptyList()
+            }
         } catch (_: Exception) { emptyList() }
         earned.addAll(badges)
         return earned

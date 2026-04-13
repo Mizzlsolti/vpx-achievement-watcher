@@ -92,6 +92,15 @@ class PlayerViewModel : ViewModel() {
         }
     }
 
+    fun clearBadge() {
+        viewModelScope.launch {
+            val pid = PrefsManager.playerId.lowercase()
+            if (pid.isBlank()) return@launch
+            val success = playerRepository.saveSelectedBadge(pid, "")
+            if (success) selectedBadge = null
+        }
+    }
+
     fun logout(onLogout: () -> Unit) {
         PrefsManager.playerName = ""
         PrefsManager.playerId = ""
