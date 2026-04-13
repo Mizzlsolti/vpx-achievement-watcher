@@ -37,16 +37,21 @@ class PlayerViewModel : ViewModel() {
         private set
     var isLoading by mutableStateOf(false)
         private set
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
 
     fun refresh() {
         playerName = PrefsManager.playerName
         playerId = PrefsManager.playerId
         viewModelScope.launch {
             isLoading = true
+            errorMessage = null
             try {
                 fetchPlayerData()
                 fetchDuelStats()
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                errorMessage = "⛔ Cloud fetch failed: ${e.message ?: "Unknown error"}"
+            }
             isLoading = false
         }
     }
