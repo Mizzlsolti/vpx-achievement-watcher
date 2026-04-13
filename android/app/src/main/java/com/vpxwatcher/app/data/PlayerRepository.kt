@@ -11,25 +11,73 @@ class PlayerRepository {
 
     private val json = FirebaseClient.json
 
-    /** Fetch full achievements state from Firebase. */
+    /**
+     * Fetch full achievements state from Firebase.
+     * Mirrors desktop restore_from_cloud(): fetches the main achievements node,
+     * then separately fetches the session sub-node and merges it (sub-node entries
+     * take precedence per ROM, keeping inline metadata entries as fallback).
+     */
     suspend fun fetchAchievementsState(playerId: String): JsonObject? {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         val raw = FirebaseClient.getNode(url, "players/$playerId/achievements") ?: return null
-        return try {
+        val baseObj = try {
             val el = json.parseToJsonElement(raw)
             if (el is JsonObject) el else null
-        } catch (_: Exception) { null }
+        } catch (_: Exception) { null } ?: return null
+
+        // Fetch session sub-node separately and merge (mirrors cloud_sync.py lines 667-683).
+        // Session data is stored per-ROM under achievements/session/{rom} (chunked format).
+        val mergedEntries = buildJsonObject {
+            // Copy all existing keys from baseObj
+            for ((key, value) in baseObj) {
+                put(key, value)
+            }
+
+            // Merge session sub-node
+            try {
+                val sessionRaw = FirebaseClient.getNode(url, "players/$playerId/achievements/session")
+                if (sessionRaw != null) {
+                    val sessionEl = json.parseToJsonElement(sessionRaw)
+                    if (sessionEl is JsonObject && sessionEl.isNotEmpty()) {
+                        // Start from existing inline session data (backward compat)
+                        val existingSession = baseObj["session"]
+                        val mergedSession = buildJsonObject {
+                            // Keep inline session entries as fallback
+                            if (existingSession is JsonObject) {
+                                for ((rom, entries) in existingSession) {
+                                    put(rom, entries)
+                                }
+                            }
+                            // Sub-node entries take precedence per ROM
+                            for ((rom, entries) in sessionEl) {
+                                if (entries is JsonArray && entries.isNotEmpty()) {
+                                    put(rom, entries)
+                                }
+                            }
+                        }
+                        put("session", mergedSession)
+                    }
+                }
+            } catch (_: Exception) {
+                // Non-critical: session sub-node fetch failed, use inline data
+            }
+        }
+
+        return mergedEntries
     }
 
     /** Compute player level from achievements state (mirrors core/badges.py compute_player_level). */
     fun computePlayerLevel(state: JsonObject): PlayerLevel {
         val seen = mutableSetOf<String>()
 
-        // global achievements
-        val global = state["global"]?.jsonObject
-        global?.values?.forEach { entries ->
-            if (entries is JsonArray) {
-                entries.forEach { e ->
+        // global achievements — cloud stores global as a flat JsonArray (uploaded by
+        // upload_full_achievements), but local state wraps it in {"__global__": [...]}.
+        // Handle both formats exactly like core/badges.py compute_player_level().
+        val globalElement = state["global"]
+        when (globalElement) {
+            is JsonArray -> {
+                // Flat array format (cloud upload format): [entry1, entry2, ...]
+                globalElement.forEach { e ->
                     val title = when {
                         e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
                         e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
@@ -38,19 +86,37 @@ class PlayerRepository {
                     if (title.isNotEmpty()) seen.add(title)
                 }
             }
+            is JsonObject -> {
+                // Dict-of-groups format (local state): {"__global__": [...], ...}
+                globalElement.values.forEach { entries ->
+                    if (entries is JsonArray) {
+                        entries.forEach { e ->
+                            val title = when {
+                                e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
+                                e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
+                                else -> ""
+                            }
+                            if (title.isNotEmpty()) seen.add(title)
+                        }
+                    }
+                }
+            }
+            else -> {} // null or unexpected type — skip
         }
 
         // session achievements (all ROMs)
-        val session = state["session"]?.jsonObject
-        session?.values?.forEach { entries ->
-            if (entries is JsonArray) {
-                entries.forEach { e ->
-                    val title = when {
-                        e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                        e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                        else -> ""
+        val sessionElement = state["session"]
+        if (sessionElement is JsonObject) {
+            sessionElement.values.forEach { entries ->
+                if (entries is JsonArray) {
+                    entries.forEach { e ->
+                        val title = when {
+                            e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
+                            e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
+                            else -> ""
+                        }
+                        if (title.isNotEmpty()) seen.add(title)
                     }
-                    if (title.isNotEmpty()) seen.add(title)
                 }
             }
         }
