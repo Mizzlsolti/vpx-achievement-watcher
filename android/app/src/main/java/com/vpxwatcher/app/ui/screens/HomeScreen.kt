@@ -127,26 +127,7 @@ fun HomeScreen(
             value = "${tournamentViewModel.activeTournaments.size}",
             subtitle = "in progress"
         )
-        Spacer(modifier = Modifier.height(24.dp))
 
-        // Player info card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "📋 Player Info",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Player ID: ${PrefsManager.playerId}", color = MaterialTheme.colorScheme.onSurface)
-                Text("Name: ${PrefsManager.playerName}", color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
     }
 }
 

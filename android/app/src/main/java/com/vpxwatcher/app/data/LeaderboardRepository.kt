@@ -73,36 +73,85 @@ class LeaderboardRepository {
         } catch (_: Exception) { emptyMap() }
     }
 
+    /**
+     * Fetch VPS database and build ROM→table name mapping.
+     * Mirrors the desktop Watcher's _load_vpsdb() in ui/vps.py.
+     * Iterates through table entries and their romFiles to map ROM keys to game names.
+     */
+    suspend fun fetchVpsTableNames(): Map<String, String> {
+        val raw = FirebaseClient.fetchUrl(VPSDB_URL) ?: return emptyMap()
+        return try {
+            val arr = json.parseToJsonElement(raw)
+            if (arr !is JsonArray) return emptyMap()
+            val mapping = mutableMapOf<String, String>()
+            arr.forEach { entry ->
+                if (entry !is JsonObject) return@forEach
+                val gameName = entry["name"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                // Iterate tableFiles → romFiles to find ROM keys
+                val tableFiles = entry["tableFiles"]
+                if (tableFiles is JsonArray) {
+                    tableFiles.forEach { tf ->
+                        if (tf is JsonObject) {
+                            val romFiles = tf["romFiles"]
+                            if (romFiles is JsonArray) {
+                                romFiles.forEach { rf ->
+                                    if (rf is JsonObject) {
+                                        val romName = rf["name"]?.jsonPrimitive?.contentOrNull
+                                        if (!romName.isNullOrBlank() && romName !in mapping) {
+                                            mapping[romName] = gameName
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            mapping
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    companion object {
+        private const val VPSDB_URL =
+            "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
+    }
+
     private fun countTotalAchievements(raw: String?): Int {
         if (raw == null) return 0
         return try {
             val obj = json.parseToJsonElement(raw)
             if (obj !is JsonObject) return 0
             val seen = mutableSetOf<String>()
-            obj["global"]?.jsonObject?.values?.forEach { entries ->
-                if (entries is JsonArray) {
-                    entries.forEach { e ->
-                        val t = when {
-                            e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                            e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                            else -> ""
-                        }
-                        if (t.isNotEmpty()) seen.add(t)
+
+            fun extractTitles(entries: JsonElement?) {
+                if (entries == null) return
+                val items: List<JsonElement> = when (entries) {
+                    is JsonArray -> entries.toList()
+                    is JsonObject -> entries.values.toList()
+                    else -> emptyList()
+                }
+                items.forEach { e ->
+                    val t = when {
+                        e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
+                        e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
+                        else -> ""
                     }
+                    if (t.isNotEmpty()) seen.add(t)
                 }
             }
-            obj["session"]?.jsonObject?.values?.forEach { entries ->
-                if (entries is JsonArray) {
-                    entries.forEach { e ->
-                        val t = when {
-                            e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                            e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                            else -> ""
-                        }
-                        if (t.isNotEmpty()) seen.add(t)
-                    }
-                }
+
+            // Global achievements: each category may be an array or sparse object
+            val globalNode = obj["global"]
+            if (globalNode is JsonObject) {
+                globalNode.values.forEach { extractTitles(it) }
             }
+
+            // Session achievements: each ROM may be an array or sparse object
+            val sessionNode = obj["session"]
+            if (sessionNode is JsonObject) {
+                sessionNode.values.forEach { extractTitles(it) }
+            }
+
             seen.size
         } catch (_: Exception) { 0 }
     }
@@ -110,8 +159,12 @@ class LeaderboardRepository {
     private fun countArrayEntries(raw: String?): Int {
         if (raw == null) return 0
         return try {
-            val arr = json.parseToJsonElement(raw)
-            if (arr is JsonArray) arr.size else 0
+            val el = json.parseToJsonElement(raw)
+            when (el) {
+                is JsonArray -> el.size
+                is JsonObject -> el.size  // sparse array from Firebase
+                else -> 0
+            }
         } catch (_: Exception) { 0 }
     }
 }

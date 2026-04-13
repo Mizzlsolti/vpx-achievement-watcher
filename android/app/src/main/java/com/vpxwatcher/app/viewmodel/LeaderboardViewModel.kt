@@ -34,8 +34,22 @@ class LeaderboardViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
+                // Fetch romnames.json as primary source
                 romNames = leaderboardRepository.fetchRomNames()
-                cleanRomNames = romNames.mapValues { (_, name) ->
+
+                // Fetch VPS database as supplementary source (best-effort)
+                val vpsNames = try {
+                    leaderboardRepository.fetchVpsTableNames()
+                } catch (_: Exception) { emptyMap() }
+
+                // Merge: VPS names take precedence, then romnames.json
+                val merged = romNames.toMutableMap()
+                vpsNames.forEach { (rom, name) ->
+                    if (rom !in merged) merged[rom] = name
+                }
+                romNames = merged
+
+                cleanRomNames = merged.mapValues { (_, name) ->
                     TableNameUtils.cleanTableName(name)
                 }
                 fetchLeaderboard("")

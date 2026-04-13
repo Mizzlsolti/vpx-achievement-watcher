@@ -76,46 +76,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // ── Backup & Restore ──
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("💾 Backup & Restore", fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = { viewModel.triggerBackup() },
-                        modifier = Modifier.weight(1f),
-                        enabled = !viewModel.isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                    ) {
-                        Text("☁️ Backup")
-                    }
-                    Button(
-                        onClick = { viewModel.triggerRestore() },
-                        modifier = Modifier.weight(1f),
-                        enabled = !viewModel.isLoading,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        ),
-                    ) {
-                        Text("☁️ Restore")
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
         // ── Push Notifications ──
         Card(
             modifier = Modifier.fillMaxWidth(),

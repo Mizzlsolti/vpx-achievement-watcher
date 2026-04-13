@@ -146,21 +146,6 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ── Player Info ──
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(viewModel.playerName, fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary)
-                Text("ID: ${viewModel.playerId}", fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // ── Duel Statistics ──
         Card(
             modifier = Modifier.fillMaxWidth(),
