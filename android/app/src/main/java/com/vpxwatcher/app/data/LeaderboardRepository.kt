@@ -109,7 +109,7 @@ class LeaderboardRepository {
         }
 
         return entries
-            .sortedByDescending { it.percentage }
+            .sortedWith(compareByDescending<CloudLeaderboardEntry> { it.percentage }.thenByDescending { it.score })
             .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
     }
 
