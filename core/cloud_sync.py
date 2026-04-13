@@ -908,6 +908,23 @@ class CloudSync:
             }
             if custom_progress:
                 metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
+            # Include global_tally so the mobile app can display progress for
+            # locked global achievements (nvram_tally, rom_count, etc.).
+            global_tally = state.get("global_tally")
+            if global_tally and isinstance(global_tally, dict):
+                # Strip internal "entries" lists that are only needed locally to
+                # keep the payload small; the app only needs progress + installed_count.
+                tally_clean = {}
+                for title, tdata in global_tally.items():
+                    safe_title = _FIREBASE_ILLEGAL_CHARS_RE.sub("_", title)
+                    if isinstance(tdata, dict):
+                        stripped = {k: v for k, v in tdata.items() if k != "entries"}
+                        if stripped:
+                            tally_clean[safe_title] = stripped
+                    else:
+                        tally_clean[safe_title] = tdata
+                if tally_clean:
+                    metadata_payload["global_tally"] = tally_clean
             if CloudSync.patch_node(cfg, f"players/{pid}/achievements", metadata_payload):
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:

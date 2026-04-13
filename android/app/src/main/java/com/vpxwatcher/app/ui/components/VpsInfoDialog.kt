@@ -20,6 +20,8 @@ fun VpsInfoDialog(
     romName: String,
     achievementTitle: String? = null,
     unlockTs: String? = null,
+    version: String? = null,
+    author: String? = null,
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -44,10 +46,18 @@ fun VpsInfoDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                InfoRow("Table", tableName)
+                if (tableName.isNotBlank()) {
+                    InfoRow("Table", tableName)
+                }
                 InfoRow("ROM", romName)
                 if (!vpsId.isNullOrBlank()) {
                     InfoRow("VPS-ID", vpsId)
+                }
+                if (!author.isNullOrBlank()) {
+                    InfoRow("Author", author)
+                }
+                if (!version.isNullOrBlank()) {
+                    InfoRow("Version", version)
                 }
                 if (!achievementTitle.isNullOrBlank()) {
                     InfoRow("Achievement", achievementTitle)

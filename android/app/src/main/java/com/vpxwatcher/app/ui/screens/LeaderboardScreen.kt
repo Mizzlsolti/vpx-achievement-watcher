@@ -113,6 +113,7 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
             )
         } else {
             // ── Leaderboard Table ──
+            val isRomSpecific = viewModel.selectedRom.isNotBlank() && viewModel.selectedRom != "global"
             LazyColumn(modifier = Modifier.weight(1f)) {
                 itemsIndexed(viewModel.leaderboard) { index, entry ->
                     val medal = when (entry.rank) {
@@ -121,9 +122,13 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                         3 -> "🥉"
                         else -> "#${entry.rank}"
                     }
-                    val badgeIcon = entry.badgeId?.let {
-                        PlayerRepository.BADGE_MAP[it]?.icon ?: "ℹ️"
-                    } ?: ""
+                    val badgeIcon = if (!entry.badgeId.isNullOrBlank()) {
+                        PlayerRepository.BADGE_MAP[entry.badgeId]?.icon ?: ""
+                    } else ""
+
+                    // VPS info dialog state
+                    var showVpsInfo by remember { mutableStateOf(false) }
+                    val hasVpsInfo = !entry.tableName.isNullOrBlank() || !entry.vpsId.isNullOrBlank()
 
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -131,25 +136,67 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         ),
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "$medal $badgeIcon ${entry.playerName}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                            )
-                            Text(
-                                text = "${entry.score}",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 14.sp,
-                            )
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "$medal $badgeIcon ${entry.playerName}",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 13.sp,
+                                    )
+                                    if (hasVpsInfo) {
+                                        TextButton(
+                                            onClick = { showVpsInfo = true },
+                                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                            modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+                                        ) {
+                                            Text("ℹ️", fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                                if (isRomSpecific && entry.total > 0) {
+                                    Text(
+                                        text = "${entry.score}/${entry.total} (${"%.1f".format(entry.percentage)}%)",
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 14.sp,
+                                    )
+                                } else {
+                                    Text(
+                                        text = "${entry.score}",
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontSize = 14.sp,
+                                    )
+                                }
+                            }
+                            // Progress bar for ROM-specific entries
+                            if (isRomSpecific && entry.total > 0) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                LinearProgressIndicator(
+                                    progress = { (entry.percentage / 100f).coerceIn(0f, 1f) },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                            }
                         }
+                    }
+
+                    // VPS Info Dialog
+                    if (showVpsInfo) {
+                        com.vpxwatcher.app.ui.components.VpsInfoDialog(
+                            tableName = entry.tableName ?: "",
+                            vpsId = entry.vpsId,
+                            romName = viewModel.selectedRom,
+                            version = entry.version,
+                            author = entry.author,
+                            onDismiss = { showVpsInfo = false },
+                        )
                     }
                 }
             }
