@@ -59,7 +59,8 @@ fun ProgressScreen(viewModel: ProgressViewModel = viewModel()) {
             onExpandedChange = { expanded = it },
         ) {
             OutlinedTextField(
-                value = if (viewModel.selectedRom == "global") "🌍 Global" else viewModel.selectedRom,
+                value = if (viewModel.selectedRom == "global") "🌍 Global"
+                    else viewModel.cleanRomName(viewModel.selectedRom),
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Table ROM") },
@@ -72,7 +73,17 @@ fun ProgressScreen(viewModel: ProgressViewModel = viewModel()) {
             ) {
                 romOptions.forEach { rom ->
                     DropdownMenuItem(
-                        text = { Text(if (rom == "global") "🌍 Global" else rom) },
+                        text = {
+                            if (rom == "global") {
+                                Text("🌍 Global")
+                            } else {
+                                Column {
+                                    Text(viewModel.cleanRomName(rom), fontSize = 14.sp)
+                                    Text(rom, fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        },
                         onClick = {
                             viewModel.selectRom(rom)
                             expanded = false

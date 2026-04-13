@@ -24,7 +24,6 @@ class SettingsViewModel : ViewModel() {
     var cloudSyncEnabled by mutableStateOf(true)
         private set
     var statusMessage by mutableStateOf("")
-        private set
     var isLoading by mutableStateOf(false)
         private set
     var latestRelease by mutableStateOf<ReleaseInfo?>(null)
@@ -108,9 +107,14 @@ class SettingsViewModel : ViewModel() {
             try {
                 val release = updateRepository.checkLatestRelease()
                 latestRelease = release
-                updateAvailable = release != null && isNewerVersion(release.version, APP_VERSION)
-                if (!updateAvailable) {
-                    statusMessage = "✅ You are on the latest version ($APP_VERSION)"
+                if (release == null) {
+                    updateAvailable = false
+                    statusMessage = "ℹ️ No app updates available"
+                } else {
+                    updateAvailable = isNewerVersion(release.version, APP_VERSION)
+                    if (!updateAvailable) {
+                        statusMessage = "✅ You are on the latest version ($APP_VERSION)"
+                    }
                 }
             } catch (e: Exception) {
                 statusMessage = "❌ Update check failed: ${e.message}"

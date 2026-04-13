@@ -8,12 +8,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vpxwatcher.app.data.PrefsManager
+import com.vpxwatcher.app.util.UpdateManager
 import com.vpxwatcher.app.viewmodel.SettingsViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Settings tab — Backup, Restore, Notifications, Updates, Version.
@@ -176,14 +179,27 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     }
                     if (viewModel.latestRelease!!.apkDownloadUrl != null) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        val context = LocalContext.current
+                        val scope = rememberCoroutineScope()
+                        var downloading by remember { mutableStateOf(false) }
                         Button(
-                            onClick = { /* APK download + install handled by UpdateManager */ },
+                            onClick = {
+                                downloading = true
+                                scope.launch {
+                                    val ok = UpdateManager.downloadAndInstall(
+                                        context, viewModel.latestRelease!!.apkDownloadUrl!!
+                                    )
+                                    downloading = false
+                                    if (!ok) viewModel.statusMessage = "❌ Download failed"
+                                }
+                            },
+                            enabled = !downloading,
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondary
                             ),
                         ) {
-                            Text("⬇️ Download & Install")
+                            Text(if (downloading) "⏳ Downloading…" else "⬇️ Download & Install")
                         }
                     }
                 }

@@ -1,5 +1,7 @@
 package com.vpxwatcher.app.ui.screens
 
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -142,7 +144,21 @@ fun SoundScreen(viewModel: PreferencesViewModel = viewModel()) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(eventLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                    Text(eventLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = {
+                            try {
+                                val vol = viewModel.soundSettings.volume.coerceIn(0, 100)
+                                val toneVol = (vol * ToneGenerator.MAX_VOLUME / 100)
+                                val tg = ToneGenerator(AudioManager.STREAM_MUSIC, toneVol)
+                                tg.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                            } catch (_: Exception) { }
+                        },
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Text("🔊", fontSize = 16.sp)
+                    }
                     Switch(
                         checked = viewModel.soundSettings.events[eventId] ?: true,
                         onCheckedChange = { viewModel.updateEventEnabled(eventId, it) },
