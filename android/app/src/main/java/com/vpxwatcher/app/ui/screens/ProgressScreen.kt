@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.vpxwatcher.app.ui.components.AchievementGrid
 import com.vpxwatcher.app.ui.components.RarityLegend
+import com.vpxwatcher.app.ui.components.VpsInfoDialog
 import com.vpxwatcher.app.viewmodel.ProgressViewModel
 
 /**
@@ -106,17 +107,38 @@ fun ProgressScreen(viewModel: ProgressViewModel = viewModel()) {
                 (viewModel.unlockedCount.toFloat() / viewModel.totalCount * 100).toInt()
             else 0
 
+            // VPS info dialog state
+            var showVpsInfo by remember { mutableStateOf(false) }
+            val hasVpsInfo = viewModel.selectedRom != "global" &&
+                (viewModel.currentVpsId != null || viewModel.currentTableName != null)
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Progress: ${viewModel.unlockedCount} / ${viewModel.totalCount} ($pct%)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Progress: ${viewModel.unlockedCount} / ${viewModel.totalCount} ($pct%)",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f),
+                        )
+                        // ℹ️ Info button — only show when VPS info is available
+                        if (hasVpsInfo) {
+                            TextButton(
+                                onClick = { showVpsInfo = true },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+                            ) {
+                                Text("ℹ️", fontSize = 16.sp)
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
                         progress = if (viewModel.totalCount > 0)
@@ -127,6 +149,18 @@ fun ProgressScreen(viewModel: ProgressViewModel = viewModel()) {
                         trackColor = MaterialTheme.colorScheme.surface,
                     )
                 }
+            }
+
+            // VPS Info Dialog
+            if (showVpsInfo) {
+                VpsInfoDialog(
+                    tableName = viewModel.currentTableName ?: "",
+                    vpsId = viewModel.currentVpsId,
+                    romName = viewModel.selectedRom,
+                    version = viewModel.currentVersion,
+                    author = viewModel.currentAuthor,
+                    onDismiss = { showVpsInfo = false },
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

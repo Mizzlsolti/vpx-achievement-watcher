@@ -48,6 +48,14 @@ class ProgressViewModel : ViewModel() {
         private set
     var isLoading by mutableStateOf(false)
         private set
+    var currentVpsId by mutableStateOf<String?>(null)
+        private set
+    var currentTableName by mutableStateOf<String?>(null)
+        private set
+    var currentVersion by mutableStateOf<String?>(null)
+        private set
+    var currentAuthor by mutableStateOf<String?>(null)
+        private set
 
     /** Get a clean display name for a ROM key. */
     fun cleanRomName(rom: String): String {
@@ -86,8 +94,12 @@ class ProgressViewModel : ViewModel() {
         if (pid.isBlank()) return
 
         if (rom == "global") {
-            // Clear ROM-specific rarity for global view
+            // Clear ROM-specific rarity and VPS info for global view
             rarityCache = emptyMap()
+            currentVpsId = null
+            currentTableName = null
+            currentVersion = null
+            currentAuthor = null
 
             // 1. Load all defined global achievement rules
             val rules = progressRepository.fetchGlobalAchievementRules()
@@ -144,6 +156,13 @@ class ProgressViewModel : ViewModel() {
             // ROM-specific achievements
             val unlockedEntries = progressRepository.fetchRomAchievements(pid, rom)
             rarityCache = progressRepository.fetchRarityCache(pid, rom)
+
+            // Load VPS info for ℹ️ button
+            val vpsInfo = progressRepository.fetchRomVpsInfo(pid, rom)
+            currentVpsId = vpsInfo?.vpsId
+            currentTableName = vpsInfo?.tableName
+            currentVersion = vpsInfo?.version
+            currentAuthor = vpsInfo?.author
 
             // Fetch cloud progress for accurate total count
             val cloudTotal = progressRepository.fetchRomProgressTotal(pid, rom)

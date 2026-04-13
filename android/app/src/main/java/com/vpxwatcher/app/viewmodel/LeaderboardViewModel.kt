@@ -69,7 +69,9 @@ class LeaderboardViewModel : ViewModel() {
     }
 
     fun onSearchChanged(query: String) {
-        searchQuery = query
+        try {
+            searchQuery = query
+        } catch (_: Exception) { /* ignore */ }
     }
 
     fun fetchLeaderboard(rom: String) {
@@ -78,7 +80,9 @@ class LeaderboardViewModel : ViewModel() {
             isLoading = true
             try {
                 leaderboard = leaderboardRepository.fetchAchievementLeaderboard(rom)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                leaderboard = emptyList()
+            }
             isLoading = false
         }
     }

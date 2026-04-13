@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,10 +44,12 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
         var expanded by remember { mutableStateOf(false) }
         val showDropdown = viewModel.searchQuery.length >= 2
         val filteredRoms = if (showDropdown) {
-            viewModel.cleanRomNames.entries
-                .filter { it.key.contains(viewModel.searchQuery, ignoreCase = true) ||
-                        it.value.contains(viewModel.searchQuery, ignoreCase = true) }
-                .take(20)
+            try {
+                viewModel.cleanRomNames.entries
+                    .filter { it.key.contains(viewModel.searchQuery, ignoreCase = true) ||
+                            it.value.contains(viewModel.searchQuery, ignoreCase = true) }
+                    .take(20)
+            } catch (_: Exception) { emptyList() }
         } else emptyList()
 
         // Use Box + DropdownMenu instead of ExposedDropdownMenuBox so the
@@ -78,26 +78,21 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                     .fillMaxWidth(0.9f)
                     .heightIn(max = 300.dp),
             ) {
-                val scrollState = rememberScrollState()
-                Column(
-                    modifier = Modifier.verticalScroll(scrollState),
-                ) {
-                    filteredRoms.forEach { (rom, cleanName) ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(cleanName, fontSize = 14.sp)
-                                    Text(rom, fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            },
-                            onClick = {
-                                viewModel.onSearchChanged(cleanName)
-                                viewModel.fetchLeaderboard(rom)
-                                expanded = false
-                            },
-                        )
-                    }
+                filteredRoms.forEach { (rom, cleanName) ->
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(cleanName, fontSize = 14.sp)
+                                Text(rom, fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        onClick = {
+                            viewModel.onSearchChanged(cleanName)
+                            viewModel.fetchLeaderboard(rom)
+                            expanded = false
+                        },
+                    )
                 }
                 // Visible scroll indicator when list is scrollable
                 if (filteredRoms.size > 5) {

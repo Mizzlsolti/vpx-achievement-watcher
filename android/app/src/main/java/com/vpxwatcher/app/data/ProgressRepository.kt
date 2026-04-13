@@ -285,6 +285,26 @@ class ProgressRepository {
     }
 
     /**
+     * Fetch VPS info (vps_id, table_name, version, author) for a ROM from the cloud progress node.
+     * Desktop uploads these fields to players/{pid}/progress/{rom}.
+     */
+    suspend fun fetchRomVpsInfo(playerId: String, rom: String): RomVpsInfo? {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        val raw = FirebaseClient.getNode(url, "players/$playerId/progress/$rom") ?: return null
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                RomVpsInfo(
+                    vpsId = obj["vps_id"]?.jsonPrimitive?.contentOrNull,
+                    tableName = obj["table_name"]?.jsonPrimitive?.contentOrNull,
+                    version = obj["version"]?.jsonPrimitive?.contentOrNull,
+                    author = obj["author"]?.jsonPrimitive?.contentOrNull,
+                )
+            } else null
+        } catch (_: Exception) { null }
+    }
+
+    /**
      * Compute rarity for all achievements in a ROM by scanning cloud_stats.
      * Falls back when the per-player rarity cache is empty.
      * Uses the cloud leaderboard data (progress/{rom} across all players) to calculate
@@ -437,4 +457,11 @@ data class GlobalAchievementRule(
     val conditionField: String? = null,
     val conditionManufacturer: String? = null,
     val conditionMinBrands: Int? = null,
+)
+
+data class RomVpsInfo(
+    val vpsId: String?,
+    val tableName: String?,
+    val version: String?,
+    val author: String?,
 )
