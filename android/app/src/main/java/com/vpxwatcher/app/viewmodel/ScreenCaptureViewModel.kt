@@ -205,15 +205,19 @@ class ScreenCaptureViewModel(application: Application) : AndroidViewModel(applic
         monitorId: Int,
         target: MutableStateFlow<Bitmap?>,
     ): Job = viewModelScope.launch(Dispatchers.IO) {
-        while (true) {
+        var backoffMs = 2000L
+        while (isActive) {
             try {
                 repo.createMjpegStream(baseUrl, monitorId).collect { bmp ->
                     target.value = bmp
+                    backoffMs = 2000L   // reset on successful frame
                 }
             } catch (_: Exception) {
-                // retry after brief pause
+                // stream ended; pause before retrying
             }
-            delay(2000)
+            if (!isActive) break
+            delay(backoffMs)
+            backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
         }
     }
 

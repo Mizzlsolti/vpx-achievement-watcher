@@ -96,8 +96,8 @@ def _capture_monitor(monitor_id: int) -> bytes | None:
             if _PIL_AVAILABLE:
                 img = Image.frombytes("RGB", screenshot.size, screenshot.bgra, "raw", "BGRX")
             else:
-                # Fallback: encode via mss to PNG bytes then re-open
-                png_bytes = mss.tools.to_png(screenshot.rgb, screenshot.size)
+                # Fallback: encode via mss to PNG bytes then re-open with PIL stub
+                png_bytes = mss.tools.to_png(screenshot.bgra, screenshot.size)
                 img = Image.open(io.BytesIO(png_bytes))
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=JPEG_QUALITY, subsampling=0)
@@ -114,7 +114,8 @@ def _capture_monitor(monitor_id: int) -> bytes | None:
 class _CaptureHandler(BaseHTTPRequestHandler):
     """Minimal HTTP handler for /api/monitors and /stream/<id>."""
 
-    # Silence the default request-per-line access log; the watcher has its own.
+    # Silence the default request-per-line access log so the watcher's own
+    # log file isn't flooded with per-frame HTTP entries.
     def log_message(self, fmt, *args):  # noqa: ANN001
         pass
 
