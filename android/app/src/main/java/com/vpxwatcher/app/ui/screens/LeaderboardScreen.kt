@@ -9,7 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,41 +41,42 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
 
         // ── ROM Search ──
         var expanded by remember { mutableStateOf(false) }
-        val showDropdown = viewModel.searchQuery.length >= 2
-        val filteredRoms = if (showDropdown) {
-            try {
+        val filteredRoms = try {
+            val query = viewModel.searchQuery
+            if (query.isEmpty()) {
+                viewModel.cleanRomNames.entries.toList().take(50)
+            } else {
                 viewModel.cleanRomNames.entries
-                    .filter { it.key.contains(viewModel.searchQuery, ignoreCase = true) ||
-                            it.value.contains(viewModel.searchQuery, ignoreCase = true) }
-                    .take(20)
-            } catch (_: Exception) { emptyList() }
-        } else emptyList()
+                    .filter { it.key.contains(query, ignoreCase = true) ||
+                            it.value.contains(query, ignoreCase = true) }
+                    .take(50)
+            }
+        } catch (_: Exception) { emptyList() }
 
-        // Use Box + DropdownMenu instead of ExposedDropdownMenuBox so the
-        // dropdown always opens DOWNWARD (ExposedDropdownMenu auto-positions
-        // upward when there is not enough space below).
-        Box {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it },
+        ) {
             OutlinedTextField(
                 value = viewModel.searchQuery,
                 onValueChange = {
                     viewModel.onSearchChanged(it)
-                    expanded = it.length >= 2
+                    expanded = true
                 },
                 label = { Text("🔍 Search ROM / Table") },
                 placeholder = { Text("Type to search…") },
                 singleLine = true,
                 trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded && showDropdown)
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded)
                 },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            DropdownMenu(
-                expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
-                onDismissRequest = { expanded = false },
-                offset = DpOffset(0.dp, 0.dp),
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .heightIn(max = 300.dp),
+                    .fillMaxWidth()
+                    .menuAnchor(),
+            )
+            ExposedDropdownMenu(
+                expanded = expanded && filteredRoms.isNotEmpty(),
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.heightIn(max = 300.dp),
             ) {
                 filteredRoms.forEach { (rom, cleanName) ->
                     DropdownMenuItem(
@@ -93,18 +93,6 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                             expanded = false
                         },
                     )
-                }
-                // Visible scroll indicator when list is scrollable
-                if (filteredRoms.size > 5) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("▼ scroll ▼", fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
         }

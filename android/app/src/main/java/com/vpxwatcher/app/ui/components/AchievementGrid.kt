@@ -82,7 +82,7 @@ fun AchievementGrid(
                                 lineHeight = 10.sp,
                             )
                             // Progress display for locked achievements (e.g. "1969/5000")
-                            if (!ach.unlocked && ach.progress != null && ach.target != null) {
+                            if (!ach.unlocked && ach.progress != null && ach.target != null && ach.progress > 0) {
                                 Text(
                                     text = "${ach.progress}/${ach.target}",
                                     fontSize = 7.sp,
