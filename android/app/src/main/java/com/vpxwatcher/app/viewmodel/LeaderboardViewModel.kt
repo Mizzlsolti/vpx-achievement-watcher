@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpxwatcher.app.data.*
+import com.vpxwatcher.app.util.TableNameUtils
 import kotlinx.coroutines.launch
 
 /**
@@ -19,6 +20,9 @@ class LeaderboardViewModel : ViewModel() {
         private set
     var romNames by mutableStateOf<Map<String, String>>(emptyMap())
         private set
+    /** ROM names cleaned via TableNameUtils (no version/year/manufacturer). */
+    var cleanRomNames by mutableStateOf<Map<String, String>>(emptyMap())
+        private set
     var searchQuery by mutableStateOf("")
         private set
     var selectedRom by mutableStateOf("")
@@ -31,6 +35,9 @@ class LeaderboardViewModel : ViewModel() {
             isLoading = true
             try {
                 romNames = leaderboardRepository.fetchRomNames()
+                cleanRomNames = romNames.mapValues { (_, name) ->
+                    TableNameUtils.cleanTableName(name)
+                }
                 fetchLeaderboard("")
             } catch (_: Exception) {}
             isLoading = false

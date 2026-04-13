@@ -6,6 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpxwatcher.app.data.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -24,6 +27,20 @@ class PreferencesViewModel : ViewModel() {
     var statusMessage by mutableStateOf("")
         private set
 
+    init {
+        try { currentTheme = PrefsManager.themeId } catch (_: Exception) {}
+    }
+
+    companion object {
+        /** Global observable theme state shared between activity and screens. */
+        private val _globalTheme = MutableStateFlow("neon_blue")
+        val globalTheme: StateFlow<String> = _globalTheme.asStateFlow()
+
+        fun initThemeFromPrefs() {
+            _globalTheme.value = PrefsManager.themeId
+        }
+    }
+
     fun refresh() {
         viewModelScope.launch {
             isLoading = true
@@ -32,7 +49,11 @@ class PreferencesViewModel : ViewModel() {
                 if (pid.isBlank()) return@launch
 
                 val theme = preferencesRepository.fetchTheme(pid)
-                if (theme != null) currentTheme = theme
+                if (theme != null) {
+                    currentTheme = theme
+                    PrefsManager.themeId = theme
+                    _globalTheme.value = theme
+                }
 
                 val sounds = preferencesRepository.fetchSoundSettings(pid)
                 if (sounds != null) soundSettings = sounds
@@ -43,6 +64,8 @@ class PreferencesViewModel : ViewModel() {
 
     fun applyTheme(themeId: String) {
         currentTheme = themeId
+        PrefsManager.themeId = themeId
+        _globalTheme.value = themeId
         viewModelScope.launch {
             val pid = PrefsManager.playerId.lowercase()
             if (pid.isBlank()) return@launch

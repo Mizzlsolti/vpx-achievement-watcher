@@ -4,13 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,28 +41,32 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
 
         // ── ROM Search ──
         var expanded by remember { mutableStateOf(false) }
-        val filteredRoms = viewModel.romNames.entries
-            .filter { it.key.contains(viewModel.searchQuery, ignoreCase = true) ||
-                    it.value.contains(viewModel.searchQuery, ignoreCase = true) }
-            .take(20)
+        val showDropdown = viewModel.searchQuery.length >= 2
+        val filteredRoms = if (showDropdown) {
+            viewModel.cleanRomNames.entries
+                .filter { it.key.contains(viewModel.searchQuery, ignoreCase = true) ||
+                        it.value.contains(viewModel.searchQuery, ignoreCase = true) }
+                .take(20)
+        } else emptyList()
 
         ExposedDropdownMenuBox(
-            expanded = expanded,
+            expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
             onExpandedChange = { expanded = it },
         ) {
             OutlinedTextField(
                 value = viewModel.searchQuery,
                 onValueChange = {
                     viewModel.onSearchChanged(it)
-                    expanded = true
+                    expanded = it.length >= 2
                 },
                 label = { Text("🔍 Search ROM / Table") },
+                placeholder = { Text("Type to search…") },
                 singleLine = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded && showDropdown) },
                 modifier = Modifier.fillMaxWidth().menuAnchor(),
             )
             ExposedDropdownMenu(
-                expanded = expanded && filteredRoms.isNotEmpty(),
+                expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
                 onDismissRequest = { expanded = false },
             ) {
                 DropdownMenuItem(
@@ -76,11 +77,17 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                         expanded = false
                     },
                 )
-                filteredRoms.forEach { (rom, name) ->
+                filteredRoms.forEach { (rom, cleanName) ->
                     DropdownMenuItem(
-                        text = { Text("$name ($rom)") },
+                        text = {
+                            Column {
+                                Text(cleanName, fontSize = 14.sp)
+                                Text(rom, fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
                         onClick = {
-                            viewModel.onSearchChanged(name)
+                            viewModel.onSearchChanged(cleanName)
                             viewModel.fetchLeaderboard(rom)
                             expanded = false
                         },

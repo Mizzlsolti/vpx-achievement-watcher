@@ -75,6 +75,19 @@ fun AchievementGrid(
                                 maxLines = 2,
                                 lineHeight = 10.sp,
                             )
+                            // Rarity label
+                            if (rarity != null) {
+                                val displayColor = rarityColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+                                Text(
+                                    text = "${rarity.tier} ${"%.1f".format(rarity.pct)}%",
+                                    fontSize = 7.sp,
+                                    textAlign = TextAlign.Center,
+                                    color = displayColor,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    lineHeight = 8.sp,
+                                )
+                            }
                         }
                     }
                 }

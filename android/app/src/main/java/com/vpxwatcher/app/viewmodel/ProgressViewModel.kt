@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpxwatcher.app.data.*
+import com.vpxwatcher.app.util.TableNameUtils
 import kotlinx.coroutines.launch
 
 /**
@@ -16,6 +17,9 @@ class ProgressViewModel : ViewModel() {
     private val progressRepository = ProgressRepository()
 
     var romList by mutableStateOf<List<String>>(emptyList())
+        private set
+    /** Raw ROM name mapping from ROMNAMES. */
+    var romNames by mutableStateOf<Map<String, String>>(emptyMap())
         private set
     var selectedRom by mutableStateOf("global")
         private set
@@ -32,6 +36,12 @@ class ProgressViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
         private set
 
+    /** Get a clean display name for a ROM key. */
+    fun cleanRomName(rom: String): String {
+        val rawName = romNames[rom] ?: return rom
+        return TableNameUtils.cleanTableName(rawName)
+    }
+
     fun refresh() {
         viewModelScope.launch {
             isLoading = true
@@ -40,6 +50,7 @@ class ProgressViewModel : ViewModel() {
                 if (pid.isBlank()) return@launch
 
                 romList = progressRepository.fetchRomList(pid)
+                romNames = progressRepository.fetchRomNames()
                 loadRom(selectedRom)
             } catch (_: Exception) {}
             isLoading = false
@@ -66,7 +77,7 @@ class ProgressViewModel : ViewModel() {
             val allEntries = globalAchievements.values.flatten()
             achievements = allEntries
             unlockedCount = allEntries.count { it.unlocked }
-            totalCount = allEntries.size
+            totalCount = if (allEntries.isNotEmpty()) allEntries.size else 0
         } else {
             achievements = progressRepository.fetchRomAchievements(pid, rom)
             rarityCache = progressRepository.fetchRarityCache(pid, rom)

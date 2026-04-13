@@ -10,15 +10,45 @@ class ProgressRepository {
 
     private val json = FirebaseClient.json
 
-    /** Fetch list of ROMs from achievements session keys. */
+    /** Fetch list of ROMs from achievements session keys + roms_played. */
     suspend fun fetchRomList(playerId: String): List<String> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
-        val raw = FirebaseClient.getNodeShallow(url, "players/$playerId/achievements/session")
-            ?: return emptyList()
+        val roms = mutableSetOf<String>()
+
+        // From session achievements
+        val rawSession = FirebaseClient.getNodeShallow(url, "players/$playerId/achievements/session")
+        if (rawSession != null) {
+            try {
+                val el = json.parseToJsonElement(rawSession)
+                if (el is JsonObject) roms.addAll(el.keys)
+            } catch (_: Exception) {}
+        }
+
+        // From roms_played
+        val rawPlayed = FirebaseClient.getNodeShallow(url, "players/$playerId/achievements/roms_played")
+        if (rawPlayed != null) {
+            try {
+                val el = json.parseToJsonElement(rawPlayed)
+                if (el is JsonObject) roms.addAll(el.keys)
+            } catch (_: Exception) {}
+        }
+
+        return roms.toList().sorted()
+    }
+
+    /** Fetch ROM names for display. */
+    suspend fun fetchRomNames(): Map<String, String> {
+        val raw = FirebaseClient.fetchUrl(
+            "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
+        ) ?: return emptyMap()
         return try {
-            val el = json.parseToJsonElement(raw)
-            if (el is JsonObject) el.keys.toList() else emptyList()
-        } catch (_: Exception) { emptyList() }
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                obj.entries.associate { (k, v) ->
+                    k to (if (v is JsonPrimitive && v.isString) v.content else v.toString().trim('"'))
+                }
+            } else emptyMap()
+        } catch (_: Exception) { emptyMap() }
     }
 
     /** Fetch achievements for a specific ROM. */
@@ -44,21 +74,69 @@ class ProgressRepository {
         } catch (_: Exception) { emptyMap() }
     }
 
-    /** Fetch rarity cache for a ROM. */
+    /** Fetch global tally for progress tracking. */
+    suspend fun fetchGlobalTally(playerId: String): Map<String, Int> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        val raw = FirebaseClient.getNode(url, "players/$playerId/achievements/global_tally")
+            ?: return emptyMap()
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                obj.entries.associate { (k, v) ->
+                    k to (v.jsonPrimitive.intOrNull ?: 0)
+                }
+            } else emptyMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    /** Fetch rarity cache for a ROM. Try player cache first, then cloud_stats. */
     suspend fun fetchRarityCache(playerId: String, rom: String): Map<String, RarityInfo> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
-        val raw = FirebaseClient.getNode(url, "players/$playerId/rarity_cache/$rom")
-            ?: return emptyMap()
+
+        // Try player-level rarity cache first
+        val rawPlayer = FirebaseClient.getNode(url, "players/$playerId/rarity_cache/$rom")
+        if (rawPlayer != null) {
+            val parsed = parseRarityData(rawPlayer)
+            if (parsed.isNotEmpty()) return parsed
+        }
+
+        // Fallback: cloud_stats rarity
+        val rawCloud = FirebaseClient.getNode(url, "cloud_stats/$rom/rarity")
+        if (rawCloud != null) {
+            val parsed = parseRarityData(rawCloud)
+            if (parsed.isNotEmpty()) return parsed
+        }
+
+        return emptyMap()
+    }
+
+    /** Compute rarity tier info from a percentage. */
+    fun computeRarityFromPct(pct: Float): RarityInfo {
+        val safePct = pct.coerceAtLeast(0f)
+        val tier = PlayerRepository.RARITY_TIERS.firstOrNull { safePct >= it.threshold }
+            ?: PlayerRepository.RARITY_TIERS.last()
+        val colorHex = "#${(tier.color and 0xFFFFFF).toString(16).padStart(6, '0')}"
+        return RarityInfo(tier = tier.name, pct = safePct, color = colorHex)
+    }
+
+    private fun parseRarityData(raw: String): Map<String, RarityInfo> {
         return try {
             val obj = json.parseToJsonElement(raw)
             if (obj is JsonObject) {
                 obj.entries.associate { (title, info) ->
                     title to when {
-                        info is JsonObject -> RarityInfo(
-                            tier = info["tier"]?.jsonPrimitive?.contentOrNull ?: "Unknown",
-                            pct = info["pct"]?.jsonPrimitive?.floatOrNull ?: 0f,
-                            color = info["color"]?.jsonPrimitive?.contentOrNull ?: "#888888"
-                        )
+                        info is JsonObject -> {
+                            val pct = info["pct"]?.jsonPrimitive?.floatOrNull ?: 0f
+                            val tier = info["tier"]?.jsonPrimitive?.contentOrNull
+                                ?: computeRarityFromPct(pct).tier
+                            val color = info["color"]?.jsonPrimitive?.contentOrNull
+                                ?: computeRarityFromPct(pct).color
+                            RarityInfo(tier = tier, pct = pct, color = color)
+                        }
+                        info is JsonPrimitive -> {
+                            val pct = info.floatOrNull ?: 0f
+                            computeRarityFromPct(pct)
+                        }
                         else -> RarityInfo("Unknown", 0f, "#888888")
                     }
                 }
