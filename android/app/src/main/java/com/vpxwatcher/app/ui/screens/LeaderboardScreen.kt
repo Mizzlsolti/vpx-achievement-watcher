@@ -44,12 +44,12 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
         val filteredRoms = try {
             val query = viewModel.searchQuery
             if (query.isEmpty()) {
-                viewModel.cleanRomNames.entries.toList()
+                viewModel.cleanRomNames.entries.toList().take(50)
             } else {
                 viewModel.cleanRomNames.entries
                     .filter { it.key.contains(query, ignoreCase = true) ||
                             it.value.contains(query, ignoreCase = true) }
-                    .toList()
+                    .take(50)
             }
         } catch (_: Exception) { emptyList() }
 
