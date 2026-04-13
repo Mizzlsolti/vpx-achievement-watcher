@@ -10,6 +10,11 @@ class ProgressRepository {
 
     private val json = FirebaseClient.json
 
+    companion object {
+        private const val GITHUB_RAW_BASE =
+            "https://raw.githubusercontent.com/Mizzlsolti/vpx-achievement-watcher/main"
+    }
+
     /** Fetch list of ROMs from achievements session keys + roms_played. */
     suspend fun fetchRomList(playerId: String): List<String> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
@@ -92,8 +97,8 @@ class ProgressRepository {
         } catch (_: Exception) { emptyMap() }
     }
 
-    /** Fetch global tally for progress tracking. */
-    suspend fun fetchGlobalTally(playerId: String): Map<String, Int> {
+    /** Fetch global tally for progress tracking. Values are objects like {"progress": 42, "installed_count": 5}. */
+    suspend fun fetchGlobalTally(playerId: String): Map<String, GlobalTallyEntry> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         val raw = FirebaseClient.getNode(url, "players/$playerId/achievements/global_tally")
             ?: return emptyMap()
@@ -101,10 +106,76 @@ class ProgressRepository {
             val obj = json.parseToJsonElement(raw)
             if (obj is JsonObject) {
                 obj.entries.associate { (k, v) ->
-                    k to (v.jsonPrimitive.intOrNull ?: 0)
+                    k to when (v) {
+                        is JsonObject -> GlobalTallyEntry(
+                            progress = v["progress"]?.jsonPrimitive?.intOrNull ?: 0,
+                            installedCount = v["installed_count"]?.jsonPrimitive?.intOrNull
+                        )
+                        is JsonPrimitive -> GlobalTallyEntry(progress = v.intOrNull ?: 0)
+                        else -> GlobalTallyEntry()
+                    }
                 }
             } else emptyMap()
         } catch (_: Exception) { emptyMap() }
+    }
+
+    /**
+     * Fetch global achievement rules from the GitHub repository.
+     * Returns a list of rule objects with title and condition.
+     */
+    suspend fun fetchGlobalAchievementRules(): List<GlobalAchievementRule> {
+        val raw = FirebaseClient.fetchUrl(
+            "$GITHUB_RAW_BASE/app_data/global_achievements.json"
+        ) ?: return emptyList()
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                val rulesArray = obj["rules"]
+                if (rulesArray is JsonArray) {
+                    rulesArray.mapNotNull { r ->
+                        if (r is JsonObject) {
+                            val title = r["title"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                            val cond = r["condition"]
+                            val condObj = if (cond is JsonObject) cond else null
+                            val condType = condObj?.get("type")?.jsonPrimitive?.contentOrNull ?: ""
+                            val condMin = condObj?.get("min")?.jsonPrimitive?.intOrNull
+                            val condField = condObj?.get("field")?.jsonPrimitive?.contentOrNull
+                            val condManufacturer = condObj?.get("manufacturer")?.jsonPrimitive?.contentOrNull
+                            val condMinBrands = condObj?.get("min_brands")?.jsonPrimitive?.intOrNull
+                            GlobalAchievementRule(
+                                title = title,
+                                conditionType = condType,
+                                conditionMin = condMin,
+                                conditionField = condField,
+                                conditionManufacturer = condManufacturer,
+                                conditionMinBrands = condMinBrands,
+                            )
+                        } else null
+                    }
+                } else emptyList()
+            } else emptyList()
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /**
+     * Fetch ROM-specific achievement rules from the GitHub repository.
+     * Returns null if not available (fallback to unlocked-only).
+     */
+    suspend fun fetchRomAchievementRules(rom: String): List<String>? {
+        val raw = FirebaseClient.fetchUrl(
+            "$GITHUB_RAW_BASE/app_data/rom_specific_achievements/$rom.ach.json"
+        ) ?: return null
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                val rulesArray = obj["rules"]
+                if (rulesArray is JsonArray) {
+                    rulesArray.mapNotNull { r ->
+                        if (r is JsonObject) r["title"]?.jsonPrimitive?.contentOrNull else null
+                    }
+                } else null
+            } else null
+        } catch (_: Exception) { null }
     }
 
     /** Fetch rarity cache for a ROM. Try player cache first, then cloud_stats. */
@@ -224,10 +295,26 @@ data class AchievementEntry(
     val title: String,
     val ts: String? = null,
     val unlocked: Boolean = false,
+    val progress: Int? = null,
+    val target: Int? = null,
+)
+
+data class GlobalTallyEntry(
+    val progress: Int = 0,
+    val installedCount: Int? = null,
 )
 
 data class RarityInfo(
     val tier: String,
     val pct: Float,
     val color: String,
+)
+
+data class GlobalAchievementRule(
+    val title: String,
+    val conditionType: String = "",
+    val conditionMin: Int? = null,
+    val conditionField: String? = null,
+    val conditionManufacturer: String? = null,
+    val conditionMinBrands: Int? = null,
 )

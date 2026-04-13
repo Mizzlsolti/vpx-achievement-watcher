@@ -131,10 +131,12 @@ fun ProgressScreen(viewModel: ProgressViewModel = viewModel()) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Rarity Legend ──
-            RarityLegend()
+            // ── Rarity Legend (ROM-specific only; not shown for Global) ──
+            if (viewModel.selectedRom != "global") {
+                RarityLegend()
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // ── Achievement Grid ──
             if (viewModel.achievements.isNotEmpty()) {
