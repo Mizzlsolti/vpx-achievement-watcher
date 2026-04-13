@@ -1153,15 +1153,19 @@ class CloudSync:
         # Apply sound settings
         sounds = prefs.get("sounds")
         if sounds and isinstance(sounds, dict):
-            if "enabled" in sounds:
+            if "enabled" in sounds and bool(sounds["enabled"]) != overlay.get("sound_enabled"):
                 cfg.OVERLAY["sound_enabled"] = bool(sounds["enabled"])
-            if "volume" in sounds:
+                changed = True
+            if "volume" in sounds and int(sounds["volume"]) != overlay.get("sound_volume"):
                 cfg.OVERLAY["sound_volume"] = int(sounds["volume"])
-            if "pack" in sounds:
+                changed = True
+            if "pack" in sounds and str(sounds["pack"]) != overlay.get("sound_pack"):
                 cfg.OVERLAY["sound_pack"] = str(sounds["pack"])
+                changed = True
             if "events" in sounds and isinstance(sounds["events"], dict):
-                cfg.OVERLAY["sound_events"] = dict(sounds["events"])
-            changed = True
+                if dict(sounds["events"]) != overlay.get("sound_events"):
+                    cfg.OVERLAY["sound_events"] = dict(sounds["events"])
+                    changed = True
         if changed:
             cfg.OVERLAY["_cloud_prefs_ts"] = cloud_ts
             cfg.save()

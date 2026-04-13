@@ -99,9 +99,12 @@ fun HomeScreen(
                     if (lastRunScore.isNotEmpty()) {
                         Text("Score: $lastRunScore", color = MaterialTheme.colorScheme.onSurface)
                     }
-                    Text("Achievements: $lastRunAchievements" +
-                        if (lastRunTotal.isNotEmpty()) "/$lastRunTotal" else "",
-                        color = MaterialTheme.colorScheme.onSurface)
+                    val achDisplay = if (lastRunTotal.isNotEmpty()) {
+                        "$lastRunAchievements/$lastRunTotal"
+                    } else {
+                        lastRunAchievements
+                    }
+                    Text("Achievements: $achDisplay", color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
