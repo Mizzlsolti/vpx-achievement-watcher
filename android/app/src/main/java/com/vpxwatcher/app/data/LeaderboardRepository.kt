@@ -113,11 +113,18 @@ class LeaderboardRepository {
             .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
     }
 
-    /** Fetch romnames.json for ROM name resolution. */
+    /** Fetch index.json to get the list of ROM keys that have NVRAM maps. */
+    suspend fun fetchIndexRomKeys(): Set<String> {
+        val raw = FirebaseClient.fetchUrl(INDEX_JSON_URL) ?: return emptySet()
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) obj.keys.toSet() else emptySet()
+        } catch (_: Exception) { emptySet() }
+    }
+
+    /** Fetch romnames.json for ROM display name resolution. */
     suspend fun fetchRomNames(): Map<String, String> {
-        val raw = FirebaseClient.fetchUrl(
-            "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
-        ) ?: return emptyMap()
+        val raw = FirebaseClient.fetchUrl(ROMNAMES_JSON_URL) ?: return emptyMap()
         return try {
             val obj = json.parseToJsonElement(raw)
             if (obj is JsonObject) {
@@ -169,6 +176,10 @@ class LeaderboardRepository {
     companion object {
         private const val VPSDB_URL =
             "https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json"
+        private const val INDEX_JSON_URL =
+            "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/index.json"
+        private const val ROMNAMES_JSON_URL =
+            "https://raw.githubusercontent.com/tomlogic/pinmame-nvram-maps/eb0d7cf16c8df0ac60664eb83df1d19ee498f31e/romnames.json"
     }
 
     private fun countTotalAchievements(raw: String?): Int {

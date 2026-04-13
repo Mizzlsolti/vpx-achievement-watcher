@@ -115,13 +115,125 @@ class CloudStatsMixin:
         self.cloud_view = _NoBrowseBrowser()
         self.cloud_view.setOpenLinks(False)
         self.cloud_view.anchorClicked.connect(self._on_cloud_view_anchor_clicked)
-        self.cloud_view.setHtml("<div style='text-align:center; color:#888; margin-top:20px;'>(Enter a ROM and click Fetch)</div>")
+        self.cloud_view.setHtml(f"<div style='text-align:center; color:{get_theme_color(self.cfg, 'primary')}; margin-top:20px;'>Loading global achievement overview...</div>")
         layout.addWidget(self.cloud_view)
         
         self._add_tab_help_button(layout, "cloud")
         self.main_tabs.addTab(tab, "☁️ Cloud")
         from PyQt6.QtCore import QTimer as _QTimer
         _QTimer.singleShot(0, self._refresh_cloud_rom_completer)
+        _QTimer.singleShot(100, self._fetch_global_leaderboard)
+
+    def _fetch_global_leaderboard(self):
+        """Fetch and display the global achievement leaderboard (all players, total achievements)."""
+        if not self.cfg.CLOUD_URL:
+            self.cloud_view.setHtml("<div style='color:#FF3B30;'>(No Firebase URL configured in System Tab!)</div>")
+            return
+
+        def _bg_fetch():
+            try:
+                player_ids = CloudSync.fetch_player_ids(self.cfg)
+                if not player_ids:
+                    html = "<div style='text-align:center; color:#888; margin-top:20px;'>No players found in cloud.</div>"
+                    QMetaObject.invokeMethod(self.cloud_view, "setHtml", Qt.ConnectionType.QueuedConnection, Q_ARG(str, html))
+                    return
+
+                # Fetch achievements node for each player
+                paths = [f"players/{pid}/achievements" for pid in player_ids]
+                batch = CloudSync.fetch_parallel(self.cfg, paths)
+
+                entries = []
+                for pid, path in zip(player_ids, paths):
+                    data = batch.get(path)
+                    if not data or not isinstance(data, dict):
+                        continue
+                    name = str(data.get("name", pid) or pid).strip()
+                    badge_id = str(data.get("selected_badge") or "").strip()
+
+                    # Count unique achievements across global + session
+                    seen = set()
+                    global_node = data.get("global")
+                    if isinstance(global_node, dict):
+                        for cat_entries in global_node.values():
+                            if isinstance(cat_entries, (list, dict)):
+                                items = cat_entries if isinstance(cat_entries, list) else cat_entries.values()
+                                for e in items:
+                                    t = ""
+                                    if isinstance(e, dict):
+                                        t = str(e.get("title", "")).strip()
+                                    elif isinstance(e, str):
+                                        t = e.strip()
+                                    if t:
+                                        seen.add(t)
+                    session_node = data.get("session")
+                    if isinstance(session_node, dict):
+                        for rom_entries in session_node.values():
+                            if isinstance(rom_entries, (list, dict)):
+                                items = rom_entries if isinstance(rom_entries, list) else rom_entries.values()
+                                for e in items:
+                                    t = ""
+                                    if isinstance(e, dict):
+                                        t = str(e.get("title", "")).strip()
+                                    elif isinstance(e, str):
+                                        t = e.strip()
+                                    if t:
+                                        seen.add(t)
+
+                    total = len(seen)
+                    if total > 0:
+                        entries.append({"name": name, "badge_id": badge_id, "total": total})
+
+                entries.sort(key=lambda x: x["total"], reverse=True)
+                html = self._generate_global_leaderboard_html(entries)
+            except Exception:
+                html = "<div style='text-align:center; color:#888; margin-top:20px;'>Failed to load global leaderboard.</div>"
+            QMetaObject.invokeMethod(self.cloud_view, "setHtml", Qt.ConnectionType.QueuedConnection, Q_ARG(str, html))
+
+        threading.Thread(target=_bg_fetch, daemon=True).start()
+
+    def _generate_global_leaderboard_html(self, entries: list) -> str:
+        """Render a global achievement leaderboard HTML table."""
+        _tc_primary = get_theme_color(self.cfg, "primary")
+        _tc_accent = get_theme_color(self.cfg, "accent")
+        _tc_border = get_theme_color(self.cfg, "border")
+        css = f"""
+        <style>
+          table {{ border-collapse: collapse; width: 80%; margin: 10px auto; }}
+          th, td {{ padding: 10px; border-bottom: 1px solid {_tc_border}44; color: #FFF; text-align: center; vertical-align: middle; }}
+          th {{ background: #1A1A1A; color: {_tc_primary}; font-weight: bold; }}
+          td.rank {{ font-weight: bold; color: {_tc_accent}; font-size: 1.2em; width: 50px; }}
+          td.name {{ font-weight: bold; text-align: left; }}
+          td.score {{ color: #00B050; font-weight: bold; font-size: 1.2em; }}
+          .title {{ font-size: 1.5em; color: #FFF; text-transform: uppercase; font-weight: bold; text-align: center; margin-bottom: 10px; }}
+        </style>
+        """
+        if not entries:
+            return "<div style='text-align:center; color:#888; margin-top:20px;'>No achievement data found.</div>"
+
+        html = [css, "<div class='title'>🌍 Global Achievement Overview</div>"]
+        html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Total Achievements</th></tr>")
+
+        for i, row in enumerate(entries):
+            rank = i + 1
+            name = _html.escape(str(row.get("name", "Unknown")))
+            total = int(row.get("total", 0))
+            medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
+
+            badge_icon = ""
+            badge_id = str(row.get("badge_id") or "").strip()
+            if badge_id:
+                try:
+                    from core.badges import BADGE_LOOKUP
+                    bdef = BADGE_LOOKUP.get(badge_id)
+                    if bdef:
+                        badge_icon = f" <span title='{_html.escape(bdef[2])}' style='font-size:1em;'>{bdef[1]}</span>"
+                except Exception:
+                    pass
+
+            html.append(f"<tr><td class='rank'>{medal}</td><td class='name'>{name}{badge_icon}</td><td class='score'>{total}</td></tr>")
+
+        html.append("</table>")
+        return "".join(html)
 
     def _refresh_cloud_rom_completer(self):
         """Populate the ROM autocomplete model with all known ROM keys and table names."""

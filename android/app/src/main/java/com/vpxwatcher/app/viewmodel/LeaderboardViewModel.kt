@@ -34,25 +34,35 @@ class LeaderboardViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
-                // Fetch romnames.json as primary source
-                romNames = leaderboardRepository.fetchRomNames()
+                // Fetch index.json as primary ROM list (only ROMs with NVRAM maps)
+                val indexKeys = leaderboardRepository.fetchIndexRomKeys()
+
+                // Fetch romnames.json for display names
+                val displayNames = leaderboardRepository.fetchRomNames()
 
                 // Fetch VPS database as supplementary source (best-effort)
                 val vpsNames = try {
                     leaderboardRepository.fetchVpsTableNames()
                 } catch (_: Exception) { emptyMap() }
 
-                // Merge: romnames.json takes precedence, VPS fills missing entries
-                val merged = romNames.toMutableMap()
-                vpsNames.forEach { (rom, name) ->
-                    if (rom !in merged) merged[rom] = name
+                // Build ROM map: only include ROMs from index.json
+                // Use display name from romnames.json, fall back to VPS, then ROM key
+                val merged = mutableMapOf<String, String>()
+                for (rom in indexKeys) {
+                    val name = displayNames[rom] ?: vpsNames[rom] ?: rom
+                    merged[rom] = name
                 }
                 romNames = merged
 
                 cleanRomNames = merged.mapValues { (_, name) ->
                     TableNameUtils.cleanTableName(name)
                 }
-                fetchLeaderboard("")
+
+                // Auto-load global leaderboard on startup (inline to avoid race condition)
+                selectedRom = ""
+                leaderboard = try {
+                    leaderboardRepository.fetchAchievementLeaderboard("")
+                } catch (_: Exception) { emptyList() }
             } catch (_: Exception) {}
             isLoading = false
         }
