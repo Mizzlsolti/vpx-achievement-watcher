@@ -4,7 +4,8 @@ import kotlinx.serialization.json.*
 
 /**
  * Records and session stats from Firebase.
- * Data source: players/{pid}/records/, players/{pid}/session_stats/
+ * Data source: players/{pid}/records/, players/{pid}/session_stats/,
+ *              players/{pid}/nvram_stats/, players/{pid}/session_deltas/
  */
 class RecordsRepository {
 
@@ -69,6 +70,51 @@ class RecordsRepository {
         }
         return result
     }
+
+    /** Fetch NVRAM audit stats for all ROMs. */
+    suspend fun fetchNvramStats(playerId: String): Map<String, Map<String, String>> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        val raw = FirebaseClient.getNode(url, "players/$playerId/nvram_stats") ?: return emptyMap()
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                obj.entries.associate { (rom, data) ->
+                    rom to if (data is JsonObject) {
+                        data.entries.associate { (field, value) ->
+                            field to try { value.jsonPrimitive.content } catch (_: Exception) { value.toString() }
+                        }
+                    } else emptyMap()
+                }
+            } else emptyMap()
+        } catch (_: Exception) { emptyMap() }
+    }
+
+    /** Fetch session deltas for all ROMs. */
+    suspend fun fetchSessionDeltas(playerId: String): Map<String, SessionDeltaData> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        val raw = FirebaseClient.getNode(url, "players/$playerId/session_deltas") ?: return emptyMap()
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                obj.entries.associate { (rom, data) ->
+                    rom to if (data is JsonObject) {
+                        val deltas = data["deltas"]?.let { d ->
+                            if (d is JsonObject) {
+                                d.entries.associate { (field, value) ->
+                                    field to (value.jsonPrimitive.intOrNull ?: 0)
+                                }
+                            } else emptyMap()
+                        } ?: emptyMap()
+                        SessionDeltaData(
+                            deltas = deltas,
+                            playtimeSec = data["playtime_sec"]?.jsonPrimitive?.intOrNull ?: 0,
+                            ts = data["ts"]?.jsonPrimitive?.contentOrNull ?: "",
+                        )
+                    } else SessionDeltaData(emptyMap(), 0, "")
+                }
+            } else emptyMap()
+        } catch (_: Exception) { emptyMap() }
+    }
 }
 
 data class SessionStat(
@@ -76,4 +122,10 @@ data class SessionStat(
     val duration: Int,
     val ts: String,
     val ballData: String,
+)
+
+data class SessionDeltaData(
+    val deltas: Map<String, Int>,
+    val playtimeSec: Int,
+    val ts: String,
 )

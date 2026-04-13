@@ -65,11 +65,43 @@ fun RecordsScreen(viewModel: RecordsViewModel = viewModel()) {
 
 @Composable
 private fun GlobalDumpsTab(viewModel: RecordsViewModel) {
-    if (viewModel.records.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text("No NVRAM records found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Prefer nvramStats; fallback to records if nvramStats is empty
+    if (viewModel.nvramStats.isNotEmpty()) {
+        LazyColumn(modifier = Modifier.padding(8.dp)) {
+            viewModel.nvramStats.toSortedMap().forEach { (rom, fields) ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "🎰 $rom",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 14.sp,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            fields.toSortedMap().forEach { (field, value) ->
+                                if (field != "ts") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(field, fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(value, fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-    } else {
+    } else if (viewModel.records.isNotEmpty()) {
+        // Fallback: use old records data
         LazyColumn(modifier = Modifier.padding(8.dp)) {
             viewModel.records.forEach { (rom, data) ->
                 item {
@@ -105,16 +137,67 @@ private fun GlobalDumpsTab(viewModel: RecordsViewModel) {
                 }
             }
         }
+    } else {
+        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            Text("No NVRAM records found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
 @Composable
 private fun SessionDeltasTab(viewModel: RecordsViewModel) {
-    if (viewModel.sessionStats.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text("No session stats found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    // Prefer sessionDeltas; fallback to sessionStats if sessionDeltas is empty
+    if (viewModel.sessionDeltas.isNotEmpty()) {
+        LazyColumn(modifier = Modifier.padding(8.dp)) {
+            viewModel.sessionDeltas.toSortedMap().forEach { (rom, data) ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "🎰 $rom",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 14.sp,
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val minutes = data.playtimeSec / 60
+                            val seconds = data.playtimeSec % 60
+                            Text(
+                                text = "⏱ ${minutes}m ${seconds}s",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            if (data.ts.isNotBlank()) {
+                                Text(
+                                    text = data.ts.take(19),
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            data.deltas.toSortedMap().forEach { (field, count) ->
+                                if (count > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(field, fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("+$count", fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-    } else {
+    } else if (viewModel.sessionStats.isNotEmpty()) {
+        // Fallback: use old sessionStats data
         LazyColumn(modifier = Modifier.padding(8.dp)) {
             viewModel.sessionStats.forEach { (rom, sessions) ->
                 item {
@@ -150,6 +233,10 @@ private fun SessionDeltasTab(viewModel: RecordsViewModel) {
                     }
                 }
             }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            Text("No session stats found.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
