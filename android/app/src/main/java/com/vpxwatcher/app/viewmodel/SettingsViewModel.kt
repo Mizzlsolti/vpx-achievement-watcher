@@ -7,9 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vpxwatcher.app.data.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import java.util.UUID
 
 /**
  * Settings ViewModel — backup/restore, notifications, version, updates.
@@ -63,16 +60,13 @@ class SettingsViewModel : ViewModel() {
             isLoading = true
             try {
                 val pid = getPlayerId() ?: return@launch
-                val signalId = UUID.randomUUID().toString()
-                val signal = buildJsonObject {
-                    put("action", "backup")
-                    put("ts", System.currentTimeMillis())
-                }
                 val url = PrefsManager.DEFAULT_CLOUD_URL
                 val success = FirebaseClient.setNode(
-                    url, "players/$pid/app_signals/$signalId", signal.toString()
+                    url, "players/$pid/preferences/trigger_backup",
+                    System.currentTimeMillis().toString()
                 )
-                statusMessage = if (success) "✅ Backup signal sent" else "❌ Failed to send backup signal"
+                statusMessage = if (success) "✅ Backup signal sent to desktop Watcher — the Watcher will process this on next sync"
+                    else "❌ Failed to send backup signal"
             } catch (e: Exception) {
                 statusMessage = "❌ Backup failed: ${e.message}"
             }
@@ -85,16 +79,13 @@ class SettingsViewModel : ViewModel() {
             isLoading = true
             try {
                 val pid = getPlayerId() ?: return@launch
-                val signalId = UUID.randomUUID().toString()
-                val signal = buildJsonObject {
-                    put("action", "restore")
-                    put("ts", System.currentTimeMillis())
-                }
                 val url = PrefsManager.DEFAULT_CLOUD_URL
                 val success = FirebaseClient.setNode(
-                    url, "players/$pid/app_signals/$signalId", signal.toString()
+                    url, "players/$pid/preferences/trigger_restore",
+                    System.currentTimeMillis().toString()
                 )
-                statusMessage = if (success) "✅ Restore signal sent" else "❌ Failed to send restore signal"
+                statusMessage = if (success) "✅ Restore signal sent to desktop Watcher — the Watcher will process this on next sync"
+                    else "❌ Failed to send restore signal"
             } catch (e: Exception) {
                 statusMessage = "❌ Restore failed: ${e.message}"
             }
