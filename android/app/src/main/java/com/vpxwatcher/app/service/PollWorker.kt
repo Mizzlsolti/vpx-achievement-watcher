@@ -243,6 +243,7 @@ class PollWorker(
         private const val PREF_SOUND_PACK = "cloud_sound_pack"
 
         /** Active SSE stream for real-time duel/achievement updates. */
+        @Volatile
         private var sseEventSource: EventSource? = null
 
         fun schedule(context: Context) {
