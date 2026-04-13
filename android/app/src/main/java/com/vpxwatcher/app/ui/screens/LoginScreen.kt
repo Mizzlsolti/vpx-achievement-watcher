@@ -33,7 +33,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(48.dp))
 
         Text(
-            text = "🎯 VPX Achievement Watcher",
+            text = "🎯 VPX AWapp",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = Primary,

@@ -63,7 +63,7 @@ fun AppNavigation() {
         drawerContent = {
             ModalDrawerSheet {
                 Text(
-                    text = "🎯 VPX Watcher",
+                    text = "🎯 VPX AWapp",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp)

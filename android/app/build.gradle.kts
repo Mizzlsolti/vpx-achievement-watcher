@@ -9,7 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.vpxwatcher.app"
+        applicationId = "com.vpxwatcher.awapp"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
@@ -23,6 +23,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+    // Rename APK output to AWapp
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "AWapp-${variant.buildType.name}.apk"
         }
     }
     compileOptions {
