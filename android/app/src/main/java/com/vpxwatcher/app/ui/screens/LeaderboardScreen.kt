@@ -4,11 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,10 +52,10 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                 .take(20)
         } else emptyList()
 
-        ExposedDropdownMenuBox(
-            expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
-            onExpandedChange = { expanded = it },
-        ) {
+        // Use Box + DropdownMenu instead of ExposedDropdownMenuBox so the
+        // dropdown always opens DOWNWARD (ExposedDropdownMenu auto-positions
+        // upward when there is not enough space below).
+        Box {
             OutlinedTextField(
                 value = viewModel.searchQuery,
                 onValueChange = {
@@ -62,29 +65,51 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
                 label = { Text("🔍 Search ROM / Table") },
                 placeholder = { Text("Type to search…") },
                 singleLine = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded && showDropdown) },
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded && showDropdown)
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
-            ExposedDropdownMenu(
+            DropdownMenu(
                 expanded = expanded && showDropdown && filteredRoms.isNotEmpty(),
                 onDismissRequest = { expanded = false },
-                modifier = Modifier.heightIn(max = 300.dp),
+                offset = DpOffset(0.dp, 0.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .heightIn(max = 300.dp),
             ) {
-                filteredRoms.forEach { (rom, cleanName) ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(cleanName, fontSize = 14.sp)
-                                Text(rom, fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        },
-                        onClick = {
-                            viewModel.onSearchChanged(cleanName)
-                            viewModel.fetchLeaderboard(rom)
-                            expanded = false
-                        },
-                    )
+                val scrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier.verticalScroll(scrollState),
+                ) {
+                    filteredRoms.forEach { (rom, cleanName) ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(cleanName, fontSize = 14.sp)
+                                    Text(rom, fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = {
+                                viewModel.onSearchChanged(cleanName)
+                                viewModel.fetchLeaderboard(rom)
+                                expanded = false
+                            },
+                        )
+                    }
+                }
+                // Visible scroll indicator when list is scrollable
+                if (filteredRoms.size > 5) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("▼ scroll ▼", fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -115,6 +140,18 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
         } else {
             // ── Leaderboard Table ──
             val isRomSpecific = viewModel.selectedRom.isNotBlank() && viewModel.selectedRom != "global"
+
+            // Show header for global overview
+            if (!isRomSpecific) {
+                Text(
+                    text = "🌍 Global Achievement Overview",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+
             LazyColumn(modifier = Modifier.weight(1f)) {
                 itemsIndexed(viewModel.leaderboard) { index, entry ->
                     val medal = when (entry.rank) {
