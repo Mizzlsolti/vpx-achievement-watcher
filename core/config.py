@@ -334,6 +334,8 @@ class AppConfig:
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
+    SCREEN_CAPTURE_ENABLED: bool = False
+    SCREEN_CAPTURE_PORT: int = 9876
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
@@ -367,6 +369,8 @@ class AppConfig:
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
+            SCREEN_CAPTURE_ENABLED=bool(data.get("SCREEN_CAPTURE_ENABLED", False)),
+            SCREEN_CAPTURE_PORT=int(data.get("SCREEN_CAPTURE_PORT", 9876)),
         )
 
     @staticmethod
@@ -423,6 +427,8 @@ class AppConfig:
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
+                "SCREEN_CAPTURE_ENABLED": getattr(self, "SCREEN_CAPTURE_ENABLED", False),
+                "SCREEN_CAPTURE_PORT": getattr(self, "SCREEN_CAPTURE_PORT", 9876),
             }
 
             d = os.path.dirname(path)
