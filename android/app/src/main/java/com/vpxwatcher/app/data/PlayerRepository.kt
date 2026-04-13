@@ -1,6 +1,9 @@
 package com.vpxwatcher.app.data
 
+import android.util.Log
 import kotlinx.serialization.json.*
+
+private const val TAG = "PlayerRepository"
 
 /**
  * Player level, badges, prestige computation from Firebase.
@@ -16,14 +19,24 @@ class PlayerRepository {
      * Mirrors desktop restore_from_cloud(): fetches the main achievements node,
      * then separately fetches the session sub-node and merges it (sub-node entries
      * take precedence per ROM, keeping inline metadata entries as fallback).
+     * Also fetches the progress node and enriches roms_played with ROMs from it.
      */
     suspend fun fetchAchievementsState(playerId: String): JsonObject? {
         val url = PrefsManager.DEFAULT_CLOUD_URL
-        val raw = FirebaseClient.getNode(url, "players/$playerId/achievements") ?: return null
+        val raw = FirebaseClient.getNode(url, "players/$playerId/achievements")
+        if (raw == null) {
+            Log.w(TAG, "fetchAchievementsState: no data returned for player $playerId")
+            return null
+        }
         val baseObj = try {
             val el = json.parseToJsonElement(raw)
             if (el is JsonObject) el else null
-        } catch (_: Exception) { null } ?: return null
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchAchievementsState: failed to parse achievements JSON: ${e.message}")
+            null
+        } ?: return null
+
+        Log.d(TAG, "fetchAchievementsState: base keys = ${baseObj.keys}")
 
         // Fetch session sub-node separately and merge (mirrors cloud_sync.py lines 667-683).
         // Session data is stored per-ROM under achievements/session/{rom} (chunked format).
@@ -48,19 +61,52 @@ class PlayerRepository {
                                     put(rom, entries)
                                 }
                             }
-                            // Sub-node entries take precedence per ROM
+                            // Sub-node entries take precedence per ROM.
+                            // Accept both JsonArray and JsonObject (sparse array from Firebase).
                             for ((rom, entries) in sessionEl) {
-                                if (entries is JsonArray && entries.isNotEmpty()) {
+                                val hasData = when (entries) {
+                                    is JsonArray -> entries.isNotEmpty()
+                                    is JsonObject -> entries.isNotEmpty()
+                                    else -> false
+                                }
+                                if (hasData) {
                                     put(rom, entries)
                                 }
                             }
                         }
                         put("session", mergedSession)
+                        Log.d(TAG, "fetchAchievementsState: merged session sub-node (${sessionEl.size} ROMs)")
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Non-critical: session sub-node fetch failed, use inline data
+                Log.w(TAG, "fetchAchievementsState: session sub-node fetch failed (non-critical): ${e.message}")
             }
+
+            // Normalize roms_played — Firebase may return a sparse object instead of array.
+            val romsPlayedElement = baseObj["roms_played"]
+            val romsPlayedList = normalizeRomsPlayed(romsPlayedElement).toMutableList()
+
+            // Enrich roms_played from progress node (mirrors cloud_sync.py lines 685-717).
+            try {
+                val progressRaw = FirebaseClient.getNodeShallow(url, "players/$playerId/progress")
+                if (progressRaw != null) {
+                    val progressEl = json.parseToJsonElement(progressRaw)
+                    if (progressEl is JsonObject && progressEl.isNotEmpty()) {
+                        for (rom in progressEl.keys) {
+                            if (rom.isNotBlank() && rom !in romsPlayedList) {
+                                romsPlayedList.add(rom)
+                            }
+                        }
+                        Log.d(TAG, "fetchAchievementsState: enriched roms_played from progress (${progressEl.size} ROMs)")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchAchievementsState: progress enrichment failed (non-critical): ${e.message}")
+            }
+
+            // Write back the normalized roms_played as a proper JsonArray
+            put("roms_played", JsonArray(romsPlayedList.map { JsonPrimitive(it) }))
         }
 
         return mergedEntries
@@ -194,7 +240,7 @@ class PlayerRepository {
      * title from each entry (JsonObject with "title" key, or bare JsonPrimitive)
      * and calls [action] with non-empty titles. Mirrors desktop badges.py logic.
      */
-    private fun forEachAchievementEntry(entries: JsonElement, action: (String) -> Unit) {
+    internal fun forEachAchievementEntry(entries: JsonElement, action: (String) -> Unit) {
         val items: List<JsonElement> = when (entries) {
             is JsonArray -> entries.toList()
             is JsonObject -> {
@@ -215,6 +261,36 @@ class PlayerRepository {
     }
 
     companion object {
+
+        /**
+         * Normalize roms_played from Firebase — handles both array format
+         * `["rom1", "rom2"]` and sparse-object format `{"0": "rom1", "3": "rom2"}`.
+         * Returns a list of non-blank ROM name strings.
+         */
+        fun normalizeRomsPlayed(element: JsonElement?): List<String> {
+            if (element == null || element is JsonNull) return emptyList()
+            return when (element) {
+                is JsonArray -> element.mapNotNull { item ->
+                    when (item) {
+                        is JsonPrimitive -> item.contentOrNull?.takeIf { it.isNotBlank() }
+                        else -> null
+                    }
+                }
+                is JsonObject -> {
+                    // Sparse array from Firebase: {"0": "rom1", "3": "rom2"}
+                    element.entries
+                        .sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                        .mapNotNull { (_, v) ->
+                            when (v) {
+                                is JsonPrimitive -> v.contentOrNull?.takeIf { it.isNotBlank() }
+                                else -> null
+                            }
+                        }
+                }
+                else -> emptyList()
+            }
+        }
+
         val LEVEL_TABLE = listOf(
             Triple(0, 1, "🪙 Rookie"),
             Triple(10, 2, "🥉 Apprentice"),

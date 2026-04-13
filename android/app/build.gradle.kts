@@ -85,4 +85,8 @@ dependencies {
 
     // WorkManager for background polling / notifications
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Unit testing
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 }

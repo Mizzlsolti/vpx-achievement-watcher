@@ -1,5 +1,6 @@
 package com.vpxwatcher.app.viewmodel
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,6 +10,8 @@ import com.vpxwatcher.app.data.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
+
+private const val TAG = "PlayerViewModel"
 
 /**
  * Player tab ViewModel — level, prestige, badges, display badge.
@@ -43,6 +46,7 @@ class PlayerViewModel : ViewModel() {
     fun refresh() {
         playerName = PrefsManager.playerName
         playerId = PrefsManager.playerId
+        Log.d(TAG, "refresh: playerName=$playerName, playerId=$playerId")
         viewModelScope.launch {
             isLoading = true
             errorMessage = null
@@ -50,6 +54,7 @@ class PlayerViewModel : ViewModel() {
                 fetchPlayerData()
                 fetchDuelStats()
             } catch (e: Exception) {
+                Log.e(TAG, "refresh: cloud fetch failed", e)
                 errorMessage = "⛔ Cloud fetch failed: ${e.message ?: "Unknown error"}"
             }
             isLoading = false
@@ -58,16 +63,29 @@ class PlayerViewModel : ViewModel() {
 
     private suspend fun fetchPlayerData() {
         val pid = PrefsManager.playerId.lowercase()
-        if (pid.isBlank()) return
+        if (pid.isBlank()) {
+            Log.w(TAG, "fetchPlayerData: playerId is blank, skipping")
+            return
+        }
 
-        val state = playerRepository.fetchAchievementsState(pid) ?: return
+        Log.d(TAG, "fetchPlayerData: fetching achievements state for pid=$pid")
+        val state = playerRepository.fetchAchievementsState(pid)
+        if (state == null) {
+            Log.w(TAG, "fetchPlayerData: fetchAchievementsState returned null for pid=$pid")
+            return
+        }
+        Log.d(TAG, "fetchPlayerData: state keys = ${state.keys}")
         playerLevel = playerRepository.computePlayerLevel(state)
+        Log.d(TAG, "fetchPlayerData: computed level = ${playerLevel?.level}, total = ${playerLevel?.total}")
         earnedBadges = playerRepository.evaluateBadges(state)
+        Log.d(TAG, "fetchPlayerData: earned ${earnedBadges.size} badges")
         selectedBadge = playerRepository.fetchSelectedBadge(pid)
+        Log.d(TAG, "fetchPlayerData: selectedBadge = $selectedBadge")
     }
 
     private suspend fun fetchDuelStats() {
         val pid = PrefsManager.playerId.lowercase()
+        Log.d(TAG, "fetchDuelStats: fetching duels for pid=$pid")
         val allDuels = duelRepository.fetchAllDuels()
         var wins = 0; var losses = 0; var ties = 0
         for (duel in allDuels) {
@@ -86,6 +104,7 @@ class PlayerViewModel : ViewModel() {
         duelWins = wins
         duelLosses = losses
         duelTies = ties
+        Log.d(TAG, "fetchDuelStats: wins=$wins, losses=$losses, ties=$ties")
     }
 
     fun selectBadge(badgeId: String) {
