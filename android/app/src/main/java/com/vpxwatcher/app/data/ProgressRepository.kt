@@ -1,6 +1,9 @@
 package com.vpxwatcher.app.data
 
+import android.util.Log
 import kotlinx.serialization.json.*
+
+private const val TAG = "ProgressRepository"
 
 /**
  * Achievement progress, rarity, global achievements from Firebase.
@@ -26,7 +29,9 @@ class ProgressRepository {
             try {
                 val el = json.parseToJsonElement(rawSession)
                 if (el is JsonObject) roms.addAll(el.keys)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchRomList: failed to parse session keys: ${e.message}")
+            }
         }
 
         // From roms_played — stored as an array of ROM name strings in Firebase,
@@ -35,25 +40,13 @@ class ProgressRepository {
         if (rawPlayed != null) {
             try {
                 val el = json.parseToJsonElement(rawPlayed)
-                when (el) {
-                    is JsonArray -> {
-                        // Array of ROM name strings: ["mm_109c", "tz_94ch", ...]
-                        el.forEach { item ->
-                            val rom = if (item is JsonPrimitive && item.isString) item.content else null
-                            if (!rom.isNullOrBlank()) roms.add(rom)
-                        }
-                    }
-                    is JsonObject -> {
-                        // Object with values that are ROM name strings (sparse array):
-                        // {"0": "mm_109c", "1": "tz_94ch", ...}
-                        el.values.forEach { v ->
-                            val rom = if (v is JsonPrimitive && v.isString) v.content else null
-                            if (!rom.isNullOrBlank()) roms.add(rom)
-                        }
-                    }
-                    else -> {}
-                }
-            } catch (_: Exception) {}
+                // Use PlayerRepository.normalizeRomsPlayed for consistent handling
+                // of both array and sparse-object formats.
+                val normalized = PlayerRepository.normalizeRomsPlayed(el)
+                roms.addAll(normalized)
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchRomList: failed to parse roms_played: ${e.message}")
+            }
         }
 
         // From progress node — desktop enriches roms_played from progress in restore_from_cloud()
@@ -66,9 +59,12 @@ class ProgressRepository {
                         if (rom.isNotBlank()) roms.add(rom)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w(TAG, "fetchRomList: failed to parse progress keys: ${e.message}")
+            }
         }
 
+        Log.d(TAG, "fetchRomList: found ${roms.size} ROMs for player $playerId")
         return roms.toList().sorted()
     }
 
@@ -146,7 +142,10 @@ class ProgressRepository {
             result.mapValues { (_, entries) ->
                 entries.filter { it.title.trim().isNotEmpty() }
             }.filterValues { it.isNotEmpty() }
-        } catch (_: Exception) { emptyMap() }
+        } catch (e: Exception) {
+            Log.w(TAG, "fetchGlobalAchievements: failed to parse global achievements: ${e.message}")
+            emptyMap()
+        }
     }
 
     /** Fetch global tally for progress tracking. Values are objects like {"progress": 42, "installed_count": 5}. */
