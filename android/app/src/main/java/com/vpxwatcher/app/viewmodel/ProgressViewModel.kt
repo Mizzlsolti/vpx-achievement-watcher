@@ -94,10 +94,12 @@ class ProgressViewModel : ViewModel() {
 
             // 2. Load unlocked global achievements from Firebase
             globalAchievements = progressRepository.fetchGlobalAchievements(pid)
+            // Deduplicate unlocked titles (trimmed, case-sensitive — matching desktop Watcher)
             val unlockedTitles = mutableSetOf<String>()
             for ((_, entries) in globalAchievements) {
                 for (entry in entries) {
-                    if (entry.title.isNotBlank()) unlockedTitles.add(entry.title.trim())
+                    val t = entry.title.trim()
+                    if (t.isNotEmpty()) unlockedTitles.add(t)
                 }
             }
 
@@ -154,19 +156,26 @@ class ProgressViewModel : ViewModel() {
                 }
             }
 
+            // Deduplicate unlocked entries by trimmed title (case-sensitive, matching desktop)
+            val seenTitles = mutableSetOf<String>()
+            val dedupedEntries = unlockedEntries.filter { entry ->
+                val t = entry.title.trim()
+                t.isNotEmpty() && seenTitles.add(t)
+            }
+
             // Try to load ROM-specific achievement rules
             val ruleTitles = progressRepository.fetchRomAchievementRules(rom)
 
             if (ruleTitles != null && ruleTitles.isNotEmpty()) {
                 // Build complete list from rules + unlocked
-                val unlockedTitleSet = unlockedEntries.map { it.title.trim() }.toSet()
+                val unlockedTitleSet = dedupedEntries.map { it.title.trim() }.toSet()
                 achievements = ruleTitles.map { title ->
                     val unlocked = title.trim() in unlockedTitleSet
                     AchievementEntry(title = title.trim(), unlocked = unlocked)
                 }
                 // Add any unlocked achievements not in rules
                 val ruleSet = ruleTitles.map { it.trim() }.toSet()
-                val extra = unlockedEntries.filter { it.title.trim() !in ruleSet }
+                val extra = dedupedEntries.filter { it.title.trim() !in ruleSet }
                 if (extra.isNotEmpty()) {
                     achievements = achievements + extra
                 }
@@ -179,13 +188,13 @@ class ProgressViewModel : ViewModel() {
                 unlockedCount = achievements.count { it.unlocked }
             } else {
                 // Fallback: use unlocked achievements only
-                achievements = unlockedEntries
-                unlockedCount = unlockedEntries.count { it.unlocked }
+                achievements = dedupedEntries
+                unlockedCount = dedupedEntries.count { it.unlocked }
                 // Use cloud total if available; otherwise fall back to unlocked count
                 totalCount = if (cloudTotal != null && cloudTotal > 0) {
                     maxOf(cloudTotal, unlockedCount)
                 } else {
-                    unlockedEntries.size
+                    dedupedEntries.size
                 }
             }
         }

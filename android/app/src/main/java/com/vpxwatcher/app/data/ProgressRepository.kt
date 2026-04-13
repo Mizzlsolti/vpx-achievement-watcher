@@ -15,7 +15,7 @@ class ProgressRepository {
             "https://raw.githubusercontent.com/Mizzlsolti/vpx-achievement-watcher/main"
     }
 
-    /** Fetch list of ROMs from achievements session keys + roms_played. */
+    /** Fetch list of ROMs from achievements session keys + roms_played + progress node. */
     suspend fun fetchRomList(playerId: String): List<String> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
         val roms = mutableSetOf<String>()
@@ -56,6 +56,19 @@ class ProgressRepository {
             } catch (_: Exception) {}
         }
 
+        // From progress node — desktop enriches roms_played from progress in restore_from_cloud()
+        val rawProgress = FirebaseClient.getNodeShallow(url, "players/$playerId/progress")
+        if (rawProgress != null) {
+            try {
+                val el = json.parseToJsonElement(rawProgress)
+                if (el is JsonObject) {
+                    el.keys.forEach { rom ->
+                        if (rom.isNotBlank()) roms.add(rom)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
         return roms.toList().sorted()
     }
 
@@ -77,9 +90,37 @@ class ProgressRepository {
     /** Fetch achievements for a specific ROM. */
     suspend fun fetchRomAchievements(playerId: String, rom: String): List<AchievementEntry> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
+
+        // Primary: fetch directly from session/{rom}
         val raw = FirebaseClient.getNode(url, "players/$playerId/achievements/session/$rom")
-            ?: return emptyList()
-        return parseAchievements(raw)
+        val directResult = if (raw != null) parseAchievements(raw) else emptyList()
+
+        if (directResult.isNotEmpty()) {
+            // Deduplicate by trimmed title (case-sensitive, matching desktop Watcher)
+            val seen = mutableSetOf<String>()
+            return directResult.filter { seen.add(it.title.trim()) }
+        }
+
+        // Fallback: fetch the entire session node and extract this ROM
+        // (mirrors desktop restore_from_cloud which fetches session sub-node separately)
+        val rawSession = FirebaseClient.getNode(url, "players/$playerId/achievements/session")
+        if (rawSession != null) {
+            try {
+                val el = json.parseToJsonElement(rawSession)
+                if (el is JsonObject) {
+                    val romData = el[rom]
+                    if (romData != null) {
+                        val parsed = parseAchievementsElement(romData)
+                        if (parsed.isNotEmpty()) {
+                            val seen = mutableSetOf<String>()
+                            return parsed.filter { seen.add(it.title.trim()) }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        return emptyList()
     }
 
     /** Fetch global achievements. */
@@ -89,16 +130,22 @@ class ProgressRepository {
             ?: return emptyMap()
         return try {
             val el = json.parseToJsonElement(raw)
-            when (el) {
+            val result = when (el) {
                 // Desktop uploads global as a flat array via __global__
                 is JsonArray -> mapOf("__global__" to parseAchievementsElement(el))
                 is JsonObject -> {
+                    // Could be {"__global__": [...]} or a flat object with keys
                     el.entries.associate { (key, value) ->
                         key to parseAchievementsElement(value)
                     }
                 }
                 else -> emptyMap()
             }
+            // Filter out entries with empty titles (already done in parseAchievementsElement,
+            // but ensure consistency in case of edge cases)
+            result.mapValues { (_, entries) ->
+                entries.filter { it.title.trim().isNotEmpty() }
+            }.filterValues { it.isNotEmpty() }
         } catch (_: Exception) { emptyMap() }
     }
 
@@ -341,16 +388,24 @@ class ProgressRepository {
             }
             items.mapNotNull { e ->
                 when (e) {
-                    is JsonObject -> AchievementEntry(
-                        title = e["title"]?.jsonPrimitive?.contentOrNull ?: "",
-                        ts = e["ts"]?.jsonPrimitive?.contentOrNull,
-                        unlocked = true
-                    )
-                    is JsonPrimitive -> AchievementEntry(
-                        title = e.contentOrNull ?: "",
-                        unlocked = true
-                    )
-                    else -> null
+                    is JsonObject -> {
+                        val title = (e["title"]?.jsonPrimitive?.contentOrNull ?: "").trim()
+                        if (title.isEmpty()) null
+                        else AchievementEntry(
+                            title = title,
+                            ts = e["ts"]?.jsonPrimitive?.contentOrNull,
+                            unlocked = true
+                        )
+                    }
+                    is JsonPrimitive -> {
+                        val title = (e.contentOrNull ?: "").trim()
+                        if (title.isEmpty()) null
+                        else AchievementEntry(
+                            title = title,
+                            unlocked = true
+                        )
+                    }
+                    else -> null  // JsonNull or unknown — skip
                 }
             }
         } catch (_: Exception) { emptyList() }
