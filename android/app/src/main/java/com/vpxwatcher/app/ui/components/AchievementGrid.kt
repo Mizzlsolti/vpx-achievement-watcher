@@ -45,12 +45,18 @@ fun AchievementGrid(
                         modifier = Modifier
                             .weight(1f)
                             .padding(2.dp)
-                            .border(1.dp, borderColor, RoundedCornerShape(6.dp)),
+                            .border(
+                                width = if (rarity != null) 2.dp else 1.dp,
+                                color = borderColor,
+                                shape = RoundedCornerShape(6.dp)
+                            ),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (ach.unlocked)
-                                MaterialTheme.colorScheme.surfaceVariant
-                            else
+                            containerColor = if (ach.unlocked) {
+                                rarityColor?.copy(alpha = 0.15f)
+                                    ?: MaterialTheme.colorScheme.surfaceVariant
+                            } else {
                                 MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                            }
                         ),
                         shape = RoundedCornerShape(6.dp),
                     ) {
@@ -65,14 +71,14 @@ fun AchievementGrid(
                                 fontSize = 16.sp,
                             )
                             Text(
-                                text = ach.title.take(18),
+                                text = ach.title,
                                 fontSize = 8.sp,
                                 textAlign = TextAlign.Center,
                                 color = if (ach.unlocked)
                                     MaterialTheme.colorScheme.onSurface
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                maxLines = 2,
+                                maxLines = 3,
                                 lineHeight = 10.sp,
                             )
                             // Progress display for locked achievements (e.g. "1969/5000")

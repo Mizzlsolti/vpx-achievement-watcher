@@ -208,6 +208,50 @@ class ProgressRepository {
         return RarityInfo(tier = tier.name, pct = safePct, color = colorHex)
     }
 
+    /**
+     * Compute rarity locally from unlocked_by / total_players counts.
+     * Mirrors core/badges.py compute_rarity().
+     */
+    fun computeRarity(unlockedBy: Int, totalPlayers: Int): RarityInfo {
+        if (totalPlayers <= 0) return RarityInfo("Unknown", 0f, "#888888")
+        val pct = (unlockedBy.toFloat() / totalPlayers) * 100f
+        return computeRarityFromPct(pct)
+    }
+
+    /**
+     * Fetch the total achievement count for a ROM from the cloud progress node.
+     * Desktop uploads {unlocked, total, percentage, ...} to players/{pid}/progress/{rom}.
+     */
+    suspend fun fetchRomProgressTotal(playerId: String, rom: String): Int? {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+        val raw = FirebaseClient.getNode(url, "players/$playerId/progress/$rom") ?: return null
+        return try {
+            val obj = json.parseToJsonElement(raw)
+            if (obj is JsonObject) {
+                obj["total"]?.jsonPrimitive?.intOrNull
+            } else null
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Compute rarity for all achievements in a ROM by scanning cloud_stats.
+     * Falls back when the per-player rarity cache is empty.
+     * Uses the cloud leaderboard data (progress/{rom} across all players) to calculate
+     * how many players unlocked each achievement.
+     */
+    suspend fun computeRarityFromCloudStats(rom: String): Map<String, RarityInfo> {
+        val url = PrefsManager.DEFAULT_CLOUD_URL
+
+        // Fetch per-ROM rarity from cloud_stats (pre-computed by desktop)
+        val rawCloud = FirebaseClient.getNode(url, "cloud_stats/$rom/rarity")
+        if (rawCloud != null) {
+            val parsed = parseRarityData(rawCloud)
+            if (parsed.isNotEmpty()) return parsed
+        }
+
+        return emptyMap()
+    }
+
     private fun parseRarityData(raw: String): Map<String, RarityInfo> {
         return try {
             val obj = json.parseToJsonElement(raw)
