@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VPX Watcher</string>
-    <string name="nav_home">Home</string>
+    <string name="app_name">VPX AWapp</string>
+    <string name="nav_home">Dashboard</string>
     <string name="nav_duels">Duels</string>
     <string name="nav_tournaments">Tournaments</string>
     <string name="nav_chat">Chat</string>
-    <string name="nav_profile">Profile</string>
+    <string name="nav_profile">Player</string>
+    <string name="nav_progress">Progress</string>
+    <string name="nav_leaderboard">Cloud</string>
+    <string name="nav_records">Records</string>
+    <string name="nav_theme">Theme</string>
+    <string name="nav_sound">Sound</string>
+    <string name="nav_settings">Settings</string>
 </resources>

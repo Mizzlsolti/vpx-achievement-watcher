@@ -1018,3 +1018,120 @@ class CloudSync:
 
         return result, total_players
 
+    # ── New methods for bidirectional app sync ─────────────────────────────
+
+    @staticmethod
+    def upload_records(cfg: AppConfig, rom: str, records_data: dict):
+        """Upload records (best scores, personal bests) to Firebase.
+        Path: players/{pid}/records/{rom}
+        Called after each game session ends.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
+            return
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        safe_rom = rom.replace("/", "_").replace(".", "_")
+
+        def _task():
+            payload = dict(records_data)
+            payload["ts"] = datetime.now(timezone.utc).isoformat()
+            if CloudSync.set_node(cfg, f"players/{pid}/records/{safe_rom}", payload):
+                log(cfg, f"[CLOUD] Records uploaded for {rom}")
+            else:
+                log(cfg, f"[CLOUD] upload_records failed for {rom}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def upload_session_stats(cfg: AppConfig, rom: str, session_data: dict):
+        """Upload session stats (score, duration, ball_data, audit_deltas) to Firebase.
+        Path: players/{pid}/session_stats/{rom}/{session_id}
+        Called after each game session ends.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
+            return
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        safe_rom = rom.replace("/", "_").replace(".", "_")
+        session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        def _task():
+            payload = dict(session_data)
+            payload["ts"] = datetime.now(timezone.utc).isoformat()
+            if CloudSync.set_node(cfg, f"players/{pid}/session_stats/{safe_rom}/{session_id}", payload):
+                log(cfg, f"[CLOUD] Session stats uploaded for {rom}")
+            else:
+                log(cfg, f"[CLOUD] upload_session_stats failed for {rom}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def upload_preferences(cfg: AppConfig, prefs_data: dict):
+        """Upload user preferences (theme, sounds) to Firebase.
+        Path: players/{pid}/preferences/
+        Called when theme or sound settings change in the desktop Watcher.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        if pid == "unknown":
+            return
+
+        def _task():
+            payload = dict(prefs_data)
+            payload["ts"] = datetime.now(timezone.utc).isoformat()
+            if CloudSync.patch_node(cfg, f"players/{pid}/preferences", payload):
+                log(cfg, "[CLOUD] Preferences uploaded")
+            else:
+                log(cfg, "[CLOUD] upload_preferences failed", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def poll_preferences(cfg: AppConfig) -> Optional[dict]:
+        """Read preferences from Firebase to pick up changes made in the app.
+        Path: players/{pid}/preferences/
+        Returns the preferences dict or None.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return None
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        if pid == "unknown":
+            return None
+        try:
+            data = CloudSync.fetch_node(cfg, f"players/{pid}/preferences")
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def poll_app_signals(cfg: AppConfig) -> list:
+        """Read and process app_signals from Firebase.
+        Path: players/{pid}/app_signals/
+        Returns list of signal dicts, then deletes processed signals.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return []
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        if pid == "unknown":
+            return []
+        try:
+            data = CloudSync.fetch_node(cfg, f"players/{pid}/app_signals")
+            if not data or not isinstance(data, dict):
+                return []
+            signals = []
+            for signal_id, signal_data in data.items():
+                if isinstance(signal_data, dict):
+                    signal_data["_signal_id"] = signal_id
+                    signals.append(signal_data)
+                    # Delete processed signal
+                    CloudSync.set_node(cfg, f"players/{pid}/app_signals/{signal_id}", None)
+            return signals
+        except Exception:
+            return []
+
+

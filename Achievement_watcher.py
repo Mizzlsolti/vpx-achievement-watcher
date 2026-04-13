@@ -209,6 +209,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._status_badge_timer.timeout.connect(self._poll_status_badge)
         self._status_badge_timer.start()
 
+        # Periodic preference poll timer: picks up theme/sound changes from the app (30s)
+        self._pref_poll_timer = QTimer(self)
+        self._pref_poll_timer.setInterval(30000)
+        self._pref_poll_timer.timeout.connect(self._poll_cloud_preferences)
+        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            self._pref_poll_timer.start()
+        self._last_cloud_theme = (self.cfg.OVERLAY or {}).get("theme", "")
+
         self.watcher.start()
 
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
@@ -2394,6 +2402,66 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                     except Exception as e:
                         log(self.cfg, f"[SCAN] Background pre-scan error: {e}", "WARN")
                 threading.Thread(target=_bg_prescan, daemon=True).start()
+        except Exception:
+            pass
+
+    def _poll_cloud_preferences(self):
+        """Poll Firebase for preference changes made in the mobile app.
+        Applies theme and sound settings if they differ from the current local config.
+        """
+        try:
+            prefs = CloudSync.poll_preferences(self.cfg)
+            if not prefs or not isinstance(prefs, dict):
+                return
+
+            # Theme sync: if the app changed the theme, apply it locally
+            cloud_theme = prefs.get("theme")
+            if cloud_theme and isinstance(cloud_theme, str):
+                current_theme = (self.cfg.OVERLAY or {}).get("theme", "")
+                if cloud_theme != current_theme and cloud_theme != self._last_cloud_theme:
+                    self._last_cloud_theme = cloud_theme
+                    self.cfg.OVERLAY["theme"] = cloud_theme
+                    self.cfg.save()
+                    try:
+                        from core.theme import generate_stylesheet
+                        from PyQt6.QtWidgets import QApplication
+                        app = QApplication.instance()
+                        if app:
+                            app.setStyleSheet(generate_stylesheet(cloud_theme))
+                        # Update combo box if it exists
+                        cmb = getattr(self, "cmb_theme", None)
+                        if cmb:
+                            idx = cmb.findData(cloud_theme)
+                            if idx >= 0:
+                                cmb.setCurrentIndex(idx)
+                    except Exception:
+                        pass
+
+            # Sound sync: if the app changed sound settings, apply locally
+            cloud_sounds = prefs.get("sounds")
+            if cloud_sounds and isinstance(cloud_sounds, dict):
+                if "enabled" in cloud_sounds:
+                    self.cfg.OVERLAY["sound_enabled"] = bool(cloud_sounds["enabled"])
+                if "volume" in cloud_sounds:
+                    self.cfg.OVERLAY["sound_volume"] = int(cloud_sounds["volume"])
+                if "pack" in cloud_sounds:
+                    self.cfg.OVERLAY["sound_pack"] = str(cloud_sounds["pack"])
+                if "events" in cloud_sounds and isinstance(cloud_sounds["events"], dict):
+                    self.cfg.OVERLAY.setdefault("sound_events", {}).update(cloud_sounds["events"])
+                self.cfg.save()
+
+            # Process app signals (backup/restore triggers from the app)
+            signals = CloudSync.poll_app_signals(self.cfg)
+            for sig in signals:
+                action = sig.get("action", "")
+                if action == "backup":
+                    try:
+                        from core.watcher_core import Watcher as _W
+                        state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
+                        pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
+                        CloudSync.upload_full_achievements(self.cfg, state, pname)
+                    except Exception:
+                        pass
         except Exception:
             pass
 

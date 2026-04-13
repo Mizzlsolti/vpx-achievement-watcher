@@ -2,9 +2,11 @@ package com.vpxwatcher.app.ui.theme
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// Colors matching the Watcher's dark UI
+// Colors matching the Watcher's dark UI (default Neon Blue theme)
 val Background = Color(0xFF111111)
 val Surface = Color(0xFF1C1C1C)
 val SurfaceVariant = Color(0xFF2A2A2A)
@@ -32,10 +34,21 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.White,
 )
 
+/** Local composition for the active theme ID. */
+val LocalWatcherThemeId = compositionLocalOf { "neon_blue" }
+
 @Composable
-fun VpxWatcherTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = DarkColorScheme,
-        content = content
-    )
+fun VpxWatcherTheme(
+    themeId: String = "neon_blue",
+    content: @Composable () -> Unit,
+) {
+    val colorScheme = WATCHER_THEME_MAP[themeId]?.let { watcherThemeToColorScheme(it) }
+        ?: DarkColorScheme
+
+    CompositionLocalProvider(LocalWatcherThemeId provides themeId) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            content = content
+        )
+    }
 }

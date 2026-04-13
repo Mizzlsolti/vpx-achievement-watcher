@@ -3355,6 +3355,26 @@ class Watcher:
                     except Exception as e:
                         log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
 
+                # Upload records and session stats to cloud for app bidirectional sync
+                if self.current_rom:
+                    try:
+                        from .cloud_sync import CloudSync as _CS_rec
+                        _score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
+                        _records_data = {
+                            "score": _score,
+                            "duration": duration_sec,
+                        }
+                        _CS_rec.upload_records(self.cfg, self.current_rom, _records_data)
+
+                        _session_data = {
+                            "score": _score,
+                            "duration": duration_sec,
+                            "ball_data": dict(self.ball_track) if self.ball_track else {},
+                        }
+                        _CS_rec.upload_session_stats(self.cfg, self.current_rom, _session_data)
+                    except Exception as e:
+                        log(self.cfg, f"[CLOUD] Records/stats upload failed: {e}", "WARN")
+
         finally:
             self.current_table = None
             self.current_rom = None

@@ -12,19 +12,54 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vpxwatcher.app.data.FirebaseClient
 import com.vpxwatcher.app.data.PrefsManager
-import com.vpxwatcher.app.ui.theme.Primary
 import com.vpxwatcher.app.viewmodel.DuelViewModel
 import com.vpxwatcher.app.viewmodel.TournamentViewModel
+import kotlinx.serialization.json.*
 
 @Composable
 fun HomeScreen(
     duelViewModel: DuelViewModel = viewModel(),
     tournamentViewModel: TournamentViewModel = viewModel()
 ) {
+    var lastRunTable by remember { mutableStateOf("") }
+    var lastRunScore by remember { mutableStateOf("") }
+    var lastRunAchievements by remember { mutableStateOf("") }
+
     LaunchedEffect(Unit) {
         duelViewModel.refresh()
         tournamentViewModel.refresh()
+        // Fetch last run info from Firebase
+        try {
+            val pid = PrefsManager.playerId.lowercase()
+            if (pid.isNotBlank()) {
+                val url = PrefsManager.DEFAULT_CLOUD_URL
+                val raw = FirebaseClient.getNode(url, "players/$pid/progress")
+                if (raw != null) {
+                    val obj = FirebaseClient.json.parseToJsonElement(raw)
+                    if (obj is JsonObject && obj.isNotEmpty()) {
+                        var latestRom = ""
+                        var latestTs = ""
+                        obj.entries.forEach { (rom, data) ->
+                            if (data is JsonObject) {
+                                val ts = data["ts"]?.jsonPrimitive?.contentOrNull ?: ""
+                                if (ts > latestTs) {
+                                    latestTs = ts
+                                    latestRom = rom
+                                }
+                            }
+                        }
+                        if (latestRom.isNotEmpty()) {
+                            val romData = obj[latestRom]?.jsonObject
+                            lastRunTable = latestRom
+                            lastRunScore = romData?.get("score")?.jsonPrimitive?.contentOrNull ?: ""
+                            lastRunAchievements = romData?.get("achievements")?.jsonPrimitive?.contentOrNull ?: "0"
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     Column(
@@ -38,7 +73,7 @@ fun HomeScreen(
             text = "🏠 Dashboard",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = Primary
+            color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -46,7 +81,27 @@ fun HomeScreen(
             fontSize = 16.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // ── Last Run Info ──
+        if (lastRunTable.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("🎮 Last Run", fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Table: $lastRunTable", color = MaterialTheme.colorScheme.onSurface)
+                    if (lastRunScore.isNotEmpty()) {
+                        Text("Score: $lastRunScore", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text("Achievements: $lastRunAchievements", color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         // Status cards
         StatusCard(
@@ -85,21 +140,13 @@ fun HomeScreen(
                 Text(
                     text = "📋 Player Info",
                     fontWeight = FontWeight.Bold,
-                    color = Primary
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Player ID: ${PrefsManager.playerId}", color = MaterialTheme.colorScheme.onSurface)
                 Text("Name: ${PrefsManager.playerName}", color = MaterialTheme.colorScheme.onSurface)
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "ℹ️ Scores can only be submitted from the desktop Watcher (NVRAM reading required).",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 
@@ -126,7 +173,7 @@ private fun StatusCard(title: String, value: String, subtitle: String) {
                 text = value,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
-                color = Primary
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
