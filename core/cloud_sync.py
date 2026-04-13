@@ -1107,6 +1107,54 @@ class CloudSync:
         threading.Thread(target=_task, daemon=True).start()
 
     @staticmethod
+    def upload_nvram_stats(cfg: AppConfig, rom: str, audits_data: dict):
+        """Upload full NVRAM audit data to Firebase.
+        Path: players/{pid}/nvram_stats/{rom}
+        Uses set_node (PUT) to always replace the previous data.
+        Called after each game session ends.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
+            return
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        safe_rom = rom.replace("/", "_").replace(".", "_")
+
+        def _task():
+            payload = dict(audits_data)
+            payload["ts"] = datetime.now(timezone.utc).isoformat()
+            if CloudSync.set_node(cfg, f"players/{pid}/nvram_stats/{safe_rom}", payload):
+                log(cfg, f"[CLOUD] NVRAM stats uploaded for {rom}")
+            else:
+                log(cfg, f"[CLOUD] upload_nvram_stats failed for {rom}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
+    def upload_session_deltas(cfg: AppConfig, rom: str, deltas_data: dict):
+        """Upload session deltas (field changes > 0 + playtime) to Firebase.
+        Path: players/{pid}/session_deltas/{rom}
+        Uses set_node (PUT) to always replace — only the latest session matters.
+        Called after each game session ends.
+        """
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
+            return
+        if CloudSync._warn_missing_player_name(cfg):
+            return
+        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        safe_rom = rom.replace("/", "_").replace(".", "_")
+
+        def _task():
+            payload = dict(deltas_data)
+            payload["ts"] = datetime.now(timezone.utc).isoformat()
+            if CloudSync.set_node(cfg, f"players/{pid}/session_deltas/{safe_rom}", payload):
+                log(cfg, f"[CLOUD] Session deltas uploaded for {rom}")
+            else:
+                log(cfg, f"[CLOUD] upload_session_deltas failed for {rom}", "WARN")
+
+        threading.Thread(target=_task, daemon=True).start()
+
+    @staticmethod
     def poll_preferences(cfg: AppConfig) -> Optional[dict]:
         """Read preferences from Firebase to pick up changes made in the app.
         Path: players/{pid}/preferences/

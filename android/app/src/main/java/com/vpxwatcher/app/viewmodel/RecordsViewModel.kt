@@ -22,6 +22,10 @@ class RecordsViewModel : ViewModel() {
         private set
     var globalRecords by mutableStateOf<Map<String, Map<String, JsonObject>>>(emptyMap())
         private set
+    var nvramStats by mutableStateOf<Map<String, Map<String, String>>>(emptyMap())
+        private set
+    var sessionDeltas by mutableStateOf<Map<String, SessionDeltaData>>(emptyMap())
+        private set
     var isLoading by mutableStateOf(false)
         private set
     var selectedTab by mutableStateOf(0)
@@ -36,6 +40,8 @@ class RecordsViewModel : ViewModel() {
 
                 records = recordsRepository.fetchAllRecords(pid)
                 sessionStats = recordsRepository.fetchAllSessionStats(pid)
+                nvramStats = recordsRepository.fetchNvramStats(pid)
+                sessionDeltas = recordsRepository.fetchSessionDeltas(pid)
             } catch (_: Exception) {}
             isLoading = false
         }
