@@ -10,6 +10,11 @@ class ProgressRepository {
 
     private val json = FirebaseClient.json
 
+    companion object {
+        private const val GITHUB_RAW_BASE =
+            "https://raw.githubusercontent.com/Mizzlsolti/vpx-achievement-watcher/main"
+    }
+
     /** Fetch list of ROMs from achievements session keys + roms_played. */
     suspend fun fetchRomList(playerId: String): List<String> {
         val url = PrefsManager.DEFAULT_CLOUD_URL
@@ -120,7 +125,7 @@ class ProgressRepository {
      */
     suspend fun fetchGlobalAchievementRules(): List<GlobalAchievementRule> {
         val raw = FirebaseClient.fetchUrl(
-            "https://raw.githubusercontent.com/Mizzlsolti/vpx-achievement-watcher/main/app_data/global_achievements.json"
+            "$GITHUB_RAW_BASE/app_data/global_achievements.json"
         ) ?: return emptyList()
         return try {
             val obj = json.parseToJsonElement(raw)
@@ -158,7 +163,7 @@ class ProgressRepository {
      */
     suspend fun fetchRomAchievementRules(rom: String): List<String>? {
         val raw = FirebaseClient.fetchUrl(
-            "https://raw.githubusercontent.com/Mizzlsolti/vpx-achievement-watcher/main/app_data/rom_specific_achievements/$rom.ach.json"
+            "$GITHUB_RAW_BASE/app_data/rom_specific_achievements/$rom.ach.json"
         ) ?: return null
         return try {
             val obj = json.parseToJsonElement(raw)

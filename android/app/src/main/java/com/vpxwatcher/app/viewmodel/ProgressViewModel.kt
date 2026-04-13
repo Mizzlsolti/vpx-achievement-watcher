@@ -16,6 +16,12 @@ class ProgressViewModel : ViewModel() {
 
     private val progressRepository = ProgressRepository()
 
+    companion object {
+        private val PROGRESS_CONDITION_TYPES = listOf(
+            "nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand"
+        )
+    }
+
     var romList by mutableStateOf<List<String>>(emptyList())
         private set
     /** Raw ROM name mapping from ROMNAMES. */
@@ -165,7 +171,7 @@ class ProgressViewModel : ViewModel() {
         tallyEntry: GlobalTallyEntry?
     ): Pair<Int?, Int?> {
         val type = rule.conditionType.lowercase()
-        if (type !in listOf("nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand")) {
+        if (type !in PROGRESS_CONDITION_TYPES) {
             return null to null
         }
         val progress = tallyEntry?.progress ?: 0
