@@ -36,7 +36,7 @@ class PreferencesRepository {
                 SoundSettings(
                     enabled = obj["enabled"]?.jsonPrimitive?.booleanOrNull ?: true,
                     volume = obj["volume"]?.jsonPrimitive?.intOrNull ?: 20,
-                    pack = obj["pack"]?.jsonPrimitive?.contentOrNull ?: "zaptron",
+                    pack = obj["pack"]?.jsonPrimitive?.contentOrNull ?: "arcade",
                     events = try {
                         val ev = obj["events"]?.jsonObject
                         ev?.entries?.associate { (k, v) -> k to (v.jsonPrimitive.booleanOrNull ?: true) }
@@ -84,6 +84,6 @@ class PreferencesRepository {
 data class SoundSettings(
     val enabled: Boolean = true,
     val volume: Int = 20,
-    val pack: String = "zaptron",
+    val pack: String = "arcade",
     val events: Map<String, Boolean> = emptyMap(),
 )
