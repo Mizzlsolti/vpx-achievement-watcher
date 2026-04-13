@@ -112,9 +112,11 @@ class ProgressRepository {
 
     /** Compute rarity tier info from a percentage. */
     fun computeRarityFromPct(pct: Float): RarityInfo {
-        val tier = PlayerRepository.RARITY_TIERS.first { pct >= it.threshold }
+        val safePct = pct.coerceAtLeast(0f)
+        val tier = PlayerRepository.RARITY_TIERS.firstOrNull { safePct >= it.threshold }
+            ?: PlayerRepository.RARITY_TIERS.last()
         val colorHex = "#${(tier.color and 0xFFFFFF).toString(16).padStart(6, '0')}"
-        return RarityInfo(tier = tier.name, pct = pct, color = colorHex)
+        return RarityInfo(tier = tier.name, pct = safePct, color = colorHex)
     }
 
     private fun parseRarityData(raw: String): Map<String, RarityInfo> {

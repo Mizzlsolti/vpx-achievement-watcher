@@ -44,7 +44,7 @@ class UpdateRepository {
 
                 return ReleaseInfo(
                     tagName = tagName,
-                    version = tagName.removePrefix("app-v").removePrefix("app-V"),
+                    version = tagName.lowercase().removePrefix("app-v"),
                     body = body,
                     htmlUrl = htmlUrl,
                     apkDownloadUrl = apkUrl,

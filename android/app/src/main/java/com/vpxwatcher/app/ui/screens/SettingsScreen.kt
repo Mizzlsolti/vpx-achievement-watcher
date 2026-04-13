@@ -190,7 +190,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                                         context, viewModel.latestRelease!!.apkDownloadUrl!!
                                     )
                                     downloading = false
-                                    if (!ok) viewModel.statusMessage = "❌ Download failed"
+                                    if (!ok) viewModel.setStatus("❌ Download failed")
                                 }
                             },
                             enabled = !downloading,

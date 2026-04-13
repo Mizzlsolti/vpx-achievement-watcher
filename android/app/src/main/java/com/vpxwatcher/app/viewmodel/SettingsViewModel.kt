@@ -24,7 +24,11 @@ class SettingsViewModel : ViewModel() {
     var cloudSyncEnabled by mutableStateOf(true)
         private set
     var statusMessage by mutableStateOf("")
-    var isLoading by mutableStateOf(false)
+        private set
+
+    fun setStatus(message: String) {
+        statusMessage = message
+    }    var isLoading by mutableStateOf(false)
         private set
     var latestRelease by mutableStateOf<ReleaseInfo?>(null)
         private set

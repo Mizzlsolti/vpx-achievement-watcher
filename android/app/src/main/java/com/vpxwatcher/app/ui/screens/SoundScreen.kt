@@ -152,7 +152,13 @@ fun SoundScreen(viewModel: PreferencesViewModel = viewModel()) {
                                 val vol = viewModel.soundSettings.volume.coerceIn(0, 100)
                                 val toneVol = (vol * ToneGenerator.MAX_VOLUME / 100)
                                 val tg = ToneGenerator(AudioManager.STREAM_MUSIC, toneVol)
-                                tg.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                                try {
+                                    tg.startTone(ToneGenerator.TONE_PROP_BEEP, 200)
+                                } finally {
+                                    // Schedule release after tone completes
+                                    android.os.Handler(android.os.Looper.getMainLooper())
+                                        .postDelayed({ tg.release() }, 300)
+                                }
                             } catch (_: Exception) { }
                         },
                         modifier = Modifier.size(36.dp),
