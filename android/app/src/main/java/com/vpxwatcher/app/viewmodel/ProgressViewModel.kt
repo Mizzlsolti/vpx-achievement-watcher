@@ -20,6 +20,13 @@ class ProgressViewModel : ViewModel() {
         private val PROGRESS_CONDITION_TYPES = listOf(
             "nvram_tally", "rom_count", "rom_complete_set", "rom_multi_brand"
         )
+
+        /** Matches core/cloud_sync.py _FIREBASE_ILLEGAL_CHARS_RE — chars illegal in Firebase keys. */
+        private val FIREBASE_ILLEGAL_CHARS = Regex("[.$#\\[\\]/]")
+
+        /** Sanitize a title for Firebase key lookup (mirrors Python's _FIREBASE_ILLEGAL_CHARS_RE.sub). */
+        fun sanitizeFirebaseKey(title: String): String =
+            FIREBASE_ILLEGAL_CHARS.replace(title, "_")
     }
 
     var romList by mutableStateOf<List<String>>(emptyList())
@@ -105,8 +112,9 @@ class ProgressViewModel : ViewModel() {
                     if (isUnlocked) {
                         AchievementEntry(title = title, unlocked = true)
                     } else {
-                        // Compute progress/target for locked achievements
+                        // Look up tally using both original and Firebase-sanitized key
                         val tallyEntry = tally[title]
+                            ?: tally[sanitizeFirebaseKey(title)]
                         val (progress, target) = computeGlobalProgress(rule, tallyEntry)
                         AchievementEntry(
                             title = title,
@@ -135,6 +143,17 @@ class ProgressViewModel : ViewModel() {
             val unlockedEntries = progressRepository.fetchRomAchievements(pid, rom)
             rarityCache = progressRepository.fetchRarityCache(pid, rom)
 
+            // Fetch cloud progress for accurate total count
+            val cloudTotal = progressRepository.fetchRomProgressTotal(pid, rom)
+
+            // Try to compute rarity locally from cloud_stats when rarity cache is empty
+            if (rarityCache.isEmpty()) {
+                val computedRarity = progressRepository.computeRarityFromCloudStats(rom)
+                if (computedRarity.isNotEmpty()) {
+                    rarityCache = computedRarity
+                }
+            }
+
             // Try to load ROM-specific achievement rules
             val ruleTitles = progressRepository.fetchRomAchievementRules(rom)
 
@@ -154,10 +173,15 @@ class ProgressViewModel : ViewModel() {
                 totalCount = achievements.size
                 unlockedCount = achievements.count { it.unlocked }
             } else {
-                // Fallback: use unlocked achievements only (current behavior)
+                // Fallback: use unlocked achievements only
                 achievements = unlockedEntries
                 unlockedCount = unlockedEntries.count { it.unlocked }
-                totalCount = unlockedEntries.size
+                // Use cloud total if available; otherwise fall back to unlocked count
+                totalCount = if (cloudTotal != null && cloudTotal > 0) {
+                    maxOf(cloudTotal, unlockedCount)
+                } else {
+                    unlockedEntries.size
+                }
             }
         }
     }

@@ -40,4 +40,13 @@ object PrefsManager {
             return name.isNotEmpty() && !name.equals("Player", ignoreCase = true) &&
                 id.isNotEmpty() && id != "unknown"
         }
+
+    // ── Generic SharedPreferences helpers for PollWorker state ──
+
+    fun getInt(key: String, default: Int): Int = prefs.getInt(key, default)
+    fun putInt(key: String, value: Int) = prefs.edit().putInt(key, value).apply()
+    fun getBoolean(key: String, default: Boolean): Boolean = prefs.getBoolean(key, default)
+    fun putBoolean(key: String, value: Boolean) = prefs.edit().putBoolean(key, value).apply()
+    fun getString(key: String, default: String): String = prefs.getString(key, default) ?: default
+    fun putString(key: String, value: String) = prefs.edit().putString(key, value).apply()
 }

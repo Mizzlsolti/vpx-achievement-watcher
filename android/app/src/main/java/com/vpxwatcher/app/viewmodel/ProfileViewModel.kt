@@ -5,12 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vpxwatcher.app.data.DuelRepository
-import com.vpxwatcher.app.data.FirebaseClient
-import com.vpxwatcher.app.data.PrefsManager
+import com.vpxwatcher.app.data.*
 import com.vpxwatcher.app.data.models.DuelStatus
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.*
 
 class ProfileViewModel : ViewModel() {
 
@@ -30,6 +27,7 @@ class ProfileViewModel : ViewModel() {
         private set
 
     private val duelRepository = DuelRepository()
+    private val playerRepository = PlayerRepository()
 
     fun refresh() {
         playerName = PrefsManager.playerName
@@ -63,21 +61,18 @@ class ProfileViewModel : ViewModel() {
     }
 
     private suspend fun fetchProfileFromCloud() {
-        val url = PrefsManager.DEFAULT_CLOUD_URL
         val pid = PrefsManager.playerId.lowercase()
-        if (url.isBlank() || pid.isBlank()) return
+        if (pid.isBlank()) return
 
         try {
-            val raw = FirebaseClient.getNode(url, "players/$pid/achievements")
-            if (raw != null) {
-                val obj = FirebaseClient.json.parseToJsonElement(raw)
-                if (obj is JsonObject) {
-                    level = obj["level"]?.jsonPrimitive?.content ?: ""
-                    badges = try {
-                        obj["badges"]?.jsonArray?.mapNotNull { it.jsonPrimitive.content } ?: emptyList()
-                    } catch (_: Exception) { emptyList() }
-                }
-            }
+            val state = playerRepository.fetchAchievementsState(pid) ?: return
+
+            // Compute player level using the same logic as PlayerViewModel
+            val playerLevel = playerRepository.computePlayerLevel(state)
+            level = playerLevel.name
+
+            // Evaluate badges from the achievements state
+            badges = playerRepository.evaluateBadges(state)
         } catch (_: Exception) {}
     }
 
