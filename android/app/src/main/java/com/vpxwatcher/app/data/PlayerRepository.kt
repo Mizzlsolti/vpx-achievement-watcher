@@ -73,51 +73,25 @@ class PlayerRepository {
         // global achievements — cloud stores global as a flat JsonArray (uploaded by
         // upload_full_achievements), but local state wraps it in {"__global__": [...]}.
         // Handle both formats exactly like core/badges.py compute_player_level().
-        val globalElement = state["global"]
-        when (globalElement) {
-            is JsonArray -> {
-                // Flat array format (cloud upload format): [entry1, entry2, ...]
-                globalElement.forEach { e ->
-                    val title = when {
-                        e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                        e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                        else -> ""
-                    }
-                    if (title.isNotEmpty()) seen.add(title)
-                }
+        // Uses forEachAchievementEntry() to also handle Firebase sparse arrays.
+        val global = state["global"]
+        val globalObj = try { global?.jsonObject } catch (_: Exception) { null }
+        if (globalObj != null) {
+            globalObj.values.forEach { entries ->
+                forEachAchievementEntry(entries) { title -> seen.add(title) }
             }
-            is JsonObject -> {
-                // Dict-of-groups format (local state): {"__global__": [...], ...}
-                globalElement.values.forEach { entries ->
-                    if (entries is JsonArray) {
-                        entries.forEach { e ->
-                            val title = when {
-                                e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                                e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                                else -> ""
-                            }
-                            if (title.isNotEmpty()) seen.add(title)
-                        }
-                    }
-                }
-            }
-            else -> {} // null or unexpected type — skip
+        } else if (global is JsonArray) {
+            // global as a flat array (desktop wraps in {"__global__": [...]}, but
+            // Firebase may return the raw array)
+            forEachAchievementEntry(global) { title -> seen.add(title) }
         }
 
         // session achievements (all ROMs)
-        val sessionElement = state["session"]
-        if (sessionElement is JsonObject) {
-            sessionElement.values.forEach { entries ->
-                if (entries is JsonArray) {
-                    entries.forEach { e ->
-                        val title = when {
-                            e is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
-                            e is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
-                            else -> ""
-                        }
-                        if (title.isNotEmpty()) seen.add(title)
-                    }
-                }
+        val session = state["session"]
+        val sessionObj = try { session?.jsonObject } catch (_: Exception) { null }
+        if (sessionObj != null) {
+            sessionObj.values.forEach { entries ->
+                forEachAchievementEntry(entries) { title -> seen.add(title) }
             }
         }
 
@@ -212,6 +186,32 @@ class PlayerRepository {
             val el = json.parseToJsonElement(raw)
             if (el is JsonPrimitive && el.isString) el.content else null
         } catch (_: Exception) { null }
+    }
+
+    /**
+     * Iterate over achievement entries in a JsonElement that may be a JsonArray
+     * or a sparse-array JsonObject (Firebase auto-conversion). Extracts the trimmed
+     * title from each entry (JsonObject with "title" key, or bare JsonPrimitive)
+     * and calls [action] with non-empty titles. Mirrors desktop badges.py logic.
+     */
+    private fun forEachAchievementEntry(entries: JsonElement, action: (String) -> Unit) {
+        val items: List<JsonElement> = when (entries) {
+            is JsonArray -> entries.toList()
+            is JsonObject -> {
+                // Sparse array from Firebase: {"0": {...}, "2": {...}}
+                entries.entries.sortedBy { it.key.toIntOrNull() ?: Int.MAX_VALUE }
+                    .map { it.value }
+            }
+            else -> return
+        }
+        for (e in items) {
+            val title = when (e) {
+                is JsonObject -> e["title"]?.jsonPrimitive?.contentOrNull?.trim() ?: ""
+                is JsonPrimitive -> e.contentOrNull?.trim() ?: ""
+                else -> ""  // JsonNull — skip
+            }
+            if (title.isNotEmpty()) action(title)
+        }
     }
 
     companion object {
