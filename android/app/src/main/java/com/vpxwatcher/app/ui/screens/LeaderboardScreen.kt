@@ -1,8 +1,10 @@
 package com.vpxwatcher.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,7 +21,6 @@ import com.vpxwatcher.app.viewmodel.LeaderboardViewModel
  * Cloud Leaderboard tab — achievement progress rankings.
  * Matches the Watcher's Cloud tab (ui/cloud_stats.py _build_tab_cloud()).
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -40,59 +41,59 @@ fun LeaderboardScreen(viewModel: LeaderboardViewModel = viewModel()) {
         Spacer(modifier = Modifier.height(12.dp))
 
         // ── ROM Search ──
-        var expanded by remember { mutableStateOf(false) }
-        val filteredRoms = try {
-            val query = viewModel.searchQuery
-            if (query.isEmpty()) {
-                viewModel.cleanRomNames.entries.toList().take(50)
-            } else {
-                viewModel.cleanRomNames.entries
-                    .filter { it.key.contains(query, ignoreCase = true) ||
-                            it.value.contains(query, ignoreCase = true) }
-                    .take(50)
-            }
-        } catch (_: Exception) { emptyList() }
+        val filteredRoms = remember(viewModel.searchQuery, viewModel.cleanRomNames) {
+            try {
+                val query = viewModel.searchQuery
+                if (query.isEmpty()) {
+                    viewModel.cleanRomNames.entries.toList().take(50)
+                } else {
+                    viewModel.cleanRomNames.entries
+                        .filter {
+                            it.key.contains(query, ignoreCase = true) ||
+                                    it.value.contains(query, ignoreCase = true)
+                        }
+                        .take(50)
+                }
+            } catch (_: Exception) { emptyList() }
+        }
 
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-        ) {
-            OutlinedTextField(
-                value = viewModel.searchQuery,
-                onValueChange = {
-                    viewModel.onSearchChanged(it)
-                    expanded = true
-                },
-                label = { Text("🔍 Search ROM / Table") },
-                placeholder = { Text("Type to search…") },
-                singleLine = true,
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded)
-                },
+        OutlinedTextField(
+            value = viewModel.searchQuery,
+            onValueChange = { viewModel.onSearchChanged(it) },
+            label = { Text("🔍 Search ROM / Table") },
+            placeholder = { Text("Type to search…") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        // ── ROM Suggestion List (inline, no overlay) ──
+        if (filteredRoms.isNotEmpty()) {
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .menuAnchor(),
-            )
-            ExposedDropdownMenu(
-                expanded = expanded && filteredRoms.isNotEmpty(),
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.heightIn(max = 300.dp),
+                    .heightIn(max = 200.dp)
+                    .padding(top = 4.dp),
             ) {
-                filteredRoms.forEach { (rom, cleanName) ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(cleanName, fontSize = 14.sp)
-                                Text(rom, fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        },
-                        onClick = {
-                            viewModel.onSearchChanged(cleanName)
-                            viewModel.fetchLeaderboard(rom)
-                            expanded = false
-                        },
-                    )
+                items(filteredRoms) { (rom, cleanName) ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.onSearchChanged(cleanName)
+                                viewModel.fetchLeaderboard(rom)
+                            },
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        tonalElevation = 1.dp,
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                            Text(cleanName, fontSize = 14.sp)
+                            Text(
+                                rom, fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    HorizontalDivider()
                 }
             }
         }
