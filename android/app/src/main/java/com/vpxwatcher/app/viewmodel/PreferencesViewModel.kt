@@ -39,6 +39,11 @@ class PreferencesViewModel : ViewModel() {
         fun initThemeFromPrefs() {
             _globalTheme.value = PrefsManager.themeId
         }
+
+        /** Update global theme from background sync (PollWorker). */
+        fun updateGlobalTheme(themeId: String) {
+            _globalTheme.value = themeId
+        }
     }
 
     fun refresh() {

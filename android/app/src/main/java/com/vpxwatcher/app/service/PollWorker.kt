@@ -3,7 +3,9 @@ package com.vpxwatcher.app.service
 import android.content.Context
 import androidx.work.*
 import com.vpxwatcher.app.data.FirebaseClient
+import com.vpxwatcher.app.data.PreferencesRepository
 import com.vpxwatcher.app.data.PrefsManager
+import com.vpxwatcher.app.viewmodel.PreferencesViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -13,6 +15,7 @@ import java.util.concurrent.TimeUnit
  * WorkManager background polling worker.
  * Checks Firebase for new events (achievements, duels, tournaments)
  * and shows Android system notifications.
+ * Also syncs preferences (theme, sounds) from the desktop Watcher.
  */
 class PollWorker(
     private val context: Context,
@@ -28,6 +31,9 @@ class PollWorker(
 
             // Check for new duel invitations
             checkDuelInbox(url, pid)
+
+            // Sync preferences (theme, sounds) from desktop Watcher
+            syncPreferences(pid)
 
             Result.success()
         } catch (_: Exception) {
@@ -51,6 +57,26 @@ class PollWorker(
                     NotificationService.showDuelInvitation(context, from)
                 }
             }
+        } catch (_: Exception) { /* silent */ }
+    }
+
+    /**
+     * Sync theme and sound preferences from cloud (desktop Watcher writes).
+     * Mirrors the desktop's _poll_cloud_preferences() polling behaviour.
+     */
+    private suspend fun syncPreferences(pid: String) {
+        try {
+            val repo = PreferencesRepository()
+
+            // Theme sync
+            val cloudTheme = repo.fetchTheme(pid)
+            if (!cloudTheme.isNullOrBlank() && cloudTheme != PrefsManager.themeId) {
+                PrefsManager.themeId = cloudTheme
+                PreferencesViewModel.updateGlobalTheme(cloudTheme)
+            }
+
+            // Sound sync (store latest cloud values in prefs if needed)
+            // Sound settings are read on demand by PreferencesViewModel.refresh()
         } catch (_: Exception) { /* silent */ }
     }
 
