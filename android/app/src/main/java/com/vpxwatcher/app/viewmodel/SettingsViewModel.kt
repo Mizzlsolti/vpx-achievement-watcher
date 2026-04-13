@@ -33,14 +33,18 @@ class SettingsViewModel : ViewModel() {
         private set
 
     companion object {
-        const val APP_VERSION = "1.0.0"
+        const val APP_VERSION = "1.0.0"  // fallback; prefer BuildConfig.VERSION_NAME at call site
+    }
+
+    private fun getPlayerId(): String? {
+        val pid = PrefsManager.playerId.lowercase()
+        return if (pid.isBlank()) null else pid
     }
 
     fun refresh() {
         viewModelScope.launch {
             try {
-                val pid = PrefsManager.playerId.lowercase()
-                if (pid.isBlank()) return@launch
+                val pid = getPlayerId() ?: return@launch
                 pushEnabled = preferencesRepository.fetchPushEnabled(pid)
             } catch (_: Exception) {}
         }
@@ -49,8 +53,7 @@ class SettingsViewModel : ViewModel() {
     fun togglePushNotifications(enabled: Boolean) {
         pushEnabled = enabled
         viewModelScope.launch {
-            val pid = PrefsManager.playerId.lowercase()
-            if (pid.isBlank()) return@launch
+            val pid = getPlayerId() ?: return@launch
             preferencesRepository.savePushEnabled(pid, enabled)
         }
     }
@@ -59,8 +62,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
-                val pid = PrefsManager.playerId.lowercase()
-                if (pid.isBlank()) return@launch
+                val pid = getPlayerId() ?: return@launch
                 val signalId = UUID.randomUUID().toString()
                 val signal = buildJsonObject {
                     put("action", "backup")
@@ -82,8 +84,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             isLoading = true
             try {
-                val pid = PrefsManager.playerId.lowercase()
-                if (pid.isBlank()) return@launch
+                val pid = getPlayerId() ?: return@launch
                 val signalId = UUID.randomUUID().toString()
                 val signal = buildJsonObject {
                     put("action", "restore")
