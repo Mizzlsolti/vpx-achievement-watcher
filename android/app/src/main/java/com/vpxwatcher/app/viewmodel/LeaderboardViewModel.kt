@@ -42,7 +42,7 @@ class LeaderboardViewModel : ViewModel() {
                     leaderboardRepository.fetchVpsTableNames()
                 } catch (_: Exception) { emptyMap() }
 
-                // Merge: VPS names take precedence, then romnames.json
+                // Merge: romnames.json takes precedence, VPS fills missing entries
                 val merged = romNames.toMutableMap()
                 vpsNames.forEach { (rom, name) ->
                     if (rom !in merged) merged[rom] = name
