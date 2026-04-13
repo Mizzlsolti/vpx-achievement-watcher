@@ -125,8 +125,7 @@ private fun QueueTab(viewModel: TournamentViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "ℹ️ Table matching from the app is limited (no local NVRAM maps). " +
-                "Tournament is created automatically when 4 players queue.",
+            text = "ℹ️ Tournament is created automatically when 4 players queue.",
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

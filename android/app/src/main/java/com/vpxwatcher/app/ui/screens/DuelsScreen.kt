@@ -99,12 +99,7 @@ fun DuelsScreen(viewModel: DuelViewModel = viewModel()) {
                     Text("🔍 Auto-Match")
                 }
             }
-            Text(
-                text = "ℹ️ Auto-Match from the app has limited table matching (no local NVRAM maps).",
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
+
         }
     }
 
