@@ -108,7 +108,14 @@ class PlayerRepository {
         val badgesElement = state["badges"]
         val badges = try {
             when (badgesElement) {
-                is JsonArray -> badgesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+                is JsonArray -> badgesElement.mapNotNull { item ->
+                    when (item) {
+                        is JsonPrimitive -> item.contentOrNull
+                        is JsonObject -> item["id"]?.jsonPrimitive?.contentOrNull
+                            ?: item["badge_id"]?.jsonPrimitive?.contentOrNull
+                        else -> null
+                    }
+                }
                 is JsonObject -> badgesElement.entries
                     .filter { (_, v) ->
                         v is JsonPrimitive && v.booleanOrNull == true

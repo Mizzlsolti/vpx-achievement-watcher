@@ -1126,6 +1126,49 @@ class CloudSync:
         return None
 
     @staticmethod
+    def download_preferences(cfg: AppConfig) -> bool:
+        """Download preferences from Firebase and apply to local config if cloud is newer.
+        Checks the ``ts`` timestamp against the local config's last-modified time.
+        Returns True if preferences were applied, False otherwise.
+        """
+        prefs = CloudSync.poll_preferences(cfg)
+        if not prefs or not isinstance(prefs, dict):
+            return False
+        cloud_ts = prefs.get("ts", "")
+        if not cloud_ts:
+            return False
+        # Compare against last known cloud preferences timestamp
+        overlay = cfg.OVERLAY if isinstance(cfg.OVERLAY, dict) else {}
+        last_ts = overlay.get("_cloud_prefs_ts", "")
+        if cloud_ts == last_ts:
+            return False
+        changed = False
+        # Apply theme
+        cloud_theme = prefs.get("theme")
+        if cloud_theme and isinstance(cloud_theme, str):
+            current_theme = overlay.get("theme", "")
+            if cloud_theme != current_theme:
+                cfg.OVERLAY["theme"] = cloud_theme
+                changed = True
+        # Apply sound settings
+        sounds = prefs.get("sounds")
+        if sounds and isinstance(sounds, dict):
+            if "enabled" in sounds:
+                cfg.OVERLAY["sound_enabled"] = bool(sounds["enabled"])
+            if "volume" in sounds:
+                cfg.OVERLAY["sound_volume"] = int(sounds["volume"])
+            if "pack" in sounds:
+                cfg.OVERLAY["sound_pack"] = str(sounds["pack"])
+            if "events" in sounds and isinstance(sounds["events"], dict):
+                cfg.OVERLAY["sound_events"] = dict(sounds["events"])
+            changed = True
+        if changed:
+            cfg.OVERLAY["_cloud_prefs_ts"] = cloud_ts
+            cfg.save()
+            log(cfg, "[CLOUD] Preferences downloaded and applied from cloud")
+        return changed
+
+    @staticmethod
     def poll_app_signals(cfg: AppConfig) -> list:
         """Read and process app_signals from Firebase.
         Path: players/{pid}/app_signals/
