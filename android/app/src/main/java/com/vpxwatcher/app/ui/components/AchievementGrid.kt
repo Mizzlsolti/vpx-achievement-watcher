@@ -75,6 +75,18 @@ fun AchievementGrid(
                                 maxLines = 2,
                                 lineHeight = 10.sp,
                             )
+                            // Progress display for locked achievements (e.g. "1969/5000")
+                            if (!ach.unlocked && ach.progress != null && ach.target != null) {
+                                Text(
+                                    text = "${ach.progress}/${ach.target}",
+                                    fontSize = 7.sp,
+                                    textAlign = TextAlign.Center,
+                                    color = Color(0xFFFF7F00), // Orange like desktop watcher
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    lineHeight = 8.sp,
+                                )
+                            }
                             // Rarity label
                             if (rarity != null) {
                                 val displayColor = rarityColor ?: MaterialTheme.colorScheme.onSurfaceVariant
