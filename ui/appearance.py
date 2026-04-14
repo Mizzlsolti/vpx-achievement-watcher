@@ -1059,19 +1059,19 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         except Exception as exc:
             QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
 
-def _on_pip_test(self):
-    """Open PiP overlay for 5 seconds as a preview, then auto-close."""
-    try:
-        from ui.overlay_pip import DuelPiPOverlay
-        if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
-            self._pip_overlay = DuelPiPOverlay(self)
-        self._pip_overlay.open()
+    def _on_pip_test(self):
+        """Open PiP overlay for 5 seconds as a preview, then auto-close."""
+        try:
+            from ui.overlay_pip import DuelPiPOverlay
+            if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
+                self._pip_overlay = DuelPiPOverlay(self)
+            self._pip_overlay.open()
 
-        # Auto-close after 5 seconds
-        QTimer.singleShot(5000, self._pip_overlay.close_pip)
+            # Auto-close after 5 seconds
+            QTimer.singleShot(5000, self._pip_overlay.close_pip)
 
-    except Exception as exc:
-        QMessageBox.warning(self, "Duel PiP", f"PiP test failed:\n{exc}")
+        except Exception as exc:
+            QMessageBox.warning(self, "Duel PiP", f"PiP test failed:\n{exc}")
 
     def _get_screen_capture_server(self):
         """Return the running ScreenCaptureServer from the watcher, or None."""
