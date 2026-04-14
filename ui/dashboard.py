@@ -522,7 +522,6 @@ class DashboardMixin:
             ("notifications_saved",                None),
             ("duel_overlay_saved",                 None),
             ("status_overlay_saved",               "status_overlay_enabled"),
-            ("screen_capture_overlay_configured",  None),
         ]
         total_relevant = 0
         total_configured = 0
