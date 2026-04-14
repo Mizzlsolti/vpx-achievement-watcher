@@ -504,6 +504,14 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
         # 7) Duel Picture-in-Picture Stream (Row 3, Col 1)
+        self.chk_pip_portrait = QCheckBox("Portrait Mode (90°)")
+        self.chk_pip_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_portrait", True)))
+        self.chk_pip_portrait.stateChanged.connect(self._on_pip_portrait_toggle)
+
+        self.chk_pip_ccw = QCheckBox("Rotate CCW")
+        self.chk_pip_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_rotate_ccw", True)))
+        self.chk_pip_ccw.stateChanged.connect(self._on_pip_ccw_toggle)
+
         self.cmb_sc_fps = QComboBox()
         self.cmb_sc_fps.addItems(_SC_FPS_OPTIONS)
         _sc_fps_val = str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower()
@@ -527,6 +535,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         box_pip = QVBoxLayout()
         box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture Stream</b>"))
+        box_pip.addWidget(self.chk_pip_portrait)
+        box_pip.addWidget(self.chk_pip_ccw)
         _fps_row = QHBoxLayout()
         _fps_row.addWidget(QLabel("FPS:"))
         _fps_row.addWidget(self.cmb_sc_fps)
@@ -926,6 +936,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_portrait,
             self.chk_status_overlay_portrait,
             self.chk_duel_overlay_portrait,
+            self.chk_pip_portrait,
         ]
 
     def _sync_sound_preferences(self):
@@ -1013,6 +1024,17 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
                 self.lbl_sc_cpu_warning.setVisible(False)
         except Exception:
             pass
+
+    def _on_pip_portrait_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_pip_portrait"] = bool(is_checked)
+        self.cfg.save()
+        self._update_switch_all_button_label()
+
+    def _on_pip_ccw_toggle(self, state: int):
+        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_pip_rotate_ccw"] = bool(is_ccw)
+        self.cfg.save()
 
     def _on_pip_place_clicked(self):
         """Open the PiP overlay in placement mode (no stream). Second click saves position."""
