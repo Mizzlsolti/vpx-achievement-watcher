@@ -27,11 +27,11 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt6 requests pywin32 pyinstaller
+        pip install -r requirements.txt
 
     - name: Build Achievement_Watcher.exe with PyInstaller
       run: |
-        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --name "Achievement_Watcher" "Achievement_watcher.py"
+        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --hidden-import="mss" --hidden-import="mss.tools" --hidden-import="PIL" --hidden-import="PIL.Image" --name "Achievement_Watcher" "Achievement_watcher.py"
 
     - name: Install Inno Setup
       run: choco install innosetup -y
