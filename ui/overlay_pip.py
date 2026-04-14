@@ -19,7 +19,7 @@ from PyQt6.QtCore import (
     QTimer,
     pyqtSignal,
 )
-from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap, QTransform
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.overlay_base import _force_topmost, _start_topmost_timer
@@ -183,10 +183,10 @@ class DuelPiPOverlay(QWidget):
     # ------------------------------------------------------------------
 
     def _setup_window(self):
-        self.setWindowTitle("📺 Duel Live – Opponent's Playfield")
         self.setWindowFlags(
-            Qt.WindowType.Window
+            Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
+            | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.setMinimumSize(160, 90)
@@ -196,11 +196,11 @@ class DuelPiPOverlay(QWidget):
     # ------------------------------------------------------------------
 
     def _restore_geometry(self):
-        cfg = self._parent_gui.cfg
-        x = int(getattr(cfg, "DUEL_PIP_X", -1))
-        y = int(getattr(cfg, "DUEL_PIP_Y", -1))
-        w = int(getattr(cfg, "DUEL_PIP_W", 480))
-        h = int(getattr(cfg, "DUEL_PIP_H", 270))
+        ov = self._parent_gui.cfg.OVERLAY or {}
+        x = int(ov.get("duel_pip_x", -1))
+        y = int(ov.get("duel_pip_y", -1))
+        w = int(ov.get("duel_pip_w", 480))
+        h = int(ov.get("duel_pip_h", 270))
         w = max(160, w)
         h = max(90, h)
 
@@ -218,13 +218,12 @@ class DuelPiPOverlay(QWidget):
 
     def _save_geometry_to_cfg(self):
         try:
-            cfg = self._parent_gui.cfg
             g = self.geometry()
-            cfg.DUEL_PIP_X = g.x()
-            cfg.DUEL_PIP_Y = g.y()
-            cfg.DUEL_PIP_W = g.width()
-            cfg.DUEL_PIP_H = g.height()
-            cfg.save()
+            self._parent_gui.cfg.OVERLAY["duel_pip_x"] = g.x()
+            self._parent_gui.cfg.OVERLAY["duel_pip_y"] = g.y()
+            self._parent_gui.cfg.OVERLAY["duel_pip_w"] = g.width()
+            self._parent_gui.cfg.OVERLAY["duel_pip_h"] = g.height()
+            self._parent_gui.cfg.save()
         except Exception:
             pass
 
@@ -274,8 +273,19 @@ class DuelPiPOverlay(QWidget):
         p = QPainter(self)
         p.fillRect(self.rect(), QColor(0, 0, 0))
 
+        ov = self._parent_gui.cfg.OVERLAY or {}
+        portrait = bool(ov.get("duel_pip_portrait", True))
+        rotate_ccw = bool(ov.get("duel_pip_rotate_ccw", True))
+
         if self._current_frame is not None:
-            scaled = self._current_frame.scaled(
+            frame = self._current_frame
+            if portrait:
+                angle = -90 if rotate_ccw else 90
+                frame = frame.transformed(
+                    QTransform().rotate(angle),
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            scaled = frame.scaled(
                 self.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
@@ -291,11 +301,28 @@ class DuelPiPOverlay(QWidget):
             p.drawRect(1, 1, self.width() - 2, self.height() - 2)
             p.setPen(QColor(160, 160, 160))
             p.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-            p.drawText(
-                self.rect(),
-                int(Qt.AlignmentFlag.AlignCenter),
-                "📺 Drag to position – Resize at edges",
-            )
+            if portrait:
+                # Rotate painter for placeholder text
+                angle = -90 if rotate_ccw else 90
+                p.translate(self.width() / 2, self.height() / 2)
+                p.rotate(angle)
+                text_rect = p.boundingRect(
+                    0, 0, 0, 0,
+                    int(Qt.AlignmentFlag.AlignCenter),
+                    "📺 Drag to position – Resize at edges",
+                )
+                p.drawText(
+                    -text_rect.width() // 2, -text_rect.height() // 2,
+                    text_rect.width(), text_rect.height(),
+                    int(Qt.AlignmentFlag.AlignCenter),
+                    "📺 Drag to position – Resize at edges",
+                )
+            else:
+                p.drawText(
+                    self.rect(),
+                    int(Qt.AlignmentFlag.AlignCenter),
+                    "📺 Drag to position – Resize at edges",
+                )
         p.end()
 
     def mousePressEvent(self, evt):  # noqa: N802

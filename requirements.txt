@@ -1,0 +1,7 @@
+PyQt6
+requests
+pywin32
+psutil
+mss
+Pillow
+pyinstaller

@@ -201,6 +201,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
     "screen_capture_overlay_configured",
     "duel_pip_saved",
+    "duel_pip_portrait", "duel_pip_rotate_ccw",
+    "duel_pip_x", "duel_pip_y", "duel_pip_w", "duel_pip_h",
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",

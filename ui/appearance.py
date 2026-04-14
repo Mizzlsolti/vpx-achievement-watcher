@@ -5,10 +5,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel,
     QCheckBox, QGroupBox, QScrollArea, QFrame, QFontComboBox, QSpinBox,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
-    QSlider, QApplication, QDialog, QMessageBox,
+    QSlider, QApplication, QMessageBox,
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QPixmap, QImage
+from PyQt6.QtGui import QFont
 
 from core.theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
 from core.watcher_core import apply_tooltips
@@ -24,9 +24,9 @@ from .effects import EffectsMixin
 from .mascots import MascotsMixin
 
 # Screen Capture dropdown option labels and their config values (index → value)
-_SC_FPS_OPTIONS = ["Auto (dynamisch)", "30", "20", "10"]
+_SC_FPS_OPTIONS = ["Auto (dynamic)", "30", "20", "10"]
 _SC_FPS_VALUES  = ["auto", "30", "20", "10"]
-_SC_QUAL_OPTIONS = ["Auto (dynamisch)", "95", "80", "60"]
+_SC_QUAL_OPTIONS = ["Auto (dynamic)", "95", "80", "60"]
 _SC_QUAL_VALUES  = ["auto", "95", "80", "60"]
 
 
@@ -503,7 +503,15 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
-        # 7) Screen Capture / Live View (Row 3, Col 1)
+        # 7) Duel Picture-in-Picture Stream (Row 3, Col 1)
+        self.chk_pip_portrait = QCheckBox("Portrait Mode (90°)")
+        self.chk_pip_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_portrait", True)))
+        self.chk_pip_portrait.stateChanged.connect(self._on_pip_portrait_toggle)
+
+        self.chk_pip_ccw = QCheckBox("Rotate CCW")
+        self.chk_pip_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_rotate_ccw", True)))
+        self.chk_pip_ccw.stateChanged.connect(self._on_pip_ccw_toggle)
+
         self.cmb_sc_fps = QComboBox()
         self.cmb_sc_fps.addItems(_SC_FPS_OPTIONS)
         _sc_fps_val = str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower()
@@ -516,42 +524,35 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.cmb_sc_quality.setCurrentIndex(_SC_QUAL_VALUES.index(_sc_qual_val) if _sc_qual_val in _SC_QUAL_VALUES else 0)
         self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
 
-        self.lbl_sc_cpu_warning = QLabel("⚠️ Qualität reduziert: CPU-Auslastung hoch")
+        self.lbl_sc_cpu_warning = QLabel("⚠️ Quality reduced: CPU usage high")
         self.lbl_sc_cpu_warning.setVisible(False)
 
-        self.btn_sc_test = QPushButton("Test")
-        self.btn_sc_test.clicked.connect(self._on_sc_test)
+        self.btn_pip_place = QPushButton("Place")
+        self.btn_pip_place.clicked.connect(self._on_pip_place_clicked)
 
-        box_screen_capture = QVBoxLayout()
-        box_screen_capture.addWidget(QLabel("<b>🖥️ Screen Capture / Live View</b>"))
-        _fps_row = QHBoxLayout()
-        _fps_row.addWidget(QLabel("FPS:"))
-        _fps_row.addWidget(self.cmb_sc_fps)
-        box_screen_capture.addLayout(_fps_row)
-        _qual_row = QHBoxLayout()
-        _qual_row.addWidget(QLabel("Quality:"))
-        _qual_row.addWidget(self.cmb_sc_quality)
-        box_screen_capture.addLayout(_qual_row)
-        box_screen_capture.addWidget(self.lbl_sc_cpu_warning)
-        _sc_btns = QHBoxLayout()
-        _sc_btns.addWidget(self.btn_sc_test)
-        box_screen_capture.addLayout(_sc_btns)
-        box_screen_capture.addStretch(1)
-
-        lay_pos.addLayout(box_screen_capture, 3, 1)
-
-        # 8) Duel Picture-in-Picture (Row 4, Col 0)
         self.btn_pip_test = QPushButton("Test")
         self.btn_pip_test.clicked.connect(self._on_pip_test)
 
         box_pip = QVBoxLayout()
-        box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture</b>"))
+        box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture Stream</b>"))
+        box_pip.addWidget(self.chk_pip_portrait)
+        box_pip.addWidget(self.chk_pip_ccw)
+        _fps_row = QHBoxLayout()
+        _fps_row.addWidget(QLabel("FPS:"))
+        _fps_row.addWidget(self.cmb_sc_fps)
+        box_pip.addLayout(_fps_row)
+        _qual_row = QHBoxLayout()
+        _qual_row.addWidget(QLabel("Quality:"))
+        _qual_row.addWidget(self.cmb_sc_quality)
+        box_pip.addLayout(_qual_row)
+        box_pip.addWidget(self.lbl_sc_cpu_warning)
         _pip_btns = QHBoxLayout()
+        _pip_btns.addWidget(self.btn_pip_place)
         _pip_btns.addWidget(self.btn_pip_test)
         box_pip.addLayout(_pip_btns)
         box_pip.addStretch(1)
 
-        lay_pos.addLayout(box_pip, 4, 0)
+        lay_pos.addLayout(box_pip, 3, 1)
 
         # CPU monitor timer (2 s interval) to update the SC warning label
         self._sc_cpu_timer = QTimer(self)
@@ -935,6 +936,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_portrait,
             self.chk_status_overlay_portrait,
             self.chk_duel_overlay_portrait,
+            self.chk_pip_portrait,
         ]
 
     def _sync_sound_preferences(self):
@@ -959,6 +961,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_ccw,
             self.chk_status_overlay_ccw,
             self.chk_duel_overlay_ccw,
+            self.chk_pip_ccw,
         ]
 
     def _update_switch_all_button_label(self):
@@ -1023,71 +1026,46 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         except Exception:
             pass
 
-    def _on_sc_test(self):
-        """Capture monitor 1, show a preview dialog, mark configured."""
-        scs = self._get_screen_capture_server()
-        if scs is None or not scs.is_running:
-            QMessageBox.warning(
-                self,
-                "Screen Capture",
-                "Screen capture server is not running.\n"
-                "Make sure mss and Pillow are installed.",
-            )
+    def _on_pip_portrait_toggle(self, state: int):
+        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_pip_portrait"] = bool(is_checked)
+        self.cfg.save()
+        self._update_switch_all_button_label()
+
+    def _on_pip_ccw_toggle(self, state: int):
+        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_pip_rotate_ccw"] = bool(is_ccw)
+        self.cfg.save()
+
+    def _on_pip_place_clicked(self):
+        """Open the PiP overlay in placement mode (no stream). Second click saves position."""
+        from ui.overlay_pip import DuelPiPOverlay
+        pip = getattr(self, "_pip_place_overlay", None)
+        if pip is not None:
+            try:
+                pip._save_geometry_to_cfg()
+                pip.close_pip()
+                pip.deleteLater()
+            except Exception:
+                pass
+            self._pip_place_overlay = None
+            self.btn_pip_place.setText("Place")
             return
+
         try:
-            import mss
-            from PIL import Image
-            import io
-
-            with mss.mss() as s:
-                mons = s.monitors
-                if not mons:
-                    raise RuntimeError("No monitors detected by mss")
-                mon = mons[1] if len(mons) > 1 else mons[0]
-                raw = s.grab(mon)
-                img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
-                img.thumbnail((640, 360))
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=80)
-                buf.seek(0)
-                qimg = QImage()
-                qimg.loadFromData(buf.read(), "JPEG")
-                pixmap = QPixmap.fromImage(qimg)
-
-            dlg = QDialog(self)
-            dlg.setWindowTitle("Screen Capture Preview")
-            dlg_layout = QVBoxLayout(dlg)
-            lbl_preview = QLabel()
-            lbl_preview.setPixmap(pixmap)
-            dlg_layout.addWidget(lbl_preview)
-            btn_ok = QPushButton("OK")
-            btn_ok.clicked.connect(dlg.accept)
-            dlg_layout.addWidget(btn_ok)
-            dlg.exec()
-
-            self.cfg.OVERLAY["screen_capture_overlay_configured"] = True
-            self.cfg.save()
+            self._pip_place_overlay = DuelPiPOverlay(self)
+            self._pip_place_overlay.show()
+            self.btn_pip_place.setText("Save position")
         except Exception as exc:
-            QMessageBox.warning(self, "Screen Capture", f"Preview failed:\n{exc}")
+            QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
 
     def _on_pip_test(self):
-        """Open a PiP overlay (placement mode) so the user can position it."""
-        scs = self._get_screen_capture_server()
-        if scs is None or not scs.is_running:
-            QMessageBox.warning(
-                self,
-                "Duel PiP",
-                "Screen capture server is not running.\n"
-                "Start the watcher and ensure mss and Pillow are installed.",
-            )
-            return
+        """Open a PiP overlay showing the placeholder so the user can preview the position."""
         try:
             from ui.overlay_pip import DuelPiPOverlay
             if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
                 self._pip_overlay = DuelPiPOverlay(self)
             self._pip_overlay.open()
-            self.cfg.OVERLAY["duel_pip_saved"] = True
-            self.cfg.save()
         except Exception as exc:
             QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
 
@@ -1141,6 +1119,15 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "chk_duel_overlay_ccw": "Rotate duel/tournament notifications counter-clockwise.",
             "btn_duel_overlay_place": "Set and save the screen position for duel notifications.",
             "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
+
+            # Appearance Tab - Duel Picture-in-Picture Stream
+            "chk_pip_portrait": "Rotate the Duel PiP video 90 degrees for portrait/cabinet screens.",
+            "chk_pip_ccw": "Rotate the Duel PiP video counter-clockwise instead of clockwise.",
+            "cmb_sc_fps": "Set the frame rate for your outgoing playfield stream during duels. 'Auto (dynamic)' adjusts based on CPU load.",
+            "cmb_sc_quality": "Set the JPEG quality for your outgoing playfield stream. 'Auto (dynamic)' reduces quality when CPU usage is high.",
+            "lbl_sc_cpu_warning": "CPU usage is high — stream quality has been automatically reduced to reduce load.",
+            "btn_pip_place": "Open a draggable PiP window to set and save the position and size for the opponent's live feed during duels. Click again to save.",
+            "btn_pip_test": "Open the Duel PiP overlay with a placeholder to preview its position and size. No stream connection required.",
 
             # Appearance Tab - Switch All button
             "btn_switch_all_orientation": "Toggle all overlay widgets between Portrait and Landscape mode at once.",
