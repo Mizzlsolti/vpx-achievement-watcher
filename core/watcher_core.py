@@ -3405,7 +3405,6 @@ class Watcher:
             self.current_rom = None
             self.start_time = None
             self.game_active = False
-            self.duel_active_for_current_table = False
             self.start_audits = {}
             self.players.clear()
             self.ball_track.update({"active": False, "index": 0, "start_time": None, "score_base": 0, "last_balls_played": None, "balls": []})
