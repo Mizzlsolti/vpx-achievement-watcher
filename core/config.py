@@ -121,6 +121,8 @@ DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)
 
 # Screen Capture overlay — marks that the user has tested / configured it
 DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
+# Duel PiP overlay — marks that the user has placed it
+DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_landscape", 100)
@@ -195,7 +197,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
-    "screen_capture_overlay_configured",
+    "screen_capture_overlay_configured", "duel_pip_saved",
     
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
@@ -338,7 +340,6 @@ class AppConfig:
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
-    SCREEN_CAPTURE_ENABLED: bool = False
     SCREEN_CAPTURE_PORT: int = 9876
     SCREEN_CAPTURE_FPS: str = "auto"
     SCREEN_CAPTURE_QUALITY: str = "auto"
@@ -379,7 +380,6 @@ class AppConfig:
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
-            SCREEN_CAPTURE_ENABLED=bool(data.get("SCREEN_CAPTURE_ENABLED", False)),
             SCREEN_CAPTURE_PORT=int(data.get("SCREEN_CAPTURE_PORT", 9876)),
             SCREEN_CAPTURE_FPS=str(data.get("SCREEN_CAPTURE_FPS", "auto")),
             SCREEN_CAPTURE_QUALITY=str(data.get("SCREEN_CAPTURE_QUALITY", "auto")),
@@ -443,7 +443,6 @@ class AppConfig:
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
-                "SCREEN_CAPTURE_ENABLED": getattr(self, "SCREEN_CAPTURE_ENABLED", False),
                 "SCREEN_CAPTURE_PORT": getattr(self, "SCREEN_CAPTURE_PORT", 9876),
                 "SCREEN_CAPTURE_FPS": getattr(self, "SCREEN_CAPTURE_FPS", "auto"),
                 "SCREEN_CAPTURE_QUALITY": getattr(self, "SCREEN_CAPTURE_QUALITY", "auto"),

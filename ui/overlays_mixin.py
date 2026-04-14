@@ -559,7 +559,7 @@ class OverlaysMixin:
 
         w = getattr(self, "watcher", None)
         scs = getattr(w, "_screen_capture_server", None) if w else None
-        if scs is None or not scs.available:
+        if scs is None or not scs.is_running:
             return
 
         my_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
@@ -574,6 +574,10 @@ class OverlaysMixin:
         if not opponent_id:
             return
 
+        # Store a cancel event so _pip_close() can abort any in-flight exchange.
+        cancel_event = _threading.Event()
+        self._pip_exchange_cancel = cancel_event
+
         def _exchange_worker():
             try:
                 from core.cloud_sync import CloudSync
@@ -586,6 +590,9 @@ class OverlaysMixin:
                 # Poll for opponent's IP (up to _PIP_EXCHANGE_TIMEOUT_SECONDS).
                 deadline = _time.monotonic() + _PIP_EXCHANGE_TIMEOUT_SECONDS
                 while _time.monotonic() < deadline:
+                    # Abort if cancelled (e.g. _pip_close was called).
+                    if cancel_event.is_set():
+                        break
                     # Abort if game is no longer active.
                     w2 = getattr(self, "watcher", None)
                     if w2 and not getattr(w2, "game_active", False) and not w2._vp_player_visible():
@@ -639,6 +646,12 @@ class OverlaysMixin:
 
     def _pip_close(self) -> None:
         """Close the PiP window and clean up Firebase IP node."""
+        # Cancel any in-flight IP exchange worker.
+        cancel = getattr(self, "_pip_exchange_cancel", None)
+        if cancel is not None:
+            cancel.set()
+            self._pip_exchange_cancel = None
+
         pip = getattr(self, "_duel_pip_overlay", None)
         if pip is not None:
             try:

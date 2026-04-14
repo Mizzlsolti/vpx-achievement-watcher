@@ -3807,6 +3807,7 @@ class Watcher:
         self._stop.clear()
         self.thread = threading.Thread(target=self._thread_main, daemon=True, name="WatcherThread")
         self.thread.start()
+        self._screen_capture_server = None
         try:
             from core.screen_capture_server import ScreenCaptureServer
             port = getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876)
@@ -3821,8 +3822,10 @@ class Watcher:
                 log(self.cfg, f"[SCREEN_CAPTURE] server started on port {port}")
             else:
                 log(self.cfg, "[SCREEN_CAPTURE] server failed to start (missing dependencies?)", "WARN")
+                self._screen_capture_server = None
         except Exception as e:
             log(self.cfg, f"[SCREEN_CAPTURE] startup error: {e}", "WARN")
+            self._screen_capture_server = None
 
     def stop(self):
         try:

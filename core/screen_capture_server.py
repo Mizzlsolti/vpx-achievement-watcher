@@ -19,7 +19,7 @@ import json
 import socket
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from typing import List, Dict, Any, Optional
 
 # mss is the cross-platform (Windows/Linux/macOS) screen-capture library.
@@ -371,7 +371,7 @@ class ScreenCaptureServer:
         self.http_port = http_port
         self._fps_cfg = fps_cfg
         self._quality_cfg = quality_cfg
-        self._http_server: Optional[HTTPServer] = None
+        self._http_server: Optional[ThreadingHTTPServer] = None
         self._stop_event = threading.Event()
         self._http_thread: Optional[threading.Thread] = None
         self._udp_thread: Optional[threading.Thread] = None
@@ -403,6 +403,11 @@ class ScreenCaptureServer:
         return self._local_ip
 
     @property
+    def is_running(self) -> bool:
+        """True when the HTTP server thread is alive and accepting connections."""
+        return self._http_thread is not None and self._http_thread.is_alive()
+
+    @property
     def available(self) -> bool:
         """True when the required libraries (mss, PIL) are installed."""
         return _MSS_AVAILABLE and _PIL_AVAILABLE
@@ -421,7 +426,7 @@ class ScreenCaptureServer:
         self._stop_event.clear()
 
         try:
-            self._http_server = HTTPServer(("", self.http_port), _CaptureHandler)
+            self._http_server = ThreadingHTTPServer(("", self.http_port), _CaptureHandler)
             # Store a back-reference so the request handler can reach us.
             self._http_server._capture_server_ref = self  # type: ignore[attr-defined]
         except OSError:

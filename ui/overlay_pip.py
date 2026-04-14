@@ -1,9 +1,14 @@
 """Duel Picture-in-Picture (PiP) Overlay.
 
 Shows the opponent's playfield as a live MJPEG stream inside a resizable,
-draggable window.  The window is automatically opened when both duel players
-have accepted the in-game prompt and screen-capture IPs have been exchanged
-via Firebase.  It closes as soon as the duel ends or VPX is closed.
+draggable overlay window that stays on top of fullscreen VPX.  The window is
+automatically opened when both duel players have accepted the in-game prompt
+and screen-capture IPs have been exchanged via Firebase.  It closes as soon as
+the duel ends or VPX is closed.
+
+When no stream URL is provided (placement mode) the window shows a placeholder
+so the user can drag it to the desired position and resize it before a real
+duel starts.
 
 Position and size are persisted in ``cfg.DUEL_PIP_X/Y/W/H`` so the window
 reopens at the same spot next duel.
@@ -19,6 +24,8 @@ from typing import Optional
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt6.QtGui import QImage, QPixmap, QResizeEvent, QCloseEvent, QMoveEvent
 from PyQt6.QtWidgets import QLabel, QWidget, QVBoxLayout, QSizePolicy
+
+from ui.overlay_base import _start_topmost_timer
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -109,11 +116,15 @@ class _MjpegReader(QObject):
 
 
 class DuelPiPOverlay(QWidget):
-    """Resizable, draggable PiP window that streams the opponent's playfield.
+    """Resizable, draggable PiP overlay that streams the opponent's playfield.
+
+    The window uses ``WindowStaysOnTopHint`` and a periodic Win32
+    ``HWND_TOPMOST`` timer so it remains visible over fullscreen VPX.
 
     Lifecycle
     ---------
-    1. Create with ``cfg`` and opponent stream URL.
+    1. Create with ``cfg`` and opponent stream URL (or empty string for
+       placement mode).
     2. Call ``open()`` to show the window and start the MJPEG reader.
     3. Call ``close_pip()`` to stop the stream and hide the window.
 
@@ -121,7 +132,7 @@ class DuelPiPOverlay(QWidget):
     the placement is remembered across duel sessions.
     """
 
-    def __init__(self, cfg, stream_url: str, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, cfg, stream_url: str = "", parent: Optional[QWidget] = None) -> None:
         super().__init__(
             parent,
             Qt.WindowType.Window
@@ -131,6 +142,7 @@ class DuelPiPOverlay(QWidget):
         self._stream_url = stream_url
         self._reader: Optional[_MjpegReader] = None
         self._save_pending = False
+        self._placement_mode = not bool(stream_url)
 
         self.setWindowTitle("⚔️ Duel Live – Opponent's Playfield")
         self.setMinimumSize(160, 90)
@@ -140,7 +152,11 @@ class DuelPiPOverlay(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._lbl_frame = QLabel("Connecting…")
+        placeholder = (
+            "📺 Drag to position  •  Resize at edges\n\nDuel PiP – Placement Mode"
+            if self._placement_mode else "Connecting…"
+        )
+        self._lbl_frame = QLabel(placeholder)
         self._lbl_frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._lbl_frame.setStyleSheet(
@@ -206,11 +222,13 @@ class DuelPiPOverlay(QWidget):
     # ── Stream control ────────────────────────────────────────────────────
 
     def open(self) -> None:
-        """Show the window and start streaming."""
+        """Show the window and start streaming (or show placement placeholder)."""
         self._apply_saved_geometry()
         self.show()
         self.raise_()
-        self._start_stream()
+        _start_topmost_timer(self)
+        if not self._placement_mode:
+            self._start_stream()
 
     def close_pip(self) -> None:
         """Stop the MJPEG stream and hide the window."""
