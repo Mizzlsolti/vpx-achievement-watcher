@@ -551,7 +551,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         # CPU monitor timer (2 s interval) to update the SC warning label
         self._sc_cpu_timer = QTimer(self)
-        self._sc_cpu_timer.setInterval(2000)
+        _cpu_interval = getattr(type(self), "CPU_MONITOR_INTERVAL_MS", 2000)
+        self._sc_cpu_timer.setInterval(_cpu_interval)
         self._sc_cpu_timer.timeout.connect(self._update_sc_cpu_warning)
         self._sc_cpu_timer.start()
 
@@ -1036,6 +1037,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
             with mss.mss() as s:
                 mons = s.monitors
+                if not mons:
+                    raise RuntimeError("No monitors detected by mss")
                 mon = mons[1] if len(mons) > 1 else mons[0]
                 raw = s.grab(mon)
                 img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")

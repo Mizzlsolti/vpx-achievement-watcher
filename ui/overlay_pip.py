@@ -12,20 +12,20 @@ import threading
 from typing import Optional
 
 from PyQt6.QtCore import (
-    Q_ARG,
-    QMetaObject,
     QObject,
     QPoint,
     QRect,
-    QSize,
     Qt,
     QTimer,
     pyqtSignal,
 )
 from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
-from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.overlay_base import _force_topmost, _start_topmost_timer
+
+# MJPEG boundary used by the screen capture server
+_MJPEG_BOUNDARY = b"--vpxframe"
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ class _MjpegReader(QObject):
                             self.frame_ready.emit(img)
                     else:
                         # No content-length — scan for next boundary
-                        boundary_pos = buf.find(b"--vpxframe")
+                        boundary_pos = buf.find(_MJPEG_BOUNDARY)
                         if boundary_pos == -1:
                             break
                         buf = buf[boundary_pos:]

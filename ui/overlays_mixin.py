@@ -542,6 +542,13 @@ class OverlaysMixin:
         except Exception:
             return None
 
+    @staticmethod
+    def _sanitize_pip_key(player_id: str) -> str:
+        """Sanitize player_id for use as a Firebase key (same chars as cloud_sync)."""
+        for ch in (".", "#", "$", "[", "]", "/"):
+            player_id = player_id.replace(ch, "_")
+        return player_id
+
     def _pip_start_exchange(self, ig_state: dict):
         """Publish own IP to Firebase and poll for opponent IP, then open PiP."""
         scs = self._get_scs()
@@ -572,11 +579,13 @@ class OverlaysMixin:
                 if sync is None:
                     sync = getattr(w, "cloud_sync", None)
                 if sync is not None:
-                    _safe_key = player_id.replace(".", "_").replace("#", "_").replace("$", "_").replace("[", "_").replace("]", "_").replace("/", "_")
+                    _safe_key = self._sanitize_pip_key(player_id)
                     pip_path = f"duels/{duel_id}/pip_ips/{_safe_key}"
                     sync.set_value(pip_path, own_url)
         except Exception:
             pass
+
+        own_safe_key = self._sanitize_pip_key(player_id)
 
         def _poll_worker():
             deadline = self._PIP_EXCHANGE_TIMEOUT_SECONDS
@@ -601,8 +610,7 @@ class OverlaysMixin:
                     if sync is not None:
                         all_ips = sync.get_value(f"duels/{duel_id}/pip_ips") or {}
                         for key, url in all_ips.items():
-                            _norm_key = key.replace("_", ".").lower()
-                            if _norm_key != player_id.lower() and url:
+                            if key != own_safe_key and url:
                                 opponent_url = str(url)
                                 break
                 except Exception:
@@ -664,6 +672,7 @@ class OverlaysMixin:
                     sync = getattr(w, "cloud_sync", None)
                 if sync is None or not player_id:
                     return
+                _safe_key = self._sanitize_pip_key(player_id)
                 # Find any active duel to get the duel_id
                 try:
                     engine = getattr(self, "_duel_engine", None)
@@ -673,7 +682,6 @@ class OverlaysMixin:
                     for duel in active:
                         duel_id = getattr(duel, "duel_id", "")
                         if duel_id:
-                            _safe_key = player_id.replace(".", "_").replace("#", "_").replace("$", "_").replace("[", "_").replace("]", "_").replace("/", "_")
                             sync.delete_value(f"duels/{duel_id}/pip_ips/{_safe_key}")
                 except Exception:
                     pass

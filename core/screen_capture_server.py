@@ -24,6 +24,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
+# MJPEG boundary — must match the constant in ui/overlay_pip.py
+_MJPEG_BOUNDARY = b"--vpxframe"
+
 # ---------------------------------------------------------------------------
 # Optional dependency guard
 # ---------------------------------------------------------------------------
@@ -145,7 +148,7 @@ class _MjpegHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header(
                 "Content-Type",
-                "multipart/x-mixed-replace; boundary=--vpxframe",
+                f"multipart/x-mixed-replace; boundary={_MJPEG_BOUNDARY.decode()}",
             )
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Pragma", "no-cache")
@@ -176,7 +179,7 @@ class _MjpegHandler(BaseHTTPRequestHandler):
                     frame = buf.getvalue()
 
                     header = (
-                        b"--vpxframe\r\n"
+                        _MJPEG_BOUNDARY + b"\r\n"
                         b"Content-Type: image/jpeg\r\n"
                         b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
                         b"\r\n"
