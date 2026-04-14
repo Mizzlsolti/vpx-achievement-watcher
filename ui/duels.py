@@ -19,7 +19,7 @@ from PyQt6.QtCore import Qt, QTimer, QStringListModel, pyqtSlot
 
 from core.config import p_aweditor
 from core.duel_engine import Duel, DuelEngine, DuelStatus
-from core.watcher_core import _strip_version_from_name
+from core.watcher_core import _strip_version_from_name, log as _wc_log
 from .widgets import HazardStripeOverlay
 
 # Interval (ms) between opponent-score re-checks while waiting for the result.
@@ -2242,28 +2242,44 @@ class DuelsMixin:
             self._refresh_active_duels()
             return
 
-        # Get the latest score from the watcher.
+        # Get the latest score — NVRAM direct read is the most reliable source
+        # since VPX has closed and VPinMAME has flushed the file by this point.
+        # last_session_score / current_highscore are kept only as fallbacks for
+        # ROMs whose NVRAM map has no score field.
         score = 0
+        end_audits: dict = {}
         try:
             w = getattr(self, "watcher", None)
             if w:
-                score = int(getattr(w, "last_session_score", 0) or 0)
+                end_audits, _, _ = w.read_nvram_audits_with_autofix(rom)
+                if end_audits:
+                    score = int(w._find_score_from_audits(end_audits) or 0)
+                    if score > 0:
+                        _wc_log(self.cfg, f"[DUEL] Score for {rom} read from NVRAM: {score}")
                 if score <= 0:
-                    # Fallback: try current high score from NVRAM state.
+                    score = int(getattr(w, "last_session_score", 0) or 0)
+                    if score > 0:
+                        _wc_log(self.cfg, f"[DUEL] Score for {rom} from last_session_score: {score}")
+                if score <= 0:
+                    # Last fallback: current high score cached from live NVRAM polling.
                     score = int(getattr(w, "current_highscore", 0) or 0)
-        except Exception:
-            pass
+                    if score > 0:
+                        _wc_log(self.cfg, f"[DUEL] Score for {rom} from current_highscore: {score}")
+        except Exception as _e:
+            _wc_log(self.cfg, f"[DUEL] Score read failed for {rom}: {_e}", "WARN")
 
         # ── Multi-game detection (F3 / in-game restart via NVRAM) ──────────
         # NVRAM is only reliably written when VPinMAME flushes, so we only
         # check here at session end — not in the live watcher loop.
+        # Re-uses the end_audits already read for the score above.
         try:
             baseline = getattr(self, "_duel_baseline_games_started", -1)
             baseline_rom = getattr(self, "_duel_baseline_rom", "")
             if baseline >= 0 and baseline_rom.lower().strip() == rom_lower:
                 w = getattr(self, "watcher", None)
                 if w:
-                    end_audits, _, _ = w.read_nvram_audits_with_autofix(rom)
+                    if not end_audits:
+                        end_audits, _, _ = w.read_nvram_audits_with_autofix(rom)
                     current_games = -1
                     for _k in self._DUEL_GAMES_STARTED_KEYS:
                         _v = w._nv_get_int_ci(end_audits, _k, -1)
@@ -2296,8 +2312,14 @@ class DuelsMixin:
         for duel in matching:
             try:
                 if score <= 0:
-                    from core.watcher_core import log
-                    log(self.cfg, f"[DUEL] Skipping score submission for {rom} — score is {score}", "WARN")
+                    _wc_log(self.cfg,
+                            f"[DUEL] Aborting duel {duel.duel_id} for {rom} — score could not be read",
+                            "WARN")
+                    try:
+                        self._duel_engine.abort_duel(duel.duel_id, reason="score_read_failed")
+                    except Exception:
+                        pass
+                    self._refresh_active_duels()
                     continue
                 result = self._duel_engine.submit_result(duel.duel_id, score)
                 if result:
