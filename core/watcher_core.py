@@ -3808,6 +3808,24 @@ class Watcher:
         self.thread = threading.Thread(target=self._thread_main, daemon=True, name="WatcherThread")
         self.thread.start()
 
+        # Start screen capture server (best-effort — watcher runs fine without it)
+        self._screen_capture_server = None
+        try:
+            from core.screen_capture_server import ScreenCaptureServer
+            scs = ScreenCaptureServer(
+                port=getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876),
+                fps_cfg=getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto"),
+                quality_cfg=getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto"),
+            )
+            if scs.start():
+                self._screen_capture_server = scs
+                log(self.cfg, "[SCS] Screen capture server started")
+            else:
+                log(self.cfg, "[SCS] Screen capture server unavailable (mss/Pillow missing?)", "WARN")
+        except Exception as exc:
+            log(self.cfg, f"[SCS] Screen capture server start failed: {exc}", "WARN")
+            self._screen_capture_server = None
+
     def stop(self):
         try:
             self._stop.set()
@@ -3815,6 +3833,13 @@ class Watcher:
                 self.thread.join(timeout=3)
         except Exception:
             pass
+
+        if getattr(self, "_screen_capture_server", None) is not None:
+            try:
+                self._screen_capture_server.stop()
+            except Exception:
+                pass
+            self._screen_capture_server = None
 
         if self.game_active:
             try:

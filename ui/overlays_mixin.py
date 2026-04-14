@@ -1,5 +1,6 @@
 """Overlays mixin: mini info, status overlay, close secondary overlays, and nav (duel) handlers."""
 from __future__ import annotations
+import threading
 from PyQt6.QtCore import QTimer
 from .overlay import MiniInfoOverlay, StatusOverlay
 from .overlay_duel import DuelInfoOverlay
@@ -8,6 +9,10 @@ import core.sound as sound
 
 class OverlaysMixin:
     """Mixin that provides mini info, status overlay, and nav (duel accept/decline) handler methods."""
+
+    _PIP_EXCHANGE_TIMEOUT_SECONDS = 60
+    _PIP_POLL_INTERVAL_SECONDS = 2
+    CPU_MONITOR_INTERVAL_MS = 2000
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
@@ -526,4 +531,155 @@ class OverlaysMixin:
                 pass
 
     # ── Duel PiP helpers ──────────────────────────────────────────────────────
+
+    def _get_scs(self):
+        """Return the running ScreenCaptureServer or None."""
+        try:
+            w = getattr(self, "watcher", None)
+            if w is None:
+                return None
+            return getattr(w, "_screen_capture_server", None)
+        except Exception:
+            return None
+
+    def _pip_start_exchange(self, ig_state: dict):
+        """Publish own IP to Firebase and poll for opponent IP, then open PiP."""
+        scs = self._get_scs()
+        if scs is None or not scs.is_running:
+            return
+
+        duel_id = ig_state.get("duel_id", "")
+        if not duel_id:
+            return
+
+        try:
+            player_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+        except Exception:
+            return
+
+        port = getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876)
+        own_ip = scs.local_ip
+        own_url = f"http://{own_ip}:{port}/stream/1"
+
+        cancel_event = threading.Event()
+        self._pip_cancel_event = cancel_event
+
+        # Publish own IP to Firebase
+        try:
+            w = getattr(self, "watcher", None)
+            if w is not None:
+                sync = getattr(w, "_cloud_sync", None)
+                if sync is None:
+                    sync = getattr(w, "cloud_sync", None)
+                if sync is not None:
+                    _safe_key = player_id.replace(".", "_").replace("#", "_").replace("$", "_").replace("[", "_").replace("]", "_").replace("/", "_")
+                    pip_path = f"duels/{duel_id}/pip_ips/{_safe_key}"
+                    sync.set_value(pip_path, own_url)
+        except Exception:
+            pass
+
+        def _poll_worker():
+            deadline = self._PIP_EXCHANGE_TIMEOUT_SECONDS
+            elapsed = 0
+            opponent_url = None
+
+            while not cancel_event.is_set() and elapsed < deadline:
+                # Check if game is still active
+                try:
+                    w2 = getattr(self, "watcher", None)
+                    if w2 is not None and not getattr(w2, "game_active", False):
+                        return
+                except Exception:
+                    pass
+
+                # Try to read opponent IP from Firebase
+                try:
+                    w2 = getattr(self, "watcher", None)
+                    sync = getattr(w2, "_cloud_sync", None) if w2 else None
+                    if sync is None and w2 is not None:
+                        sync = getattr(w2, "cloud_sync", None)
+                    if sync is not None:
+                        all_ips = sync.get_value(f"duels/{duel_id}/pip_ips") or {}
+                        for key, url in all_ips.items():
+                            _norm_key = key.replace("_", ".").lower()
+                            if _norm_key != player_id.lower() and url:
+                                opponent_url = str(url)
+                                break
+                except Exception:
+                    pass
+
+                if opponent_url:
+                    break
+
+                cancel_event.wait(self._PIP_POLL_INTERVAL_SECONDS)
+                elapsed += self._PIP_POLL_INTERVAL_SECONDS
+
+            if opponent_url and not cancel_event.is_set():
+                QTimer.singleShot(0, lambda: self._pip_open(opponent_url, duel_id))
+
+        t = threading.Thread(target=_poll_worker, daemon=True, name="PiPExchange")
+        t.start()
+
+    def _pip_open(self, stream_url: str, duel_id: str = ""):
+        """Create and show the DuelPiPOverlay."""
+        try:
+            from ui.overlay_pip import DuelPiPOverlay
+            if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
+                self._pip_overlay = DuelPiPOverlay(self, stream_url=stream_url)
+            else:
+                self._pip_overlay._stream_url = stream_url
+            self._pip_overlay.open()
+        except Exception as exc:
+            try:
+                from core.watcher_core import log
+                log(self.cfg, f"[PiP] open failed: {exc}", "WARN")
+            except Exception:
+                pass
+
+    def _pip_close(self):
+        """Cancel any pending exchange, close PiP, clean up Firebase IP node."""
+        try:
+            cancel = getattr(self, "_pip_cancel_event", None)
+            if cancel is not None:
+                cancel.set()
+                self._pip_cancel_event = None
+        except Exception:
+            pass
+
+        try:
+            pip = getattr(self, "_pip_overlay", None)
+            if pip is not None:
+                pip.close_pip()
+                self._pip_overlay = None
+        except Exception:
+            pass
+
+        # Clean up own IP from Firebase in a daemon thread
+        def _cleanup():
+            try:
+                player_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+                w = getattr(self, "watcher", None)
+                sync = getattr(w, "_cloud_sync", None) if w else None
+                if sync is None and w is not None:
+                    sync = getattr(w, "cloud_sync", None)
+                if sync is None or not player_id:
+                    return
+                # Find any active duel to get the duel_id
+                try:
+                    engine = getattr(self, "_duel_engine", None)
+                    if engine is None:
+                        return
+                    active = engine.get_active_duels()
+                    for duel in active:
+                        duel_id = getattr(duel, "duel_id", "")
+                        if duel_id:
+                            _safe_key = player_id.replace(".", "_").replace("#", "_").replace("$", "_").replace("[", "_").replace("]", "_").replace("/", "_")
+                            sync.delete_value(f"duels/{duel_id}/pip_ips/{_safe_key}")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        t = threading.Thread(target=_cleanup, daemon=True, name="PiPCleanup")
+        t.start()
 

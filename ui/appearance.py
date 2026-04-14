@@ -5,10 +5,10 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel,
     QCheckBox, QGroupBox, QScrollArea, QFrame, QFontComboBox, QSpinBox,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
-    QSlider, QApplication,
+    QSlider, QApplication, QDialog, QMessageBox,
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPixmap, QImage
 
 from core.theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
 from core.watcher_core import apply_tooltips
@@ -497,6 +497,64 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
+        # 7) Screen Capture / Live View (Row 3, Col 1)
+        self.cmb_sc_fps = QComboBox()
+        self.cmb_sc_fps.addItems(["Auto (dynamisch)", "30", "20", "10"])
+        _sc_fps_val = str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower()
+        _sc_fps_map = {"auto": 0, "30": 1, "20": 2, "10": 3}
+        self.cmb_sc_fps.setCurrentIndex(_sc_fps_map.get(_sc_fps_val, 0))
+        self.cmb_sc_fps.currentIndexChanged.connect(self._on_sc_fps_changed)
+
+        self.cmb_sc_quality = QComboBox()
+        self.cmb_sc_quality.addItems(["Auto (dynamisch)", "95", "80", "60"])
+        _sc_qual_val = str(getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto")).lower()
+        _sc_qual_map = {"auto": 0, "95": 1, "80": 2, "60": 3}
+        self.cmb_sc_quality.setCurrentIndex(_sc_qual_map.get(_sc_qual_val, 0))
+        self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
+
+        self.lbl_sc_cpu_warning = QLabel("⚠️ Qualität reduziert: CPU-Auslastung hoch")
+        self.lbl_sc_cpu_warning.setVisible(False)
+
+        self.btn_sc_test = QPushButton("Test")
+        self.btn_sc_test.clicked.connect(self._on_sc_test)
+
+        box_screen_capture = QVBoxLayout()
+        box_screen_capture.addWidget(QLabel("<b>🖥️ Screen Capture / Live View</b>"))
+        _fps_row = QHBoxLayout()
+        _fps_row.addWidget(QLabel("FPS:"))
+        _fps_row.addWidget(self.cmb_sc_fps)
+        box_screen_capture.addLayout(_fps_row)
+        _qual_row = QHBoxLayout()
+        _qual_row.addWidget(QLabel("Quality:"))
+        _qual_row.addWidget(self.cmb_sc_quality)
+        box_screen_capture.addLayout(_qual_row)
+        box_screen_capture.addWidget(self.lbl_sc_cpu_warning)
+        _sc_btns = QHBoxLayout()
+        _sc_btns.addWidget(self.btn_sc_test)
+        box_screen_capture.addLayout(_sc_btns)
+        box_screen_capture.addStretch(1)
+
+        lay_pos.addLayout(box_screen_capture, 3, 1)
+
+        # 8) Duel Picture-in-Picture (Row 4, Col 0)
+        self.btn_pip_test = QPushButton("Test")
+        self.btn_pip_test.clicked.connect(self._on_pip_test)
+
+        box_pip = QVBoxLayout()
+        box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture</b>"))
+        _pip_btns = QHBoxLayout()
+        _pip_btns.addWidget(self.btn_pip_test)
+        box_pip.addLayout(_pip_btns)
+        box_pip.addStretch(1)
+
+        lay_pos.addLayout(box_pip, 4, 0)
+
+        # CPU monitor timer (2 s interval) to update the SC warning label
+        self._sc_cpu_timer = QTimer(self)
+        self._sc_cpu_timer.setInterval(2000)
+        self._sc_cpu_timer.timeout.connect(self._update_sc_cpu_warning)
+        self._sc_cpu_timer.start()
+
         layout.addWidget(grp_pos)
 
         lbl_overlay_bg_tip = QLabel(
@@ -919,6 +977,122 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             chk.setChecked(should_be_portrait)
         self.cfg.save()
         self._update_switch_all_button_label()
+
+    # ------------------------------------------------------------------
+    # Screen Capture / Live View handlers
+    # ------------------------------------------------------------------
+
+    def _on_sc_fps_changed(self):
+        _map = {0: "auto", 1: "30", 2: "20", 3: "10"}
+        val = _map.get(self.cmb_sc_fps.currentIndex(), "auto")
+        self.cfg.SCREEN_CAPTURE_FPS = val
+        self.cfg.save()
+        scs = self._get_screen_capture_server()
+        if scs is not None:
+            scs.set_fps_cfg(val)
+
+    def _on_sc_quality_changed(self):
+        _map = {0: "auto", 1: "95", 2: "80", 3: "60"}
+        val = _map.get(self.cmb_sc_quality.currentIndex(), "auto")
+        self.cfg.SCREEN_CAPTURE_QUALITY = val
+        self.cfg.save()
+        scs = self._get_screen_capture_server()
+        if scs is not None:
+            scs.set_quality_cfg(val)
+
+    def _update_sc_cpu_warning(self):
+        try:
+            scs = self._get_screen_capture_server()
+            if scs is None or not scs.is_running:
+                self.lbl_sc_cpu_warning.setVisible(False)
+                return
+            cpu = getattr(scs, "_cached_cpu", 0.0)
+            if cpu > 90:
+                self.lbl_sc_cpu_warning.setStyleSheet("color: #FF3B30;")
+                self.lbl_sc_cpu_warning.setVisible(True)
+            elif cpu > 80:
+                self.lbl_sc_cpu_warning.setStyleSheet("color: #FFD60A;")
+                self.lbl_sc_cpu_warning.setVisible(True)
+            else:
+                self.lbl_sc_cpu_warning.setVisible(False)
+        except Exception:
+            pass
+
+    def _on_sc_test(self):
+        """Capture monitor 1, show a preview dialog, mark configured."""
+        scs = self._get_screen_capture_server()
+        if scs is None or not scs.is_running:
+            QMessageBox.warning(
+                self,
+                "Screen Capture",
+                "Screen capture server is not running.\n"
+                "Make sure mss and Pillow are installed.",
+            )
+            return
+        try:
+            import mss
+            from PIL import Image
+            import io
+
+            with mss.mss() as s:
+                mons = s.monitors
+                mon = mons[1] if len(mons) > 1 else mons[0]
+                raw = s.grab(mon)
+                img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+                img.thumbnail((640, 360))
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=80)
+                buf.seek(0)
+                qimg = QImage()
+                qimg.loadFromData(buf.read(), "JPEG")
+                pixmap = QPixmap.fromImage(qimg)
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Screen Capture Preview")
+            dlg_layout = QVBoxLayout(dlg)
+            lbl_preview = QLabel()
+            lbl_preview.setPixmap(pixmap)
+            dlg_layout.addWidget(lbl_preview)
+            btn_ok = QPushButton("OK")
+            btn_ok.clicked.connect(dlg.accept)
+            dlg_layout.addWidget(btn_ok)
+            dlg.exec()
+
+            self.cfg.OVERLAY["screen_capture_overlay_configured"] = True
+            self.cfg.save()
+        except Exception as exc:
+            QMessageBox.warning(self, "Screen Capture", f"Preview failed:\n{exc}")
+
+    def _on_pip_test(self):
+        """Open a PiP overlay (placement mode) so the user can position it."""
+        scs = self._get_screen_capture_server()
+        if scs is None or not scs.is_running:
+            QMessageBox.warning(
+                self,
+                "Duel PiP",
+                "Screen capture server is not running.\n"
+                "Start the watcher and ensure mss and Pillow are installed.",
+            )
+            return
+        try:
+            from ui.overlay_pip import DuelPiPOverlay
+            if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
+                self._pip_overlay = DuelPiPOverlay(self)
+            self._pip_overlay.open()
+            self.cfg.OVERLAY["duel_pip_saved"] = True
+            self.cfg.save()
+        except Exception as exc:
+            QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
+
+    def _get_screen_capture_server(self):
+        """Return the running ScreenCaptureServer from the watcher, or None."""
+        try:
+            w = getattr(self, "watcher", None)
+            if w is None:
+                return None
+            return getattr(w, "_screen_capture_server", None)
+        except Exception:
+            return None
 
     def _init_overlay_tooltips(self):
         tips = {
