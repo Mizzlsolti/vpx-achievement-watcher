@@ -119,6 +119,12 @@ DEFAULT_OVERLAY.setdefault("duel_overlay_portrait", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_rotate_ccw", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)
 
+# Screen Capture / Live View
+DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
+
+# Duel PiP
+DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
+
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_landscape", 100)
@@ -193,6 +199,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
+    "screen_capture_overlay_configured",
+    "duel_pip_saved",
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",
@@ -334,6 +342,13 @@ class AppConfig:
     CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
+    SCREEN_CAPTURE_PORT: int = 9876
+    SCREEN_CAPTURE_FPS: str = "auto"
+    SCREEN_CAPTURE_QUALITY: str = "auto"
+    DUEL_PIP_X: int = -1
+    DUEL_PIP_Y: int = -1
+    DUEL_PIP_W: int = 480
+    DUEL_PIP_H: int = 270
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @staticmethod
@@ -367,6 +382,13 @@ class AppConfig:
             CLOUD_ENABLED=cloud_enabled,
             CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
+            SCREEN_CAPTURE_PORT=int(data.get("SCREEN_CAPTURE_PORT", 9876)),
+            SCREEN_CAPTURE_FPS=str(data.get("SCREEN_CAPTURE_FPS", "auto")),
+            SCREEN_CAPTURE_QUALITY=str(data.get("SCREEN_CAPTURE_QUALITY", "auto")),
+            DUEL_PIP_X=int(data.get("DUEL_PIP_X", -1)),
+            DUEL_PIP_Y=int(data.get("DUEL_PIP_Y", -1)),
+            DUEL_PIP_W=int(data.get("DUEL_PIP_W", 480)),
+            DUEL_PIP_H=int(data.get("DUEL_PIP_H", 270)),
         )
 
     @staticmethod
@@ -423,6 +445,13 @@ class AppConfig:
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
+                "SCREEN_CAPTURE_PORT": getattr(self, "SCREEN_CAPTURE_PORT", 9876),
+                "SCREEN_CAPTURE_FPS": getattr(self, "SCREEN_CAPTURE_FPS", "auto"),
+                "SCREEN_CAPTURE_QUALITY": getattr(self, "SCREEN_CAPTURE_QUALITY", "auto"),
+                "DUEL_PIP_X": getattr(self, "DUEL_PIP_X", -1),
+                "DUEL_PIP_Y": getattr(self, "DUEL_PIP_Y", -1),
+                "DUEL_PIP_W": getattr(self, "DUEL_PIP_W", 480),
+                "DUEL_PIP_H": getattr(self, "DUEL_PIP_H", 270),
             }
 
             d = os.path.dirname(path)

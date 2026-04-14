@@ -1,0 +1,411 @@
+"""ui/overlay_pip.py – Duel Picture-in-Picture overlay.
+
+Shows the opponent's MJPEG live stream as a resizable, always-on-top overlay
+window.  The user can drag it to any monitor and resize it at the edges; the
+video scales dynamically.  Position and size are auto-saved to config with a
+300 ms debounce so rapid drags don't hammer the config file.
+"""
+
+from __future__ import annotations
+
+import threading
+from typing import Optional
+
+from PyQt6.QtCore import (
+    QObject,
+    QPoint,
+    QRect,
+    Qt,
+    QTimer,
+    pyqtSignal,
+)
+from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
+from PyQt6.QtWidgets import QApplication, QWidget
+
+from ui.overlay_base import _force_topmost, _start_topmost_timer
+
+# MJPEG boundary used by the screen capture server
+_MJPEG_BOUNDARY = b"--vpxframe"
+
+
+# ---------------------------------------------------------------------------
+# MJPEG reader (runs in a background thread)
+# ---------------------------------------------------------------------------
+
+class _MjpegReader(QObject):
+    """Reads MJPEG frames from *url* and emits ``frame_ready`` for each frame."""
+
+    frame_ready = pyqtSignal(QImage)
+
+    def __init__(self, url: str, stop_event: threading.Event):
+        super().__init__()
+        self._url = url
+        self._stop = stop_event
+
+    @staticmethod
+    def _validate_stream_url(url: str) -> bool:
+        """Validate that the URL is a safe http/https URL pointing to a private IP."""
+        try:
+            from urllib.parse import urlparse
+            import ipaddress
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return False
+            host = parsed.hostname or ""
+            # Reject empty or obviously unsafe hosts
+            if not host or host.lower() in ("localhost",):
+                return True  # localhost is fine
+            try:
+                addr = ipaddress.ip_address(host)
+                # Only allow private/loopback/link-local ranges
+                if not (addr.is_private or addr.is_loopback or addr.is_link_local):
+                    return False
+            except ValueError:
+                # hostname (not IP) — only allow localhost
+                if host.lower() != "localhost":
+                    return False
+            return True
+        except Exception:
+            return False
+
+    def run(self):  # called from background thread
+        try:
+            import urllib.request
+            from urllib.parse import urlparse
+
+            if not self._validate_stream_url(self._url):
+                return
+
+            req = urllib.request.Request(self._url)
+            resp = urllib.request.urlopen(req, timeout=10)  # noqa: S310
+
+            buf = b""
+            header_done = False
+            content_length = 0
+
+            while not self._stop.is_set():
+                chunk = resp.read(4096)
+                if not chunk:
+                    break
+                buf += chunk
+
+                while True:
+                    if not header_done:
+                        # Look for the end of the MJPEG part header
+                        header_end = buf.find(b"\r\n\r\n")
+                        if header_end == -1:
+                            break
+                        header = buf[:header_end].decode("latin-1", errors="replace")
+                        buf = buf[header_end + 4:]
+                        header_done = True
+                        content_length = 0
+                        for line in header.splitlines():
+                            if line.lower().startswith("content-length:"):
+                                try:
+                                    content_length = int(line.split(":", 1)[1].strip())
+                                except ValueError:
+                                    pass
+
+                    if content_length > 0:
+                        if len(buf) < content_length:
+                            break
+                        jpeg = buf[:content_length]
+                        buf = buf[content_length:]
+                        # Skip trailing \r\n after frame body
+                        if buf.startswith(b"\r\n"):
+                            buf = buf[2:]
+                        header_done = False
+
+                        img = QImage()
+                        img.loadFromData(jpeg, "JPEG")
+                        if not img.isNull():
+                            self.frame_ready.emit(img)
+                    else:
+                        # No content-length — scan for next boundary
+                        boundary_pos = buf.find(_MJPEG_BOUNDARY)
+                        if boundary_pos == -1:
+                            break
+                        buf = buf[boundary_pos:]
+                        header_done = False
+                        content_length = 0
+
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# DuelPiPOverlay
+# ---------------------------------------------------------------------------
+
+class DuelPiPOverlay(QWidget):
+    """Always-on-top, resizable PiP overlay for the opponent's live stream.
+
+    In *placement mode* (no URL) it shows a placeholder so the user can
+    drag and resize it to the desired position before a duel starts.
+    In *stream mode* it shows the live MJPEG video.
+    """
+
+    def __init__(self, parent_gui, stream_url: str = ""):
+        super().__init__(None)
+        self._parent_gui = parent_gui
+        self._stream_url = stream_url
+        self._current_frame: Optional[QPixmap] = None
+        self._stop_event = threading.Event()
+        self._reader_thread: Optional[threading.Thread] = None
+        self._reader: Optional[_MjpegReader] = None
+
+        # Debounce timer for saving geometry to config
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(300)
+        self._save_timer.timeout.connect(self._save_geometry_to_cfg)
+
+        # Resize state
+        self._resize_margin = 8
+        self._resize_dir: Optional[str] = None
+        self._resize_origin = QPoint()
+        self._resize_start_geo = QRect()
+
+        # Drag state
+        self._drag_offset = QPoint()
+        self._dragging = False
+
+        self._setup_window()
+        self._restore_geometry()
+
+        if stream_url:
+            self._start_stream()
+
+        _start_topmost_timer(self, interval_ms=3000)
+
+    # ------------------------------------------------------------------
+    # Window setup
+    # ------------------------------------------------------------------
+
+    def _setup_window(self):
+        self.setWindowTitle("📺 Duel Live – Opponent's Playfield")
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
+        self.setMinimumSize(160, 90)
+
+    # ------------------------------------------------------------------
+    # Geometry persistence
+    # ------------------------------------------------------------------
+
+    def _restore_geometry(self):
+        cfg = self._parent_gui.cfg
+        x = int(getattr(cfg, "DUEL_PIP_X", -1))
+        y = int(getattr(cfg, "DUEL_PIP_Y", -1))
+        w = int(getattr(cfg, "DUEL_PIP_W", 480))
+        h = int(getattr(cfg, "DUEL_PIP_H", 270))
+        w = max(160, w)
+        h = max(90, h)
+
+        if x == -1 or y == -1:
+            # Centre on primary screen
+            primary = QApplication.primaryScreen()
+            if primary:
+                geo = primary.availableGeometry()
+                x = geo.left() + (geo.width() - w) // 2
+                y = geo.top() + (geo.height() - h) // 2
+            else:
+                x, y = 100, 100
+
+        self.setGeometry(x, y, w, h)
+
+    def _save_geometry_to_cfg(self):
+        try:
+            cfg = self._parent_gui.cfg
+            g = self.geometry()
+            cfg.DUEL_PIP_X = g.x()
+            cfg.DUEL_PIP_Y = g.y()
+            cfg.DUEL_PIP_W = g.width()
+            cfg.DUEL_PIP_H = g.height()
+            cfg.save()
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Stream
+    # ------------------------------------------------------------------
+
+    def _start_stream(self):
+        self._stop_event.clear()
+        reader = _MjpegReader(self._stream_url, self._stop_event)
+        reader.frame_ready.connect(self._on_frame)
+        self._reader = reader
+
+        t = threading.Thread(target=reader.run, daemon=True, name="PiPMjpegReader")
+        self._reader_thread = t
+        t.start()
+
+    def _on_frame(self, img: QImage):
+        self._current_frame = QPixmap.fromImage(img)
+        self.update()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def open(self):
+        """Show the overlay and (re-)start the stream if a URL is set."""
+        self.show()
+        self.raise_()
+        _force_topmost(self)
+        if self._stream_url and (
+            self._reader_thread is None or not self._reader_thread.is_alive()
+        ):
+            self._start_stream()
+
+    def close_pip(self):
+        """Stop the stream and hide the overlay."""
+        self._stop_event.set()
+        self.hide()
+        self._current_frame = None
+
+    # ------------------------------------------------------------------
+    # Qt event handlers
+    # ------------------------------------------------------------------
+
+    def paintEvent(self, _evt):  # noqa: N802
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(0, 0, 0))
+
+        if self._current_frame is not None:
+            scaled = self._current_frame.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            p.drawPixmap(x, y, scaled)
+        else:
+            # Placeholder
+            pen = QPen(QColor(80, 80, 80))
+            pen.setWidth(2)
+            p.setPen(pen)
+            p.drawRect(1, 1, self.width() - 2, self.height() - 2)
+            p.setPen(QColor(160, 160, 160))
+            p.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            p.drawText(
+                self.rect(),
+                int(Qt.AlignmentFlag.AlignCenter),
+                "📺 Drag to position – Resize at edges",
+            )
+        p.end()
+
+    def mousePressEvent(self, evt):  # noqa: N802
+        if evt.button() == Qt.MouseButton.LeftButton:
+            pos = evt.position().toPoint()
+            direction = self._resize_direction(pos)
+            if direction:
+                self._resize_dir = direction
+                self._resize_origin = evt.globalPosition().toPoint()
+                self._resize_start_geo = self.geometry()
+                self._dragging = False
+            else:
+                self._resize_dir = None
+                self._drag_offset = evt.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                self._dragging = True
+
+    def mouseMoveEvent(self, evt):  # noqa: N802
+        pos = evt.position().toPoint()
+        if evt.buttons() & Qt.MouseButton.LeftButton:
+            if self._resize_dir:
+                self._do_resize(evt.globalPosition().toPoint())
+            elif self._dragging:
+                target = evt.globalPosition().toPoint() - self._drag_offset
+                self.move(target)
+                self._save_timer.start()
+        else:
+            # Update cursor shape for resize handles
+            direction = self._resize_direction(pos)
+            if direction in ("left", "right"):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+            elif direction in ("top", "bottom"):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+            elif direction in ("top-left", "bottom-right"):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+            elif direction in ("top-right", "bottom-left"):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+            else:
+                self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def mouseReleaseEvent(self, evt):  # noqa: N802
+        if evt.button() == Qt.MouseButton.LeftButton:
+            self._resize_dir = None
+            self._dragging = False
+            self._save_timer.start()
+
+    def resizeEvent(self, evt):  # noqa: N802
+        self._save_timer.start()
+        super().resizeEvent(evt)
+
+    def moveEvent(self, evt):  # noqa: N802
+        self._save_timer.start()
+        super().moveEvent(evt)
+
+    # ------------------------------------------------------------------
+    # Resize helpers
+    # ------------------------------------------------------------------
+
+    def _resize_direction(self, pos: QPoint) -> Optional[str]:
+        """Return the resize edge/corner for mouse position *pos*, or None."""
+        m = self._resize_margin
+        x, y = pos.x(), pos.y()
+        w, h = self.width(), self.height()
+        left = x < m
+        right = x > w - m
+        top = y < m
+        bottom = y > h - m
+
+        if top and left:
+            return "top-left"
+        if top and right:
+            return "top-right"
+        if bottom and left:
+            return "bottom-left"
+        if bottom and right:
+            return "bottom-right"
+        if left:
+            return "left"
+        if right:
+            return "right"
+        if top:
+            return "top"
+        if bottom:
+            return "bottom"
+        return None
+
+    def _do_resize(self, global_pos: QPoint):
+        delta = global_pos - self._resize_origin
+        dx, dy = delta.x(), delta.y()
+        geo = QRect(self._resize_start_geo)
+        d = self._resize_dir
+
+        if "right" in d:
+            geo.setRight(geo.right() + dx)
+        if "bottom" in d:
+            geo.setBottom(geo.bottom() + dy)
+        if "left" in d:
+            geo.setLeft(geo.left() + dx)
+        if "top" in d:
+            geo.setTop(geo.top() + dy)
+
+        min_w, min_h = 160, 90
+        if geo.width() < min_w:
+            if "left" in d:
+                geo.setLeft(geo.right() - min_w)
+            else:
+                geo.setRight(geo.left() + min_w)
+        if geo.height() < min_h:
+            if "top" in d:
+                geo.setTop(geo.bottom() - min_h)
+            else:
+                geo.setBottom(geo.top() + min_h)
+
+        self.setGeometry(geo)

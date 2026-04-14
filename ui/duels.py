@@ -2196,6 +2196,11 @@ class DuelsMixin:
 
         If both checks pass, delegates to ``DuelEngine.submit_result()``.
         """
+        try:
+            self._pip_close()
+        except Exception:
+            pass
+
         if not rom:
             return
 
