@@ -1100,10 +1100,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
             self._pip_place_window = DuelPiPOverlay(self.cfg)
             self._pip_place_window.open()
-
-            # Mark PiP as placed/saved.
-            self.cfg.OVERLAY["duel_pip_saved"] = True
-            self.cfg.save()
         except Exception as exc:
             try:
                 from PyQt6.QtWidgets import QMessageBox

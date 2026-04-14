@@ -153,7 +153,7 @@ class DuelPiPOverlay(QWidget):
         layout.setSpacing(0)
 
         placeholder = (
-            "📺 Drag to position  •  Resize at edges\n\nDuel PiP – Placement Mode"
+            "📺 Drag to position – Resize at edges\n\nDuel PiP – Placement Mode"
             if self._placement_mode else "Connecting…"
         )
         self._lbl_frame = QLabel(placeholder)
@@ -191,6 +191,9 @@ class DuelPiPOverlay(QWidget):
             self._cfg.DUEL_PIP_Y = pos.y()
             self._cfg.DUEL_PIP_W = sz.width()
             self._cfg.DUEL_PIP_H = sz.height()
+            # Mark PiP as placed once the user has actually moved or resized it.
+            if self._placement_mode:
+                self._cfg.OVERLAY["duel_pip_saved"] = True
             self._cfg.save()
         except Exception:
             pass
