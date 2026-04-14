@@ -125,6 +125,15 @@ DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
 # Duel PiP
 DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
 
+# WebRTC STUN/TURN configuration for Duel PiP
+DEFAULT_OVERLAY.setdefault(
+    "webrtc_stun_servers",
+    ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
+)
+DEFAULT_OVERLAY.setdefault("webrtc_turn_server", "")
+DEFAULT_OVERLAY.setdefault("webrtc_turn_username", "")
+DEFAULT_OVERLAY.setdefault("webrtc_turn_credential", "")
+
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_y_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_landscape", 100)
@@ -203,6 +212,8 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_pip_saved",
     "duel_pip_portrait", "duel_pip_rotate_ccw",
     "duel_pip_x", "duel_pip_y", "duel_pip_w", "duel_pip_h",
+    "webrtc_stun_servers", "webrtc_turn_server",
+    "webrtc_turn_username", "webrtc_turn_credential",
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",
