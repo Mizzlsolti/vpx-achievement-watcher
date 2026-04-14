@@ -359,6 +359,11 @@ class OverlaysMixin:
                     self._duel_games_played = {}
                 duel_id = ig_state.get("duel_id", "")
                 self._duel_games_played[duel_id] = 1
+                # Start PiP exchange so the opponent's playfield is shown.
+                try:
+                    self._pip_start_exchange(ig_state)
+                except Exception:
+                    pass
                 # Clear state and hide overlay.
                 self._duel_ingame_notify_state = None
                 try:
