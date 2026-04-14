@@ -551,7 +551,7 @@ class OverlaysMixin:
         """
         try:
             from core.watcher_core import log
-        except Exception:
+        except ImportError:
             log = None  # type: ignore[assignment]
 
         def _log(msg: str, level: str = "INFO"):
