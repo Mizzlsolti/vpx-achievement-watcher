@@ -961,6 +961,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_ccw,
             self.chk_status_overlay_ccw,
             self.chk_duel_overlay_ccw,
+            self.chk_pip_ccw,
         ]
 
     def _update_switch_all_button_label(self):
@@ -1120,6 +1121,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
 
             # Appearance Tab - Duel Picture-in-Picture Stream
+            "chk_pip_portrait": "Rotate the Duel PiP video 90 degrees for portrait/cabinet screens.",
+            "chk_pip_ccw": "Rotate the Duel PiP video counter-clockwise instead of clockwise.",
             "cmb_sc_fps": "Set the frame rate for your outgoing playfield stream during duels. 'Auto (dynamic)' adjusts based on CPU load.",
             "cmb_sc_quality": "Set the JPEG quality for your outgoing playfield stream. 'Auto (dynamic)' reduces quality when CPU usage is high.",
             "lbl_sc_cpu_warning": "CPU usage is high — stream quality has been automatically reduced to reduce load.",
