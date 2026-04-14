@@ -193,7 +193,6 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
-
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",
