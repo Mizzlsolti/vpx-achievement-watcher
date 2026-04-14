@@ -23,6 +23,12 @@ from .overlay import (
 from .effects import EffectsMixin
 from .mascots import MascotsMixin
 
+# Screen Capture dropdown option labels and their config values (index → value)
+_SC_FPS_OPTIONS = ["Auto (dynamisch)", "30", "20", "10"]
+_SC_FPS_VALUES  = ["auto", "30", "20", "10"]
+_SC_QUAL_OPTIONS = ["Auto (dynamisch)", "95", "80", "60"]
+_SC_QUAL_VALUES  = ["auto", "95", "80", "60"]
+
 
 class AppearanceMixin(MascotsMixin, EffectsMixin):
     """Mixin that provides the Appearance tab (Overlay, Theme, Sound sub-tabs) and all
@@ -499,17 +505,15 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         # 7) Screen Capture / Live View (Row 3, Col 1)
         self.cmb_sc_fps = QComboBox()
-        self.cmb_sc_fps.addItems(["Auto (dynamisch)", "30", "20", "10"])
+        self.cmb_sc_fps.addItems(_SC_FPS_OPTIONS)
         _sc_fps_val = str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower()
-        _sc_fps_map = {"auto": 0, "30": 1, "20": 2, "10": 3}
-        self.cmb_sc_fps.setCurrentIndex(_sc_fps_map.get(_sc_fps_val, 0))
+        self.cmb_sc_fps.setCurrentIndex(_SC_FPS_VALUES.index(_sc_fps_val) if _sc_fps_val in _SC_FPS_VALUES else 0)
         self.cmb_sc_fps.currentIndexChanged.connect(self._on_sc_fps_changed)
 
         self.cmb_sc_quality = QComboBox()
-        self.cmb_sc_quality.addItems(["Auto (dynamisch)", "95", "80", "60"])
+        self.cmb_sc_quality.addItems(_SC_QUAL_OPTIONS)
         _sc_qual_val = str(getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto")).lower()
-        _sc_qual_map = {"auto": 0, "95": 1, "80": 2, "60": 3}
-        self.cmb_sc_quality.setCurrentIndex(_sc_qual_map.get(_sc_qual_val, 0))
+        self.cmb_sc_quality.setCurrentIndex(_SC_QUAL_VALUES.index(_sc_qual_val) if _sc_qual_val in _SC_QUAL_VALUES else 0)
         self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
 
         self.lbl_sc_cpu_warning = QLabel("⚠️ Qualität reduziert: CPU-Auslastung hoch")
@@ -984,8 +988,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
     # ------------------------------------------------------------------
 
     def _on_sc_fps_changed(self):
-        _map = {0: "auto", 1: "30", 2: "20", 3: "10"}
-        val = _map.get(self.cmb_sc_fps.currentIndex(), "auto")
+        idx = self.cmb_sc_fps.currentIndex()
+        val = _SC_FPS_VALUES[idx] if 0 <= idx < len(_SC_FPS_VALUES) else "auto"
         self.cfg.SCREEN_CAPTURE_FPS = val
         self.cfg.save()
         scs = self._get_screen_capture_server()
@@ -993,8 +997,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             scs.set_fps_cfg(val)
 
     def _on_sc_quality_changed(self):
-        _map = {0: "auto", 1: "95", 2: "80", 3: "60"}
-        val = _map.get(self.cmb_sc_quality.currentIndex(), "auto")
+        idx = self.cmb_sc_quality.currentIndex()
+        val = _SC_QUAL_VALUES[idx] if 0 <= idx < len(_SC_QUAL_VALUES) else "auto"
         self.cfg.SCREEN_CAPTURE_QUALITY = val
         self.cfg.save()
         scs = self._get_screen_capture_server()

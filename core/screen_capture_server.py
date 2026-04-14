@@ -386,7 +386,7 @@ class ScreenCaptureServer:
             # We sleep ~1.5 s between samples to keep the overhead low.
             psutil.cpu_percent(interval=None)  # prime the counter
             while not self._stop_event.is_set():
-                self._stop_event.wait(1.5)
+                self._stop_event.wait(1.5)  # sleep 1.5 s between samples
                 if self._stop_event.is_set():
                     break
                 self._cached_cpu = psutil.cpu_percent(interval=None)

@@ -623,7 +623,9 @@ class OverlaysMixin:
                 elapsed += self._PIP_POLL_INTERVAL_SECONDS
 
             if opponent_url and not cancel_event.is_set():
-                QTimer.singleShot(0, lambda: self._pip_open(opponent_url, duel_id))
+                _url = opponent_url
+                _did = duel_id
+                QTimer.singleShot(0, lambda u=_url, d=_did: self._pip_open(u, d))
 
         t = threading.Thread(target=_poll_worker, daemon=True, name="PiPExchange")
         t.start()

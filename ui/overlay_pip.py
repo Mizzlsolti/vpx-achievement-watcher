@@ -42,9 +42,39 @@ class _MjpegReader(QObject):
         self._url = url
         self._stop = stop_event
 
+    @staticmethod
+    def _validate_stream_url(url: str) -> bool:
+        """Validate that the URL is a safe http/https URL pointing to a private IP."""
+        try:
+            from urllib.parse import urlparse
+            import ipaddress
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return False
+            host = parsed.hostname or ""
+            # Reject empty or obviously unsafe hosts
+            if not host or host.lower() in ("localhost",):
+                return True  # localhost is fine
+            try:
+                addr = ipaddress.ip_address(host)
+                # Only allow private/loopback/link-local ranges
+                if not (addr.is_private or addr.is_loopback or addr.is_link_local):
+                    return False
+            except ValueError:
+                # hostname (not IP) — only allow localhost
+                if host.lower() != "localhost":
+                    return False
+            return True
+        except Exception:
+            return False
+
     def run(self):  # called from background thread
         try:
             import urllib.request
+            from urllib.parse import urlparse
+
+            if not self._validate_stream_url(self._url):
+                return
 
             req = urllib.request.Request(self._url)
             resp = urllib.request.urlopen(req, timeout=10)  # noqa: S310
