@@ -24,7 +24,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     data object Chat : Screen("chat", "Chat", Icons.Default.Chat)
     data object Theme : Screen("theme", "Theme", Icons.Default.Palette)
     data object Settings : Screen("settings", "Settings", Icons.Default.Settings)
-    data object LiveView : Screen("live_view", "📺 Live View", Icons.Default.Tv)
 }
 
 val bottomNavItems = listOf(
@@ -46,7 +45,6 @@ val drawerNavItems = listOf(
     Screen.Chat,
     Screen.Theme,
     Screen.Settings,
-    Screen.LiveView,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +151,6 @@ fun AppNavigation() {
                 composable(Screen.Chat.route) { ChatScreen() }
                 composable(Screen.Theme.route) { ThemeScreen() }
                 composable(Screen.Settings.route) { SettingsScreen() }
-                composable(Screen.LiveView.route) { ScreenCaptureScreen() }
             }
         }
     }
