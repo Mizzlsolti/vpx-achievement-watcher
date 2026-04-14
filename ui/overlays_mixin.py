@@ -366,12 +366,6 @@ class OverlaysMixin:
                     self._get_duel_overlay().hide()
                 except Exception:
                     pass
-                # Initiate PiP: publish our screen-capture IP to Firebase and start
-                # polling for the opponent's IP.
-                try:
-                    self._pip_start_exchange(ig_state)
-                except Exception:
-                    pass
                 return
         except Exception as e:
             try:

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox,
     QSlider, QApplication,
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from core.theme import generate_stylesheet, list_themes, get_theme, DEFAULT_THEME
