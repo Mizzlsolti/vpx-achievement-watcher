@@ -30,8 +30,28 @@ jobs:
         pip install -r requirements.txt
 
     - name: Build Achievement_Watcher.exe with PyInstaller
-      run: |
-        pyinstaller --noconfirm --onefile --windowed --icon="watcher.ico" --add-data "watcher.ico;." --hidden-import="mss" --hidden-import="mss.tools" --hidden-import="PIL" --hidden-import="PIL.Image" --name "Achievement_Watcher" "Achievement_watcher.py"
+      run: >-
+        pyinstaller --noconfirm --onefile --windowed
+        --icon="watcher.ico"
+        --add-data "watcher.ico;."
+        --hidden-import="mss"
+        --hidden-import="mss.tools"
+        --hidden-import="PIL"
+        --hidden-import="PIL.Image"
+        --hidden-import="aiortc"
+        --hidden-import="aiortc.codecs"
+        --hidden-import="aiortc.codecs.h264"
+        --hidden-import="aiortc.codecs.opus"
+        --hidden-import="aiortc.contrib.media"
+        --hidden-import="av"
+        --hidden-import="cffi"
+        --hidden-import="cryptography"
+        --hidden-import="cryptography.hazmat.primitives"
+        --hidden-import="cryptography.hazmat.backends"
+        --hidden-import="cryptography.hazmat.backends.openssl"
+        --hidden-import="pylibsrtp"
+        --name "Achievement_Watcher"
+        "Achievement_watcher.py"
 
     - name: Install Inno Setup
       run: choco install innosetup -y
