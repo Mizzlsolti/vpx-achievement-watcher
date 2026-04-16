@@ -770,6 +770,7 @@ class SystemMixin:
         import zipfile
         import hashlib
         import hmac as _hmac
+        import uuid
         import glob as _glob
         from PyQt6.QtWidgets import QFileDialog
 
@@ -782,7 +783,12 @@ class SystemMixin:
             zip_path += ".zip"
 
         pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        hmac_key = f"{pid}-vpxaw-backup".encode("utf-8")
+        # Derive HMAC key from player ID + machine hardware address to make it
+        # specific to both the player and the machine (not forgeable from pid alone).
+        machine_id = str(uuid.getnode())
+        hmac_key = hashlib.sha256(
+            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+        ).digest()
 
         try:
             from core.config import (
@@ -793,6 +799,7 @@ class SystemMixin:
 
             base = self.cfg.BASE
             files_to_backup: list[tuple[str, str]] = []
+            failed_files: list[str] = []
 
             def _add(path: str, arcname: str):
                 if os.path.isfile(path):
@@ -837,14 +844,16 @@ class SystemMixin:
                         h.update(arcname.encode("utf-8"))
                         h.update(data)
                         zf.writestr(arcname, data)
-                    except Exception:
-                        pass
+                    except Exception as fe:
+                        failed_files.append(f"{arcname}: {fe}")
+                        log(self.cfg, f"[BACKUP] Failed to include {arcname}: {fe}", "WARN")
                 # Write HMAC signature
                 zf.writestr("_backup.sig", h.hexdigest())
 
-            self._msgbox_topmost("info", "Backup to ZIP",
-                f"Backup saved successfully!\n\n{zip_path}\n\n"
-                f"{len(files_to_backup)} file(s) included.")
+            msg = f"Backup saved successfully!\n\n{zip_path}\n\n{len(files_to_backup) - len(failed_files)} file(s) included."
+            if failed_files:
+                msg += f"\n\n⚠️ {len(failed_files)} file(s) could not be read:\n" + "\n".join(f"  • {x}" for x in failed_files[:10])
+            self._msgbox_topmost("info", "Backup to ZIP", msg)
         except Exception as e:
             self._msgbox_topmost("warn", "Backup to ZIP", f"Backup failed:\n\n{e}")
 
@@ -853,6 +862,7 @@ class SystemMixin:
         import zipfile
         import hashlib
         import hmac as _hmac
+        import uuid
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
         zip_path, _ = QFileDialog.getOpenFileName(
@@ -862,7 +872,10 @@ class SystemMixin:
             return
 
         pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        hmac_key = f"{pid}-vpxaw-backup".encode("utf-8")
+        machine_id = str(uuid.getnode())
+        hmac_key = hashlib.sha256(
+            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+        ).digest()
 
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
@@ -903,6 +916,7 @@ class SystemMixin:
 
             base = self.cfg.BASE
             restored = 0
+            failed_restore: list[str] = []
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
                     if name == "_backup.sig":
@@ -917,13 +931,16 @@ class SystemMixin:
                         with open(dest, "wb") as fh:
                             fh.write(zf.read(name))
                         restored += 1
-                    except Exception:
-                        pass
+                    except Exception as re:
+                        failed_restore.append(f"{name}: {re}")
+                        log(self.cfg, f"[RESTORE] Failed to restore {name}: {re}", "WARN")
 
-            self._msgbox_topmost("info", "Restore from ZIP",
-                f"✅ Restore completed successfully!\n\n"
-                f"{restored} file(s) restored from:\n{zip_path}\n\n"
-                "Please restart the application for all changes to take effect.")
+            msg = (f"✅ Restore completed!\n\n"
+                   f"{restored} file(s) restored from:\n{zip_path}\n\n"
+                   "Please restart the application for all changes to take effect.")
+            if failed_restore:
+                msg += f"\n\n⚠️ {len(failed_restore)} file(s) could not be restored:\n" + "\n".join(f"  • {x}" for x in failed_restore[:10])
+            self._msgbox_topmost("info" if not failed_restore else "warn", "Restore from ZIP", msg)
         except Exception as e:
             self._msgbox_topmost("warn", "Restore from ZIP", f"Restore failed:\n\n{e}")
 
