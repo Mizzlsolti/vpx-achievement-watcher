@@ -329,12 +329,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
                 self._trophie_gui.on_theme_changed()
         except Exception:
             pass
-        # Sync theme to cloud for app bidirectional sync
-        try:
-            from core.cloud_sync import CloudSync
-            CloudSync.upload_preferences(self.cfg, {"theme": theme_id})
-        except Exception:
-            pass
 
     def _on_theme_combo_changed(self, _index: int):
         theme_id = self.cmb_theme.currentData()
@@ -776,7 +770,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         def _on_sound_enabled(state):
             self.cfg.OVERLAY["sound_enabled"] = bool(state)
             self.cfg.save()
-            self._sync_sound_preferences()
         self.chk_sound_enabled.stateChanged.connect(_on_sound_enabled)
         row_enable.addWidget(self.chk_sound_enabled)
         row_enable.addSpacing(20)
@@ -798,7 +791,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.lbl_sound_vol_pct.setText(f"{val}%")
             self.cfg.OVERLAY["sound_volume"] = val
             self.cfg.save()
-            self._sync_sound_preferences()
         self.sld_sound_volume.valueChanged.connect(_on_sound_volume)
         row_enable.addWidget(self.sld_sound_volume)
         row_enable.addWidget(self.lbl_sound_vol_pct)
@@ -821,7 +813,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         def _on_sound_pack(idx):
             self.cfg.OVERLAY["sound_pack"] = self.cmb_sound_pack.itemData(idx)
             self.cfg.save()
-            self._sync_sound_preferences()
         self.cmb_sound_pack.currentIndexChanged.connect(_on_sound_pack)
         row_pack.addWidget(self.cmb_sound_pack)
         row_pack.addStretch(1)
@@ -872,7 +863,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
                     ev = self.cfg.OVERLAY.setdefault("sound_events", {})
                     ev[eid] = bool(state)
                     self.cfg.save()
-                    self._sync_sound_preferences()
                 return _handler
 
             chk_event.stateChanged.connect(_make_event_handler(event_id))
@@ -938,20 +928,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_duel_overlay_portrait,
             self.chk_pip_portrait,
         ]
-
-    def _sync_sound_preferences(self):
-        """Upload current sound preferences to cloud for bidirectional sync with the app."""
-        try:
-            from core.cloud_sync import CloudSync
-            sounds_data = {
-                "enabled": bool(self.cfg.OVERLAY.get("sound_enabled", False)),
-                "volume": int(self.cfg.OVERLAY.get("sound_volume", 20)),
-                "pack": str(self.cfg.OVERLAY.get("sound_pack", "zaptron")),
-                "events": dict(self.cfg.OVERLAY.get("sound_events", {})),
-            }
-            CloudSync.upload_preferences(self.cfg, {"sounds": sounds_data})
-        except Exception:
-            pass
 
     def _ccw_checkboxes(self):
         """Returns the list of all overlay CCW-rotation checkboxes."""

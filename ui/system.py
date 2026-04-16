@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QMetaObject, Q_ARG, pyqtSlot, QRegularExpression
 from PyQt6.QtGui import QRegularExpressionValidator
-from core.cloud_sync import CloudSync, _sanitize_firebase_keys
+from core.cloud_sync import CloudSync
 from .widgets import HazardStripeOverlay
 from core.watcher_core import (
     ensure_dir, log, sanitize_filename,
@@ -173,15 +173,6 @@ class SystemMixin:
         lay_cloud_btns = QHBoxLayout(cloud_btns_wrapper)
         lay_cloud_btns.setContentsMargins(0, 0, 0, 0)
 
-        self.btn_backup_cloud = QPushButton("☁️ Backup to Cloud")
-        self.btn_backup_cloud.setToolTip(
-            "Manually upload your full achievement data, VPS mapping, and ROM progress to the cloud. "
-            "Use this to create an immediate backup of your current data."
-        )
-        self.btn_backup_cloud.setEnabled(self.cfg.CLOUD_ENABLED)
-        self.btn_backup_cloud.clicked.connect(self._manual_cloud_backup)
-        lay_cloud_btns.addWidget(self.btn_backup_cloud)
-
         self.btn_restore_cloud = QPushButton("☁️ Restore from Cloud")
         self.btn_restore_cloud.setToolTip(
             "Downloads your full achievement progress from the cloud using your Player ID. "
@@ -199,6 +190,38 @@ class SystemMixin:
 
         lay_cloud.addWidget(cloud_btns_wrapper)
         layout.addWidget(grp_cloud)
+
+        # --- 📦 Local Backup & Restore ---
+        grp_zip = QGroupBox("📦 Local Backup & Restore")
+        lay_zip = QVBoxLayout(grp_zip)
+        lbl_zip = QLabel(
+            "Back up all local achievement data to a ZIP file with anti-cheat HMAC signature, "
+            "or restore from a previously created ZIP backup."
+        )
+        lbl_zip.setWordWrap(True)
+        lbl_zip.setStyleSheet("color: #AAAAAA; font-size: 9pt;")
+        lay_zip.addWidget(lbl_zip)
+
+        zip_btns_row = QHBoxLayout()
+        self.btn_backup_zip = QPushButton("📦 Backup to ZIP")
+        self.btn_backup_zip.setToolTip(
+            "Pack all local achievement data (achievements, progress log, VPS mapping, "
+            "session stats, NVRAM stats, session deltas, records, preferences) into a ZIP file "
+            "with an HMAC anti-cheat signature. Use this to create a full local backup."
+        )
+        self.btn_backup_zip.clicked.connect(self._backup_to_zip)
+        zip_btns_row.addWidget(self.btn_backup_zip)
+
+        self.btn_restore_zip = QPushButton("📂 Restore from ZIP")
+        self.btn_restore_zip.setToolTip(
+            "Restore local achievement data from a previously created ZIP backup. "
+            "Validates the HMAC signature before restoring. "
+            "Warning: This will overwrite your local achievement data."
+        )
+        self.btn_restore_zip.clicked.connect(self._restore_from_zip)
+        zip_btns_row.addWidget(self.btn_restore_zip)
+        lay_zip.addLayout(zip_btns_row)
+        layout.addWidget(grp_zip)
 
         # Lock player identity fields on startup if Cloud Sync is already enabled
         if self.cfg.CLOUD_ENABLED:
@@ -742,202 +765,185 @@ class SystemMixin:
         msg += " successfully restored from the cloud!"
         self._msgbox_topmost("info", "Restore from Cloud", msg)
 
-    def _manual_cloud_backup(self):
-        """Perform a full manual backup of all local data to cloud."""
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
-            self._msgbox_topmost("warn", "Backup to Cloud", "Cloud sync is not enabled.")
-            return
+    def _backup_to_zip(self):
+        """Create a ZIP backup of all local achievement data with HMAC anti-cheat signature."""
+        import zipfile
+        import hashlib
+        import hmac as _hmac
+        import uuid
+        import glob as _glob
+        from PyQt6.QtWidgets import QFileDialog
 
-        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
-        if not pid or pid == "unknown":
-            self._msgbox_topmost("warn", "Backup to Cloud", "Please set a valid Player ID first.")
-            return
-
-        player_name = self.cfg.OVERLAY.get("player_name", "").strip()
-        if not player_name or player_name.lower() == "player":
-            self._msgbox_topmost("warn", "Backup to Cloud", "Please set a valid player name (not 'Player') first.")
-            return
-
-        confirm = QMessageBox.question(
-            self,
-            "Backup to Cloud",
-            "This will upload your current data to the cloud. Continue?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+        zip_path, _ = QFileDialog.getSaveFileName(
+            self, "Backup to ZIP", "", "ZIP Files (*.zip)"
         )
-        if confirm != QMessageBox.StandardButton.Yes:
+        if not zip_path:
+            return
+        if not zip_path.lower().endswith(".zip"):
+            zip_path += ".zip"
+
+        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        # Derive HMAC key from player ID + machine hardware address to make it
+        # specific to both the player and the machine (not forgeable from pid alone).
+        machine_id = str(uuid.getnode())
+        hmac_key = hashlib.sha256(
+            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+        ).digest()
+
+        try:
+            from core.config import (
+                f_achievements_state, f_vps_mapping, f_progress_upload_log,
+                f_custom_achievements_progress, p_highlights, p_session,
+            )
+            from core.watcher_core import secure_load_json
+
+            base = self.cfg.BASE
+            files_to_backup: list[tuple[str, str]] = []
+            failed_files: list[str] = []
+
+            def _add(path: str, arcname: str):
+                if os.path.isfile(path):
+                    files_to_backup.append((path, arcname))
+
+            # Core state files
+            _add(f_achievements_state(self.cfg), "achievements_state.json")
+            _add(f_vps_mapping(self.cfg), "vps_id_mapping.json")
+            _add(f_progress_upload_log(self.cfg), "progress_upload_log.json")
+            _add(f_custom_achievements_progress(self.cfg), "custom_achievements_progress.json")
+
+            # Session highlights
+            highlights_dir = p_highlights(self.cfg)
+            for f in _glob.glob(os.path.join(highlights_dir, "*.summary.json")):
+                files_to_backup.append((f, os.path.join("session_stats", "Highlights", os.path.basename(f))))
+
+            # Local session stats (per-ROM)
+            session_dir = p_session(self.cfg)
+            for f in _glob.glob(os.path.join(session_dir, "**", "*.json"), recursive=True):
+                rel = os.path.relpath(f, base)
+                files_to_backup.append((f, os.path.join("session_stats", rel)))
+
+            # Local records, nvram_stats, session_deltas (custom directories under BASE)
+            for sub in ("records", "nvram_stats", "session_deltas"):
+                sub_dir = os.path.join(base, sub)
+                if os.path.isdir(sub_dir):
+                    for f in _glob.glob(os.path.join(sub_dir, "**", "*.json"), recursive=True):
+                        rel = os.path.relpath(f, base)
+                        files_to_backup.append((f, rel))
+
+            # Config / settings
+            from core.config import CONFIG_FILE
+            _add(CONFIG_FILE, "config.json")
+
+            # Build the ZIP and compute HMAC
+            h = _hmac.new(hmac_key, digestmod=hashlib.sha256)
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for filepath, arcname in files_to_backup:
+                    try:
+                        with open(filepath, "rb") as fh:
+                            data = fh.read()
+                        h.update(arcname.encode("utf-8"))
+                        h.update(data)
+                        zf.writestr(arcname, data)
+                    except Exception as fe:
+                        failed_files.append(f"{arcname}: {fe}")
+                        log(self.cfg, f"[BACKUP] Failed to include {arcname}: {fe}", "WARN")
+                # Write HMAC signature
+                zf.writestr("_backup.sig", h.hexdigest())
+
+            msg = f"Backup saved successfully!\n\n{zip_path}\n\n{len(files_to_backup) - len(failed_files)} file(s) included."
+            if failed_files:
+                msg += f"\n\n⚠️ {len(failed_files)} file(s) could not be read:\n" + "\n".join(f"  • {x}" for x in failed_files[:10])
+            self._msgbox_topmost("info", "Backup to ZIP", msg)
+        except Exception as e:
+            self._msgbox_topmost("warn", "Backup to ZIP", f"Backup failed:\n\n{e}")
+
+    def _restore_from_zip(self):
+        """Restore local achievement data from a ZIP backup (validates HMAC signature)."""
+        import zipfile
+        import hashlib
+        import hmac as _hmac
+        import uuid
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        zip_path, _ = QFileDialog.getOpenFileName(
+            self, "Restore from ZIP", "", "ZIP Files (*.zip)"
+        )
+        if not zip_path:
             return
 
-        self.btn_backup_cloud.setEnabled(False)
-        self.btn_backup_cloud.setText("⏳ Backing up...")
+        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+        machine_id = str(uuid.getnode())
+        hmac_key = hashlib.sha256(
+            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+        ).digest()
 
-        def _worker():
-            from datetime import datetime, timezone
-            from core.watcher_core import compute_player_level
-            from core.config import f_custom_achievements_progress
-            from core.watcher_core import secure_load_json
-            results = []
-            errors = []
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                names = zf.namelist()
+                if "_backup.sig" not in names:
+                    self._msgbox_topmost("warn", "Restore from ZIP",
+                        "❌ Backup file is missing the HMAC signature.\n\n"
+                        "This backup may be corrupt or was not created by this application.")
+                    return
 
-            state = self.watcher._ach_state_load()
+                stored_sig = zf.read("_backup.sig").decode("utf-8").strip()
 
-            # Load CAT progress to include in the achievements payload
-            custom_progress: dict = {}
-            try:
-                custom_progress = secure_load_json(f_custom_achievements_progress(self.cfg)) or {}
-            except Exception:
-                pass
+                # Recompute HMAC over all non-signature entries
+                h = _hmac.new(hmac_key, digestmod=hashlib.sha256)
+                for name in sorted(n for n in names if n != "_backup.sig"):
+                    data = zf.read(name)
+                    h.update(name.encode("utf-8"))
+                    h.update(data)
 
-            # 1. Upload achievements metadata (without session to avoid oversized request)
-            try:
-                lv = compute_player_level(state)
-                badges = list(state.get("badges") or [])
-                selected_badge = state.get("selected_badge", "")
-                metadata_payload = {
-                    "name": player_name,
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    "global": list(state.get("global", {}).get("__global__", []) or []),
-                    "roms_played": list(state.get("roms_played", []) or []),
-                    "player_level": lv["level"],
-                    "player_level_name": lv["name"],
-                    "player_prestige": lv["prestige"],
-                    "player_prestige_display": lv["prestige_display"],
-                    "player_fully_maxed": lv["fully_maxed"],
-                    "badges": badges,
-                    "badge_count": len(badges),
-                    "selected_badge": selected_badge,
-                }
-                if custom_progress:
-                    metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
-                if CloudSync.patch_node(self.cfg, f"players/{pid}/achievements", metadata_payload):
-                    results.append("✅ Achievements metadata")
-                    log(self.cfg, "[CLOUD] Manual backup: achievements metadata uploaded")
-                else:
-                    errors.append("❌ Achievements metadata: upload failed")
-            except Exception as e:
-                errors.append(f"❌ Achievements metadata: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: achievements metadata upload failed: {e}", "WARN")
+                if not _hmac.compare_digest(h.hexdigest(), stored_sig):
+                    self._msgbox_topmost("warn", "Restore from ZIP",
+                        "❌ HMAC signature verification failed!\n\n"
+                        "The backup may have been tampered with or was created "
+                        "with a different Player ID. Restore aborted.")
+                    return
 
-            # 1b. Upload session data per ROM to keep each request small
-            session_uploaded = 0
-            session_errors = 0
-            try:
-                session = dict(state.get("session", {}) or {})
-                for rom, entries in session.items():
-                    if entries:
-                        if CloudSync.set_node(self.cfg, f"players/{pid}/achievements/session/{rom}", entries):
-                            session_uploaded += 1
-                        else:
-                            session_errors += 1
-                            log(self.cfg, f"[CLOUD] Manual backup: session upload failed for {rom}", "WARN")
-                if session_uploaded > 0:
-                    results.append(f"✅ Session for {session_uploaded} ROM(s)")
-                if session_errors > 0:
-                    errors.append(f"❌ Session: {session_errors} ROM(s) failed")
-            except Exception as e:
-                errors.append(f"❌ Session: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: session upload failed: {e}", "WARN")
+            confirm = QMessageBox.question(
+                self, "Restore from ZIP",
+                "The backup signature is valid.\n\n"
+                "This will overwrite your local achievement data. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if confirm != QMessageBox.StandardButton.Yes:
+                return
 
-            # 2. Upload VPS mapping
-            try:
-                from .vps import _load_vps_mapping
-                mapping = _load_vps_mapping(self.cfg)
-                if CloudSync.set_node(self.cfg, f"players/{pid}/vps_mapping", mapping):
-                    results.append(f"✅ VPS mapping ({len(mapping)} entries)")
-                    log(self.cfg, f"[CLOUD] Manual backup: VPS mapping uploaded: {len(mapping)} entries")
-                else:
-                    errors.append("❌ VPS mapping: upload failed")
-            except Exception as e:
-                errors.append(f"❌ VPS mapping: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: VPS mapping upload failed: {e}", "WARN")
+            from core.config import CONFIG_FILE
 
-            # 3. Upload progress for each ROM that has session data
-            def _entry_title(e):
-                return str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-
-            progress_uploaded = 0
-            progress_errors = 0
-            try:
-                session = state.get("session", {}) or {}
-                for rom, entries in session.items():
-                    if not entries:
+            base = self.cfg.BASE
+            restored = 0
+            failed_restore: list[str] = []
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for name in zf.namelist():
+                    if name == "_backup.sig":
                         continue
+                    # Map arcname back to absolute path
+                    if name == "config.json":
+                        dest = CONFIG_FILE
+                    else:
+                        dest = os.path.join(base, name)
                     try:
-                        rules = self.watcher._collect_player_rules_for_rom(rom)
-                        total = len(rules)
-                        if total == 0:
-                            continue
-                        unlocked_titles = {_entry_title(e) for e in entries}
-                        unlocked = sum(
-                            1 for r in rules
-                            if str(r.get("title", "")).strip() in unlocked_titles
-                        )
-                        percentage = round((unlocked / total) * 100, 1)
-                        progress_payload = {
-                            "name": player_name,
-                            "unlocked": unlocked,
-                            "total": total,
-                            "percentage": percentage,
-                            "ts": datetime.now(timezone.utc).isoformat(),
-                        }
-                        if CloudSync.set_node(self.cfg, f"players/{pid}/progress/{rom}", progress_payload):
-                            progress_uploaded += 1
-                        else:
-                            progress_errors += 1
-                    except Exception as _rom_err:
-                        progress_errors += 1
-                        log(self.cfg, f"[CLOUD] Manual backup: progress upload failed for {rom}: {_rom_err}", "WARN")
-                if progress_uploaded > 0:
-                    results.append(f"✅ Progress for {progress_uploaded} ROM(s)")
-                if progress_errors > 0:
-                    errors.append(f"❌ Progress: {progress_errors} ROM(s) failed")
-            except Exception as e:
-                errors.append(f"❌ Progress: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: progress iteration failed: {e}", "WARN")
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with open(dest, "wb") as fh:
+                            fh.write(zf.read(name))
+                        restored += 1
+                    except Exception as re:
+                        failed_restore.append(f"{name}: {re}")
+                        log(self.cfg, f"[RESTORE] Failed to restore {name}: {re}", "WARN")
 
-            # 4. Upload CAT progress via upload_cat_progress() (includes unlocked_titles)
-            cat_uploaded = 0
-            cat_errors = 0
-            try:
-                from core.cat_registry import upload_cat_progress
-                from core.config import f_custom_achievements_progress
-                all_cat_progress = secure_load_json(f_custom_achievements_progress(self.cfg)) or {}
-                if isinstance(all_cat_progress, dict):
-                    for table_key in all_cat_progress:
-                        try:
-                            if upload_cat_progress(self.cfg, table_key):
-                                cat_uploaded += 1
-                            else:
-                                cat_errors += 1
-                        except Exception as _cat_err:
-                            cat_errors += 1
-                            log(self.cfg, f"[CLOUD] Manual backup: CAT upload failed for '{table_key}': {_cat_err}", "WARN")
-                if cat_uploaded > 0:
-                    results.append(f"✅ CAT Progress for {cat_uploaded} table(s)")
-                if cat_errors > 0:
-                    errors.append(f"❌ CAT Progress: {cat_errors} table(s) failed")
-            except Exception as e:
-                errors.append(f"❌ CAT Progress: {e}")
-                log(self.cfg, f"[CLOUD] Manual backup: CAT progress iteration failed: {e}", "WARN")
+            msg = (f"✅ Restore completed!\n\n"
+                   f"{restored} file(s) restored from:\n{zip_path}\n\n"
+                   "Please restart the application for all changes to take effect.")
+            if failed_restore:
+                msg += f"\n\n⚠️ {len(failed_restore)} file(s) could not be restored:\n" + "\n".join(f"  • {x}" for x in failed_restore[:10])
+            self._msgbox_topmost("info" if not failed_restore else "warn", "Restore from ZIP", msg)
+        except Exception as e:
+            self._msgbox_topmost("warn", "Restore from ZIP", f"Restore failed:\n\n{e}")
 
-            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
-            summary = "\n".join(results + errors)
-            QMetaObject.invokeMethod(self, "_on_manual_cloud_backup_done",
-                Qt.ConnectionType.QueuedConnection,
-                Q_ARG(str, summary),
-                Q_ARG(bool, len(errors) == 0))
-
-        import threading
-        threading.Thread(target=_worker, daemon=True, name="ManualCloudBackup").start()
-
-    @pyqtSlot(str, bool)
-    def _on_manual_cloud_backup_done(self, summary: str, success: bool):
-        self.btn_backup_cloud.setEnabled(True)
-        self.btn_backup_cloud.setText("☁️ Backup to Cloud")
-        if success:
-            self._msgbox_topmost("info", "Backup to Cloud", f"Backup completed successfully!\n\n{summary}")
-        else:
-            self._msgbox_topmost("warn", "Backup to Cloud", f"Backup completed with some issues:\n\n{summary}")
 
     def _cloud_upload_vps_mapping(self):
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""

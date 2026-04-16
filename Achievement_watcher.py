@@ -209,13 +209,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._status_badge_timer.timeout.connect(self._poll_status_badge)
         self._status_badge_timer.start()
 
-        # Periodic preference poll timer: picks up theme/sound changes from the app (30s)
-        self._pref_poll_timer = QTimer(self)
-        self._pref_poll_timer.setInterval(30000)
-        self._pref_poll_timer.timeout.connect(self._poll_cloud_preferences)
+        # Periodic app-signals poll timer: picks up duel accept/decline signals from the app (30s)
+        self._app_signals_timer = QTimer(self)
+        self._app_signals_timer.setInterval(30000)
+        self._app_signals_timer.timeout.connect(self._poll_app_signals)
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
-            self._pref_poll_timer.start()
-        self._last_cloud_theme = (self.cfg.OVERLAY or {}).get("theme", "")
+            self._app_signals_timer.start()
 
         self.watcher.start()
 
@@ -2412,58 +2411,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         except Exception:
             pass
 
-    def _poll_cloud_preferences(self):
-        """Poll Firebase for preference changes made in the mobile app.
-        Applies theme and sound settings if they differ from the current local config.
-        """
+    def _poll_app_signals(self):
+        """Poll Firebase for app signals (duel accept/decline, backup/restore triggers)."""
         try:
-            prefs = CloudSync.poll_preferences(self.cfg)
-            if not prefs or not isinstance(prefs, dict):
-                return
-
-            # Theme sync: if the app changed the theme, apply it locally
-            cloud_theme = prefs.get("theme")
-            if cloud_theme and isinstance(cloud_theme, str):
-                current_theme = (self.cfg.OVERLAY or {}).get("theme", "")
-                if cloud_theme != current_theme and cloud_theme != self._last_cloud_theme:
-                    self._last_cloud_theme = cloud_theme
-                    self.cfg.OVERLAY["theme"] = cloud_theme
-                    self.cfg.save()
-                    try:
-                        from core.theme import generate_stylesheet
-                        from PyQt6.QtWidgets import QApplication
-                        app = QApplication.instance()
-                        if app:
-                            app.setStyleSheet(generate_stylesheet(cloud_theme))
-                        # Update combo box if it exists
-                        cmb = getattr(self, "cmb_theme", None)
-                        if cmb:
-                            idx = cmb.findData(cloud_theme)
-                            if idx >= 0:
-                                cmb.setCurrentIndex(idx)
-                    except Exception:
-                        pass
-
-            # Sound sync: if the app changed sound settings, apply locally
-            cloud_sounds = prefs.get("sounds")
-            if cloud_sounds and isinstance(cloud_sounds, dict):
-                if "enabled" in cloud_sounds:
-                    self.cfg.OVERLAY["sound_enabled"] = bool(cloud_sounds["enabled"])
-                if "volume" in cloud_sounds:
-                    self.cfg.OVERLAY["sound_volume"] = int(cloud_sounds["volume"])
-                if "pack" in cloud_sounds:
-                    self.cfg.OVERLAY["sound_pack"] = str(cloud_sounds["pack"])
-                if "events" in cloud_sounds and isinstance(cloud_sounds["events"], dict):
-                    self.cfg.OVERLAY.setdefault("sound_events", {}).update(cloud_sounds["events"])
-                self.cfg.save()
-
-            # Process app signals (backup/restore triggers from the app)
             signals = CloudSync.poll_app_signals(self.cfg)
             for sig in signals:
                 action = sig.get("action", "")
                 if action == "backup":
                     try:
-                        from core.watcher_core import Watcher as _W
                         state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
                         pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
                         CloudSync.upload_full_achievements(self.cfg, state, pname)
@@ -2472,42 +2427,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                 elif action == "restore":
                     try:
                         CloudSync.restore_from_cloud(self.cfg)
-                    except Exception:
-                        pass
-
-            # Process trigger_backup / trigger_restore from preferences path
-            # (written by the mobile app as a timestamp)
-            trigger_backup_ts = prefs.get("trigger_backup")
-            if trigger_backup_ts:
-                last_ts = getattr(self, "_last_trigger_backup_ts", None)
-                if str(trigger_backup_ts) != str(last_ts):
-                    self._last_trigger_backup_ts = str(trigger_backup_ts)
-                    try:
-                        state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
-                        pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
-                        CloudSync.upload_full_achievements(self.cfg, state, pname)
-                    except Exception:
-                        pass
-                    # Clear the trigger so it doesn't re-fire
-                    try:
-                        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-                        CloudSync.set_node(self.cfg, f"players/{pid}/preferences/trigger_backup", None)
-                    except Exception:
-                        pass
-
-            trigger_restore_ts = prefs.get("trigger_restore")
-            if trigger_restore_ts:
-                last_ts = getattr(self, "_last_trigger_restore_ts", None)
-                if str(trigger_restore_ts) != str(last_ts):
-                    self._last_trigger_restore_ts = str(trigger_restore_ts)
-                    try:
-                        CloudSync.restore_from_cloud(self.cfg)
-                    except Exception:
-                        pass
-                    # Clear the trigger so it doesn't re-fire
-                    try:
-                        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-                        CloudSync.set_node(self.cfg, f"players/{pid}/preferences/trigger_restore", None)
                     except Exception:
                         pass
         except Exception:

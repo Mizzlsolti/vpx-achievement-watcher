@@ -9,23 +9,20 @@ import com.vpxwatcher.app.data.*
 import kotlinx.coroutines.launch
 
 /**
- * Settings ViewModel — backup/restore, notifications, version, updates.
+ * Settings ViewModel — version check and updates.
+ * Preferences (push notifications, theme, sounds) are now managed locally.
  */
 class SettingsViewModel : ViewModel() {
 
-    private val preferencesRepository = PreferencesRepository()
     private val updateRepository = UpdateRepository()
 
-    var pushEnabled by mutableStateOf(true)
-        private set
-    var cloudSyncEnabled by mutableStateOf(true)
-        private set
     var statusMessage by mutableStateOf("")
         private set
 
     fun setStatus(message: String) {
         statusMessage = message
-    }    var isLoading by mutableStateOf(false)
+    }
+    var isLoading by mutableStateOf(false)
         private set
     var latestRelease by mutableStateOf<ReleaseInfo?>(null)
         private set
@@ -34,66 +31,6 @@ class SettingsViewModel : ViewModel() {
 
     companion object {
         const val APP_VERSION = "1.0.0"  // fallback; prefer BuildConfig.VERSION_NAME at call site
-    }
-
-    private fun getPlayerId(): String? {
-        val pid = PrefsManager.playerId.lowercase()
-        return if (pid.isBlank()) null else pid
-    }
-
-    fun refresh() {
-        viewModelScope.launch {
-            try {
-                val pid = getPlayerId() ?: return@launch
-                pushEnabled = preferencesRepository.fetchPushEnabled(pid)
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun togglePushNotifications(enabled: Boolean) {
-        pushEnabled = enabled
-        viewModelScope.launch {
-            val pid = getPlayerId() ?: return@launch
-            preferencesRepository.savePushEnabled(pid, enabled)
-        }
-    }
-
-    fun triggerBackup() {
-        viewModelScope.launch {
-            isLoading = true
-            try {
-                val pid = getPlayerId() ?: return@launch
-                val url = PrefsManager.DEFAULT_CLOUD_URL
-                val success = FirebaseClient.setNode(
-                    url, "players/$pid/preferences/trigger_backup",
-                    System.currentTimeMillis().toString()
-                )
-                statusMessage = if (success) "✅ Backup signal sent to desktop Watcher — the Watcher will process this on next sync"
-                    else "❌ Failed to send backup signal"
-            } catch (e: Exception) {
-                statusMessage = "❌ Backup failed: ${e.message}"
-            }
-            isLoading = false
-        }
-    }
-
-    fun triggerRestore() {
-        viewModelScope.launch {
-            isLoading = true
-            try {
-                val pid = getPlayerId() ?: return@launch
-                val url = PrefsManager.DEFAULT_CLOUD_URL
-                val success = FirebaseClient.setNode(
-                    url, "players/$pid/preferences/trigger_restore",
-                    System.currentTimeMillis().toString()
-                )
-                statusMessage = if (success) "✅ Restore signal sent to desktop Watcher — the Watcher will process this on next sync"
-                    else "❌ Failed to send restore signal"
-            } catch (e: Exception) {
-                statusMessage = "❌ Restore failed: ${e.message}"
-            }
-            isLoading = false
-        }
     }
 
     fun checkForUpdates() {

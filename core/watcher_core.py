@@ -3355,50 +3355,6 @@ class Watcher:
                     except Exception as e:
                         log(self.cfg, f"[CAT] Upload failed: {e}", "WARN")
 
-                # Upload records and session stats to cloud for app bidirectional sync
-                if self.current_rom:
-                    try:
-                        from .cloud_sync import CloudSync as _CS_rec
-                        _score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
-                        _records_data = {
-                            "score": _score,
-                            "duration": duration_sec,
-                        }
-                        _CS_rec.upload_records(self.cfg, self.current_rom, _records_data)
-
-                        _session_data = {
-                            "score": _score,
-                            "duration": duration_sec,
-                            "ball_data": dict(self.ball_track) if self.ball_track else {},
-                        }
-                        _CS_rec.upload_session_stats(self.cfg, self.current_rom, _session_data)
-
-                        # Upload NVRAM audits (Global NVRAM Dump) to cloud
-                        _nvram_audits_data = {}
-                        for k, v in end_audits.items():
-                            try:
-                                _nvram_audits_data[str(k)] = v if isinstance(v, (int, float, str)) else str(v)
-                            except Exception:
-                                pass
-                        if _nvram_audits_data:
-                            _CS_rec.upload_nvram_stats(self.cfg, self.current_rom, _nvram_audits_data)
-
-                        # Upload session deltas to cloud
-                        _deltas_data = {}
-                        _p1 = self.players.get(1, {})
-                        _live_deltas = _p1.get("session_deltas", {})
-                        for k, v in _live_deltas.items():
-                            try:
-                                iv = int(v)
-                                if iv > 0:
-                                    _deltas_data[str(k)] = iv
-                            except Exception:
-                                pass
-                        _play_sec = int(_p1.get("active_play_seconds", 0.0))
-                        _deltas_payload = {"deltas": _deltas_data, "playtime_sec": _play_sec}
-                        _CS_rec.upload_session_deltas(self.cfg, self.current_rom, _deltas_payload)
-                    except Exception as e:
-                        log(self.cfg, f"[CLOUD] Records/stats upload failed: {e}", "WARN")
 
         finally:
             self.current_table = None

@@ -3,10 +3,8 @@ package com.vpxwatcher.app.service
 import android.content.Context
 import androidx.work.*
 import com.vpxwatcher.app.data.FirebaseClient
-import com.vpxwatcher.app.data.PreferencesRepository
 import com.vpxwatcher.app.data.PrefsManager
 import com.vpxwatcher.app.data.ProgressRepository
-import com.vpxwatcher.app.viewmodel.PreferencesViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
@@ -17,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * WorkManager background polling worker.
  * Checks Firebase for new events (achievements, duels, tournaments)
  * and shows Android system notifications.
- * Also syncs preferences (theme, sounds) from the desktop Watcher.
+ * Preferences (theme, sounds) are now stored locally and no longer synced from Firebase.
  */
 class PollWorker(
     private val context: Context,
@@ -40,10 +38,7 @@ class PollWorker(
             // Check for tournament updates
             checkTournaments(url, pid)
 
-            // Sync preferences (theme, sounds) from desktop Watcher
-            syncPreferences(pid)
-
-            // Sync session stats and progress data
+            // Sync per-ROM progress data
             syncProgressData(url, pid)
 
             Result.success()
@@ -181,31 +176,6 @@ class PollWorker(
     }
 
     /**
-     * Sync theme and sound preferences from cloud (desktop Watcher writes).
-     * Mirrors the desktop's _poll_cloud_preferences() polling behaviour.
-     */
-    private suspend fun syncPreferences(pid: String) {
-        try {
-            val repo = PreferencesRepository()
-
-            // Theme sync
-            val cloudTheme = repo.fetchTheme(pid)
-            if (!cloudTheme.isNullOrBlank() && cloudTheme != PrefsManager.themeId) {
-                PrefsManager.themeId = cloudTheme
-                PreferencesViewModel.updateGlobalTheme(cloudTheme)
-            }
-
-            // Sound sync — fetch from cloud and store locally
-            val cloudSounds = repo.fetchSoundSettings(pid)
-            if (cloudSounds != null) {
-                PrefsManager.putBoolean(PREF_SOUND_ENABLED, cloudSounds.enabled)
-                PrefsManager.putInt(PREF_SOUND_VOLUME, cloudSounds.volume)
-                PrefsManager.putString(PREF_SOUND_PACK, cloudSounds.pack)
-            }
-        } catch (_: Exception) { /* silent */ }
-    }
-
-    /**
      * Sync per-ROM progress data from cloud for accurate display.
      */
     private suspend fun syncProgressData(url: String, pid: String) {
@@ -238,9 +208,6 @@ class PollWorker(
     companion object {
         private const val WORK_NAME = "vpx_watcher_poll"
         private const val PREF_LAST_ACH_COUNT = "last_known_ach_count"
-        private const val PREF_SOUND_ENABLED = "cloud_sound_enabled"
-        private const val PREF_SOUND_VOLUME = "cloud_sound_volume"
-        private const val PREF_SOUND_PACK = "cloud_sound_pack"
 
         /** Active SSE stream for real-time duel/achievement updates. */
         @Volatile
