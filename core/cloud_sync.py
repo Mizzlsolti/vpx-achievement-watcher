@@ -34,7 +34,6 @@ from .watcher_core import (
     ensure_dir,
     is_excluded_field,
 )
-from .config import f_custom_achievements_progress
 
 _FIREBASE_ILLEGAL_CHARS_RE = re.compile(r'[.$#\[\]/]')
 
@@ -884,14 +883,8 @@ class CloudSync:
             lv = compute_player_level(state)
             badges = list(state.get("badges") or [])
             selected_badge = state.get("selected_badge", "")
-            # Load CAT (Custom Achievement Table) progress so it is included in
-            # the cloud backup even though CAT names are not valid ROM identifiers.
-            custom_progress: dict = {}
-            try:
-                custom_progress = secure_load_json(f_custom_achievements_progress(cfg)) or {}
-            except Exception:
-                pass
             # Upload metadata without session to avoid oversized single request.
+            # custom_progress and global_tally are no longer uploaded to reduce traffic.
             metadata_payload = {
                 "name": pname,
                 "ts": datetime.now(timezone.utc).isoformat(),
@@ -906,34 +899,15 @@ class CloudSync:
                 "badge_count": len(badges),
                 "selected_badge": selected_badge,
             }
-            if custom_progress:
-                metadata_payload["custom_progress"] = _sanitize_firebase_keys(custom_progress)
-            # Include global_tally so the mobile app can display progress for
-            # locked global achievements (nvram_tally, rom_count, etc.).
-            global_tally = state.get("global_tally")
-            if global_tally and isinstance(global_tally, dict):
-                # Strip internal "entries" lists that are only needed locally to
-                # keep the payload small; the app only needs progress + installed_count.
-                tally_clean = {}
-                for title, tdata in global_tally.items():
-                    safe_title = _FIREBASE_ILLEGAL_CHARS_RE.sub("_", title)
-                    if isinstance(tdata, dict):
-                        stripped = {k: v for k, v in tdata.items() if k != "entries"}
-                        if stripped:
-                            tally_clean[safe_title] = stripped
-                    else:
-                        tally_clean[safe_title] = tdata
-                if tally_clean:
-                    metadata_payload["global_tally"] = tally_clean
             if CloudSync.patch_node(cfg, f"players/{pid}/achievements", metadata_payload):
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:
                 log(cfg, "[CLOUD] upload_full_achievements: metadata upload failed", "WARN")
-            # Upload session data per ROM to keep each request small.
-            for rom, entries in session_entries.items():
-                if entries:
-                    if not CloudSync.set_node(cfg, f"players/{pid}/achievements/session/{rom}", entries):
-                        log(cfg, f"[CLOUD] upload_full_achievements: session upload failed for {rom}", "WARN")
+            # Batch all session ROM data into a single patch_node call to reduce HTTP requests.
+            session_batch = {rom: entries for rom, entries in session_entries.items() if entries}
+            if session_batch:
+                if not CloudSync.patch_node(cfg, f"players/{pid}/achievements/session", session_batch):
+                    log(cfg, "[CLOUD] upload_full_achievements: session batch upload failed", "WARN")
 
         threading.Thread(target=_task, daemon=True).start()
 
@@ -949,18 +923,21 @@ class CloudSync:
         if not player_ids:
             return {}, 0
 
-        paths = [f"players/{pid}/achievements" for pid in player_ids]
+        # Fetch only the per-ROM session node instead of the entire achievements node
+        # to reduce download traffic (shallow per-ROM path).
+        paths = [f"players/{pid}/achievements/session/{rom}" for pid in player_ids]
         batch = CloudSync.fetch_parallel(cfg, paths)
 
         total_players = 0
         title_counts: dict = {}
 
-        for path, data in batch.items():
-            if not data or not isinstance(data, dict):
-                continue
-            session = data.get("session", {})
-            rom_entries = session.get(rom, [])
+        for path, rom_entries in batch.items():
             if not rom_entries:
+                continue
+            # rom_entries is the direct list (or sparse object) for this ROM
+            if isinstance(rom_entries, dict):
+                rom_entries = list(rom_entries.values())
+            if not isinstance(rom_entries, list):
                 continue
             total_players += 1
             seen_titles: set = set()
@@ -1035,143 +1012,7 @@ class CloudSync:
 
         return result, total_players
 
-    # ── New methods for bidirectional app sync ─────────────────────────────
-
-    @staticmethod
-    def upload_records(cfg: AppConfig, rom: str, records_data: dict):
-        """Upload records (best scores, personal bests) to Firebase.
-        Path: players/{pid}/records/{rom}
-        Called after each game session ends.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        if CloudSync._warn_missing_player_name(cfg):
-            return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        safe_rom = rom.replace("/", "_").replace(".", "_")
-
-        def _task():
-            payload = dict(records_data)
-            payload["ts"] = datetime.now(timezone.utc).isoformat()
-            if CloudSync.set_node(cfg, f"players/{pid}/records/{safe_rom}", payload):
-                log(cfg, f"[CLOUD] Records uploaded for {rom}")
-            else:
-                log(cfg, f"[CLOUD] upload_records failed for {rom}", "WARN")
-
-        threading.Thread(target=_task, daemon=True).start()
-
-    @staticmethod
-    def upload_session_stats(cfg: AppConfig, rom: str, session_data: dict):
-        """Upload session stats (score, duration, ball_data, audit_deltas) to Firebase.
-        Path: players/{pid}/session_stats/{rom}/{session_id}
-        Called after each game session ends.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        if CloudSync._warn_missing_player_name(cfg):
-            return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        safe_rom = rom.replace("/", "_").replace(".", "_")
-        session_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-
-        def _task():
-            payload = dict(session_data)
-            payload["ts"] = datetime.now(timezone.utc).isoformat()
-            if CloudSync.set_node(cfg, f"players/{pid}/session_stats/{safe_rom}/{session_id}", payload):
-                log(cfg, f"[CLOUD] Session stats uploaded for {rom}")
-            else:
-                log(cfg, f"[CLOUD] upload_session_stats failed for {rom}", "WARN")
-
-        threading.Thread(target=_task, daemon=True).start()
-
-    @staticmethod
-    def upload_preferences(cfg: AppConfig, prefs_data: dict):
-        """Upload user preferences (theme, sounds) to Firebase.
-        Path: players/{pid}/preferences/
-        Called when theme or sound settings change in the desktop Watcher.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        if pid == "unknown":
-            return
-
-        def _task():
-            payload = dict(prefs_data)
-            payload["ts"] = datetime.now(timezone.utc).isoformat()
-            if CloudSync.patch_node(cfg, f"players/{pid}/preferences", payload):
-                log(cfg, "[CLOUD] Preferences uploaded")
-            else:
-                log(cfg, "[CLOUD] upload_preferences failed", "WARN")
-
-        threading.Thread(target=_task, daemon=True).start()
-
-    @staticmethod
-    def upload_nvram_stats(cfg: AppConfig, rom: str, audits_data: dict):
-        """Upload full NVRAM audit data to Firebase.
-        Path: players/{pid}/nvram_stats/{rom}
-        Uses set_node (PUT) to always replace the previous data.
-        Called after each game session ends.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        if CloudSync._warn_missing_player_name(cfg):
-            return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        safe_rom = rom.replace("/", "_").replace(".", "_")
-
-        def _task():
-            payload = dict(audits_data)
-            payload["ts"] = datetime.now(timezone.utc).isoformat()
-            if CloudSync.set_node(cfg, f"players/{pid}/nvram_stats/{safe_rom}", payload):
-                log(cfg, f"[CLOUD] NVRAM stats uploaded for {rom}")
-            else:
-                log(cfg, f"[CLOUD] upload_nvram_stats failed for {rom}", "WARN")
-
-        threading.Thread(target=_task, daemon=True).start()
-
-    @staticmethod
-    def upload_session_deltas(cfg: AppConfig, rom: str, deltas_data: dict):
-        """Upload session deltas (field changes > 0 + playtime) to Firebase.
-        Path: players/{pid}/session_deltas/{rom}
-        Uses set_node (PUT) to always replace — only the latest session matters.
-        Called after each game session ends.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        if CloudSync._warn_missing_player_name(cfg):
-            return
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        safe_rom = rom.replace("/", "_").replace(".", "_")
-
-        def _task():
-            payload = dict(deltas_data)
-            payload["ts"] = datetime.now(timezone.utc).isoformat()
-            if CloudSync.set_node(cfg, f"players/{pid}/session_deltas/{safe_rom}", payload):
-                log(cfg, f"[CLOUD] Session deltas uploaded for {rom}")
-            else:
-                log(cfg, f"[CLOUD] upload_session_deltas failed for {rom}", "WARN")
-
-        threading.Thread(target=_task, daemon=True).start()
-
-    @staticmethod
-    def poll_preferences(cfg: AppConfig) -> Optional[dict]:
-        """Read preferences from Firebase to pick up changes made in the app.
-        Path: players/{pid}/preferences/
-        Returns the preferences dict or None.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return None
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        if pid == "unknown":
-            return None
-        try:
-            data = CloudSync.fetch_node(cfg, f"players/{pid}/preferences")
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-        return None
+    # ── App signals polling ─────────────────────────────────────────────────
 
     @staticmethod
     def poll_app_signals(cfg: AppConfig) -> list:

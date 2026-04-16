@@ -24,7 +24,6 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
-    LaunchedEffect(Unit) { viewModel.refresh() }
 
     Column(
         modifier = Modifier
@@ -70,31 +69,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 Text(
                     text = "Status: Enabled",
                     color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // ── Push Notifications ──
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text("🔔 Push Notifications", fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface)
-                    Text("Receive alerts for achievements, duels, etc.", fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Switch(
-                    checked = viewModel.pushEnabled,
-                    onCheckedChange = { viewModel.togglePushNotifications(it) },
                 )
             }
         }
