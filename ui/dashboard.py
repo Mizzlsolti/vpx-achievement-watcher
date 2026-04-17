@@ -1,10 +1,10 @@
 """Dashboard-tab mixin: Dashboard build, notification feed, notification generation,
-session-end hook, cloud rank/beaten polling, and update check."""
+session-end hook, cloud rank check, and update check."""
 from __future__ import annotations
 
 import os
 import threading
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
@@ -28,7 +28,7 @@ def _parse_version(v_str):
 
 class DashboardMixin:
     """Mixin that provides the Dashboard tab, notification feed UI, notification
-    generation, session-end hook, cloud rank/beaten polling, and update check.
+    generation, session-end hook, cloud rank check, and update check.
 
     Expects the host class to provide:
         self.cfg                – AppConfig instance
@@ -38,8 +38,6 @@ class DashboardMixin:
         self._restart_watcher() – slot
         self.quit_all()         – slot
         self.CURRENT_VERSION    – str
-        self._HIGHSCORE_POLL_INTERVAL_MS – int
-        self._NOTIF_COOLDOWN_HOURS       – int
         self.maps_table         – QTableWidget (Available Maps tab)
         self.txt_cloud_rom      – QLineEdit (Cloud tab)
         self._fetch_cloud_leaderboard()  – method
@@ -233,13 +231,6 @@ class DashboardMixin:
         self._dashboard_refresh_timer.setInterval(10000)
         self._dashboard_refresh_timer.timeout.connect(self._refresh_dashboard_cards)
         self._dashboard_refresh_timer.start()
-
-        # Highscore-beaten polling timer (5 min, only when cloud enabled)
-        self._highscore_poll_timer = QTimer(self)
-        self._highscore_poll_timer.setInterval(self._HIGHSCORE_POLL_INTERVAL_MS)
-        self._highscore_poll_timer.timeout.connect(self._poll_highscore_beaten)
-        if getattr(self.cfg, "CLOUD_ENABLED", False):
-            self._highscore_poll_timer.start()
 
     @staticmethod
     def _dot(color: str, label: str, value: str) -> str:
@@ -1001,86 +992,6 @@ class DashboardMixin:
                 pass
 
         threading.Thread(target=_bg, daemon=True, name="LeaderboardRankCheck").start()
-
-    def _poll_highscore_beaten(self):
-        """Periodic check (every 5 min): detect if own top scores have been beaten."""
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
-            return
-        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip()
-        if not pid or pid == "unknown":
-            return
-
-        def _bg():
-            try:
-                # Load ROMs where this player has uploaded scores
-                state = self.watcher._ach_state_load()
-                roms_played = list((state.get("session") or {}).keys())
-                if not roms_played:
-                    return
-
-                player_ids = CloudSync.fetch_player_ids(self.cfg)
-                if not player_ids:
-                    return
-
-                # Check last-notified timestamps to avoid spam (24 h cooldown per ROM)
-                notif_items = _notif.load_notifications(self.cfg)
-                from datetime import datetime, timezone, timedelta
-                now = datetime.now(timezone.utc)
-                recently_notified: set = set()
-                for n in notif_items:
-                    if n.get("type") in ("highscore_beaten", "achievement_beaten"):
-                        try:
-                            ts = datetime.fromisoformat(n.get("timestamp", ""))
-                            if (now - ts.astimezone(timezone.utc)) < timedelta(hours=self._NOTIF_COOLDOWN_HOURS):
-                                detail = n.get("detail", "")
-                                if detail.startswith("ROM: "):
-                                    recently_notified.add(detail[5:])
-                        except Exception:
-                            pass
-
-                for rom in roms_played:
-                    if rom in recently_notified:
-                        continue
-                    # Custom achievement tables have non-standard names; skip cloud fetch.
-                    if not _is_valid_rom_name(rom):
-                        continue
-                    paths = [f"players/{p}/progress/{rom}" for p in player_ids]
-                    batch = CloudSync.fetch_parallel(self.cfg, paths)
-
-                    scores = []
-                    for path, entry in batch.items():
-                        if entry and isinstance(entry, dict):
-                            pct = float(entry.get("percentage", 0))
-                            p_id = path.split("/")[1] if "/" in path else ""
-                            scores.append((pct, p_id))
-                    scores.sort(reverse=True)
-
-                    if not scores:
-                        continue
-                    top_pid = scores[0][1]
-                    if top_pid and top_pid != pid:
-                        # Check own score exists at all
-                        own_in = any(p_id == pid for _, p_id in scores)
-                        if own_in:
-                            leader_score = float(scores[0][0])
-                            your_score = next((pct for pct, p_id in scores if p_id == pid), 0.0)
-                            leader_entry = batch.get(f"players/{top_pid}/progress/{rom}", {})
-                            # player_name/name may be stored alongside the progress entry in Firebase;
-                            # fall back to the player ID if no name field is present.
-                            leader_name = str(leader_entry.get("player_name", "") or leader_entry.get("name", "") or top_pid)
-                            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
-                            QMetaObject.invokeMethod(
-                                self, "_add_achievement_beaten_notification",
-                                Qt.ConnectionType.QueuedConnection,
-                                Q_ARG(str, rom),
-                                Q_ARG(float, float(your_score)),
-                                Q_ARG(str, leader_name),
-                                Q_ARG(float, leader_score),
-                            )
-            except Exception:
-                pass
-
-        threading.Thread(target=_bg, daemon=True, name="HighscorePolling").start()
 
     def _check_for_updates(self):
         """Startup update check: uses GitHub Releases API, adds Dashboard notification only (no popup)."""

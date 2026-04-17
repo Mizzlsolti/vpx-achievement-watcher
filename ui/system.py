@@ -438,8 +438,10 @@ class SystemMixin:
         self.cfg.CLOUD_ENABLED = False
         self.cfg.save()
         self._lock_player_identity_fields(False)
-        if hasattr(self, "_highscore_poll_timer"):
-            self._highscore_poll_timer.stop()
+        if hasattr(self, "_app_lifecycle_timer"):
+            self._app_lifecycle_timer.stop()
+        if hasattr(self, "_app_signals_timer"):
+            self._app_signals_timer.stop()
         if getattr(self, "btn_backup_cloud", None):
             self.btn_backup_cloud.setEnabled(False)
         if getattr(self, "btn_restore_cloud", None):
@@ -503,9 +505,16 @@ class SystemMixin:
                 self._cloud_btns_overlay.hide()
             if getattr(self, "chk_cloud_backup", None):
                 self.chk_cloud_backup.setVisible(True)
-            if hasattr(self, "_highscore_poll_timer"):
-                if not self._highscore_poll_timer.isActive():
-                    self._highscore_poll_timer.start()
+            # Start the lifecycle timer so app_active is checked periodically.
+            if hasattr(self, "_app_lifecycle_timer"):
+                if not self._app_lifecycle_timer.isActive():
+                    self._app_lifecycle_timer.start()
+                # Check app_active immediately now that cloud is enabled.
+                try:
+                    self._check_app_active()
+                except Exception as _e:
+                    from core.watcher_core import log as _log
+                    _log(self.cfg, f"[CLOUD] app_active check on enable failed: {_e}", "WARN")
             if self.cfg.CLOUD_URL:
                 CloudSync.cleanup_legacy_progress(self.cfg)
             self._lock_player_identity_fields(True)
