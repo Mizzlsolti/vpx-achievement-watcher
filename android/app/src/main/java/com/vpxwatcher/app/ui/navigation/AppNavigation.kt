@@ -20,7 +20,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     data object Leaderboard : Screen("leaderboard", "Cloud", Icons.Default.Cloud)
     data object Duels : Screen("duels", "Duels", Icons.Default.SportsKabaddi)
     data object Tournaments : Screen("tournaments", "Tournaments", Icons.Default.EmojiEvents)
-    data object Chat : Screen("chat", "Chat", Icons.Default.Chat)
     data object Theme : Screen("theme", "Theme", Icons.Default.Palette)
     data object Settings : Screen("settings", "Settings", Icons.Default.Settings)
 }
@@ -40,7 +39,6 @@ val drawerNavItems = listOf(
     Screen.Leaderboard,
     Screen.Duels,
     Screen.Tournaments,
-    Screen.Chat,
     Screen.Theme,
     Screen.Settings,
 )
@@ -145,7 +143,6 @@ fun AppNavigation() {
                 composable(Screen.Leaderboard.route) { LeaderboardScreen() }
                 composable(Screen.Duels.route) { DuelsScreen() }
                 composable(Screen.Tournaments.route) { TournamentScreen() }
-                composable(Screen.Chat.route) { ChatScreen() }
                 composable(Screen.Theme.route) { ThemeScreen() }
                 composable(Screen.Settings.route) { SettingsScreen() }
             }

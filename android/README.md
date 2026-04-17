@@ -1,6 +1,6 @@
 # VPX Achievement Watcher — Android Companion App
 
-📱 Android companion app for the [VPX Achievement Watcher](https://github.com/Mizzlsolti/vpx-achievement-watcher) desktop application. Manage Score Duels, join Tournaments, and chat with other players — all synced via Firebase Realtime Database.
+📱 Android companion app for the [VPX Achievement Watcher](https://github.com/Mizzlsolti/vpx-achievement-watcher) desktop application. Manage Score Duels, join Tournaments — all synced via Firebase Realtime Database.
 
 ## Screenshots
 
@@ -11,7 +11,6 @@
 - **🏠 Dashboard** — Quick status overview of pending duels, active tournaments, and queue status
 - **⚔️ Score Duels** — Accept/decline duel invitations, send new duels, auto-match, view history and leaderboard
 - **🏆 Tournaments** — Join the 4-player tournament queue, view live brackets, tournament history
-- **💬 Tournament Chat** — Real-time chat via Server-Sent Events (SSE), ban/timeout enforcement
 - **👤 Profile** — View player info, level, badges, duel statistics
 - **🔗 Overlay Sync** — Actions in the app (accept/decline duel) automatically dismiss the desktop Watcher's overlay
 
@@ -68,7 +67,6 @@ cd android
 ### Key Design Decisions
 
 - **No Firebase SDK** — Uses plain HTTP REST calls matching the desktop Watcher's `CloudSync` approach
-- **SSE for Chat** — Real-time chat via Server-Sent Events, matching the Watcher's `_run_sse()` implementation
 - **Same Validation** — Login validation matches `CloudSync.validate_player_identity()` exactly
 - **App Signals** — Writes to `players/{pid}/app_signals/` so the desktop Watcher can auto-dismiss overlays
 
@@ -90,7 +88,6 @@ See [FIREBASE_RULES.md](FIREBASE_RULES.md) for the Firebase Realtime Database ru
 |---------|----------|--------|
 | Duels | 5 seconds | Polling |
 | Tournaments | 30 seconds | Polling |
-| Chat | Real-time | SSE stream |
 | Duel expiry | 30 seconds | Polling |
 
 ## License
