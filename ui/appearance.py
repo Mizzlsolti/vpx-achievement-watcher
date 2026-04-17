@@ -1036,16 +1036,23 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
 
     def _on_pip_test(self):
-        """Open PiP overlay for 5 seconds as a preview, then auto-close."""
+        """Open PiP overlay for 5 seconds as a preview at the saved position/size."""
         try:
             from ui.overlay_pip import DuelPiPOverlay
-            if not hasattr(self, "_pip_overlay") or self._pip_overlay is None:
-                self._pip_overlay = DuelPiPOverlay(self)
-            self._pip_overlay.open()
-
-            # Auto-close after 5 seconds
-            QTimer.singleShot(5000, self._pip_overlay.close_pip)
-
+            # Always create a fresh overlay so _restore_geometry() reads the
+            # latest saved position and size — reusing an existing instance
+            # would show it wherever it was last moved/hidden.
+            pip = getattr(self, "_pip_test_overlay", None)
+            if pip is not None:
+                try:
+                    pip.close_pip()
+                    pip.deleteLater()
+                except Exception:
+                    pass
+                self._pip_test_overlay = None
+            self._pip_test_overlay = DuelPiPOverlay(self)
+            self._pip_test_overlay.open()
+            QTimer.singleShot(5000, self._pip_test_overlay.close_pip)
         except Exception as exc:
             QMessageBox.warning(self, "Duel PiP", f"PiP test failed:\n{exc}")
 

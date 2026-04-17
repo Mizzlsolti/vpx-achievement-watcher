@@ -416,10 +416,13 @@ class WebRTCSession:
         self._pc.addTrack(self._screen_track)
 
         # Handle incoming video track (opponent's screen)
+        # Use ensure_future so the task is scheduled on the running event loop
+        # (avoids the DeprecationWarning / RuntimeError from get_event_loop() in
+        # Python 3.10+ when called from a non-async callback).
         @self._pc.on("track")
         def on_track(track):
             if track.kind == "video":
-                asyncio.get_event_loop().create_task(self._receive_video(track))
+                asyncio.ensure_future(self._receive_video(track))
 
         @self._pc.on("connectionstatechange")
         async def on_connection_state():
