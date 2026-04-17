@@ -704,7 +704,6 @@ class SystemMixin:
         import zipfile
         import hashlib
         import hmac as _hmac
-        import uuid
         import glob as _glob
         from PyQt6.QtWidgets import QFileDialog
 
@@ -717,11 +716,8 @@ class SystemMixin:
             zip_path += ".zip"
 
         pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        # Derive HMAC key from player ID + machine hardware address to make it
-        # specific to both the player and the machine (not forgeable from pid alone).
-        machine_id = str(uuid.getnode())
         hmac_key = hashlib.sha256(
-            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+            f"{pid}|vpxaw-backup-v1".encode("utf-8")
         ).digest()
 
         try:
@@ -818,7 +814,6 @@ class SystemMixin:
         import zipfile
         import hashlib
         import hmac as _hmac
-        import uuid
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
         zip_path, _ = QFileDialog.getOpenFileName(
@@ -828,9 +823,8 @@ class SystemMixin:
             return
 
         pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        machine_id = str(uuid.getnode())
         hmac_key = hashlib.sha256(
-            f"{pid}|{machine_id}|vpxaw-backup-v1".encode("utf-8")
+            f"{pid}|vpxaw-backup-v1".encode("utf-8")
         ).digest()
 
         try:
