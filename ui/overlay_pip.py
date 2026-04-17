@@ -153,7 +153,7 @@ class DuelPiPOverlay(QWidget):
         self._stop_event = threading.Event()
         self._reader_thread: Optional[threading.Thread] = None
         self._reader: Optional[_MjpegReader] = None
-        self._aspect_adjusted = False  # True after first frame resizes the window
+        self._video_aspect: Optional[float] = None  # w/h ratio of the incoming video (after rotation)
 
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
@@ -239,7 +239,7 @@ class DuelPiPOverlay(QWidget):
 
     def _start_stream(self):
         self._stop_event.clear()
-        self._aspect_adjusted = False
+        self._video_aspect = None  # reset so first frame re-applies aspect ratio
         reader = _MjpegReader(self._stream_url, self._stop_event)
         reader.frame_ready.connect(self._on_frame)
         self._reader = reader
@@ -250,29 +250,39 @@ class DuelPiPOverlay(QWidget):
 
     def _on_frame(self, img: QImage):
         self._current_frame = QPixmap.fromImage(img)
-        # On the very first frame, resize the window to match the video's
-        # effective aspect ratio (portrait option is already applied in paint,
-        # so we account for it here too) while keeping the current width.
-        if not self._aspect_adjusted:
-            self._aspect_adjusted = True
-            self._adjust_aspect_to_frame(img)
+        # Compute and store the effective aspect ratio from this frame.
+        # If the ratio changed (new stream / different video source), snap the
+        # window once so it starts at the correct shape.
+        aspect = self._compute_aspect(img)
+        if aspect is not None and aspect != self._video_aspect:
+            self._video_aspect = aspect
+            self._snap_height_to_aspect()
         self.update()
 
-    def _adjust_aspect_to_frame(self, img: QImage):
-        """Resize the window height so its aspect ratio matches the incoming frame."""
+    def _compute_aspect(self, img: QImage) -> Optional[float]:
+        """Return width/height aspect ratio of the frame after portrait rotation."""
         try:
             ov = self._parent_gui.cfg.OVERLAY or {}
             portrait = bool(ov.get("duel_pip_portrait", True))
             fw, fh = img.width(), img.height()
             if portrait:
-                # Frame will be rotated 90° in paint, so effective dimensions swap.
                 fw, fh = fh, fw
             if fw <= 0 or fh <= 0:
+                return None
+            return fw / fh
+        except Exception:
+            return None
+
+    def _snap_height_to_aspect(self):
+        """Adjust the window height to match ``_video_aspect`` for the current width."""
+        try:
+            aspect = self._video_aspect
+            if aspect is None or aspect <= 0:
                 return
             cur_w = self.width()
             if cur_w <= 0:
                 return
-            new_h = max(90, int(cur_w * fh / fw))
+            new_h = max(90, int(cur_w / aspect))
             if new_h != self.height():
                 geo = self.geometry()
                 geo.setHeight(new_h)
@@ -400,8 +410,13 @@ class DuelPiPOverlay(QWidget):
 
     def mouseReleaseEvent(self, evt):  # noqa: N802
         if evt.button() == Qt.MouseButton.LeftButton:
+            was_resizing = self._resize_dir is not None
             self._resize_dir = None
             self._dragging = False
+            # After a manual resize, snap the window height to maintain the
+            # video's aspect ratio so there are no black bars.
+            if was_resizing and self._video_aspect is not None:
+                self._snap_height_to_aspect()
             self._save_timer.start()
 
     def resizeEvent(self, evt):  # noqa: N802
