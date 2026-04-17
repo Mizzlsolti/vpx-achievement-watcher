@@ -234,7 +234,7 @@ class CloudSync:
         VPS mapping was mandatory).  Runs only once per installation, guarded by a marker file.
         Executes in a background thread to avoid blocking the UI.
         """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not cfg.CLOUD_BACKUP_ENABLED:
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
             return
 
         marker = f_legacy_cleanup_marker(cfg)
@@ -288,7 +288,7 @@ class CloudSync:
         entries).  Runs only once per installation, guarded by a marker file.
         Executes in a background thread to avoid blocking the UI.
         """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not cfg.CLOUD_BACKUP_ENABLED:
+        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
             return
 
         marker = f_rom_keys_cloud_cleaned_marker(cfg)
@@ -337,8 +337,6 @@ class CloudSync:
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
-            return
-        if not cfg.CLOUD_BACKUP_ENABLED:
             return
         # Block upload for custom achievement tables (names with spaces/special chars are not
         # valid VPinMAME ROM names and must not be used as Firebase path segments).
@@ -855,8 +853,6 @@ class CloudSync:
         safety net to ensure all ROMs are in sync.
         """
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return
-        if not cfg.CLOUD_BACKUP_ENABLED:
             return
         pname = player_name.strip() if player_name else cfg.OVERLAY.get("player_name", "Player").strip()
         if not pname or pname.lower() == "player":

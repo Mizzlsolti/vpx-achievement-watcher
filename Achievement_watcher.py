@@ -641,12 +641,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "and feedback.<br><br>"
             "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
             "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
-            "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
+            "• <b>Cloud Sync</b>: Enable cloud synchronisation. When active, your achievement "
+            "progress, VPS mapping, and metadata are automatically backed up to the cloud "
+            "after every session and achievement unlock.<br>"
+            "• <b>Restore from Cloud</b>: Download your cloud data to restore achievements, "
+            "VPS mapping, and CAT progress on a new PC.<br>"
             "• <b>Local Backup &amp; Restore</b>: Back up all local data to a ZIP file or restore from a previous backup.<br>"
-            "• <b>Visual Effects</b>: Use the ✨ Effects sub-tab in the Appearance tab to "
-            "control individual overlay effects and Low Performance Mode.<br>"
-            "• <b>Mascots</b>: Trophie &amp; Steely settings have moved to the "
-            "🎨 Appearance → 🏆 Mascots sub-tab.<br>"
             "• <b>Feedback</b>: Report bugs or suggestions directly from here."
         ),
         "system_maintenance": (
@@ -1957,7 +1957,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         _set_tip("txt_player_name", "Enter your display name (used for local records and leaderboards).")
         _set_tip("txt_player_id", "Your unique 4-character ID. Keep this safe to restore your cloud progress after a reinstall!")
         _set_tip("chk_cloud_enabled", "Enable Cloud Sync: validates your Player Name and Player ID, then activates cloud sync. Fields are locked while Cloud Sync is active.")
-        _set_tip("chk_cloud_backup", "Enable automatic backup of your achievement progress, scores, and VPS mapping to the cloud.")
         _set_tip("btn_repair", "Recreates missing folders and downloads the base database if corrupted.")
         _set_tip("btn_prefetch", "Forces a background download of all missing NVRAM maps from the internet.")
         _set_tip("base_label", "Current base directory for achievements data.")
@@ -2266,7 +2265,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             state["selected_badge"] = badge_id
             self.watcher._ach_state_save(state)
             # Re-upload full achievements to cloud so the new badge appears on leaderboards
-            if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_BACKUP_ENABLED:
+            if self.cfg.CLOUD_ENABLED:
                 pname = self.cfg.OVERLAY.get("player_name", "Player").strip()
                 if pname:
                     _state_copy = dict(state)

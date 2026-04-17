@@ -352,7 +352,6 @@ class AppConfig:
     LOG_CTRL: bool = False
     LOG_SUPPRESS: List[str] = field(default_factory=lambda: list(DEFAULT_LOG_SUPPRESS))
     CLOUD_ENABLED: bool = False
-    CLOUD_BACKUP_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
     SCREEN_CAPTURE_PORT: int = 9876
@@ -363,6 +362,15 @@ class AppConfig:
     DUEL_PIP_W: int = 480
     DUEL_PIP_H: int = 270
     _load_error: bool = field(default=False, repr=False, compare=False)
+
+    @property
+    def CLOUD_BACKUP_ENABLED(self) -> bool:  # noqa: N802
+        """Cloud backup is always active when Cloud Sync is enabled."""
+        return self.CLOUD_ENABLED
+
+    @CLOUD_BACKUP_ENABLED.setter
+    def CLOUD_BACKUP_ENABLED(self, value: bool) -> None:  # noqa: N802
+        pass  # No-op: backup state is derived from CLOUD_ENABLED
 
     @staticmethod
     def _parse_config(data: dict) -> "AppConfig":
@@ -382,9 +390,6 @@ class AppConfig:
         _migrate_anim_to_fx(ov)
 
         cloud_enabled = bool(data.get("CLOUD_ENABLED", False))
-        cloud_backup_enabled = bool(data.get("CLOUD_BACKUP_ENABLED", False))
-        if not cloud_enabled:
-            cloud_backup_enabled = False
 
         return AppConfig(
             BASE=data.get("BASE", AppConfig.BASE),
@@ -393,7 +398,6 @@ class AppConfig:
             OVERLAY=ov,
             FIRST_RUN=bool(data.get("FIRST_RUN", False)),
             CLOUD_ENABLED=cloud_enabled,
-            CLOUD_BACKUP_ENABLED=cloud_backup_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
             SCREEN_CAPTURE_PORT=int(data.get("SCREEN_CAPTURE_PORT", 9876)),
             SCREEN_CAPTURE_FPS=str(data.get("SCREEN_CAPTURE_FPS", "auto")),
@@ -445,16 +449,12 @@ class AppConfig:
                     clean_overlay[k] = ov[k]
 
             cloud_enabled_val = getattr(self, "CLOUD_ENABLED", False)
-            cloud_backup_val = getattr(self, "CLOUD_BACKUP_ENABLED", False)
-            if not cloud_enabled_val:
-                cloud_backup_val = False
 
             to_dump = {
                 "BASE": getattr(self, "BASE", r"C:\vPinball\VPX Achievement Watcher"),
                 "NVRAM_DIR": getattr(self, "NVRAM_DIR", r"C:\vPinball\VisualPinball\VPinMAME\nvram"),
                 "TABLES_DIR": getattr(self, "TABLES_DIR", r"C:\vPinball\VisualPinball\Tables"),
                 "CLOUD_ENABLED": cloud_enabled_val,
-                "CLOUD_BACKUP_ENABLED": cloud_backup_val,
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
