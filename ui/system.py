@@ -158,17 +158,6 @@ class SystemMixin:
         self.chk_cloud_enabled.stateChanged.connect(self._save_cloud_settings)
         lay_cloud.addWidget(self.chk_cloud_enabled)
 
-        self.chk_cloud_backup = QCheckBox("💾 Auto-Backup Progress to Cloud")
-        self.chk_cloud_backup.setToolTip(
-            "When enabled, your achievement progress and VPS mapping "
-            "are automatically uploaded to the cloud for backup purposes. "
-            "Use 'Restore from Cloud' to recover your data on a new PC."
-        )
-        self.chk_cloud_backup.setChecked(self.cfg.CLOUD_BACKUP_ENABLED)
-        self.chk_cloud_backup.setVisible(self.cfg.CLOUD_ENABLED)
-        self.chk_cloud_backup.stateChanged.connect(self._save_cloud_backup_settings)
-        lay_cloud.addWidget(self.chk_cloud_backup)
-
         cloud_btns_wrapper = QWidget()
         lay_cloud_btns = QHBoxLayout(cloud_btns_wrapper)
         lay_cloud_btns.setContentsMargins(0, 0, 0, 0)
@@ -386,10 +375,6 @@ class SystemMixin:
                 if getattr(self, "_cloud_btns_overlay", None):
                     self._cloud_btns_overlay.show()
                     self._cloud_btns_overlay.raise_()
-                if getattr(self, "chk_cloud_backup", None):
-                    self.chk_cloud_backup.setVisible(False)
-                    self.chk_cloud_backup.setChecked(False)
-                    self.cfg.CLOUD_BACKUP_ENABLED = False
                 self.cfg.save()
                 if name_invalid and id_invalid:
                     self._msgbox_topmost(
@@ -449,11 +434,6 @@ class SystemMixin:
         if getattr(self, "_cloud_btns_overlay", None):
             self._cloud_btns_overlay.show()
             self._cloud_btns_overlay.raise_()
-        if getattr(self, "chk_cloud_backup", None):
-            self.chk_cloud_backup.setVisible(False)
-            self.chk_cloud_backup.setChecked(False)
-            self.cfg.CLOUD_BACKUP_ENABLED = False
-            self.cfg.save()
 
     @pyqtSlot(bool, str, str, str, str)
     def _on_cloud_validate_done(self, ok: bool, reason: str, msg: str, new_name: str, new_id: str):
@@ -503,8 +483,6 @@ class SystemMixin:
                 self.btn_restore_cloud.setEnabled(True)
             if getattr(self, "_cloud_btns_overlay", None):
                 self._cloud_btns_overlay.hide()
-            if getattr(self, "chk_cloud_backup", None):
-                self.chk_cloud_backup.setVisible(True)
             # Start the lifecycle timer so app_active is checked periodically.
             if hasattr(self, "_app_lifecycle_timer"):
                 if not self._app_lifecycle_timer.isActive():
@@ -547,10 +525,6 @@ class SystemMixin:
             title = "⛔ Identity Conflict"
             msg = result.get("msg", "Identity conflict detected.")
         self._msgbox_topmost("warn", title, msg)
-
-    def _save_cloud_backup_settings(self):
-        self.cfg.CLOUD_BACKUP_ENABLED = self.chk_cloud_backup.isChecked()
-        self.cfg.save()
 
     def _save_overlay_page_settings(self):
         self.cfg.OVERLAY["overlay_page2_enabled"] = self.chk_overlay_page2.isChecked()

@@ -145,8 +145,6 @@ def main():
                 win.btn_backup_cloud.setEnabled(True)
             if cfg.CLOUD_ENABLED and hasattr(win, "btn_restore_cloud"):
                 win.btn_restore_cloud.setEnabled(True)
-            if cfg.CLOUD_ENABLED and hasattr(win, "chk_cloud_backup"):
-                win.chk_cloud_backup.setVisible(True)
         except Exception:
             pass
         # Force an immediate Dashboard refresh so the Setup Status checklist

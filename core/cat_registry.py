@@ -108,7 +108,7 @@ def upload_cat_progress(
         return False
 
     # 2. Cloud feature flags
-    if not cfg.CLOUD_ENABLED or not cfg.CLOUD_BACKUP_ENABLED:
+    if not cfg.CLOUD_ENABLED:
         return False
     if not cfg.CLOUD_URL:
         return False
