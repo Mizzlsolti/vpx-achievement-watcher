@@ -79,6 +79,11 @@ class CloudSync:
     _recent_full_ach_uploads: dict = {}
     _recent_full_ach_uploads_lock = threading.Lock()
 
+    # Local disk cache TTL for rarity data (seconds). Rarity changes slowly; 1 hour
+    # is sufficient to keep comparisons reasonably fresh while drastically reducing
+    # cloud read traffic.
+    _RARITY_DISK_CACHE_TTL_SEC: int = 3600  # 1 hour
+
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
     _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
 
@@ -838,10 +843,17 @@ class CloudSync:
         return True
 
     @staticmethod
-    def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str):
+    def upload_full_achievements(cfg: AppConfig, state: dict, player_name: str, changed_rom: str = None):
         """Upload the full achievements state (global + session + roms_played) to Firebase
         under /players/{pid}/achievements.json. Called automatically after each session
-        and each achievement unlock when cloud sync is enabled."""
+        and each achievement unlock when cloud sync is enabled.
+
+        When *changed_rom* is provided (achievement unlock): only that ROM's session data
+        is uploaded instead of the full session batch, reducing payload from ~150 KB to
+        ~5 KB.  The metadata (name, level, badges, etc.) is always uploaded.
+        When *changed_rom* is None (session end): the full session batch is uploaded as a
+        safety net to ensure all ROMs are in sync.
+        """
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
             return
         if not cfg.CLOUD_BACKUP_ENABLED:
@@ -903,11 +915,19 @@ class CloudSync:
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:
                 log(cfg, "[CLOUD] upload_full_achievements: metadata upload failed", "WARN")
-            # Batch all session ROM data into a single patch_node call to reduce HTTP requests.
-            session_batch = {rom: entries for rom, entries in session_entries.items() if entries}
-            if session_batch:
-                if not CloudSync.patch_node(cfg, f"players/{pid}/achievements/session", session_batch):
-                    log(cfg, "[CLOUD] upload_full_achievements: session batch upload failed", "WARN")
+            if changed_rom:
+                # Single-ROM upload on achievement unlock: only send the changed ROM's
+                # session data to keep the payload small (~5 KB instead of ~150 KB).
+                rom_entries = session_entries.get(changed_rom)
+                if rom_entries:
+                    if not CloudSync.set_node(cfg, f"players/{pid}/achievements/session/{changed_rom}", rom_entries):
+                        log(cfg, f"[CLOUD] upload_full_achievements: session upload failed for {changed_rom}", "WARN")
+            else:
+                # Full batch upload on session end (safety net to keep all ROMs in sync).
+                session_batch = {rom: entries for rom, entries in session_entries.items() if entries}
+                if session_batch:
+                    if not CloudSync.patch_node(cfg, f"players/{pid}/achievements/session", session_batch):
+                        log(cfg, "[CLOUD] upload_full_achievements: session batch upload failed", "WARN")
 
         threading.Thread(target=_task, daemon=True).start()
 
@@ -918,7 +938,26 @@ class CloudSync:
         achievement title of the given ROM.
 
         Returns: ({achievement_title: {tier, color, pct}, ...}, total_players)
+
+        Results are cached locally on disk for 1 hour to reduce cloud traffic.
+        The cache lives at {cfg.BASE}/tools/rarity_cache/{rom}.json.
+        The cloud fetch still queries all players when it runs — rarity comparison
+        requires other players' data; only the computed result is cached.
         """
+        # Check local disk cache before hitting the cloud.
+        _cache_key = rom.replace("/", "_").replace(".", "_")
+        _cache_dir = os.path.join(cfg.BASE, "tools", "rarity_cache")
+        _cache_file = os.path.join(_cache_dir, f"{_cache_key}.json")
+        try:
+            if os.path.isfile(_cache_file):
+                _age = time.time() - os.path.getmtime(_cache_file)
+                if _age < CloudSync._RARITY_DISK_CACHE_TTL_SEC:
+                    with open(_cache_file, "r", encoding="utf-8") as _f:
+                        _cached = json.load(_f)
+                    return _cached.get("data", {}), _cached.get("total_players", 0)
+        except Exception:
+            pass
+
         player_ids = CloudSync.fetch_player_ids(cfg)
         if not player_ids:
             return {}, 0
@@ -951,25 +990,11 @@ class CloudSync:
         for title, count in title_counts.items():
             result[title] = compute_rarity(count, total_players)
 
-        # Cache rarity data back to cloud under players/{pid}/rarity_cache/{rom}.
-        # Store as a list of {title, tier, color, pct} entries instead of a dict
-        # keyed by achievement title: Firebase Realtime Database forbids certain
-        # characters (. $ # [ ] /) in key names and achievement titles can contain
-        # them (e.g. "Dr. Dude").  The in-memory `result` dict returned below is
-        # always computed locally from player data and is never read back from this
-        # Firebase node, so no reverse transformation is needed on the read path.
+        # Save computed result to local disk cache.
         try:
-            if result and cfg.CLOUD_URL and cfg.CLOUD_ENABLED:
-                overlay = cfg.OVERLAY if isinstance(cfg.OVERLAY, dict) else {}
-                pid = str(overlay.get("player_id", "unknown")).strip().lower()
-                safe_rom = rom.replace("/", "_").replace(".", "_")
-                result_list = [{"title": t, **info} for t, info in result.items()]
-                CloudSync.set_node(
-                    cfg,
-                    f"players/{pid}/rarity_cache/{safe_rom}",
-                    {"data": result_list, "total_players": total_players,
-                     "ts": datetime.now(timezone.utc).isoformat()},
-                )
+            ensure_dir(_cache_dir)
+            with open(_cache_file, "w", encoding="utf-8") as _f:
+                json.dump({"data": result, "total_players": total_players}, _f)
         except Exception:
             pass
 

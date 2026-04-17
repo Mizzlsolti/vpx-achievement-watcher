@@ -3116,7 +3116,7 @@ class Watcher:
                 if not skip_cloud and self.cfg.CLOUD_ENABLED:
                     player_name = self.cfg.OVERLAY.get("player_name", "Player")
                     from .cloud_sync import CloudSync
-                    CloudSync.upload_full_achievements(self.cfg, state, player_name)
+                    CloudSync.upload_full_achievements(self.cfg, state, player_name, changed_rom=rom)
             except Exception:
                 pass
   
