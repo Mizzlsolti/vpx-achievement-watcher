@@ -91,8 +91,6 @@ Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and W
 - **Notifications**: In-app alerts for tournament start, elimination, final reached, and final result
 - **History**: Completed tournaments are saved locally with your placement (🏆 Winner, #2, #3-4)
 
-**💬 Tournament Chat**: Live chat for tournament participants — real-time messagesy
-
 ---
 
 ### 🎨 Appearance
@@ -180,7 +178,6 @@ The System tab has **2 sub-tabs**:
 - **👤 Player Profile**: Set your display name and 4-character player ID. Identity fields are locked while Cloud Sync is active
 - **☁️ Cloud Sync & Backup**: Enable/disable Cloud Sync (validates player name and ID against cloud for uniqueness). Auto-Backup toggle, manual Backup to Cloud, and Restore from Cloud (restores achievements, VPS mapping, and CAT progress)
 - **🐛 Feedback & Bug Reports**: Report bugs or suggestions directly from the app
-- **🔑 Admin Login**: Log in as chat moderator for Tournament Chat moderation (admin only)
 
 #### 🔧 Maintenance
 - **📁 Directory Setup**: Configure BASE, NVRAM, and Tables directories

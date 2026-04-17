@@ -633,6 +633,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Player Profile</b>: Set your display name and 4-character player ID. "
             "The player ID is required for cloud sync and data recovery — keep it safe!<br>"
             "• <b>Cloud Sync</b>: Enable cloud synchronisation and automatic progress backup.<br>"
+            "• <b>Local Backup &amp; Restore</b>: Back up all local data to a ZIP file or restore from a previous backup.<br>"
             "• <b>Visual Effects</b>: Use the ✨ Effects sub-tab in the Appearance tab to "
             "control individual overlay effects and Low Performance Mode.<br>"
             "• <b>Mascots</b>: Trophie &amp; Steely settings have moved to the "

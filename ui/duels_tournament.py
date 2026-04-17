@@ -6,7 +6,6 @@ Provides:
 - Tournament history table
 - Tournament Rules dialog
 - Notification overlay integration (deferred when VPX is running)
-- Real-time Tournament Chat (backed by Firebase Realtime Database)
 """
 from __future__ import annotations
 
@@ -23,7 +22,6 @@ from PyQt6.QtWidgets import (
 )
 
 from core.tournament_engine import TournamentEngine, TOURNAMENT_SIZE, _clean_table_name
-from .chat import ChatWidget
 
 _TABLE_STYLE = (
     "QTableWidget { background:#111; color:#DDD; gridline-color:#333; }"
@@ -225,13 +223,8 @@ class TournamentWidget(QWidget):
 
         left_col.addWidget(grp_hist)
 
-        # ── Chat panel (below tournament content) ─────────────────────────
-        self._chat_widget = ChatWidget(self._cfg)
-        self._chat_widget.setMaximumHeight(660)
-
-        # Compose the vertical layout: tournament content on top, chat below
+        # Compose the vertical layout: tournament content
         root.addLayout(left_col, 1)
-        root.addWidget(self._chat_widget, 1)
 
         # ── Bottom bar ─────────────────────────────────────────────────────
         bottom = QHBoxLayout()

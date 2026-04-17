@@ -4,7 +4,6 @@
     <string name="nav_home">Dashboard</string>
     <string name="nav_duels">Duels</string>
     <string name="nav_tournaments">Tournaments</string>
-    <string name="nav_chat">Chat</string>
     <string name="nav_profile">Player</string>
     <string name="nav_progress">Progress</string>
     <string name="nav_leaderboard">Cloud</string>

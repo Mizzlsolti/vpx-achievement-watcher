@@ -195,7 +195,7 @@ class SystemMixin:
         grp_zip = QGroupBox("📦 Local Backup & Restore")
         lay_zip = QVBoxLayout(grp_zip)
         lbl_zip = QLabel(
-            "Back up all local achievement data to a ZIP file with anti-cheat HMAC signature, "
+            "Back up ALL local data and settings to a ZIP file with anti-cheat HMAC signature, "
             "or restore from a previously created ZIP backup."
         )
         lbl_zip.setWordWrap(True)
@@ -205,9 +205,10 @@ class SystemMixin:
         zip_btns_row = QHBoxLayout()
         self.btn_backup_zip = QPushButton("📦 Backup to ZIP")
         self.btn_backup_zip.setToolTip(
-            "Pack all local achievement data (achievements, progress log, VPS mapping, "
-            "session stats, NVRAM stats, session deltas, records, preferences) into a ZIP file "
-            "with an HMAC anti-cheat signature. Use this to create a full local backup."
+            "Pack ALL local data and settings (achievements, progress log, VPS mapping, "
+            "session stats, NVRAM stats, session deltas, records, ROM-specific achievements, "
+            "AWEditor files, map cache, preferences) into a ZIP file "
+            "with an HMAC anti-cheat signature. Use this to create a complete local backup."
         )
         self.btn_backup_zip.clicked.connect(self._backup_to_zip)
         zip_btns_row.addWidget(self.btn_backup_zip)
@@ -248,22 +249,9 @@ class SystemMixin:
 
         layout.addStretch(1)
 
-        # ── Bottom row: Admin Login (left) + Help ❓ (right) ──────────────────
+        # ── Bottom row: Help ❓ (right) ───────────────────────────────────────
         bottom_row = QHBoxLayout()
         bottom_row.addStretch(1)
-        self._btn_admin_login = QPushButton("🔑 Admin Login")
-        self._btn_admin_login.setFixedHeight(28)
-        self._btn_admin_login.setToolTip("Log in as chat moderator (admin only)")
-        self._btn_admin_login.setStyleSheet(
-            "QPushButton { background-color:#1a1a1a; color:#888; border:1px solid #555;"
-            " border-radius:5px; font-weight:bold; padding:0 14px; }"
-            "QPushButton:hover { background-color:#333; color:#DDD; }"
-            "QPushButton[adminActive=true] { color:#FF7F00; border-color:#FF7F00; }"
-        )
-        self._btn_admin_login.clicked.connect(self._on_admin_login_clicked)
-        bottom_row.addWidget(self._btn_admin_login)
-
-        bottom_row.addSpacing(6)
 
         btn_help = QPushButton("❓")
         btn_help.setFixedSize(28, 28)
@@ -587,43 +575,6 @@ class SystemMixin:
             else:
                 overlay.hide()
 
-    # ── Admin Login (chat moderation) ─────────────────────────────────────────
-
-    def _on_admin_login_clicked(self) -> None:
-        """Toggle admin session: show login dialog or log out."""
-        from .chat import get_admin_uid, set_admin_session, AdminLoginDialog
-        if get_admin_uid():
-            # Already logged in – offer to log out
-            from PyQt6.QtWidgets import QMessageBox
-            reply = QMessageBox.question(
-                self, "Admin Logout",
-                "You are currently logged in as admin.\nLog out of the admin session?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                set_admin_session(None)
-                self._update_admin_button_state()
-        else:
-            dlg = AdminLoginDialog(self.cfg, self)
-            dlg.exec()
-            self._update_admin_button_state()
-
-    def _update_admin_button_state(self) -> None:
-        """Refresh the Admin Login button label to reflect current admin status."""
-        from .chat import get_admin_uid
-        btn = getattr(self, "_btn_admin_login", None)
-        if btn is None:
-            return
-        if get_admin_uid():
-            btn.setText("🔑 Admin: Active")
-            btn.setProperty("adminActive", True)
-        else:
-            btn.setText("🔑 Admin Login")
-            btn.setProperty("adminActive", False)
-        btn.style().unpolish(btn)
-        btn.style().polish(btn)
-
     def _restore_achievements_from_cloud(self):
         if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
             self._msgbox_topmost("warn", "Restore from Cloud", "Cloud sync is not enabled.")
@@ -794,6 +745,7 @@ class SystemMixin:
             from core.config import (
                 f_achievements_state, f_vps_mapping, f_progress_upload_log,
                 f_custom_achievements_progress, p_highlights, p_session,
+                p_rom_spec, p_aweditor,
             )
             from core.watcher_core import secure_load_json
 
@@ -829,6 +781,27 @@ class SystemMixin:
                     for f in _glob.glob(os.path.join(sub_dir, "**", "*.json"), recursive=True):
                         rel = os.path.relpath(f, base)
                         files_to_backup.append((f, rel))
+
+            # ROM-specific achievement definitions
+            rom_spec_dir = p_rom_spec(self.cfg)
+            if os.path.isdir(rom_spec_dir):
+                for f in _glob.glob(os.path.join(rom_spec_dir, "*.ach.json")):
+                    rel = os.path.relpath(f, base)
+                    files_to_backup.append((f, rel))
+
+            # AWEditor generated files (custom achievement scripts and JSON)
+            aweditor_dir = p_aweditor(self.cfg)
+            if os.path.isdir(aweditor_dir):
+                for f in _glob.glob(os.path.join(aweditor_dir, "**", "*.json"), recursive=True):
+                    rel = os.path.relpath(f, base)
+                    files_to_backup.append((f, rel))
+                for f in _glob.glob(os.path.join(aweditor_dir, "**", "*.vbs"), recursive=True):
+                    rel = os.path.relpath(f, base)
+                    files_to_backup.append((f, rel))
+
+            # Available maps cache
+            maps_cache = os.path.join(base, "tools", "available_maps_cache.json")
+            _add(maps_cache, os.path.join("tools", "available_maps_cache.json"))
 
             # Config / settings
             from core.config import CONFIG_FILE
