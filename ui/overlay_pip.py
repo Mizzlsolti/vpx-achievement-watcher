@@ -153,6 +153,7 @@ class DuelPiPOverlay(QWidget):
         self._stop_event = threading.Event()
         self._reader_thread: Optional[threading.Thread] = None
         self._reader: Optional[_MjpegReader] = None
+        self._aspect_adjusted = False  # True after first frame resizes the window
 
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
@@ -197,10 +198,15 @@ class DuelPiPOverlay(QWidget):
 
     def _restore_geometry(self):
         ov = self._parent_gui.cfg.OVERLAY or {}
+        portrait = bool(ov.get("duel_pip_portrait", True))
         x = int(ov.get("duel_pip_x", -1))
         y = int(ov.get("duel_pip_y", -1))
-        w = int(ov.get("duel_pip_w", 480))
-        h = int(ov.get("duel_pip_h", 270))
+        # Default window shape matches the expected content orientation so the
+        # placeholder and the stream both look correct out of the box.
+        default_w = 270 if portrait else 480
+        default_h = 480 if portrait else 270
+        w = int(ov.get("duel_pip_w", default_w))
+        h = int(ov.get("duel_pip_h", default_h))
         w = max(160, w)
         h = max(90, h)
 
@@ -233,6 +239,7 @@ class DuelPiPOverlay(QWidget):
 
     def _start_stream(self):
         self._stop_event.clear()
+        self._aspect_adjusted = False
         reader = _MjpegReader(self._stream_url, self._stop_event)
         reader.frame_ready.connect(self._on_frame)
         self._reader = reader
@@ -243,7 +250,36 @@ class DuelPiPOverlay(QWidget):
 
     def _on_frame(self, img: QImage):
         self._current_frame = QPixmap.fromImage(img)
+        # On the very first frame, resize the window to match the video's
+        # effective aspect ratio (portrait option is already applied in paint,
+        # so we account for it here too) while keeping the current width.
+        if not self._aspect_adjusted:
+            self._aspect_adjusted = True
+            self._adjust_aspect_to_frame(img)
         self.update()
+
+    def _adjust_aspect_to_frame(self, img: QImage):
+        """Resize the window height so its aspect ratio matches the incoming frame."""
+        try:
+            ov = self._parent_gui.cfg.OVERLAY or {}
+            portrait = bool(ov.get("duel_pip_portrait", True))
+            fw, fh = img.width(), img.height()
+            if portrait:
+                # Frame will be rotated 90° in paint, so effective dimensions swap.
+                fw, fh = fh, fw
+            if fw <= 0 or fh <= 0:
+                return
+            cur_w = self.width()
+            if cur_w <= 0:
+                return
+            new_h = max(90, int(cur_w * fh / fw))
+            if new_h != self.height():
+                geo = self.geometry()
+                geo.setHeight(new_h)
+                self.setGeometry(geo)
+                self._save_geometry_to_cfg()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Public API
