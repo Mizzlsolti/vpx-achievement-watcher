@@ -24,7 +24,7 @@ _TABLE_STYLE = (
 
 _COMPLETED_STATUSES = {DuelStatus.WON, DuelStatus.LOST}
 _MAX_PLAYERS = 50
-_MIN_DUELS = 3
+_MIN_DUELS = 1
 _CACHE_TTL_SECONDS = 300  # 5 minutes
 _ACCENT_COLOR = "#FF7F00"
 
@@ -87,7 +87,7 @@ def _build_leaderboard(raw: dict, own_name: str) -> tuple[list[dict], int]:
             stats[op_name]["wins"] += 1
             stats[ch_name]["losses"] += 1
 
-    # Filter players with enough duels
+    # Include every player with at least one completed duel
     qualified = [
         {"name": name, "wins": s["wins"], "losses": s["losses"]}
         for name, s in stats.items()
