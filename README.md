@@ -80,7 +80,7 @@ The Score Duels tab is organized into **4 sub-tabs**:
 Live feed of all active and recently completed duels across all players.
 
 #### 🏆 Leaderboard
-Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and Win Rate (%). Players need at least 3 completed duels to qualify. Your own row is highlighted with a ★. Medals for top 3: 🥇🥈🥉.
+Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and Win Rate (%). Every player with at least one completed duel appears in the ranking. Your own row is highlighted with a ★. Medals for top 3: 🥇🥈🥉.
 
 #### 🏆 Tournament
 4-player single-elimination knockout tournaments:
