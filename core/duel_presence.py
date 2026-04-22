@@ -59,14 +59,12 @@ def publish_presence(
         return False
     try:
         from core.cloud_sync import CloudSync
-        from core.watcher_core import log
         data = {
             "playing": bool(playing),
             "orientation": str(orientation),
             "ts": int(time.time() * 1000),
         }
         ok = CloudSync.set_node(cfg, _path(duel_id, player_key), data)
-        log(cfg, f"[PiP Presence] Published: duel={duel_id} player={player_key} playing={playing} orientation={orientation}", "INFO")
         return ok
     except Exception as exc:
         try:

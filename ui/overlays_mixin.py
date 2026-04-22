@@ -933,7 +933,6 @@ class OverlaysMixin:
                 self._pip_poll_result = {
                     "action": "close",
                     "ig_state": ig_state,
-                    "opp_orientation": opp_orientation,
                     "reason": reason,
                 }
         except Exception:
