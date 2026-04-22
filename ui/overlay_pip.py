@@ -154,6 +154,7 @@ class DuelPiPOverlay(QWidget):
         self._reader_thread: Optional[threading.Thread] = None
         self._reader: Optional[_MjpegReader] = None
         self._video_aspect: Optional[float] = None  # w/h ratio of the incoming video (after rotation)
+        self._remote_orientation: Optional[str] = None  # "portrait" | "landscape" from opponent's presence
 
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
@@ -262,8 +263,7 @@ class DuelPiPOverlay(QWidget):
     def _compute_aspect(self, img: QImage) -> Optional[float]:
         """Return width/height aspect ratio of the frame after portrait rotation."""
         try:
-            ov = self._parent_gui.cfg.OVERLAY or {}
-            portrait = bool(ov.get("duel_pip_portrait", True))
+            portrait = self._effective_portrait()
             fw, fh = img.width(), img.height()
             if portrait:
                 fw, fh = fh, fw
@@ -272,6 +272,17 @@ class DuelPiPOverlay(QWidget):
             return fw / fh
         except Exception:
             return None
+
+    def _effective_portrait(self) -> bool:
+        """Return True if the opponent's stream should be treated as portrait.
+
+        Uses the remote orientation advertised via ``set_remote_orientation`` when
+        available, and falls back to the local ``duel_pip_portrait`` config flag.
+        """
+        if self._remote_orientation is not None:
+            return self._remote_orientation == "portrait"
+        ov = self._parent_gui.cfg.OVERLAY or {}
+        return bool(ov.get("duel_pip_portrait", True))
 
     def _snap_height_to_aspect(self):
         """Adjust the window height to match ``_video_aspect`` for the current width."""
@@ -305,6 +316,20 @@ class DuelPiPOverlay(QWidget):
         ):
             self._start_stream()
 
+    def set_remote_orientation(self, orientation: str) -> None:
+        """Set the opponent's advertised orientation ("portrait" or "landscape").
+
+        This drives how incoming frames are rotated.  The change takes effect
+        on the next frame received; any cached aspect ratio is invalidated so
+        the window shape is re-snapped.
+        """
+        if orientation not in ("portrait", "landscape"):
+            return
+        if self._remote_orientation != orientation:
+            self._remote_orientation = orientation
+            # Invalidate cached aspect so _snap_height_to_aspect re-runs.
+            self._video_aspect = None
+
     def close_pip(self):
         """Stop the stream and hide the overlay."""
         self._stop_event.set()
@@ -319,8 +344,8 @@ class DuelPiPOverlay(QWidget):
         p = QPainter(self)
         p.fillRect(self.rect(), QColor(0, 0, 0))
 
+        portrait = self._effective_portrait()
         ov = self._parent_gui.cfg.OVERLAY or {}
-        portrait = bool(ov.get("duel_pip_portrait", True))
         rotate_ccw = bool(ov.get("duel_pip_rotate_ccw", True))
 
         if self._current_frame is not None:
