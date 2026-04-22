@@ -356,9 +356,10 @@ class OverlaysMixin:
                     self._duel_games_played = {}
                 duel_id = ig_state.get("duel_id", "")
                 self._duel_games_played[duel_id] = 1
-                # Start PiP exchange so the opponent's playfield is shown.
+                # Register the duel for presence tracking — the PiP window will
+                # appear automatically once both players are simultaneously playing.
                 try:
-                    self._pip_start_exchange(ig_state)
+                    self._pip_register_presence(ig_state)
                 except Exception:
                     pass
                 # Clear state and hide overlay.
@@ -541,13 +542,22 @@ class OverlaysMixin:
             player_id = player_id.replace(ch, "_")
         return player_id
 
-    def _pip_start_exchange(self, ig_state: dict):
+    def _pip_start_exchange(self, ig_state: dict, remote_orientation=None):
         """Start a WebRTC session for the Duel PiP stream.
 
         Each player registers in Firebase, determines their role (offerer /
         answerer) by alphabetical key order, exchanges SDP via Firebase, and
         once connected, streams their screen while receiving the opponent's
         screen in the PiP overlay.
+
+        Parameters
+        ----------
+        ig_state:
+            In-game duel state dict (must contain ``duel_id``).
+        remote_orientation:
+            The opponent's advertised orientation ("portrait" | "landscape" |
+            None).  When provided it is forwarded to the PiP overlay so that
+            incoming frames are rotated correctly.
         """
         try:
             from core.watcher_core import log
@@ -584,11 +594,33 @@ class OverlaysMixin:
             _log(f"[WebRTC] Could not import webrtc_stream: {exc}", "WARN")
             return
 
-        # Clean up any previous session
-        self._pip_close()
+        # Stop only the WebRTC session / overlay — presence timers stay alive.
+        session = getattr(self, "_pip_webrtc_session", None)
+        if session is not None:
+            try:
+                session.stop()
+            except Exception:
+                pass
+            self._pip_webrtc_session = None
+        try:
+            pip_old = getattr(self, "_pip_overlay", None)
+            if pip_old is not None:
+                pip_old.close_pip()
+                self._pip_overlay = None
+        except Exception:
+            pass
 
         # Create the PiP overlay in placement mode (no stream URL needed)
         self._pip_open(duel_id=duel_id)
+
+        # Apply the opponent's orientation so frames are rotated correctly.
+        if remote_orientation in ("portrait", "landscape"):
+            try:
+                pip = getattr(self, "_pip_overlay", None)
+                if pip is not None:
+                    pip.set_remote_orientation(remote_orientation)
+            except Exception as exc:
+                _log(f"[WebRTC] Could not set remote orientation: {exc}", "WARN")
 
         # Create and start the WebRTC session
         session = WebRTCSession(
@@ -653,6 +685,368 @@ class OverlaysMixin:
             if pip is not None:
                 pip.close_pip()
                 self._pip_overlay = None
+        except Exception:
+            pass
+
+        # Clean up presence (remove local node, stop timers)
+        try:
+            self._pip_deregister_presence()
+        except Exception:
+            pass
+
+    # ── Presence-based PiP trigger ────────────────────────────────────────────
+
+    # Heartbeat interval (ms) for publishing local playing state.
+    _PIP_HEARTBEAT_MS: int = 10_000   # 10 s
+    # Polling interval (ms) for checking the opponent's playing state.
+    _PIP_POLL_MS: int = 5_000         # 5 s
+
+    def _local_orientation(self) -> str:
+        """Return 'portrait' or 'landscape' for the local player's setup.
+
+        Derives the orientation from the primary screen geometry first, then
+        falls back to the ``duel_overlay_portrait`` / ``duel_pip_portrait``
+        config flags so the Cabinet (Portrait) vs Desktop (Landscape) distinction
+        is detected automatically.
+        """
+        try:
+            from PyQt6.QtWidgets import QApplication
+            screen = QApplication.primaryScreen()
+            if screen is not None:
+                geo = screen.geometry()
+                if geo.height() > geo.width():
+                    return "portrait"
+                return "landscape"
+        except Exception:
+            pass
+        try:
+            ov = self.cfg.OVERLAY or {}
+            if bool(ov.get("duel_overlay_portrait", ov.get("duel_pip_portrait", False))):
+                return "portrait"
+        except Exception:
+            pass
+        return "landscape"
+
+    def _pip_register_presence(self, ig_state: dict) -> None:
+        """Start presence tracking for an accepted duel.
+
+        Stores the duel context and starts two QTimers:
+        - a heartbeat that publishes the local ``playing`` flag every
+          ``_PIP_HEARTBEAT_MS`` ms, and
+        - a poll that checks the opponent's presence every ``_PIP_POLL_MS`` ms
+          and opens / closes the PiP window accordingly.
+
+        The PiP window is **not** opened here — it only opens once both sides
+        report ``playing=true`` simultaneously.
+        """
+        try:
+            from core.watcher_core import log
+        except ImportError:
+            log = None  # type: ignore[assignment]
+
+        def _log(msg: str, level: str = "INFO"):
+            try:
+                if log is not None:
+                    log(self.cfg, msg, level)
+            except Exception:
+                pass
+
+        if not getattr(self.cfg, "CLOUD_ENABLED", False):
+            _log("[PiP Presence] Cloud disabled — skipping presence registration", "INFO")
+            return
+
+        duel_id = ig_state.get("duel_id", "")
+        if not duel_id:
+            _log("[PiP Presence] _pip_register_presence: missing duel_id", "WARN")
+            return
+
+        try:
+            player_id = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+        except Exception as exc:
+            _log(f"[PiP Presence] could not read player_id: {exc}", "WARN")
+            return
+
+        if not player_id:
+            _log("[PiP Presence] player_id is empty — skipping presence", "WARN")
+            return
+
+        player_key = self._sanitize_pip_key(player_id)
+
+        # Stop any previous presence tracking before starting a new one.
+        self._pip_stop_presence_timers()
+
+        self._pip_presence_duel_id = duel_id
+        self._pip_presence_player_key = player_key
+        self._pip_presence_ig_state = ig_state
+        self._pip_session_open = False
+
+        _log(f"[PiP Presence] Registered for duel={duel_id} player={player_key}", "INFO")
+
+        # Publish an initial heartbeat immediately (before the first timer tick).
+        self._pip_presence_heartbeat()
+
+        # Heartbeat timer — keeps local presence fresh while playing.
+        htimer = QTimer(self)
+        htimer.setInterval(self._PIP_HEARTBEAT_MS)
+        htimer.timeout.connect(self._pip_presence_heartbeat)
+        htimer.start()
+        self._pip_heartbeat_timer = htimer
+
+        # Poll timer — checks opponent and triggers PiP open/close.
+        ptimer = QTimer(self)
+        ptimer.setInterval(self._PIP_POLL_MS)
+        ptimer.timeout.connect(self._pip_presence_poll)
+        ptimer.start()
+        self._pip_poll_timer = ptimer
+
+    def _pip_stop_presence_timers(self) -> None:
+        """Stop and discard the heartbeat and poll QTimers (if running)."""
+        try:
+            ht = getattr(self, "_pip_heartbeat_timer", None)
+            if ht is not None:
+                ht.stop()
+                self._pip_heartbeat_timer = None
+        except Exception:
+            pass
+        try:
+            pt = getattr(self, "_pip_poll_timer", None)
+            if pt is not None:
+                pt.stop()
+                self._pip_poll_timer = None
+        except Exception:
+            pass
+
+    def _pip_presence_heartbeat(self) -> None:
+        """Publish the local player's current playing state to Firebase.
+
+        Called every ``_PIP_HEARTBEAT_MS`` ms by the heartbeat timer.
+        """
+        duel_id = getattr(self, "_pip_presence_duel_id", "")
+        player_key = getattr(self, "_pip_presence_player_key", "")
+        if not duel_id or not player_key:
+            return
+        try:
+            w = getattr(self, "watcher", None)
+            playing = bool(w and getattr(w, "game_active", False))
+            orientation = self._local_orientation()
+            import threading as _threading
+            _threading.Thread(
+                target=self._pip_presence_heartbeat_bg,
+                args=(duel_id, player_key, playing, orientation),
+                daemon=True,
+                name="PiPPresenceHB",
+            ).start()
+        except Exception:
+            pass
+
+    def _pip_presence_heartbeat_bg(
+        self,
+        duel_id: str,
+        player_key: str,
+        playing: bool,
+        orientation: str,
+    ) -> None:
+        """Background worker for the heartbeat (avoids blocking the UI thread)."""
+        try:
+            from core.duel_presence import publish_presence
+            publish_presence(self.cfg, duel_id, player_key, playing, orientation)
+        except Exception:
+            pass
+
+    def _pip_presence_poll(self) -> None:
+        """Check opponent's presence and open / close PiP accordingly.
+
+        Called every ``_PIP_POLL_MS`` ms by the poll timer (UI thread).
+        First applies any pending action from the previous background poll,
+        then starts a new background poll.
+        """
+        # Apply any result that was computed by the previous background poll.
+        try:
+            result = getattr(self, "_pip_poll_result", None)
+            if result is not None:
+                self._pip_poll_result = None
+                action = result.get("action")
+                opp_orientation = result.get("opp_orientation")
+                ig_state = result.get("ig_state", {})
+                reason = result.get("reason", "opponent")
+                if action == "open":
+                    self._pip_presence_open(ig_state, opp_orientation)
+                elif action == "close":
+                    self._pip_presence_close(reason=reason)
+        except Exception:
+            pass
+
+        duel_id = getattr(self, "_pip_presence_duel_id", "")
+        player_key = getattr(self, "_pip_presence_player_key", "")
+        ig_state = getattr(self, "_pip_presence_ig_state", {})
+        if not duel_id or not player_key:
+            return
+        try:
+            import threading as _threading
+            _threading.Thread(
+                target=self._pip_presence_poll_bg,
+                args=(duel_id, player_key, ig_state),
+                daemon=True,
+                name="PiPPresencePoll",
+            ).start()
+        except Exception:
+            pass
+
+    def _pip_presence_poll_bg(
+        self,
+        duel_id: str,
+        player_key: str,
+        ig_state: dict,
+    ) -> None:
+        """Background worker: fetch opponent presence, store pending action.
+
+        The result is stored in ``self._pip_poll_result`` and consumed by the
+        next call to ``_pip_presence_poll()`` on the UI thread.
+        """
+        try:
+            from core.duel_presence import fetch_presence, is_playing, get_orientation
+
+            # Determine opponent key from duel state.
+            opponent_key = self._resolve_opponent_key(ig_state, player_key)
+            if not opponent_key:
+                return
+
+            opponent_presence = fetch_presence(self.cfg, duel_id, opponent_key)
+            opp_playing = is_playing(opponent_presence)
+            opp_orientation = get_orientation(opponent_presence, fallback=None)
+
+            # Local playing state (GIL-safe read).
+            w = getattr(self, "watcher", None)
+            local_playing = bool(w and getattr(w, "game_active", False))
+
+            both_playing = local_playing and opp_playing
+            session_open = getattr(self, "_pip_session_open", False)
+
+            if both_playing and not session_open:
+                self._pip_poll_result = {
+                    "action": "open",
+                    "ig_state": ig_state,
+                    "opp_orientation": opp_orientation,
+                }
+            elif not both_playing and session_open:
+                reason = "local" if not local_playing else "opponent"
+                self._pip_poll_result = {
+                    "action": "close",
+                    "ig_state": ig_state,
+                    "reason": reason,
+                }
+        except Exception:
+            pass
+
+    def _resolve_opponent_key(self, ig_state: dict, player_key: str) -> str:
+        """Return the Firebase presence key for the opponent in *ig_state*."""
+        try:
+            # ig_state contains a 'duel' Duel object with challenger / opponent fields.
+            duel = ig_state.get("duel")
+            candidates = []
+            if duel is not None:
+                try:
+                    candidates.append(str(getattr(duel, "challenger", "") or "").strip().lower())
+                except Exception:
+                    pass
+                try:
+                    candidates.append(str(getattr(duel, "opponent", "") or "").strip().lower())
+                except Exception:
+                    pass
+            # Fallback: direct string fields (future-proofing)
+            for field in ("challenger", "opponent"):
+                val = str(ig_state.get(field, "") or "").strip().lower()
+                if val:
+                    candidates.append(val)
+            for candidate_id in candidates:
+                if not candidate_id:
+                    continue
+                candidate_key = self._sanitize_pip_key(candidate_id)
+                if candidate_key != player_key:
+                    return candidate_key
+        except Exception:
+            pass
+        return ""
+
+    def _pip_presence_open(self, ig_state: dict, opp_orientation) -> None:
+        """Open the PiP window because both players are now playing.
+
+        Must be called from the UI thread.
+        """
+        try:
+            from core.watcher_core import log
+            log(self.cfg, "[PiP Presence] Both players playing — opening PiP", "INFO")
+        except Exception:
+            pass
+        self._pip_session_open = True
+        # Pass the opponent's orientation to the overlay before/after opening.
+        self._pip_start_exchange(ig_state, remote_orientation=opp_orientation)
+
+    def _pip_presence_close(self, reason: str = "opponent") -> None:
+        """Close the PiP window but keep presence tracking running.
+
+        Must be called from the UI thread.
+        """
+        try:
+            from core.watcher_core import log
+            log(self.cfg, f"[PiP Presence] {reason.capitalize()} stopped playing — closing PiP", "INFO")
+        except Exception:
+            pass
+        self._pip_session_open = False
+
+        # Stop the WebRTC session and hide the overlay without touching the
+        # presence timers (they continue running so we can re-open later).
+        session = getattr(self, "_pip_webrtc_session", None)
+        if session is not None:
+            try:
+                session.stop()
+            except Exception:
+                pass
+            self._pip_webrtc_session = None
+        try:
+            cancel = getattr(self, "_pip_cancel_event", None)
+            if cancel is not None:
+                cancel.set()
+                self._pip_cancel_event = None
+        except Exception:
+            pass
+        try:
+            pip = getattr(self, "_pip_overlay", None)
+            if pip is not None:
+                pip.close_pip()
+                self._pip_overlay = None
+        except Exception:
+            pass
+
+    def _pip_deregister_presence(self) -> None:
+        """Stop presence timers and remove the local presence node from Firebase."""
+        self._pip_stop_presence_timers()
+        self._pip_session_open = False
+
+        duel_id = getattr(self, "_pip_presence_duel_id", "")
+        player_key = getattr(self, "_pip_presence_player_key", "")
+
+        self._pip_presence_duel_id = ""
+        self._pip_presence_player_key = ""
+        self._pip_presence_ig_state = {}
+
+        if duel_id and player_key:
+            try:
+                import threading as _threading
+                _threading.Thread(
+                    target=self._pip_presence_remove_bg,
+                    args=(duel_id, player_key),
+                    daemon=True,
+                    name="PiPPresenceRM",
+                ).start()
+            except Exception:
+                pass
+
+    def _pip_presence_remove_bg(self, duel_id: str, player_key: str) -> None:
+        """Background worker: remove local presence node from Firebase."""
+        try:
+            from core.duel_presence import remove_presence
+            remove_presence(self.cfg, duel_id, player_key)
         except Exception:
             pass
 

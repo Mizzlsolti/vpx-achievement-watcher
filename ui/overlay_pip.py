@@ -19,7 +19,7 @@ from PyQt6.QtCore import (
     QTimer,
     pyqtSignal,
 )
-from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap, QTransform
+from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.overlay_base import _force_topmost, _start_topmost_timer
@@ -153,7 +153,8 @@ class DuelPiPOverlay(QWidget):
         self._stop_event = threading.Event()
         self._reader_thread: Optional[threading.Thread] = None
         self._reader: Optional[_MjpegReader] = None
-        self._video_aspect: Optional[float] = None  # w/h ratio of the incoming video (after rotation)
+        self._video_aspect: Optional[float] = None  # kept for backwards compat; unused
+        self._remote_orientation: Optional[str] = None  # diagnostics only; see set_remote_orientation
 
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
@@ -239,7 +240,6 @@ class DuelPiPOverlay(QWidget):
 
     def _start_stream(self):
         self._stop_event.clear()
-        self._video_aspect = None  # reset so first frame re-applies aspect ratio
         reader = _MjpegReader(self._stream_url, self._stop_event)
         reader.frame_ready.connect(self._on_frame)
         self._reader = reader
@@ -249,47 +249,17 @@ class DuelPiPOverlay(QWidget):
         t.start()
 
     def _on_frame(self, img: QImage):
+        # The window shape is driven by the local user's orientation (set via
+        # _restore_geometry / user drag), NOT by the incoming frame.  The frame
+        # is simply drawn inside the window preserving its native aspect ratio,
+        # with letterbox / pillarbox bars absorbing any mismatch.
         self._current_frame = QPixmap.fromImage(img)
-        # Compute and store the effective aspect ratio from this frame.
-        # If the ratio changed (new stream / different video source), snap the
-        # window once so it starts at the correct shape.
-        aspect = self._compute_aspect(img)
-        if aspect is not None and aspect != self._video_aspect:
-            self._video_aspect = aspect
-            self._snap_height_to_aspect()
         self.update()
 
-    def _compute_aspect(self, img: QImage) -> Optional[float]:
-        """Return width/height aspect ratio of the frame after portrait rotation."""
-        try:
-            ov = self._parent_gui.cfg.OVERLAY or {}
-            portrait = bool(ov.get("duel_pip_portrait", True))
-            fw, fh = img.width(), img.height()
-            if portrait:
-                fw, fh = fh, fw
-            if fw <= 0 or fh <= 0:
-                return None
-            return fw / fh
-        except Exception:
-            return None
-
-    def _snap_height_to_aspect(self):
-        """Adjust the window height to match ``_video_aspect`` for the current width."""
-        try:
-            aspect = self._video_aspect
-            if aspect is None or aspect <= 0:
-                return
-            cur_w = self.width()
-            if cur_w <= 0:
-                return
-            new_h = max(90, int(cur_w / aspect))
-            if new_h != self.height():
-                geo = self.geometry()
-                geo.setHeight(new_h)
-                self.setGeometry(geo)
-                self._save_geometry_to_cfg()
-        except Exception:
-            pass
+    def _local_portrait(self) -> bool:
+        """Return True when the local user's setup is portrait (Cabinet)."""
+        ov = self._parent_gui.cfg.OVERLAY or {}
+        return bool(ov.get("duel_pip_portrait", True))
 
     # ------------------------------------------------------------------
     # Public API
@@ -305,6 +275,19 @@ class DuelPiPOverlay(QWidget):
         ):
             self._start_stream()
 
+    def set_remote_orientation(self, orientation: str) -> None:
+        """Record the opponent's advertised orientation (diagnostics only).
+
+        The opponent's orientation does NOT affect the local window shape or
+        frame rotation — the sender transmits frames in their native orientation
+        and the receiver draws them with ``KeepAspectRatio``, producing
+        letterbox/pillarbox bars when the ratios differ.  This setter is kept
+        so future diagnostics / logging can access the value.
+        """
+        if orientation not in ("portrait", "landscape"):
+            return
+        self._remote_orientation = orientation
+
     def close_pip(self):
         """Stop the stream and hide the overlay."""
         self._stop_event.set()
@@ -319,19 +302,18 @@ class DuelPiPOverlay(QWidget):
         p = QPainter(self)
         p.fillRect(self.rect(), QColor(0, 0, 0))
 
+        # Window shape is driven by the LOCAL orientation; the stream is drawn
+        # at its native aspect ratio with letterbox/pillarbox bars absorbing any
+        # mismatch between local window and remote stream.
+        local_portrait = self._local_portrait()
         ov = self._parent_gui.cfg.OVERLAY or {}
-        portrait = bool(ov.get("duel_pip_portrait", True))
         rotate_ccw = bool(ov.get("duel_pip_rotate_ccw", True))
 
         if self._current_frame is not None:
-            frame = self._current_frame
-            if portrait:
-                angle = -90 if rotate_ccw else 90
-                frame = frame.transformed(
-                    QTransform().rotate(angle),
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            scaled = frame.scaled(
+            # Draw the incoming frame at its native aspect ratio, centered.
+            # No rotation: the sender transmits in its own orientation; the
+            # receiver only scales + letterboxes/pillarboxes.
+            scaled = self._current_frame.scaled(
                 self.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
@@ -340,14 +322,16 @@ class DuelPiPOverlay(QWidget):
             y = (self.height() - scaled.height()) // 2
             p.drawPixmap(x, y, scaled)
         else:
-            # Placeholder
+            # Placeholder — orientation of the placeholder text follows the
+            # local window shape so the "Drag to position" hint reads correctly
+            # for both Cabinet (portrait) and Desktop (landscape) users.
             pen = QPen(QColor(80, 80, 80))
             pen.setWidth(2)
             p.setPen(pen)
             p.drawRect(1, 1, self.width() - 2, self.height() - 2)
             p.setPen(QColor(160, 160, 160))
             p.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
-            if portrait:
+            if local_portrait:
                 # Rotate painter for placeholder text
                 angle = -90 if rotate_ccw else 90
                 p.translate(self.width() / 2, self.height() / 2)
@@ -410,13 +394,11 @@ class DuelPiPOverlay(QWidget):
 
     def mouseReleaseEvent(self, evt):  # noqa: N802
         if evt.button() == Qt.MouseButton.LeftButton:
-            was_resizing = self._resize_dir is not None
             self._resize_dir = None
             self._dragging = False
-            # After a manual resize, snap the window height to maintain the
-            # video's aspect ratio so there are no black bars.
-            if was_resizing and self._video_aspect is not None:
-                self._snap_height_to_aspect()
+            # No aspect snap: the window shape follows the local user's
+            # orientation, not the stream's aspect ratio.  Any mismatch is
+            # absorbed by letterbox/pillarbox bars in paintEvent.
             self._save_timer.start()
 
     def resizeEvent(self, evt):  # noqa: N802
