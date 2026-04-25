@@ -24,8 +24,48 @@ from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.overlay_base import _force_topmost, _start_topmost_timer
 
+try:
+    import win32gui as _win32gui  # type: ignore
+except ImportError:
+    _win32gui = None  # type: ignore
+
 # MJPEG boundary used by the screen capture server
 _MJPEG_BOUNDARY = b"--vpxframe"
+
+
+def _vpx_player_screen():
+    """Return the QScreen that contains the centre of the 'Visual Pinball Player' window.
+
+    Returns ``None`` when the window cannot be found or pywin32 is not available.
+    """
+    if not _win32gui:
+        return None
+    try:
+        found_rect = {}
+
+        def _cb(hwnd, _):
+            try:
+                if not _win32gui.IsWindowVisible(hwnd):
+                    return True
+                title = (_win32gui.GetWindowText(hwnd) or "").strip().lower()
+                if "visual pinball player" in title:
+                    found_rect["rect"] = _win32gui.GetWindowRect(hwnd)
+                    return False
+            except Exception:
+                pass
+            return True
+
+        _win32gui.EnumWindows(_cb, None)
+        rect = found_rect.get("rect")
+        if not rect:
+            return None
+        left, top, right, bottom = rect
+        cx = (left + right) // 2
+        cy = (top + bottom) // 2
+        screen = QApplication.screenAt(QPoint(cx, cy))
+        return screen
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -211,8 +251,21 @@ class DuelPiPOverlay(QWidget):
         w = max(160, w)
         h = max(90, h)
 
+        follow_vpx = bool(ov.get("duel_pip_follow_vpx", True))
+        if follow_vpx:
+            # When VPX is found, always center on its screen regardless of any
+            # previously saved position (the cabinet user wants the PiP on the
+            # playfield screen every time).
+            vpx_screen = _vpx_player_screen()
+            if vpx_screen is not None:
+                geo = vpx_screen.availableGeometry()
+                x = geo.left() + (geo.width() - w) // 2
+                y = geo.top() + (geo.height() - h) // 2
+                self.setGeometry(x, y, w, h)
+                return
+
+        # VPX not found (or follow_vpx disabled): use saved position or primary screen.
         if x == -1 or y == -1:
-            # Centre on primary screen
             primary = QApplication.primaryScreen()
             if primary:
                 geo = primary.availableGeometry()
@@ -267,6 +320,7 @@ class DuelPiPOverlay(QWidget):
 
     def open(self):
         """Show the overlay and (re-)start the stream if a URL is set."""
+        self._restore_geometry()
         self.show()
         self.raise_()
         _force_topmost(self)
