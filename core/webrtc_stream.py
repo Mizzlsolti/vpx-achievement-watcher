@@ -76,40 +76,208 @@ _EXCHANGE_TIMEOUT_S: float = 60.0  # max wait for signaling exchange
 
 if _AIORTC_OK and _MSS_OK:
     class ScreenCaptureTrack(VideoStreamTrack):
-        """``aiortc`` ``VideoStreamTrack`` that streams a desktop monitor via ``mss``."""
+        """``aiortc`` ``VideoStreamTrack`` that streams a desktop monitor via ``mss``.
+
+        When *cfg* is supplied the track honours ``SCREEN_CAPTURE_FPS`` and
+        ``SCREEN_CAPTURE_QUALITY`` config values, including their ``"auto"``
+        (CPU-adaptive) mode.  It also attempts to capture only the Visual
+        Pinball Player window instead of the whole primary monitor.
+        """
 
         kind = "video"
 
-        def __init__(self, monitor: int = 1) -> None:
+        # Adaptive quality table (mirrors screen_capture_server._ADAPTIVE_QUALITY_TABLE)
+        _ADAPTIVE_TABLE = [
+            (50,  10, 60),
+            (70,   8, 55),
+            (85,   6, 50),
+            (101,  4, 40),
+        ]
+        _MAX_LONG_EDGE = 720
+        _VPX_HWND_REFRESH_S: float = 3.0
+        _CPU_REFRESH_S: float = 5.0
+
+        def __init__(self, monitor: int = 1, cfg=None, log_fn=None) -> None:
             super().__init__()
             self._monitor_idx = monitor
+            self._cfg = cfg
+            self._log = log_fn if log_fn is not None else (lambda msg, level="INFO": None)
             self._sct: Optional[object] = None
+
+            # Throttle state
+            self._last_cpu_refresh: float = 0.0
+            self._cached_cpu: float = 0.0
+            self._last_throttle: Optional[tuple] = None
+
+            # VPX HWND cache
+            self._last_hwnd_refresh: float = 0.0
+            self._vpx_region: Optional[dict] = None
+            self._last_hwnd: Optional[int] = None
+
+            # Frame timing for FPS control
+            self._next_frame_time: float = 0.0
+
+        def _get_fps_quality(self) -> tuple:
+            """Return (fps, quality) based on cfg and CPU load."""
+            fps_raw = "auto"
+            qual_raw = "auto"
+            if self._cfg is not None:
+                fps_raw = str(getattr(self._cfg, "SCREEN_CAPTURE_FPS", "auto")).strip().lower()
+                qual_raw = str(getattr(self._cfg, "SCREEN_CAPTURE_QUALITY", "auto")).strip().lower()
+
+            if fps_raw == "auto" or qual_raw == "auto":
+                cpu = self._cached_cpu
+                for threshold, fps_a, qual_a in self._ADAPTIVE_TABLE:
+                    if cpu < threshold:
+                        fps_final = fps_a if fps_raw == "auto" else int(fps_raw)
+                        qual_final = qual_a if qual_raw == "auto" else int(qual_raw)
+                        return fps_final, qual_final
+                fps_final = 4 if fps_raw == "auto" else int(fps_raw)
+                qual_final = 40 if qual_raw == "auto" else int(qual_raw)
+                return fps_final, qual_final
+
+            try:
+                return int(fps_raw), int(qual_raw)
+            except ValueError:
+                return 10, 60
+
+        def _refresh_cpu(self) -> None:
+            """Re-sample CPU usage every _CPU_REFRESH_S seconds."""
+            now = time.monotonic()
+            if now - self._last_cpu_refresh < self._CPU_REFRESH_S:
+                return
+            self._last_cpu_refresh = now
+            try:
+                import psutil
+                self._cached_cpu = psutil.cpu_percent(interval=None)
+            except Exception:
+                pass
+
+        def _refresh_vpx_region(self) -> None:
+            """Re-detect the VPX player window every _VPX_HWND_REFRESH_S seconds."""
+            now = time.monotonic()
+            if now - self._last_hwnd_refresh < self._VPX_HWND_REFRESH_S:
+                return
+            self._last_hwnd_refresh = now
+
+            try:
+                import win32gui as _wg
+            except Exception:
+                return
+
+            found: dict = {}
+
+            def _cb(hwnd, _):
+                try:
+                    if not _wg.IsWindowVisible(hwnd):
+                        return True
+                    title = (_wg.GetWindowText(hwnd) or "").strip().lower()
+                    if "visual pinball player" in title:
+                        left, top, right, bottom = _wg.GetWindowRect(hwnd)
+                        w = right - left
+                        h = bottom - top
+                        if w > 0 and h > 0:
+                            found["rect"] = {"left": left, "top": top, "width": w, "height": h}
+                            found["hwnd"] = hwnd
+                            return False
+                except Exception:
+                    pass
+                return True
+
+            try:
+                _wg.EnumWindows(_cb, None)
+            except Exception:
+                pass
+
+            if found.get("rect"):
+                self._vpx_region = found["rect"]
+                hwnd = found.get("hwnd")
+                if hwnd != self._last_hwnd:
+                    self._last_hwnd = hwnd
+                    r = found["rect"]
+                    self._log(
+                        f"[ScreenCapture] Capturing VPX HWND 0x{hwnd:X} region {r['width']}x{r['height']}",
+                        "INFO",
+                    )
+            else:
+                if self._last_hwnd is not None:
+                    self._log("[ScreenCapture] VPX player window lost — falling back to full monitor", "INFO")
+                    self._last_hwnd = None
+                self._vpx_region = None
+
+        def _scale_to_fit(self, img):
+            """Downscale img so its longest edge is at most _MAX_LONG_EDGE pixels."""
+            w, h = img.size
+            long_edge = max(w, h)
+            if long_edge <= self._MAX_LONG_EDGE:
+                return img
+            scale = self._MAX_LONG_EDGE / long_edge
+            new_w = max(1, int(w * scale))
+            new_h = max(1, int(h * scale))
+            try:
+                from PIL import Image as _PIL
+                resample = _PIL.Resampling.LANCZOS
+            except AttributeError:
+                resample = 1  # LANCZOS int fallback
+            return img.resize((new_w, new_h), resample)
 
         async def recv(self):  # type: ignore[override]
             pts, time_base = await self.next_timestamp()
 
+            # Enforce FPS cap: sleep until the next frame is due
+            fps, quality = self._get_fps_quality()
+            now = time.monotonic()
+            if self._next_frame_time > now:
+                await asyncio.sleep(self._next_frame_time - now)
+            self._next_frame_time = time.monotonic() + 1.0 / max(1, fps)
+
+            # Log throttle step changes
+            if (fps, quality) != self._last_throttle:
+                cpu = self._cached_cpu
+                self._log(
+                    f"[ScreenCapture] CPU={cpu:.0f}% → throttled to fps={fps}, quality={quality}",
+                    "INFO",
+                )
+                self._last_throttle = (fps, quality)
+
             loop = asyncio.get_event_loop()
-            frame = await loop.run_in_executor(None, self._capture_frame)
+            frame = await loop.run_in_executor(None, self._capture_frame, quality)
 
             frame.pts = pts
             frame.time_base = time_base
             return frame
 
-        def _capture_frame(self):
+        def _capture_frame(self, quality: int = 60):
             """Capture one screen frame (called in executor thread)."""
+            import io as _io
             from PIL import Image
+
+            # Refresh CPU and VPX window detection (cheap — skipped when too recent)
+            self._refresh_cpu()
+            self._refresh_vpx_region()
 
             if self._sct is None:
                 self._sct = _mss_module.mss()
 
-            monitors = self._sct.monitors  # type: ignore[union-attr]
-            # monitors[0] is the "all screens" composite; real monitors start at 1.
-            idx = max(1, min(self._monitor_idx, len(monitors) - 1))
-            mon = monitors[idx]
+            # Choose capture region: VPX window or fallback monitor
+            if self._vpx_region is not None:
+                mon = self._vpx_region
+            else:
+                monitors = self._sct.monitors  # type: ignore[union-attr]
+                idx = max(1, min(self._monitor_idx, len(monitors) - 1))
+                mon = monitors[idx]
 
             raw = self._sct.grab(mon)  # type: ignore[union-attr]
-            # frombytes with "BGRX" raw decoder converts the mss BGRA buffer to RGB.
             pil_img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+
+            # Cap to 720p before encoding
+            pil_img = self._scale_to_fit(pil_img)
+
+            # Re-encode as JPEG at current quality and decode back to av.VideoFrame
+            buf = _io.BytesIO()
+            pil_img.save(buf, format="JPEG", quality=quality, optimize=False)
+            buf.seek(0)
+            pil_img = Image.open(buf).convert("RGB")
 
             return _av.VideoFrame.from_image(pil_img)
 
@@ -412,7 +580,7 @@ class WebRTCSession:
         self._pc = RTCPeerConnection(configuration=cfg_rtc)
 
         # Add local screen capture track
-        self._screen_track = ScreenCaptureTrack()
+        self._screen_track = ScreenCaptureTrack(cfg=self._cfg, log_fn=self._log)
         self._pc.addTrack(self._screen_track)
 
         # Handle incoming video track (opponent's screen)
