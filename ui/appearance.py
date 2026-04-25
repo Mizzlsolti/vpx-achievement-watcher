@@ -1110,8 +1110,8 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             # Appearance Tab - Duel Picture-in-Picture Stream
             "chk_pip_portrait": "Rotate the Duel PiP video 90 degrees for portrait/cabinet screens.",
             "chk_pip_ccw": "Rotate the Duel PiP video counter-clockwise instead of clockwise.",
-            "cmb_sc_fps": "Set the frame rate for your outgoing playfield stream during duels. 'Auto (dynamic)' adjusts based on CPU load.",
-            "cmb_sc_quality": "Set the JPEG quality for your outgoing playfield stream. 'Auto (dynamic)' reduces quality when CPU usage is high.",
+            "cmb_sc_fps": "'Auto (dynamic)' tunes FPS and quality based on CPU load — defaults to 10 fps / quality 60 and drops further as CPU usage rises.",
+            "cmb_sc_quality": "Stream is captured from the Visual Pinball Player window only, so it is much lighter than a full-screen capture. 'Auto (dynamic)' reduces quality when CPU usage is high.",
             "lbl_sc_cpu_warning": "CPU usage is high — stream quality has been automatically reduced to reduce load.",
             "btn_pip_place": "Open a draggable PiP window to set and save the position and size for the opponent's live feed during duels. Click again to save.",
             "btn_pip_test": "Open the Duel PiP overlay with a placeholder to preview its position and size. No stream connection required.",

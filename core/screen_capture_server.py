@@ -24,6 +24,11 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
 
+try:
+    import win32gui as _win32gui
+except Exception:
+    _win32gui = None
+
 # MJPEG boundary — must match the constant in ui/overlay_pip.py
 _MJPEG_BOUNDARY = b"--vpxframe"
 
@@ -46,11 +51,17 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 _ADAPTIVE_QUALITY_TABLE = [
-    (70,  30, 95),
-    (80,  30, 80),
-    (90,  20, 70),
-    (101, 10, 50),
+    (50,  10, 60),
+    (70,   8, 55),
+    (85,   6, 50),
+    (101,  4, 40),
 ]
+
+# Maximum long-edge (pixels) for captured frames before JPEG encoding.
+_MAX_LONG_EDGE = 720
+
+# How often (seconds) to re-detect the VPX player window position.
+_VPX_HWND_REFRESH_S: float = 3.0
 
 
 def _get_lan_ip() -> str:
@@ -77,6 +88,67 @@ def _set_low_priority():
             os.nice(5)
         except Exception:
             pass
+
+
+def _get_vpx_window_region():
+    """Return ``(region_dict, hwnd)`` for the 'Visual Pinball Player' window.
+
+    *region_dict* is an mss-style ``{"left", "top", "width", "height"}`` dict.
+    Returns ``(None, None)`` when the window is not found or win32gui is unavailable.
+    """
+    if _win32gui is None:
+        return None, None
+    try:
+        found: dict = {}
+
+        def _cb(hwnd, _):
+            try:
+                if not _win32gui.IsWindowVisible(hwnd):
+                    return True
+                title = (_win32gui.GetWindowText(hwnd) or "").strip().lower()
+                if "visual pinball player" in title:
+                    left, top, right, bottom = _win32gui.GetWindowRect(hwnd)
+                    w = right - left
+                    h = bottom - top
+                    if w > 0 and h > 0:
+                        found["rect"] = {"left": left, "top": top, "width": w, "height": h}
+                        found["hwnd"] = hwnd
+                        return False
+            except Exception:
+                pass
+            return True
+
+        _win32gui.EnumWindows(_cb, None)
+        if found.get("rect"):
+            return found["rect"], found.get("hwnd")
+    except Exception:
+        pass
+    return None, None
+
+
+def _scale_to_fit_720p(img, max_long_edge: int = _MAX_LONG_EDGE):
+    """Downscale *img* so its longest edge is at most *max_long_edge* pixels.
+
+    Returns the image unchanged when it already fits within the limit.
+    Uses ``Image.LANCZOS`` (or ``ANTIALIAS`` for older Pillow) for quality.
+    """
+    w, h = img.size
+    long_edge = max(w, h)
+    if long_edge <= max_long_edge:
+        return img
+    scale = max_long_edge / long_edge
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    try:
+        from PIL import Image as _PIL
+        resample = _PIL.Resampling.LANCZOS
+    except AttributeError:
+        try:
+            from PIL import Image as _PIL
+            resample = _PIL.LANCZOS
+        except AttributeError:
+            resample = 1  # LANCZOS int fallback
+    return img.resize((new_w, new_h), resample)
 
 
 # ---------------------------------------------------------------------------
@@ -163,16 +235,56 @@ class _MjpegHandler(BaseHTTPRequestHandler):
                 if monitor_id < 1 or monitor_id >= len(mons):
                     return
 
-                mon = mons[monitor_id]
+                fallback_mon = mons[monitor_id]
+
+                # --- VPX window region tracking ---
+                vpx_region: Optional[dict] = None
+                last_hwnd_refresh: float = 0.0
+                last_hwnd: Optional[int] = None
+                last_throttle: Optional[tuple] = None
 
                 while True:
                     fps, quality = server._current_fps_quality()
+
+                    # Log throttle step changes
+                    if (fps, quality) != last_throttle:
+                        cpu = server._cached_cpu
+                        print(
+                            f"[ScreenCapture] CPU={cpu:.0f}% → throttled to fps={fps}, quality={quality}"
+                        )
+                        last_throttle = (fps, quality)
+
                     interval = 1.0 / max(1, fps)
+
+                    # Re-detect VPX window every _VPX_HWND_REFRESH_S seconds
+                    now = time.monotonic()
+                    if now - last_hwnd_refresh >= _VPX_HWND_REFRESH_S:
+                        last_hwnd_refresh = now
+                        region, hwnd = _get_vpx_window_region()
+                        if region is not None:
+                            vpx_region = region
+                            if hwnd != last_hwnd:
+                                last_hwnd = hwnd
+                                print(
+                                    f"[ScreenCapture] Capturing VPX HWND 0x{hwnd:X}"
+                                    f" region {region['width']}x{region['height']}"
+                                )
+                        else:
+                            if last_hwnd is not None:
+                                print("[ScreenCapture] VPX player window lost — falling back to full monitor")
+                                last_hwnd = None
+                            vpx_region = None
+
+                    # Capture: VPX window region when available, else full monitor
+                    mon = vpx_region if vpx_region is not None else fallback_mon
 
                     t0 = time.monotonic()
 
                     raw = sct.grab(mon)
                     img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+
+                    # Cap to 720p on the long edge before encoding
+                    img = _scale_to_fit_720p(img)
 
                     buf = io.BytesIO()
                     img.save(buf, format="JPEG", quality=quality, optimize=False)
@@ -339,14 +451,14 @@ class ScreenCaptureServer:
                     fps_final = fps_a if fps_raw == "auto" else int(fps_raw)
                     qual_final = qual_a if qual_raw == "auto" else int(qual_raw)
                     return fps_final, qual_final
-            fps_final = 10 if fps_raw == "auto" else int(fps_raw)
-            qual_final = 50 if qual_raw == "auto" else int(qual_raw)
+            fps_final = 4 if fps_raw == "auto" else int(fps_raw)
+            qual_final = 40 if qual_raw == "auto" else int(qual_raw)
             return fps_final, qual_final
 
         try:
             return int(fps_raw), int(qual_raw)
         except ValueError:
-            return 30, 80
+            return 10, 60
 
     # ------------------------------------------------------------------
     # Background workers
