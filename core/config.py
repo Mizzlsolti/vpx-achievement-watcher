@@ -124,6 +124,7 @@ DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
 
 # Duel PiP
 DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
+DEFAULT_OVERLAY.setdefault("duel_pip_follow_vpx", True)
 
 # WebRTC STUN/TURN configuration for Duel PiP
 DEFAULT_OVERLAY.setdefault(
@@ -212,6 +213,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_pip_saved",
     "duel_pip_portrait", "duel_pip_rotate_ccw",
     "duel_pip_x", "duel_pip_y", "duel_pip_w", "duel_pip_h",
+    "duel_pip_follow_vpx",
     "webrtc_stun_servers", "webrtc_turn_server",
     "webrtc_turn_username", "webrtc_turn_credential",
     "low_performance_mode",
