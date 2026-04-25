@@ -251,15 +251,24 @@ class DuelPiPOverlay(QWidget):
         w = max(160, w)
         h = max(90, h)
 
+        follow_vpx = bool(ov.get("duel_pip_follow_vpx", True))
+        if follow_vpx:
+            # When VPX is found, always center on its screen regardless of any
+            # previously saved position (the cabinet user wants the PiP on the
+            # playfield screen every time).
+            vpx_screen = _vpx_player_screen()
+            if vpx_screen is not None:
+                geo = vpx_screen.availableGeometry()
+                x = geo.left() + (geo.width() - w) // 2
+                y = geo.top() + (geo.height() - h) // 2
+                self.setGeometry(x, y, w, h)
+                return
+
+        # VPX not found (or follow_vpx disabled): use saved position or primary screen.
         if x == -1 or y == -1:
-            follow_vpx = bool((self._parent_gui.cfg.OVERLAY or {}).get("duel_pip_follow_vpx", True))
-            target_screen = None
-            if follow_vpx:
-                target_screen = _vpx_player_screen()
-            if target_screen is None:
-                target_screen = QApplication.primaryScreen()
-            if target_screen:
-                geo = target_screen.availableGeometry()
+            primary = QApplication.primaryScreen()
+            if primary:
+                geo = primary.availableGeometry()
                 x = geo.left() + (geo.width() - w) // 2
                 y = geo.top() + (geo.height() - h) // 2
             else:
@@ -311,9 +320,7 @@ class DuelPiPOverlay(QWidget):
 
     def open(self):
         """Show the overlay and (re-)start the stream if a URL is set."""
-        ov = self._parent_gui.cfg.OVERLAY or {}
-        if int(ov.get("duel_pip_x", -1)) == -1 or int(ov.get("duel_pip_y", -1)) == -1:
-            self._restore_geometry()
+        self._restore_geometry()
         self.show()
         self.raise_()
         _force_topmost(self)
