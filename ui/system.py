@@ -205,7 +205,6 @@ class SystemMixin:
         self.btn_restore_zip = QPushButton("📂 Restore from ZIP")
         self.btn_restore_zip.setToolTip(
             "Restore local achievement data from a previously created ZIP backup. "
-            "Validates the HMAC signature before restoring. "
             "Warning: This will overwrite your local achievement data."
         )
         self.btn_restore_zip.clicked.connect(self._restore_from_zip)
@@ -810,10 +809,8 @@ class SystemMixin:
             self._msgbox_topmost("warn", "Backup to ZIP", f"Backup failed:\n\n{e}")
 
     def _restore_from_zip(self):
-        """Restore local achievement data from a ZIP backup (validates HMAC signature)."""
+        """Restore local achievement data from a ZIP backup."""
         import zipfile
-        import hashlib
-        import hmac as _hmac
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
         zip_path, _ = QFileDialog.getOpenFileName(
@@ -822,39 +819,9 @@ class SystemMixin:
         if not zip_path:
             return
 
-        pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        hmac_key = hashlib.sha256(
-            f"{pid}|vpxaw-backup-v1".encode("utf-8")
-        ).digest()
-
         try:
-            with zipfile.ZipFile(zip_path, "r") as zf:
-                names = zf.namelist()
-                if "_backup.sig" not in names:
-                    self._msgbox_topmost("warn", "Restore from ZIP",
-                        "❌ Backup file is missing the HMAC signature.\n\n"
-                        "This backup may be corrupt or was not created by this application.")
-                    return
-
-                stored_sig = zf.read("_backup.sig").decode("utf-8").strip()
-
-                # Recompute HMAC over all non-signature entries
-                h = _hmac.new(hmac_key, digestmod=hashlib.sha256)
-                for name in sorted(n for n in names if n != "_backup.sig"):
-                    data = zf.read(name)
-                    h.update(name.encode("utf-8"))
-                    h.update(data)
-
-                if not _hmac.compare_digest(h.hexdigest(), stored_sig):
-                    self._msgbox_topmost("warn", "Restore from ZIP",
-                        "❌ HMAC signature verification failed!\n\n"
-                        "The backup may have been tampered with or was created "
-                        "with a different Player ID. Restore aborted.")
-                    return
-
             confirm = QMessageBox.question(
                 self, "Restore from ZIP",
-                "The backup signature is valid.\n\n"
                 "This will overwrite your local achievement data. Continue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
