@@ -57,6 +57,32 @@ class OverlayPagesMixin:
         except Exception:
             return False
 
+    # ── Page-enabled helper ───────────────────────────────────────────────────
+
+    def _overlay_page_enabled(self, page_idx: int) -> bool:
+        """Return True if the overlay page is currently allowed to be shown.
+
+        Page 0 (Highlights) is always allowed.
+        Pages 1–4 (Page 2–5 in UI) are gated by their overlay_pageX_enabled flag.
+        Page 4 (Score Duels) is additionally gated by duels_do_not_disturb.
+        """
+        if page_idx == 0:
+            return True
+        ov = self.cfg.OVERLAY or {}
+        key_map = {
+            1: "overlay_page2_enabled",
+            2: "overlay_page3_enabled",
+            3: "overlay_page4_enabled",
+            4: "overlay_page5_enabled",
+        }
+        cfg_key = key_map.get(page_idx)
+        if cfg_key and not bool(ov.get(cfg_key, True)):
+            return False
+        # Page 4 (Score Duels) is also blocked when Do Not Disturb is on.
+        if page_idx == 4 and bool(ov.get("duels_do_not_disturb", False)):
+            return False
+        return True
+
     # ── Content check helper ─────────────────────────────────────────────────
 
     def _overlay_page_has_content(self, page_idx: int) -> bool:
@@ -112,17 +138,7 @@ class OverlayPagesMixin:
 
     def _navigate_overlay_page(self, direction: int):
         """Cycle to the next/previous overlay page, skipping disabled pages."""
-        ov = self.cfg.OVERLAY or {}
-        enabled_pages = [0]
-        if ov.get("overlay_page2_enabled", True):
-            enabled_pages.append(1)
-        if ov.get("overlay_page3_enabled", True):
-            enabled_pages.append(2)
-        if ov.get("overlay_page4_enabled", True):
-            enabled_pages.append(3)
-        if ov.get("overlay_page5_enabled", True):
-            enabled_pages.append(4)
-
+        enabled_pages = [p for p in range(5) if self._overlay_page_enabled(p)]
         if not enabled_pages:
             enabled_pages = [0]
 
@@ -175,6 +191,21 @@ class OverlayPagesMixin:
     def _show_overlay_page(self, page_idx: int):
         """Show one of the 5 overlay pages."""
         self._ensure_overlay()
+        if not self._overlay_page_enabled(page_idx):
+            # Requested page is disabled -- fall back to the first allowed page
+            # that also has content, or hide the overlay cleanly.
+            candidates = [
+                p for p in range(5)
+                if self._overlay_page_enabled(p) and self._overlay_page_has_content(p)
+            ]
+            if not candidates:
+                try:
+                    self._hide_overlay()
+                except Exception:
+                    pass
+                return
+            page_idx = candidates[0]
+            self._overlay_page = page_idx
         if page_idx == 0:
             self._vpc_page5_data = None
             # Page 1: Main Stats (existing combined-players view)

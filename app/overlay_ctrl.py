@@ -284,19 +284,9 @@ class OverlayCtrlMixin:
                     if not secs:
                         # Page 0 has no content – try to open the first
                         # enabled page that has content instead.
-                        _ov_cfg = self.cfg.OVERLAY or {}
-                        _fallback_pages = []
-                        if _ov_cfg.get("overlay_page2_enabled", True):
-                            _fallback_pages.append(1)
-                        if _ov_cfg.get("overlay_page3_enabled", True):
-                            _fallback_pages.append(2)
-                        if _ov_cfg.get("overlay_page4_enabled", True):
-                            _fallback_pages.append(3)
-                        if _ov_cfg.get("overlay_page5_enabled", True):
-                            _fallback_pages.append(4)
                         _fallback_pages = [
-                            p for p in _fallback_pages
-                            if self._overlay_page_has_content(p)
+                            p for p in (1, 2, 3, 4)
+                            if self._overlay_page_enabled(p) and self._overlay_page_has_content(p)
                         ]
                         if _fallback_pages:
                             self._overlay_page = _fallback_pages[0]
@@ -309,19 +299,10 @@ class OverlayCtrlMixin:
             else:
                 # Overlay already visible – cycle to next enabled page, close after last.
                 # Page 0 is skipped for CAT tables.
-                ov = self.cfg.OVERLAY or {}
                 if not self._is_active_cat_table():
-                    enabled_pages = [0]
+                    enabled_pages = [p for p in range(5) if self._overlay_page_enabled(p)]
                 else:
-                    enabled_pages = []
-                if ov.get("overlay_page2_enabled", True):
-                    enabled_pages.append(1)
-                if ov.get("overlay_page3_enabled", True):
-                    enabled_pages.append(2)
-                if ov.get("overlay_page4_enabled", True):
-                    enabled_pages.append(3)
-                if ov.get("overlay_page5_enabled", True):
-                    enabled_pages.append(4)
+                    enabled_pages = [p for p in range(1, 5) if self._overlay_page_enabled(p)]
                 # Additionally skip pages that have no content to display.
                 enabled_pages = [
                     p for p in enabled_pages
