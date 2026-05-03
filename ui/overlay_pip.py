@@ -9,6 +9,7 @@ video scales dynamically.  Position and size are auto-saved to config with a
 from __future__ import annotations
 
 import threading
+import time
 from typing import Optional
 
 from PyQt6.QtCore import (
@@ -77,10 +78,11 @@ class _MjpegReader(QObject):
 
     frame_ready = pyqtSignal(QImage)
 
-    def __init__(self, url: str, stop_event: threading.Event):
+    def __init__(self, url: str, stop_event: threading.Event, cfg=None):
         super().__init__()
         self._url = url
         self._stop = stop_event
+        self._cfg = cfg
 
     @staticmethod
     def _validate_stream_url(url: str) -> bool:
@@ -123,6 +125,11 @@ class _MjpegReader(QObject):
             header_done = False
             content_length = 0
 
+            # FPS throttle state
+            last_emit_ts: float = 0.0
+            cfg_cache_ts: float = 0.0
+            cached_fps: int = 10
+
             while not self._stop.is_set():
                 chunk = resp.read(4096)
                 if not chunk:
@@ -155,6 +162,25 @@ class _MjpegReader(QObject):
                         if buf.startswith(b"\r\n"):
                             buf = buf[2:]
                         header_done = False
+
+                        # --- FPS throttle ---
+                        now = time.monotonic()
+                        # Re-read cfg at most every 1 s
+                        if now - cfg_cache_ts >= 1.0:
+                            try:
+                                from core.perf import resolve_capture_fps_quality
+                                cached_fps, _ = resolve_capture_fps_quality(self._cfg)
+                            except Exception:
+                                cached_fps = 10
+                            cfg_cache_ts = now
+
+                        min_interval = 1.0 / max(1, cached_fps)
+                        if now - last_emit_ts < min_interval:
+                            # Drop this frame — skip the expensive JPEG decode
+                            continue
+
+                        last_emit_ts = now
+                        # --- end FPS throttle ---
 
                         img = QImage()
                         img.loadFromData(jpeg, "JPEG")
@@ -195,6 +221,10 @@ class DuelPiPOverlay(QWidget):
         self._reader: Optional[_MjpegReader] = None
         self._video_aspect: Optional[float] = None  # kept for backwards compat; unused
         self._remote_orientation: Optional[str] = None  # diagnostics only; see set_remote_orientation
+
+        # Cache for quality / transform mode (refreshed by a 1 s timer)
+        self._paint_quality: int = 60
+        self._paint_quality_ts: float = 0.0
 
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
@@ -293,7 +323,12 @@ class DuelPiPOverlay(QWidget):
 
     def _start_stream(self):
         self._stop_event.clear()
-        reader = _MjpegReader(self._stream_url, self._stop_event)
+        cfg = None
+        try:
+            cfg = self._parent_gui.cfg
+        except Exception:
+            pass
+        reader = _MjpegReader(self._stream_url, self._stop_event, cfg=cfg)
         reader.frame_ready.connect(self._on_frame)
         self._reader = reader
 
@@ -320,6 +355,11 @@ class DuelPiPOverlay(QWidget):
 
     def open(self):
         """Show the overlay and (re-)start the stream if a URL is set."""
+        try:
+            if not bool(self._parent_gui.cfg.OVERLAY.get("duel_pip_enabled", True)):
+                return
+        except Exception:
+            pass
         self._restore_geometry()
         self.show()
         self.raise_()
@@ -363,6 +403,27 @@ class DuelPiPOverlay(QWidget):
         ov = self._parent_gui.cfg.OVERLAY or {}
         rotate_ccw = bool(ov.get("duel_pip_rotate_ccw", True))
 
+        # Determine transformation mode: use FastTransformation when quality is
+        # low or low_performance_mode is active to reduce paint cost.
+        # Cache the resolved quality for ~1 s to avoid calling the helper on every paint.
+        use_fast = False
+        try:
+            now = time.monotonic()
+            if now - self._paint_quality_ts >= 1.0:
+                from core.perf import resolve_capture_fps_quality
+                _, self._paint_quality = resolve_capture_fps_quality(self._parent_gui.cfg)
+                self._paint_quality_ts = now
+            low_perf = bool(ov.get("low_performance_mode", False))
+            use_fast = self._paint_quality < 60 or low_perf
+        except Exception:
+            use_fast = False
+
+        transform_mode = (
+            Qt.TransformationMode.FastTransformation
+            if use_fast
+            else Qt.TransformationMode.SmoothTransformation
+        )
+
         if self._current_frame is not None:
             # Draw the incoming frame at its native aspect ratio, centered.
             # No rotation: the sender transmits in its own orientation; the
@@ -370,7 +431,7 @@ class DuelPiPOverlay(QWidget):
             scaled = self._current_frame.scaled(
                 self.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+                transform_mode,
             )
             x = (self.width() - scaled.width()) // 2
             y = (self.height() - scaled.height()) // 2

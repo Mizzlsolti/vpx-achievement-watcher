@@ -119,6 +119,12 @@ if _AIORTC_OK and _MSS_OK:
 
         def _get_fps_quality(self) -> tuple:
             """Return (fps, quality) based on cfg and CPU load."""
+            try:
+                from core.perf import resolve_capture_fps_quality
+                return resolve_capture_fps_quality(self._cfg)
+            except Exception:
+                pass
+            # Fallback if helper unavailable
             fps_raw = "auto"
             qual_raw = "auto"
             if self._cfg is not None:

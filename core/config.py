@@ -123,6 +123,7 @@ DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)
 DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
 
 # Duel PiP
+DEFAULT_OVERLAY.setdefault("duel_pip_enabled", True)
 DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
 DEFAULT_OVERLAY.setdefault("duel_pip_follow_vpx", True)
 
@@ -210,6 +211,7 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
     "screen_capture_overlay_configured",
+    "duel_pip_enabled",
     "duel_pip_saved",
     "duel_pip_portrait", "duel_pip_rotate_ccw",
     "duel_pip_x", "duel_pip_y", "duel_pip_w", "duel_pip_h",
