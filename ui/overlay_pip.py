@@ -222,6 +222,10 @@ class DuelPiPOverlay(QWidget):
         self._video_aspect: Optional[float] = None  # kept for backwards compat; unused
         self._remote_orientation: Optional[str] = None  # diagnostics only; see set_remote_orientation
 
+        # Cache for quality / transform mode (refreshed by a 1 s timer)
+        self._paint_quality: int = 60
+        self._paint_quality_ts: float = 0.0
+
         # Debounce timer for saving geometry to config
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
@@ -401,13 +405,16 @@ class DuelPiPOverlay(QWidget):
 
         # Determine transformation mode: use FastTransformation when quality is
         # low or low_performance_mode is active to reduce paint cost.
+        # Cache the resolved quality for ~1 s to avoid calling the helper on every paint.
         use_fast = False
         try:
-            from core.perf import resolve_capture_fps_quality
-            cfg = self._parent_gui.cfg
-            _, quality = resolve_capture_fps_quality(cfg)
+            now = time.monotonic()
+            if now - self._paint_quality_ts >= 1.0:
+                from core.perf import resolve_capture_fps_quality
+                _, self._paint_quality = resolve_capture_fps_quality(self._parent_gui.cfg)
+                self._paint_quality_ts = now
             low_perf = bool(ov.get("low_performance_mode", False))
-            use_fast = quality < 60 or low_perf
+            use_fast = self._paint_quality < 60 or low_perf
         except Exception:
             use_fast = False
 

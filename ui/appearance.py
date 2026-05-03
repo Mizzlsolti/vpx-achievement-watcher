@@ -1025,7 +1025,11 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.cfg.save()
 
     def _apply_pip_enabled_state(self, enabled: bool):
-        """Enable or disable the dependent PIP controls based on *enabled*."""
+        """Enable or disable the dependent PIP controls based on *enabled*.
+
+        ``btn_pip_test`` is intentionally omitted so the user can always
+        preview the PIP window placement even when the stream is disabled.
+        """
         for widget in (
             self.chk_pip_portrait,
             self.chk_pip_ccw,
@@ -1039,8 +1043,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
                 widget.setEnabled(enabled)
             except Exception:
                 pass
-        # The Test button always stays enabled so the user can preview placement
-        # even when the PIP stream is disabled (a Test only shows a placeholder window).
 
     def _on_pip_enabled_toggle(self, state: int):
         enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
