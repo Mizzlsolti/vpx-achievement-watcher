@@ -223,3 +223,84 @@ In summary, the watcher is responsible for **collecting, enriching, and
 forwarding** reliable metadata.  It surfaces the server's verdict via the
 **Status Overlay**.  It is **not** responsible for being the final arbiter of
 fair play — server-side validation is always authoritative.
+
+---
+
+## Minimum Client Version Enforcement
+
+### Overview
+
+The Firebase Realtime Database stores a **minimum required client version** at
+the read-only node `meta/min_client_version` (e.g. `"3.1"`).  The watcher
+reads this value once at startup on a background thread and compares it against
+its own `WATCHER_VERSION`.  If the local version is below the minimum, the
+watcher:
+
+1. Disables all cloud **write** operations for the lifetime of the process
+   (`cfg._cloud_blocked_by_version = True`).
+2. Shows a **red, non-dismissable banner** at the top of the main window.
+3. Shows a **modal "⛔ Update Required" dialog** once on startup.
+4. Persists a Dashboard notification of type `update_required`.
+
+**Read operations** (`fetch_*`) remain fully functional so users can still
+browse leaderboards in read-only mode.
+
+The server is the authoritative source of truth.  The client-side enforcement
+above is the primary defence; the Firebase rules below are a backstop.
+
+### Firebase Rules Snippet
+
+```json
+{
+  "rules": {
+    "meta": {
+      "min_client_version": { ".read": true, ".write": false }
+    },
+    "players": {
+      "$pid": {
+        ".write": "query.client_version != null && root.child('meta/min_client_version').val() != null"
+      }
+    },
+    "duels": {
+      ".write": "query.client_version != null && root.child('meta/min_client_version').val() != null"
+    }
+  }
+}
+```
+
+> **Limitation:** Firebase Realtime Database rules do not expose a built-in
+> semantic version-comparison function.  The snippet above only validates that
+> the `client_version` query parameter is *present* — it does not enforce a
+> minimum value server-side.  Two practical options for full server enforcement:
+>
+> (a) **String-equality for major versions** — if you only ever block an entire
+>     major release, a simple `query.client_version != "3.0"` rule suffices.
+>
+> (b) **Cloud Function write proxy** — replace direct Firebase REST writes with
+>     an HTTPS Cloud Function that parses and compares the version string before
+>     forwarding the write to the Realtime Database.
+>
+> The client-side guard (§1.3 + §1.4 above) is the primary defence; the
+> Firebase rules are an additional backstop.
+
+### Client version query parameter
+
+Every write request from the watcher appends
+`?client_version=<WATCHER_VERSION>` to the Firebase REST URL so that Firebase
+rules (and any future Cloud Function proxy) can inspect the version without
+parsing the request body.
+
+### How to set the minimum version (maintainer steps)
+
+1. Open the [Firebase Console](https://console.firebase.google.com/) and select
+   the project used by the watcher.
+2. Navigate to **Realtime Database → Data**.
+3. Locate (or create) the `meta` node at the root of the database.
+4. Add a child key `min_client_version` with the string value of the minimum
+   version you want to enforce, e.g. `"3.1"`.
+5. Save.  All watcher instances will pick up the new value within the same
+   session (the value is fetched once per process start).
+
+> **Example:** To block all clients older than v3.1, set
+> `meta/min_client_version` to `"3.1"`.  Clients running v3.0, v2.x, etc.
+> will immediately lose cloud write access after their next restart.

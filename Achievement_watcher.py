@@ -97,6 +97,7 @@ from app.bootstrap import Bridge, main, _authors_match, _parse_version
 from app.tray import TrayMixin
 from app.overlay_ctrl import OverlayCtrlMixin
 from app.hotkeys import HotkeysMixin
+from ui.update_banner import UpdateBanner
 
 
 class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudStatsMixin, AWEditorMixin, SystemMixin, AppearanceMixin, OverlaysMixin, ProgressMixin,
@@ -124,7 +125,21 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._validated_player_id = self.cfg.OVERLAY.get("player_id", "").strip()
             
         self.main_tabs = QTabWidget()
-        self.setCentralWidget(self.main_tabs)
+
+        # ── Update banner (shown above tabs when an update or version block is detected) ──
+        self._update_banner = UpdateBanner(self)
+        _central = QWidget()
+        _central_layout = QVBoxLayout(_central)
+        _central_layout.setContentsMargins(0, 0, 0, 0)
+        _central_layout.setSpacing(0)
+        _central_layout.addWidget(self._update_banner)
+        _central_layout.addWidget(self.main_tabs)
+        self.setCentralWidget(_central)
+
+        # Runtime cloud-block flag (not persisted).  Set to True by
+        # _check_min_client_version when the server reports a minimum version
+        # higher than WATCHER_VERSION.
+        self._cloud_blocked_by_version = False
 
         self.bridge.overlay_trigger.connect(self._on_overlay_trigger)
         self.bridge.overlay_show.connect(self._show_overlay_latest)
@@ -233,6 +248,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         self._apply_theme()
         self._check_for_updates()
+        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            self._check_min_client_version()
         self._init_tooltips_main()
         self._init_overlay_tooltips()
 
