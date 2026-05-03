@@ -498,6 +498,10 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
         # 7) Duel Picture-in-Picture Stream (Row 3, Col 1)
+        self.chk_pip_enabled = QCheckBox("📺 Enable Duel PIP Stream")
+        self.chk_pip_enabled.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_enabled", True)))
+        self.chk_pip_enabled.stateChanged.connect(self._on_pip_enabled_toggle)
+
         self.chk_pip_portrait = QCheckBox("Portrait Mode (90°)")
         self.chk_pip_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_portrait", True)))
         self.chk_pip_portrait.stateChanged.connect(self._on_pip_portrait_toggle)
@@ -518,6 +522,9 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.cmb_sc_quality.setCurrentIndex(_SC_QUAL_VALUES.index(_sc_qual_val) if _sc_qual_val in _SC_QUAL_VALUES else 0)
         self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
 
+        self.lbl_sc_fps = QLabel("FPS (outgoing + PIP render):")
+        self.lbl_sc_quality = QLabel("Quality (outgoing + PIP render):")
+
         self.lbl_sc_cpu_warning = QLabel("⚠️ Quality reduced: CPU usage high")
         self.lbl_sc_cpu_warning.setVisible(False)
 
@@ -529,14 +536,15 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         box_pip = QVBoxLayout()
         box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture Stream</b>"))
+        box_pip.addWidget(self.chk_pip_enabled)
         box_pip.addWidget(self.chk_pip_portrait)
         box_pip.addWidget(self.chk_pip_ccw)
         _fps_row = QHBoxLayout()
-        _fps_row.addWidget(QLabel("FPS:"))
+        _fps_row.addWidget(self.lbl_sc_fps)
         _fps_row.addWidget(self.cmb_sc_fps)
         box_pip.addLayout(_fps_row)
         _qual_row = QHBoxLayout()
-        _qual_row.addWidget(QLabel("Quality:"))
+        _qual_row.addWidget(self.lbl_sc_quality)
         _qual_row.addWidget(self.cmb_sc_quality)
         box_pip.addLayout(_qual_row)
         box_pip.addWidget(self.lbl_sc_cpu_warning)
@@ -547,6 +555,9 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         box_pip.addStretch(1)
 
         lay_pos.addLayout(box_pip, 3, 1)
+
+        # Apply initial enabled state to PIP sub-controls
+        self._apply_pip_enabled_state(bool(self.cfg.OVERLAY.get("duel_pip_enabled", True)))
 
         # CPU monitor timer (2 s interval) to update the SC warning label
         self._sc_cpu_timer = QTimer(self)
@@ -1013,6 +1024,38 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.cfg.OVERLAY["duel_pip_rotate_ccw"] = bool(is_ccw)
         self.cfg.save()
 
+    def _apply_pip_enabled_state(self, enabled: bool):
+        """Enable or disable the dependent PIP controls based on *enabled*."""
+        for widget in (
+            self.chk_pip_portrait,
+            self.chk_pip_ccw,
+            self.cmb_sc_fps,
+            self.cmb_sc_quality,
+            self.lbl_sc_fps,
+            self.lbl_sc_quality,
+            self.btn_pip_place,
+        ):
+            try:
+                widget.setEnabled(enabled)
+            except Exception:
+                pass
+        # The Test button always stays enabled so the user can preview placement
+        # even when the PIP stream is disabled (a Test only shows a placeholder window).
+
+    def _on_pip_enabled_toggle(self, state: int):
+        enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
+        self.cfg.OVERLAY["duel_pip_enabled"] = bool(enabled)
+        self.cfg.save()
+        self._apply_pip_enabled_state(enabled)
+        # When toggled OFF while a duel PIP is active, close it immediately
+        if not enabled:
+            try:
+                pip = getattr(self, "_pip_overlay", None)
+                if pip is not None and pip.isVisible():
+                    pip.close_pip()
+            except Exception:
+                pass
+
     def _on_pip_place_clicked(self):
         """Open the PiP overlay in placement mode (no stream). Second click saves position."""
         from ui.overlay_pip import DuelPiPOverlay
@@ -1108,10 +1151,11 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
 
             # Appearance Tab - Duel Picture-in-Picture Stream
+            "chk_pip_enabled": "Enable or disable the Duel PiP stream window. When off, no PIP window opens during duels.",
             "chk_pip_portrait": "Rotate the Duel PiP video 90 degrees for portrait/cabinet screens.",
             "chk_pip_ccw": "Rotate the Duel PiP video counter-clockwise instead of clockwise.",
-            "cmb_sc_fps": "'Auto (dynamic)' tunes FPS and quality based on CPU load — defaults to 10 fps / quality 60 and drops further as CPU usage rises.",
-            "cmb_sc_quality": "Stream is captured from the Visual Pinball Player window only, so it is much lighter than a full-screen capture. 'Auto (dynamic)' reduces quality when CPU usage is high.",
+            "cmb_sc_fps": "'Auto (dynamic)' tunes FPS and quality based on CPU load — defaults to 10 fps / quality 60 and drops further as CPU usage rises. Applies to both outgoing stream and PIP render.",
+            "cmb_sc_quality": "Stream is captured from the Visual Pinball Player window only, so it is much lighter than a full-screen capture. 'Auto (dynamic)' reduces quality when CPU usage is high. Applies to both outgoing stream and PIP render.",
             "lbl_sc_cpu_warning": "CPU usage is high — stream quality has been automatically reduced to reduce load.",
             "btn_pip_place": "Open a draggable PiP window to set and save the position and size for the opponent's live feed during duels. Click again to save.",
             "btn_pip_test": "Open the Duel PiP overlay with a placeholder to preview its position and size. No stream connection required.",
