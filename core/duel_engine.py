@@ -178,6 +178,8 @@ class DuelEngine:
         """Upload a duel record to the cloud. Returns True on success."""
         if not self._cfg.CLOUD_ENABLED:
             return False
+        if CloudSync._is_write_blocked(self._cfg):
+            return False
         node = self._cloud_node_for_duel(duel.duel_id)
         ok = CloudSync.set_node(self._cfg, node, asdict(duel))
         if not ok:

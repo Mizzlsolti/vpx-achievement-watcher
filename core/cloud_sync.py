@@ -33,6 +33,7 @@ from .watcher_core import (
     compute_rarity,
     ensure_dir,
     is_excluded_field,
+    WATCHER_VERSION,
 )
 
 _FIREBASE_ILLEGAL_CHARS_RE = re.compile(r'[.$#\[\]/]')
@@ -86,6 +87,62 @@ class CloudSync:
 
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
     _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
+
+    # Minimum client version enforcement.
+    # Cached once per process after the first fetch; None means not yet fetched or fetch failed.
+    _min_client_version: Optional[str] = None
+    _min_client_version_fetched: bool = False
+    _min_client_version_lock = threading.Lock()
+
+    # Once-per-session warning flag for version-blocked write attempts.
+    _blocked_warned: bool = False
+    _blocked_warned_lock = threading.Lock()
+
+    @staticmethod
+    def fetch_min_client_version(cfg: "AppConfig") -> Optional[str]:
+        """Read the minimum required client version from Firebase ``meta/min_client_version``.
+
+        Returns the version string (e.g. ``"3.1"``) or ``None`` when the node
+        is absent, the request fails, or the result cannot be parsed.
+
+        The result is cached on the class for the lifetime of the process so
+        that the network round-trip is performed at most once per session.
+        """
+        with CloudSync._min_client_version_lock:
+            if CloudSync._min_client_version_fetched:
+                return CloudSync._min_client_version
+            CloudSync._min_client_version_fetched = True  # mark even on failure
+
+        try:
+            if not cfg.CLOUD_URL:
+                return None
+            url = cfg.CLOUD_URL.strip().rstrip('/')
+            endpoint = f"{url}/meta/min_client_version.json"
+            req = urllib.request.Request(endpoint, headers={"User-Agent": f"AchievementWatcher/{WATCHER_VERSION}"})
+            with _urlopen_ssl_aware(cfg, req, 5) as resp:
+                raw = resp.read().decode('utf-8')
+            value = json.loads(raw)
+            if value is None:
+                CloudSync._min_client_version = None
+                return None
+            result = str(value).strip().strip('"')
+            CloudSync._min_client_version = result if result else None
+            return CloudSync._min_client_version
+        except Exception as e:
+            log(cfg, f"[CLOUD] fetch_min_client_version failed: {e}", "WARN")
+            CloudSync._min_client_version = None
+            return None
+
+    @staticmethod
+    def _is_write_blocked(cfg: "AppConfig") -> bool:
+        """Return True (and log once) when writes are blocked due to version enforcement."""
+        if getattr(cfg, "_cloud_blocked_by_version", False):
+            with CloudSync._blocked_warned_lock:
+                if not CloudSync._blocked_warned:
+                    log(cfg, "[CLOUD] Upload blocked: client version too old — update the watcher to re-enable cloud writes.", "WARN")
+                    CloudSync._blocked_warned = True
+            return True
+        return False
 
     @staticmethod
     def _warn_missing_player_name(cfg: AppConfig) -> bool:
@@ -336,6 +393,8 @@ class CloudSync:
     @staticmethod
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
+        if CloudSync._is_write_blocked(cfg):
+            return
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
             return
         # Block upload for custom achievement tables (names with spaces/special chars are not
@@ -379,7 +438,7 @@ class CloudSync:
                 return
             CloudSync._recent_progress_uploads[_dedup_key] = _now
 
-        endpoint = f"{url}/players/{pid}/progress/{rom}.json"
+        endpoint = f"{url}/players/{pid}/progress/{rom}.json?client_version={WATCHER_VERSION}"
         
         def _task():
             percentage = round((unlocked / total) * 100, 1)
@@ -557,10 +616,12 @@ class CloudSync:
         errors, matching the retry pattern used in ``fetch_node()`` and
         ``fetch_data()``.
         """
+        if CloudSync._is_write_blocked(cfg):
+            return False
         if not cfg.CLOUD_URL or not node_path:
             return False
         url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json"
+        endpoint = f"{url}/{node_path}.json?client_version={WATCHER_VERSION}"
         payload = None
         _MAX_RETRIES = 3
         for _attempt in range(_MAX_RETRIES):
@@ -590,10 +651,12 @@ class CloudSync:
         matching the retry pattern used in ``set_node()``.
         Returns True on success.
         """
+        if CloudSync._is_write_blocked(cfg):
+            return False
         if not cfg.CLOUD_URL or not node_path:
             return False
         url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json"
+        endpoint = f"{url}/{node_path}.json?client_version={WATCHER_VERSION}"
         payload = None
         _MAX_RETRIES = 3
         for _attempt in range(_MAX_RETRIES):
@@ -852,6 +915,8 @@ class CloudSync:
         When *changed_rom* is None (session end): the full session batch is uploaded as a
         safety net to ensure all ROMs are in sync.
         """
+        if CloudSync._is_write_blocked(cfg):
+            return
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
             return
         pname = player_name.strip() if player_name else cfg.OVERLAY.get("player_name", "Player").strip()

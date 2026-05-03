@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
+import webbrowser
 from datetime import datetime, timezone
 
 from PyQt6.QtWidgets import (
@@ -1019,7 +1020,102 @@ class DashboardMixin:
                         Qt.ConnectionType.QueuedConnection,
                         Q_ARG(str, tag),
                     )
+                    QMetaObject.invokeMethod(
+                        self, "_show_update_banner",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, tag),
+                    )
             except Exception as e:
                 print(f"[UPDATE CHECK] failed: {e}")
 
         threading.Thread(target=_task, daemon=True).start()
+
+    def _check_min_client_version(self):
+        """Background check: fetch meta/min_client_version and block cloud writes if outdated."""
+
+        def _task():
+            try:
+                from core.cloud_sync import CloudSync
+                from core.watcher_core import WATCHER_VERSION
+                min_ver = CloudSync.fetch_min_client_version(self.cfg)
+                if not min_ver:
+                    return
+                if _parse_version(WATCHER_VERSION) < _parse_version(min_ver):
+                    # Set runtime flag on cfg so all write helpers see it immediately.
+                    self.cfg._cloud_blocked_by_version = True
+                    self.cfg._cloud_min_required_version = min_ver
+                    from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+                    QMetaObject.invokeMethod(
+                        self, "_on_version_blocked",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(str, min_ver),
+                    )
+            except Exception as e:
+                print(f"[VERSION CHECK] failed: {e}")
+
+        threading.Thread(target=_task, daemon=True, name="MinVersionCheck").start()
+
+    @pyqtSlot(str)
+    def _show_update_banner(self, tag: str):
+        """Show the orange 'update available' banner (called from UI thread)."""
+        try:
+            banner = getattr(self, "_update_banner", None)
+            if banner is not None:
+                banner.set_update_available(tag, self.CURRENT_VERSION)
+        except Exception:
+            pass
+
+    @pyqtSlot(str)
+    def _on_version_blocked(self, min_ver: str):
+        """Called on the GUI thread when the local version is below min_client_version."""
+        from core.watcher_core import WATCHER_VERSION
+
+        # Show red non-dismissable banner at the top of the window.
+        try:
+            banner = getattr(self, "_update_banner", None)
+            if banner is not None:
+                banner.set_update_required(min_ver, WATCHER_VERSION)
+        except Exception:
+            pass
+
+        # Persist a Dashboard notification.
+        try:
+            _notif.add_notification(
+                self.cfg,
+                type="update_required",
+                icon="⛔",
+                title=f"Update Required — cloud disabled (need v{min_ver}+)",
+                detail="Your version is no longer supported. Update to re-enable cloud features.",
+                action_tab="system_maintenance",
+                dedup_key="version_blocked",
+            )
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+        # Show modal warning dialog.
+        try:
+            from PyQt6.QtWidgets import QMessageBox, QPushButton
+            from PyQt6.QtCore import Qt
+
+            msg = (
+                f"Your VPX Achievement Watcher version (<b>{WATCHER_VERSION}</b>) is no longer supported.<br><br>"
+                f"The cloud now requires version <b>{min_ver}</b> or newer. "
+                "All cloud features (duels, leaderboards, score uploads) are disabled until you update.<br><br>"
+                "Click <b>Download Update</b> to get the latest version."
+            )
+            box = QMessageBox(
+                QMessageBox.Icon.Critical,
+                "⛔ Update Required",
+                msg,
+                parent=self,
+            )
+            box.setWindowFlags(box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+            btn_download = box.addButton("Download Update", QMessageBox.ButtonRole.AcceptRole)
+            box.addButton("Continue Offline", QMessageBox.ButtonRole.RejectRole)
+            box.setTextFormat(Qt.TextFormat.RichText)
+            box.exec()
+            if box.clickedButton() is btn_download:
+                webbrowser.open("https://github.com/Mizzlsolti/vpx-achievement-watcher/releases/latest")
+        except Exception:
+            pass
