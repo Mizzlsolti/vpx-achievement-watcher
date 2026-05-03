@@ -118,7 +118,7 @@ class CloudSync:
                 return None
             url = cfg.CLOUD_URL.strip().rstrip('/')
             endpoint = f"{url}/meta/min_client_version.json"
-            req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
+            req = urllib.request.Request(endpoint, headers={"User-Agent": f"AchievementWatcher/{WATCHER_VERSION}"})
             with _urlopen_ssl_aware(cfg, req, 5) as resp:
                 raw = resp.read().decode('utf-8')
             value = json.loads(raw)

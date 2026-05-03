@@ -138,8 +138,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         # Runtime cloud-block flag (not persisted).  Set to True by
         # _check_min_client_version when the server reports a minimum version
-        # higher than WATCHER_VERSION.
-        self._cloud_blocked_by_version = False
+        # higher than WATCHER_VERSION.  Checked by CloudSync._is_write_blocked.
+        self.cfg._cloud_blocked_by_version = False
 
         self.bridge.overlay_trigger.connect(self._on_overlay_trigger)
         self.bridge.overlay_show.connect(self._show_overlay_latest)

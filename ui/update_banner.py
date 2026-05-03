@@ -23,7 +23,7 @@ _STYLE_RED = (
 
 
 class UpdateBanner(QFrame):
-    """Yellow/orange banner shown at the top of MainWindow when a newer release is available.
+    """Orange/red banner shown at the top of MainWindow when a version event is detected.
 
     Hidden by default; call set_update_available(tag, current) to show an orange
     "update available" banner, or set_update_required(min_version, current) to show

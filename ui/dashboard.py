@@ -1069,7 +1069,6 @@ class DashboardMixin:
     def _on_version_blocked(self, min_ver: str):
         """Called on the GUI thread when the local version is below min_client_version."""
         from core.watcher_core import WATCHER_VERSION
-        import webbrowser
 
         # Show red non-dismissable banner at the top of the window.
         try:

@@ -280,8 +280,8 @@ above is the primary defence; the Firebase rules below are a backstop.
 >     an HTTPS Cloud Function that parses and compares the version string before
 >     forwarding the write to the Realtime Database.
 >
-> The client-side guard (§1.3 + §1.4 above) is the primary defence; the
-> Firebase rules are an additional backstop.
+> The client-side guard (version-check at startup + write-blocking in all upload
+> methods) is the primary defence; the Firebase rules are an additional backstop.
 
 ### Client version query parameter
 
