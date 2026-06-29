@@ -208,3 +208,7 @@ Thanks to this people:
 | **VPC Data** by emb417 | [vpc-data](https://github.com/emb417/vpc-data) |
 | **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
 | **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |
+
+## GitHub Actions cleanup workflow
+
+The repository includes `.github/workflows/cleanup-artifacts.yml` to delete old Actions artifacts and workflow runs across all `Mizzlsolti` repositories. Before running it, add a repository secret named `CLEANUP_TOKEN` with a PAT that has `Actions: Read and write` and `Metadata: Read` access to the owner's repositories.
