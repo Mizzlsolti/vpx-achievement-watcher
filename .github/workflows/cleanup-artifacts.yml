@@ -1,0 +1,40 @@
+name: Cleanup old artifacts & logs
+
+on:
+  schedule:
+    - cron: '0 3 * * *'        # täglich 03:00 UTC
+  workflow_dispatch: {}         # manuell startbar
+
+permissions:
+  actions: write                # nötig zum Löschen von Artefakten/Runs
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.CLEANUP_TOKEN }}   # PAT mit Zugriff auf alle Repos
+      MAX_AGE_DAYS: 7                          # Artefakte älter als X Tage löschen
+      KEEP_RUNS: 20                            # so viele Runs pro Repo behalten
+    steps:
+      - name: Delete old artifacts and runs across all repos
+        run: |
+          owner="Mizzlsolti"
+          cutoff=$(date -u -d "-${MAX_AGE_DAYS} days" +%s)
+
+          for repo in $(gh repo list "$owner" --limit 200 --json nameWithOwner -q '.[].nameWithOwner'); do
+            echo "::group::$repo"
+            gh api "repos/$repo/actions/artifacts" --paginate -q '.artifacts[] | "\(.id) \(.created_at)"' \
+            | while read id created; do
+                ts=$(date -u -d "$created" +%s)
+                if [ "$ts" -lt "$cutoff" ]; then
+                  echo "Delete artifact $id ($created)"
+                  gh api -X DELETE "repos/$repo/actions/artifacts/$id" || true
+                fi
+              done
+            gh api "repos/$repo/actions/runs" --paginate -q '.workflow_runs | sort_by(.created_at) | reverse | .['"$KEEP_RUNS"':] | .[].id' \
+            | while read run; do
+                echo "Delete run $run"
+                gh api -X DELETE "repos/$repo/actions/runs/$run" || true
+              done
+            echo "::endgroup::"
+          done
