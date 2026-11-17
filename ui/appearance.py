@@ -526,15 +526,10 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.chk_overlay_page3.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page3)
 
-        self.chk_overlay_page4 = QCheckBox("Page 4: VPC Leaderboard")
+        self.chk_overlay_page4 = QCheckBox("Page 4: Score Duels")
         self.chk_overlay_page4.setChecked(bool(self.cfg.OVERLAY.get("overlay_page4_enabled", True)))
         self.chk_overlay_page4.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page4)
-
-        self.chk_overlay_page5 = QCheckBox("Page 5: Score Duels")
-        self.chk_overlay_page5.setChecked(bool(self.cfg.OVERLAY.get("overlay_page5_enabled", True)))
-        self.chk_overlay_page5.stateChanged.connect(self._save_overlay_page_settings)
-        lay_pages.addWidget(self.chk_overlay_page5)
 
         layout.addWidget(grp_pages)
 
@@ -1002,11 +997,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.overlay.scale_pct = int(val)
             self.overlay._apply_scale(int(val))
             self.overlay._apply_geometry()
-            if getattr(self, '_vpc_page5_data', None):
-                # VPC page 5 is active — recalculate image dimensions for new overlay size
-                self._refresh_vpc_page5()
-            else:
-                self.overlay._refresh_current_content()
+            self.overlay._refresh_current_content()
         try:
             if hasattr(self, "_overlay_picker") and isinstance(self._overlay_picker, OverlayPositionPicker):
                 self._overlay_picker.apply_portrait_from_cfg()

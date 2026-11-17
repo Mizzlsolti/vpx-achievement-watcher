@@ -3,6 +3,7 @@ from __future__ import annotations
 from PyQt6.QtCore import QTimer
 from .overlay import MiniInfoOverlay, StatusOverlay
 from .overlay_duel import DuelInfoOverlay
+from .overlay_pages import PAGE_DUELS
 import core.sound as sound
 
 
@@ -442,10 +443,10 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_left automatch notify handling failed: {e}", "WARN")
             except Exception:
                 pass
-        # Page 5 (Score Duels): intercept Left for duel actions.
+        # Page 4 (Score Duels): intercept Left for duel actions.
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 4
+                getattr(self, "_overlay_page", -1) == PAGE_DUELS
                 and getattr(self, "overlay", None) is not None
                 and self.overlay.isVisible()
             ):
@@ -511,10 +512,10 @@ class OverlaysMixin:
                 log(self.cfg, f"[NAV] _on_nav_right duel invite handling failed: {e}", "WARN")
             except Exception:
                 pass
-        # Page 5 (Score Duels): intercept Right for duel actions.
+        # Page 4 (Score Duels): intercept Right for duel actions.
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 4
+                getattr(self, "_overlay_page", -1) == PAGE_DUELS
                 and getattr(self, "overlay", None) is not None
                 and self.overlay.isVisible()
             ):

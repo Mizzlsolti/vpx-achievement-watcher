@@ -208,7 +208,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._overlay_busy = False
         self._overlay_last_action = 0.0
         self.overlay = None
-        self._overlay_page = 0  # current page: 0=Highlights/Score, 1=Achievement Progress, 2=Cloud Leaderboard, 3=VPC Leaderboard, 4=Score Duels
+        self._overlay_page = 0  # current page: 0=Highlights/Score, 1=Achievement Progress, 2=Cloud Leaderboard, 3=Score Duels
 
         self._mini_test_idx = 0
         self._status_overlay_test_idx = 0
@@ -546,7 +546,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
-            "(Pages 2–6). Page 1 (Highlights & Score) is always active. "
+            "(Pages 2–4). Page 1 (Highlights & Score) is always active. "
             "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
         ),
         "appearance_theme": (

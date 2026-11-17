@@ -9,6 +9,7 @@ from PyQt6.QtCore import QTimer
 
 from ui.overlay import OverlayWindow, MiniInfoOverlay
 from ui.overlay import read_active_players
+from ui.overlay_pages import PAGE_COUNT
 
 
 class OverlayCtrlMixin:
@@ -310,7 +311,7 @@ class OverlayCtrlMixin:
                         # Page 0 has no content – try to open the first
                         # enabled page that has content instead.
                         _fallback_pages = [
-                            p for p in (1, 2, 3, 4)
+                            p for p in range(1, PAGE_COUNT)
                             if self._overlay_page_enabled(p) and self._overlay_page_has_content(p)
                         ]
                         if _fallback_pages:
@@ -325,9 +326,9 @@ class OverlayCtrlMixin:
                 # Overlay already visible – cycle to next enabled page, close after last.
                 # Page 0 is skipped for CAT tables.
                 if not self._is_active_cat_table():
-                    enabled_pages = [p for p in range(5) if self._overlay_page_enabled(p)]
+                    enabled_pages = [p for p in range(PAGE_COUNT) if self._overlay_page_enabled(p)]
                 else:
-                    enabled_pages = [p for p in range(1, 5) if self._overlay_page_enabled(p)]
+                    enabled_pages = [p for p in range(1, PAGE_COUNT) if self._overlay_page_enabled(p)]
                 # Additionally skip pages that have no content to display.
                 enabled_pages = [
                     p for p in enabled_pages

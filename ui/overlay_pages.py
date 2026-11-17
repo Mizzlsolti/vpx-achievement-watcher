@@ -1,16 +1,13 @@
-"""Overlay-pages mixin: navigation, HTML generation, and page-switching logic for overlay pages 1–5."""
+"""Overlay-pages mixin: navigation, HTML generation, and page-switching logic for overlay pages 1–4."""
 from __future__ import annotations
 
 import os
 import json
 import threading
-import base64
 import html as _html_mod
-import ssl
 import time
-import urllib.request
 
-from PyQt6.QtCore import Qt, pyqtSlot, Q_ARG, QMetaObject, QObject, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSlot, Q_ARG, QMetaObject, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from core.config import p_aweditor, f_custom_achievements_progress
@@ -19,8 +16,23 @@ from core.badges import compute_player_level
 from core.theme import get_theme_color
 
 
+# Overlay page indices (UI shows them 1-based).
+PAGE_HIGHLIGHTS = 0
+PAGE_PROGRESS = 1
+PAGE_CLOUD = 2
+PAGE_DUELS = 3
+PAGE_COUNT = 4
+
+# Config keys of the optional pages (Page 2–4 in the UI).
+PAGE_ENABLED_KEYS = {
+    PAGE_PROGRESS: "overlay_page2_enabled",
+    PAGE_CLOUD: "overlay_page3_enabled",
+    PAGE_DUELS: "overlay_page4_enabled",
+}
+
+
 class OverlayPagesMixin:
-    """Mixin that provides overlay page navigation, HTML generation, and page-switching for overlay pages 0–4 (5 pages total).
+    """Mixin that provides overlay page navigation, HTML generation, and page-switching for overlay pages 0–3 (4 pages total).
 
     Expects the host class to provide:
         self.cfg            – AppConfig instance
@@ -29,8 +41,6 @@ class OverlayPagesMixin:
         self._overlay_page  – int: current page index
         self._overlay_cycle – dict with 'sections' key
         self._rarity_cache  – dict: per-ROM rarity data
-        self._vpc_page5_data – dict or None: cached VPC page5 data
-        self._vpc_cache     – dict or None: TTL cache for VPC data
         self._ensure_overlay()
         self._prepare_overlay_sections()
         self._show_overlay_section(section)
@@ -63,23 +73,18 @@ class OverlayPagesMixin:
         """Return True if the overlay page is currently allowed to be shown.
 
         Page 0 (Highlights) is always allowed.
-        Pages 1–4 (Page 2–5 in UI) are gated by their overlay_pageX_enabled flag.
-        Page 4 (Score Duels) is additionally gated by duels_do_not_disturb.
+        Pages 1–3 (Page 2–4 in UI) are gated by their enable flag.
+        The Score Duels page is additionally gated by duels_do_not_disturb.
         """
-        if page_idx == 0:
+        if page_idx == PAGE_HIGHLIGHTS:
             return True
+        if not (0 <= page_idx < PAGE_COUNT):
+            return False
         ov = self.cfg.OVERLAY or {}
-        key_map = {
-            1: "overlay_page2_enabled",
-            2: "overlay_page3_enabled",
-            3: "overlay_page4_enabled",
-            4: "overlay_page5_enabled",
-        }
-        cfg_key = key_map.get(page_idx)
+        cfg_key = PAGE_ENABLED_KEYS.get(page_idx)
         if cfg_key and not bool(ov.get(cfg_key, True)):
             return False
-        # Page 4 (Score Duels) is also blocked when Do Not Disturb is on.
-        if page_idx == 4 and bool(ov.get("duels_do_not_disturb", False)):
+        if page_idx == PAGE_DUELS and bool(ov.get("duels_do_not_disturb", False)):
             return False
         return True
 
@@ -131,14 +136,14 @@ class OverlayPagesMixin:
                 return False
             return True
 
-        # Pages 3 (VPC Weekly) and 4 (Score Duels) always have content.
+        # The Score Duels page always has content.
         return True
 
     # ── Overlay page navigation core ─────────────────────────────────────────
 
     def _navigate_overlay_page(self, direction: int):
         """Cycle to the next/previous overlay page, skipping disabled pages."""
-        enabled_pages = [p for p in range(5) if self._overlay_page_enabled(p)]
+        enabled_pages = [p for p in range(PAGE_COUNT) if self._overlay_page_enabled(p)]
         if not enabled_pages:
             enabled_pages = [0]
 
@@ -189,13 +194,13 @@ class OverlayPagesMixin:
             pass
 
     def _show_overlay_page(self, page_idx: int):
-        """Show one of the 5 overlay pages."""
+        """Show one of the 4 overlay pages."""
         self._ensure_overlay()
         if not self._overlay_page_enabled(page_idx):
             # Requested page is disabled -- fall back to the first allowed page
             # that also has content, or hide the overlay cleanly.
             candidates = [
-                p for p in range(5)
+                p for p in range(PAGE_COUNT)
                 if self._overlay_page_enabled(p) and self._overlay_page_has_content(p)
             ]
             if not candidates:
@@ -207,7 +212,6 @@ class OverlayPagesMixin:
             page_idx = candidates[0]
             self._overlay_page = page_idx
         if page_idx == 0:
-            self._vpc_page5_data = None
             # Page 1: Main Stats (existing combined-players view)
             secs = self._overlay_cycle.get("sections", [])
             if not secs:
@@ -223,21 +227,16 @@ class OverlayPagesMixin:
                     )
                 )
         elif page_idx == 1:
-            self._vpc_page5_data = None
             # Page 2: Local Achievement Progress for last played ROM
             css, header_html, rows = self._overlay_page2_html()
             self._show_page_with_transition(
                 lambda: self.overlay.set_html_scrollable(css, header_html, rows, "Achievement Progress")
             )
         elif page_idx == 2:
-            self._vpc_page5_data = None
             # Page 3: Cloud Leaderboard (dynamic)
             self._overlay_page4_show()
-        elif page_idx == 3:
-            # Page 4: VPC Weekly Challenge Leaderboard
-            self._overlay_page5_show()
-        elif page_idx == 4:
-            # Page 5: Score Duels Auto-Match
+        elif page_idx == PAGE_DUELS:
+            # Page 4: Score Duels Auto-Match
             self._overlay_page6_show()
 
     # ── Last-played helpers ───────────────────────────────────────────────────
@@ -579,7 +578,7 @@ class OverlayPagesMixin:
         return "<div style='color:#888;text-align:center;'>(No local leaderboard available)</div>"
 
     def _overlay_page4_show(self):
-        """Show Page 4: Cloud Leaderboard. Fetches data in the background."""
+        """Show Page 3: Cloud Leaderboard. Fetches data in the background."""
         from core.cloud_sync import CloudSync
 
         self._ensure_overlay()
@@ -666,227 +665,7 @@ class OverlayPagesMixin:
 
         threading.Thread(target=_do_fetch, daemon=True).start()
 
-    def _generate_vpc_html_landscape(self, b64_img, week_text, table_name, overlay_w, overlay_h):
-        # Use full overlay dimensions — image already contains all branding/week info.
-        avail_w = overlay_w
-        avail_h = overlay_h
-
-        # The API returns 1920x1080 landscape images (16:9 aspect ratio).
-        aspect = 16.0 / 9.0
-
-        # Fit image within available bounds while preserving aspect ratio.
-        img_w = avail_w
-        img_h = int(img_w / aspect)
-
-        if img_h > avail_h:
-            img_h = avail_h
-            img_w = int(img_h * aspect)
-
-        img_w = max(100, img_w)
-        img_h = max(56, img_h)
-
-        # Use <table> centering — the only reliable method in Qt's RichText engine.
-        # Fixed pixel width/height prevent Qt from misaligning percentage-based images.
-        return (
-            f"<table width='100%' height='100%'><tr><td align='center' valign='middle'>"
-            f"<img src='data:image/png;base64,{b64_img}' width='{img_w}' height='{img_h}' />"
-            f"</td></tr></table>"
-        )
-
-    def _refresh_vpc_page5(self):
-        """Recalculate and redisplay the VPC image for the current overlay size."""
-        data = getattr(self, '_vpc_page5_data', None)
-        if not data:
-            return
-        b64_img = data['b64_img']
-        week_text = data['week_text']
-        table_name = data['table_name']
-        is_portrait = data['is_portrait']
-
-        if is_portrait:
-            # Portrait overlay renders content in a landscape pre-canvas (H×W).
-            # Use pre-canvas dimensions so the image fills it edge-to-edge.
-            pre_w = self.overlay.height() if self.overlay else 1920
-            pre_h = self.overlay.width() if self.overlay else 1080
-            final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
-        else:
-            overlay_w = self.overlay.width() if self.overlay else 1920
-            overlay_h = self.overlay.height() if self.overlay else 1080
-            final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
-
-        self.overlay.set_html_fullsize(final_html, "VPC Weekly")
-
-    def _overlay_page5_show(self):
-        """Show Page 5: VPC Weekly Competition (Live Data + Official Image)."""
-        self._ensure_overlay()
-
-        # Check TTL-based memory cache (~5 minutes)
-        _VPC_CACHE_TTL_SECONDS = 300
-        vpc_cache = getattr(self, '_vpc_cache', None)
-        if vpc_cache and (time.time() - vpc_cache.get('ts', 0)) < _VPC_CACHE_TTL_SECONDS:
-            cached = vpc_cache
-            is_portrait = getattr(self.overlay, 'portrait_mode', False) if self.overlay else False
-            b64_img = cached['b64_img']
-            week_text = cached['week_text']
-            table_name = cached['table_name']
-            if is_portrait:
-                pre_w = self.overlay.height() if self.overlay else 1920
-                pre_h = self.overlay.width() if self.overlay else 1080
-                final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
-            else:
-                overlay_w = self.overlay.width() if self.overlay else 1920
-                overlay_h = self.overlay.height() if self.overlay else 1080
-                final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
-            self._vpc_page5_data = {
-                'b64_img': b64_img,
-                'week_text': week_text,
-                'table_name': table_name,
-                'is_portrait': is_portrait,
-            }
-            self._show_page_with_transition(lambda: self.overlay.set_html_fullsize(final_html, "VPC Weekly"))
-            return
-
-        # Recommended PyQt6 pattern for cross-thread UI updates
-        class VpcWorkerSignals(QObject):
-            update_ui = pyqtSignal(str, str)
-
-        signals = VpcWorkerSignals()
-        signals.update_ui.connect(self.overlay.set_html_fullsize)
-
-        # Show loading screen
-        _tc_primary = get_theme_color(self.cfg, "primary")
-        loading_html = (
-            f"<div style='color:{_tc_primary};font-size:1.15em;font-weight:bold;text-align:center;padding:6px 0;'>"
-            f"VPC Weekly</div>"
-            f"<div style='color:#888;text-align:center;padding:16px;'>Fetching live Challenge data & image...</div>"
-        )
-        self._show_page_with_transition(lambda: self.overlay.set_html_fullsize(loading_html, "VPC Weekly"))
-
-        def _fetch_vpc_challenge():
-            try:
-                # SSL workaround for Windows systems with missing/outdated CA certificates
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-
-                # 1. Challenge-Daten (Text/Infos) über die GET API abrufen
-                req_api = urllib.request.Request(
-                    "https://virtualpinballchat.com/vpc/api/v1/currentWeek?channelName=competition-corner",
-                    headers={'User-Agent': 'VPX-Achievement-Watcher'}
-                )
-                with urllib.request.urlopen(req_api, timeout=10, context=ctx) as response:
-                    api_data = json.loads(response.read().decode('utf-8'))
-
-                if isinstance(api_data, list) and len(api_data) > 0:
-                    week_data = api_data[0]
-                else:
-                    week_data = api_data
-
-                table_name = week_data.get("tableName", week_data.get("table", "Unknown Table"))
-                week_number = week_data.get("weekNumber", "")
-
-                week_text = f"Week {week_number} - " if week_number else ""
-
-                # 2. Ausrichtung erkennen (Portrait oder Landscape) – komplett getrennte Pfade
-                is_portrait = getattr(self.overlay, 'portrait_mode', False) if self.overlay else False
-
-                if is_portrait:
-                    # Portrait overlay: content is rendered in a landscape pre-canvas
-                    # (H×W = overlay height × overlay width) before being rotated 90°.
-                    # Request the landscape VPC image so it fills the pre-canvas perfectly.
-                    vpc_payload = json.dumps({
-                        "layout": "landscape"
-                    }).encode('utf-8')
-
-                    req_img = urllib.request.Request(
-                        "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
-                        data=vpc_payload,
-                        headers={
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'VPX-Achievement-Watcher'
-                        },
-                        method='POST'
-                    )
-
-                    with urllib.request.urlopen(req_img, timeout=45, context=ctx) as img_response:
-                        img_data = img_response.read()
-
-                    b64_img = base64.b64encode(img_data).decode('utf-8')
-                    # Use pre-canvas dimensions (H×W) so the image fills the canvas edge-to-edge.
-                    pre_w = self.overlay.height() if self.overlay else 1920
-                    pre_h = self.overlay.width() if self.overlay else 1080
-                    final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, pre_w, pre_h)
-
-                else:
-                    # Landscape: eigener API-Aufruf mit layout="landscape"
-                    landscape_payload = json.dumps({
-                        "layout": "landscape"
-                    }).encode('utf-8')
-
-                    req_img_landscape = urllib.request.Request(
-                        "https://virtualpinballchat.com/vpc/api/v1/generateWeeklyLeaderboard",
-                        data=landscape_payload,
-                        headers={
-                            'Content-Type': 'application/json',
-                            'User-Agent': 'VPX-Achievement-Watcher'
-                        },
-                        method='POST'
-                    )
-
-                    with urllib.request.urlopen(req_img_landscape, timeout=45, context=ctx) as img_response:
-                        img_data = img_response.read()
-
-                    b64_img = base64.b64encode(img_data).decode('utf-8')
-                    overlay_w = self.overlay.width() if self.overlay else 1920
-                    overlay_h = self.overlay.height() if self.overlay else 1080
-                    final_html = self._generate_vpc_html_landscape(b64_img, week_text, table_name, overlay_w, overlay_h)
-
-                # Cache raw data so the slider can recalculate the image
-                self._vpc_page5_data = {
-                    'b64_img': b64_img,
-                    'week_text': week_text,
-                    'table_name': table_name,
-                    'is_portrait': is_portrait,
-                }
-
-                # Store TTL cache for fast re-open (~5 min TTL)
-                self._vpc_cache = {
-                    'b64_img': b64_img,
-                    'week_text': week_text,
-                    'table_name': table_name,
-                    'ts': time.time(),
-                }
-
-                # Slider hook: When overlay scale changes, recalculate the image
-                try:
-                    self.overlay.resizeEvent_original  # check if already hooked
-                except AttributeError:
-                    _orig = self.overlay.resizeEvent
-                    self.overlay.resizeEvent_original = _orig
-                    _self = self  # Reference to Achievement_watcher instance
-
-                    def _hooked_resize(event, _orig=_orig, _aw=_self):
-                        _orig(event)
-                        if getattr(_aw, '_vpc_page5_data', None):
-                            _aw._refresh_vpc_page5()
-
-                    self.overlay.resizeEvent = _hooked_resize
-
-                # Über das definierte Signal emitten, damit PyQt6 es sicher in den Main-Thread schiebt!
-                signals.update_ui.emit(final_html, "VPC Weekly")
-
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                error_html = (
-                    f"<div style='color:#FF5555;text-align:center;padding:16px;'>"
-                    f"Error loading VPC Challenge:<br><span style='font-size:0.8em;'>{str(e)}</span></div>"
-                )
-                signals.update_ui.emit(error_html, "VPC Weekly")
-
-        threading.Thread(target=_fetch_vpc_challenge, daemon=True).start()
-
-    # ── Page 5: Score Duels Auto-Match ───────────────────────────────────────
+    # ── Page 4: Score Duels Auto-Match ───────────────────────────────────────
 
     _P6_POLL_INTERVAL_MS = 5_000   # poll matchmaking every 5 seconds
     _P6_TICK_INTERVAL_MS = 1_000   # elapsed timer tick every 1 second
@@ -917,7 +696,7 @@ class OverlayPagesMixin:
         return ""
 
     def _overlay_page6_build_html(self) -> str:
-        """Build and return the full HTML string for Page 5 (Score Duels Auto-Match)."""
+        """Build and return the full HTML string for Page 4 (Score Duels Auto-Match)."""
         state = getattr(self, "_p6_state", "IDLE")
 
         _tc_primary = get_theme_color(self.cfg, "primary")
@@ -1092,7 +871,7 @@ class OverlayPagesMixin:
         return html
 
     def _overlay_page6_refresh(self):
-        """Update Page 6 content in-place without triggering a slide/fade transition.
+        """Update the Score Duels page in-place without triggering a slide/fade transition.
 
         Used by the 1-second tick timer so only the HTML text is updated, avoiding
         the constant flickering caused by a full transition_to() animation each second.
@@ -1107,7 +886,7 @@ class OverlayPagesMixin:
             pass
 
     def _overlay_page6_show(self):
-        """Show Page 5: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
+        """Show Page 4: Score Duels Auto-Match (IDLE / SEARCHING / MATCH_FOUND)."""
         self._ensure_overlay()
         html = self._overlay_page6_build_html()
         state = getattr(self, "_p6_state", "IDLE")
@@ -1122,7 +901,7 @@ class OverlayPagesMixin:
                 pass
 
     def _overlay_page6_init_timers(self):
-        """Lazily initialise the poll and tick timers for page 6."""
+        """Lazily initialise the poll and tick timers for the Score Duels page."""
         if getattr(self, "_p6_poll_timer", None) is None:
             self._p6_poll_timer = QTimer(self)
             self._p6_poll_timer.setInterval(self._P6_POLL_INTERVAL_MS)
@@ -1181,7 +960,7 @@ class OverlayPagesMixin:
         except Exception:
             pass
         # Refresh display and disable auto-close
-        if getattr(self, "_overlay_page", -1) == 4:
+        if getattr(self, "_overlay_page", -1) == PAGE_DUELS:
             self._overlay_page6_show()
         # Immediate first poll
         self._overlay_page6_do_poll()
@@ -1194,10 +973,10 @@ class OverlayPagesMixin:
         self._p6_elapsed_sec = int(getattr(self, "_p6_elapsed_sec", 0)) + 1
         if self._p6_elapsed_sec >= 300:
             self._overlay_page6_stop_search()
-            if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
+            if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():
                 self._overlay_page6_refresh()
             return
-        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():
             self._overlay_page6_refresh()
 
     def _overlay_page6_do_poll(self):
@@ -1251,7 +1030,7 @@ class OverlayPagesMixin:
                     trophie.on_automatch_found()
             except Exception:
                 pass
-            if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
+            if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():
                 self._overlay_page6_show()
         else:
             self._p6_queue_count   = result.get("queue_count", 0)
@@ -1289,7 +1068,7 @@ class OverlayPagesMixin:
         if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
             return
         self._p6_state = "IDLE"
-        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 
     def _overlay_page6_decline(self):
@@ -1301,7 +1080,7 @@ class OverlayPagesMixin:
         if getattr(self, "_p6_state", "IDLE") != "MATCH_FOUND":
             return
         self._p6_state = "IDLE"
-        if getattr(self, "_overlay_page", -1) == 4 and self.overlay and self.overlay.isVisible():
+        if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():
             self._overlay_page6_show()
 
     # ── Cloud overlay slot ────────────────────────────────────────────────────
@@ -1311,7 +1090,7 @@ class OverlayPagesMixin:
         """Thread-safe slot to update the cloud leaderboard overlay HTML."""
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 3
+                getattr(self, "_overlay_page", -1) == PAGE_CLOUD
                 and self.overlay
                 and self.overlay.isVisible()
             ):
@@ -1328,7 +1107,7 @@ class OverlayPagesMixin:
         """Thread-safe slot to refresh the Achievement Progress page after rarity data arrives."""
         try:
             if (
-                getattr(self, "_overlay_page", -1) == 1
+                getattr(self, "_overlay_page", -1) == PAGE_PROGRESS
                 and getattr(self, "overlay", None) is not None
                 and self.overlay.isVisible()
             ):

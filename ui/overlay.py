@@ -248,8 +248,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         try:
             self.container.show()
             self.text_container.show()
-            if not getattr(self, '_fullsize_mode', False):
-                self.title.show()
+            self.title.show()
             self.body.show()
         except Exception:
             pass
@@ -612,7 +611,13 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         return x, y
 
     def _apply_geometry(self):
-        ref = self._target_screen_geometry()
+        ov = self.parent_gui.cfg.OVERLAY
+        user_placed = bool(ov.get("use_xy", False))
+        # A position placed by the user keeps the size reference it always had
+        # (matches the Place picker); only the default placement follows the
+        # playfield screen.
+        target = self._target_screen_geometry()
+        ref = self._ref_screen_geometry() if user_placed else target
         if self.portrait_mode:
             base_h = int(ref.height() * 0.55)
             base_w = int(base_h * 9 / 16)
@@ -624,9 +629,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         # Default placement is relative to ONE screen (the playfield screen),
         # not the whole virtual desktop – otherwise "center" lands between two
         # monitors on dual-screen setups.
-        vgeo = ref
-        ov = self.parent_gui.cfg.OVERLAY
-        if ov.get("use_xy", False):
+        vgeo = target
+        if user_placed:
             x = int(ov.get("pos_x", 0))
             y = int(ov.get("pos_y", 0))
             x, y = self._fit_into_one_screen(x, y, w, h)
@@ -667,10 +671,6 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
     def _layout_positions_for(self, w: int, h: int, portrait_pre_render: bool = False):
         if hasattr(self, "text_container"):
             self.text_container.setGeometry(0, 0, w, h)
-        if getattr(self, '_fullsize_mode', False):
-            self.title.hide()
-            self.body.setGeometry(0, 0, w, h)
-            return
         pad = 24
         try:
             self.title.setAlignment(Qt.AlignmentFlag.AlignHCenter)
@@ -766,7 +766,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             old_title_vis = self.title.isVisible()
             old_body_vis = self.body.isVisible()
             self.text_container.setGeometry(0, 0, pre_w, pre_h)
-            self.title.setVisible(not getattr(self, '_fullsize_mode', False))
+            self.title.setVisible(True)
             self.body.setVisible(True)
             self._layout_positions_for(pre_w, pre_h, portrait_pre_render=False)
             QApplication.processEvents(QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents, 5)
@@ -864,21 +864,11 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
     def _refresh_current_content(self):
         """Re-render the currently displayed page using the current font settings.
         Handles all page types: fixed-columns (page 0), scrollable rows (page 1),
-        plain HTML pages (pages 2/3), and fullsize pages (page 5 VPC leaderboard)."""
+        and plain HTML pages (pages 3/4)."""
         if self._current_combined:
             self._render_fixed_columns()
         elif self._current_html is not None:
-            if getattr(self, '_fullsize_mode', False):
-                # In fullsize mode (e.g. VPC page 5), never call set_html() as that
-                # resets _fullsize_mode. Prefer delegating to parent's _refresh_vpc_page5()
-                # so image pixel dimensions are recalculated for the current overlay size.
-                parent = getattr(self, 'parent_gui', None)
-                if parent is not None and getattr(parent, '_vpc_page5_data', None):
-                    parent._refresh_vpc_page5()
-                else:
-                    self.set_html_fullsize(self._current_html, self._current_title)
-            else:
-                self.set_html(self._current_html, self._current_title)
+            self.set_html(self._current_html, self._current_title)
         elif self._p2_rows is not None:
             self._render_p2()
             self._layout_positions()
@@ -947,7 +937,6 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             self._pp_widget.raise_()
 
     def set_placeholder(self, session_title: Optional[str] = None):
-        self._fullsize_mode = False
         self._current_combined = None
         self._current_html = None
         self._p2_rows = None
@@ -957,7 +946,6 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self._layout_positions()
 
     def set_html(self, html: str, session_title: Optional[str] = None):
-        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None
@@ -970,29 +958,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self.body.setText(f"<div style='{css}'>{html}</div>")
         self._layout_positions()
 
-    def set_html_fullsize(self, html: str, session_title: Optional[str] = None):
-        """Like set_html() but expands body to the full window — no title bar, no insets.
-
-        Use this for pages that display a full-window image (e.g. Page 5 VPC leaderboard).
-        Switching to any other page via set_html/set_combined/etc. automatically restores
-        the normal title + body layout.
-        """
-        if hasattr(self, "_p2_timer"):
-            self._p2_timer.stop()
-        self._fullsize_mode = True
-        self._current_combined = None
-        self._current_html = html
-        self._p2_rows = None
-        self._current_title = "Highlights" if session_title is None else session_title
-        self.title.hide()
-        body_pt = getattr(self, "_body_pt", 20)
-        css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
-        self.body.setText(f"<div style='{css}'>{html}</div>")
-        self.body.setGeometry(0, 0, self.width(), self.height())
-        self.request_rotation(force=True)
-
     def set_combined(self, combined: dict, session_title: Optional[str] = None):
-        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = combined or {}
@@ -1004,7 +970,6 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
     def set_html_scrollable(self, css: str, header_html: str, rows: list,
                             session_title: Optional[str] = None):
         """Display a list of table rows with Python QTimer-based scrolling."""
-        self._fullsize_mode = False
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
         self._current_combined = None
@@ -1171,6 +1136,18 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             total_achs = int(self._current_combined["_demo_total_achs"])
             unlocked_total = int(self._current_combined.get("_demo_unlocked", 0))
             pct = round((unlocked_total / total_achs) * 100, 1) if total_achs > 0 else 0.0
+
+        _mp_page = isinstance((self._current_combined or {}).get("multiplayer"), dict) and \
+            bool((self._current_combined or {}).get("multiplayer", {}).get("games"))
+        if _mp_page:
+            # Multiplayer page has no progress bar: no fill animation / shine sweep.
+            total_achs = 0
+            pct = 0.0
+            self._progress_pct_current = self._progress_pct_target = 0.0
+            try:
+                self._progress_bar_timer.stop()
+            except Exception:
+                pass
 
         # Animated progress bar: update target and start timer if changed
         new_pct_target = pct if total_achs > 0 else 0.0

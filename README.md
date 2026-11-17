@@ -109,7 +109,7 @@ Customize the look and feel of the entire application, organized into **5 sub-ta
   - Status Overlay (cloud/leaderboard feedback, can be disabled)
   - ⚔️ Duel Notifications
 - **🔄 Switch All → Portrait/Landscape**: Toggle all overlay orientations at once
-- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard), Page 4 (VPC Leaderboard), Page 5 (Score Duels) can be toggled
+- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard), Page 4 (Score Duels) can be toggled
 - **Custom Background**: Place an `overlay_bg.jpg/png` next to the executable for a custom overlay background
 
 #### 🎨 Theme
@@ -133,12 +133,6 @@ Customize the look and feel of the entire application, organized into **5 sub-ta
 - **Skins**: Multiple visual skins for both mascots
 - **Personality**: Unique speech bubbles, reactions, memory, and a "bickering" system between them
 - **Portrait Mode**: Steely supports 90° rotation for cabinet screens
-
----
-
-### 📺 VPC Weekly Challenge
-
-View Discord's Weekly Challenge directly on the overlay (view only).
 
 ---
 
@@ -209,7 +203,6 @@ Thanks to this people:
 | **NVRAM Maps** by tomlogic | [pinmame-nvram-maps](https://github.com/tomlogic/pinmame-nvram-maps) |
 | **vpxtool** by francisdb | [vpxtool](https://github.com/francisdb/vpxtool) |
 | **Score Server** by superhac | [score-server](https://github.com/superhac/score-server) — live scores, players and balls for the multiplayer mode (incl. his PinMAME `GetController` patch) |
-| **VPC Data** by emb417 | [vpc-data](https://github.com/emb417/vpc-data) |
 | **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
 | **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |
 

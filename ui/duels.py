@@ -1548,7 +1548,7 @@ class DuelsMixin:
             changed_duels = self._duel_engine.sync_active_duel_states()
             from PyQt6.QtCore import QMetaObject, Q_ARG, Qt
             if new_duels:
-                # Check if automatch is active (GUI widget or overlay page 6).
+                # Check if automatch is active (GUI widget or the Score Duels overlay page).
                 aw = getattr(self, "_automatch_widget", None)
                 automatch_gui = aw is not None and getattr(aw, "_searching", False)
                 automatch_overlay = getattr(self, "_p6_state", "IDLE") == "SEARCHING"

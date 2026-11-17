@@ -33,3 +33,8 @@ android/.idea/
 *.apk
 *.aab
 *.hprof
+
+# Local runtime config (never commit)
+config.json
+config.json.bak
+config.json.tmp
