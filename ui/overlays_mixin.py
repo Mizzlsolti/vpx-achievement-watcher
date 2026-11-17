@@ -115,7 +115,10 @@ class OverlaysMixin:
     ]
 
     def _on_mini_info_show(self, rom: str, seconds: int = 10):
-        msg = f"NVRAM map not found for {rom}."
+        # The watcher sends complete sentences (no NVRAM map, no VPS-ID, no live
+        # game status); only the map sampler sends a bare ROM name.
+        text = str(rom or "").strip()
+        msg = text if (" " in text or "\n" in text) else f"NVRAM map not found for {text}."
         try:
             sound.play_sound(self.cfg, "toast_info")
         except Exception:
