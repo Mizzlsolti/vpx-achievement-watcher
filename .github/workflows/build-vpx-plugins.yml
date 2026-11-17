@@ -101,7 +101,7 @@ jobs:
                   "\n   // Provide a message for other plugins to get the Controller pointer\n"
                   "   msgApi->SubscribeMsg(endpointId, getControllerMsgId = msgApi->GetMsgID(\"PinMAME\", \"GetController\"), OnGetController, nullptr);\n"), 1)
               s = s.replace(a3, (
-                  "   msgApi->UnsubscribeMsg(getControllerMsgId, OnGetController);\n"
+                  "   msgApi->UnsubscribeMsg(getControllerMsgId, OnGetController, nullptr);\n"
                   "   msgApi->ReleaseMsgID(getControllerMsgId);\n") + a3, 1)
               p.write_text(s, encoding="utf-8")
               print("PinMAME plugin patched")
