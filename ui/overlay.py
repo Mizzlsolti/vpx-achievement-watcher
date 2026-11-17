@@ -571,8 +571,48 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         else:
             self._nav_arrows.hide()
 
+    def _target_screen_geometry(self) -> QRect:
+        """Screen the overlay belongs on: the VPX playfield screen (live or the
+        last one seen during the session), else the primary screen."""
+        try:
+            w = getattr(self.parent_gui, "watcher", None)
+            r = None
+            if w is not None:
+                r = w._get_vp_player_rect() or getattr(w, "_last_vp_player_rect", None)
+            if r:
+                x, y, rw, rh = r
+                scr = QApplication.screenAt(QPoint(int(x + rw // 2), int(y + rh // 2)))
+                if scr:
+                    return scr.geometry()
+        except Exception:
+            pass
+        scr = QApplication.primaryScreen()
+        return scr.geometry() if scr else QRect(0, 0, 1280, 720)
+
+    @staticmethod
+    def _fit_into_one_screen(x: int, y: int, w: int, h: int) -> tuple[int, int]:
+        """Keep a saved position on a single monitor (never split across two)."""
+        try:
+            screens = QApplication.screens() or []
+            if not screens:
+                return x, y
+            center = QPoint(x + w // 2, y + h // 2)
+            geo = None
+            for s in screens:
+                if s.geometry().contains(center):
+                    geo = s.geometry()
+                    break
+            if geo is None:
+                geo = min((s.geometry() for s in screens),
+                          key=lambda g: (g.center().x() - center.x()) ** 2 + (g.center().y() - center.y()) ** 2)
+            x = max(geo.left(), min(x, geo.right() - w + 1))
+            y = max(geo.top(), min(y, geo.bottom() - h + 1))
+        except Exception:
+            pass
+        return x, y
+
     def _apply_geometry(self):
-        ref = self._ref_screen_geometry()
+        ref = self._target_screen_geometry()
         if self.portrait_mode:
             base_h = int(ref.height() * 0.55)
             base_w = int(base_h * 9 / 16)
@@ -581,17 +621,15 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             base_h = int(ref.height() * 0.30)
         w = max(120, int(base_w * self.scale_pct / 100))
         h = max(120, int(base_h * self.scale_pct / 100))
-        screens = QApplication.screens() or []
-        if screens:
-            vgeo = screens[0].geometry()
-            for s in screens[1:]:
-                vgeo = vgeo.united(s.geometry())
-        else:
-            vgeo = QRect(0, 0, 1280, 720)
+        # Default placement is relative to ONE screen (the playfield screen),
+        # not the whole virtual desktop – otherwise "center" lands between two
+        # monitors on dual-screen setups.
+        vgeo = ref
         ov = self.parent_gui.cfg.OVERLAY
         if ov.get("use_xy", False):
             x = int(ov.get("pos_x", 0))
             y = int(ov.get("pos_y", 0))
+            x, y = self._fit_into_one_screen(x, y, w, h)
         else:
             pad = 20
             pos = (getattr(self, "position", "center") or "center").lower()

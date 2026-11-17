@@ -1,5 +1,5 @@
 {
-  "BASE": "/tmp/tmpen_mah1x",
+  "BASE": "/tmp/tmpg7ktvla3",
   "NVRAM_DIR": "C:\\vPinball\\VisualPinball\\VPinMAME\\nvram",
   "TABLES_DIR": "C:\\vPinball\\VisualPinball\\Tables",
   "CLOUD_ENABLED": false,
@@ -121,7 +121,7 @@
     "duel_right_mods": 0,
     "duel_right_joy_button": 0,
     "player_name": "Solters",
-    "player_id": "28bf",
+    "player_id": "2b90",
     "duel_rules_seen": false
   },
   "POPPER_DB_PATH": "",

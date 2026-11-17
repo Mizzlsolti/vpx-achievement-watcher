@@ -1596,6 +1596,56 @@ class Watcher:
         self._vp_visible_cache = (now, result)
         return result
 
+    def _find_table_file(self, vpx_filename: str) -> Optional[str]:
+        """Locate a .vpx outside the TABLES_DIR root.
+
+        1. The command line of the running VPinballX*.exe (-play / -edit "<path>").
+        2. A cached recursive index of TABLES_DIR (rebuilt at most every 60 s on a miss).
+        """
+        want = (vpx_filename or "").lower()
+        if not want:
+            return None
+        try:
+            import psutil
+            for proc in psutil.process_iter(["name", "cmdline"]):
+                try:
+                    name = (proc.info.get("name") or "").lower()
+                    if not (name.startswith("vpinballx") and name.endswith(".exe")):
+                        continue
+                    for arg in proc.info.get("cmdline") or []:
+                        a = str(arg).strip().strip('"')
+                        if a.lower().endswith(".vpx") and os.path.basename(a).lower() == want and os.path.isfile(a):
+                            return a
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        idx = getattr(self, "_table_file_index", None)
+        now = time.time()
+        if not isinstance(idx, dict) or (want not in idx and now - float(getattr(self, "_table_file_index_ts", 0.0)) > 60):
+            idx = {}
+            try:
+                for root, _dirs, files in os.walk(self.cfg.TABLES_DIR):
+                    for fn in files:
+                        if fn.lower().endswith(".vpx"):
+                            idx.setdefault(fn.lower(), os.path.join(root, fn))
+            except Exception:
+                pass
+            self._table_file_index = idx
+            self._table_file_index_ts = now
+        path = idx.get(want)
+        return path if path and os.path.isfile(path) else None
+
+    def remember_vp_player_screen(self) -> None:
+        """Cache where the VPX playfield was, so overlays shown after VPX closed
+        can still be placed on the playfield screen."""
+        try:
+            r = self._get_vp_player_rect()
+            if r:
+                self._last_vp_player_rect = r
+        except Exception:
+            pass
+
     def _get_vp_player_rect(self) -> tuple[int, int, int, int] | None:
         if not win32gui:
             return None
@@ -3544,6 +3594,10 @@ class Watcher:
         if not os.path.isfile(vpx_path):
             alt = os.path.join(self.cfg.TABLES_DIR, table_fragment)
             vpx_path = alt if os.path.isfile(alt) else None
+        if not vpx_path:
+            # Tables kept in sub-folders (VPX 10.8.1 table folders, frontends …):
+            # ask the running VPX process first, then search TABLES_DIR recursively.
+            vpx_path = self._find_table_file(vpx_filename)
 
         cache = getattr(self, "_rom_detect_cache", None)
         if not isinstance(cache, dict):
@@ -3800,6 +3854,9 @@ class Watcher:
                         self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
 
                 if active_rom:
+                    if now_loop - float(getattr(self, "_last_vp_rect_ts", 0.0)) > 5.0:
+                        self._last_vp_rect_ts = now_loop
+                        self.remember_vp_player_screen()
                     audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
                     audits_ctl = audits 
 
