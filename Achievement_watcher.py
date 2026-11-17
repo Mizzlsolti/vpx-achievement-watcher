@@ -108,7 +108,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.watcher = watcher
         self.bridge = bridge
         self.setWindowTitle("VPX Achievement Watcher")
-        self.resize(1720, 1290)
+        self.resize(1100, 720)
         
         icon = self._get_icon()
         self.setWindowIcon(icon)
@@ -178,6 +178,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._build_tab_cloud() 
         self._build_tab_system()
         self._build_tab_aweditor()
+        self._regroup_main_tabs()
 
         self.timer_stats = QTimer(self)
         self.timer_stats.timeout.connect(self.update_stats)
@@ -341,11 +342,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status and the latest session information.<br><br>"
-            "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
-            "• <b>Session Summary</b>: Overview of the last play session "
+            "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active. "
+            "The buttons next to it restart the engine, minimize to tray or quit the application.<br>"
+            "• <b>Last Run</b>: Overview of the last play session "
             "(table, score, achievements and result).<br>"
-            "• <b>Notifications</b>: System messages and event notifications.<br>"
-            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
+            "• <b>Setup Status</b>: What is still missing for leaderboards (click a link to go there).<br>"
+            "• <b>Notifications</b>: System messages and event notifications."
         ),
         "player": (
             "<b>👤 Player</b><br><br>"
@@ -360,8 +362,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "your name on cloud leaderboards."
         ),
         "progress": (
-            "<b>📈 Progress</b><br><br>"
-            "The Progress tab shows your local achievement progress for each table.<br><br>"
+            "<b>📈 Achievements</b><br><br>"
+            "The Achievements sub-tab (Player) shows your local achievement progress for each table.<br><br>"
             "• Select a ROM from the dropdown at the top.<br>"
             "• The view lists all available achievements with their current status "
             "(unlocked ✅ / locked 🔒).<br>"
@@ -475,7 +477,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "QPainter CPU fallback on systems without GPU drivers."
         ),
         "available_maps": (
-            "<b>📚 Available Maps</b><br><br>"
+            "<b>📚 NVRAM Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
             "• <b>Search</b>: Filter by table name or ROM name.<br>"
             "• <b>🎯 Local tables with nvram map</b>: Show only locally installed tables that have an NVRAM mapping.<br>"
@@ -494,7 +496,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
         "controls": (
             "<b>🕹️ Controls</b><br><br>"
-            "The Controls tab lets you configure hotkeys and input bindings for the overlay.<br><br>"
+            "The Controls sub-tab (Appearance) lets you configure hotkeys and input bindings for the overlay.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
             "• <b>Show/Hide GUI (Systray)</b>: Enable this binding to toggle the main GUI window between visible "
             "and minimized-to-systray using a keyboard key or joystick button. Disabled by default — "
@@ -505,8 +507,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "💡 You can also combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
         ),
         "cloud": (
-            "<b>☁️ Cloud</b><br><br>"
-            "The Cloud tab lets you browse the global leaderboard stored in the cloud.<br><br>"
+            "<b>☁️ Cloud Leaderboard</b><br><br>"
+            "The Cloud Leaderboard sub-tab (Stats) lets you browse the global leaderboard stored in the cloud.<br><br>"
             "• <b>Category</b>: Choose Achievement Progress to view progress leaderboards.<br>"
             "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
             "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM."
@@ -533,11 +535,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "or install an app update."
         ),
         "stats": (
-            "<b>📊 Records &amp; Stats</b><br><br>"
-            "The Records &amp; Stats tab gives you an overview of high scores and statistics.<br><br>"
+            "<b>📊 Stats</b><br><br>"
+            "The Stats tab gives you an overview of high scores and statistics.<br><br>"
             "• <b>🌍 Global NVRAM Dumps</b>: All saved NVRAM scores for the selected table "
             "across all players.<br>"
-            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session."
+            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
+            "• <b>☁️ Cloud Leaderboard</b>: The global leaderboard (see the help on that sub-tab)."
         ),
         "aweditor": (
             "<b>🎯 AWEditor – Custom Achievement System for Non-ROM Tables</b><br><br>"
@@ -597,6 +600,70 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
     }
 
+    def _regroup_main_tabs(self):
+        """Group the pages into fewer main tabs (compact window):
+        Dashboard · Player · Tables · Stats · Appearance · System."""
+        tabs = self.main_tabs
+        pages = {}
+        for i in range(tabs.count()):
+            pages[tabs.tabText(i)] = tabs.widget(i)
+
+        def find(word):
+            for t, w in pages.items():
+                if word.lower() in t.lower():
+                    return t, w
+            return None, None
+
+        keys = {
+            "dashboard": "Dashboard", "player": "Player", "appearance": "Appearance",
+            "controls": "Controls", "stats": "Records", "progress": "Progress",
+            "available_maps": "Available Maps", "cloud": "Cloud", "system": "System",
+            "aweditor": "AWEditor", "duels": "Score Duels",
+        }
+        found = {k: find(v) for k, v in keys.items()}
+        self._tab_pages = {k: w for k, (_t, w) in found.items() if w is not None}
+        while tabs.count():
+            tabs.removeTab(0)
+
+        def group(items):
+            box = QWidget()
+            lay = QVBoxLayout(box)
+            lay.setContentsMargins(0, 4, 0, 0)
+            sub = QTabWidget()
+            for widget, label in items:
+                if widget is not None:
+                    sub.addTab(widget, label)
+            lay.addWidget(sub)
+            return box, sub
+
+        p = self._tab_pages
+        tabs.addTab(p["dashboard"], found["dashboard"][0])
+        box, self.player_subtabs = group([(p.get("player"), "👤 Level & Badges"),
+                                          (p.get("progress"), "📈 Achievements")])
+        tabs.addTab(box, "👤 Player")
+        box, self.tables_subtabs = group([(p.get("available_maps"), "📚 NVRAM Maps"),
+                                          (p.get("aweditor"), "🎯 AWEditor")])
+        tabs.addTab(box, "📚 Tables")
+        if p.get("cloud") is not None:
+            self.stats_tabs.addTab(p["cloud"], "☁️ Cloud Leaderboard")
+        tabs.addTab(p["stats"], "📊 Stats")
+        if p.get("controls") is not None:
+            self.appearance_subtabs.addTab(p["controls"], "🕹️ Controls")
+        tabs.addTab(p["appearance"], found["appearance"][0])
+        tabs.addTab(p["system"], found["system"][0])
+        if p.get("duels") is not None:
+            tabs.addTab(p["duels"], found["duels"][0])
+
+    def _go_to_tab(self, key: str) -> None:
+        """Show the page registered under ``key``, switching main and sub tab."""
+        from PyQt6.QtWidgets import QStackedWidget
+        node = getattr(self, "_tab_pages", {}).get(key)
+        while node is not None:
+            parent = node.parentWidget()
+            if isinstance(parent, QStackedWidget) and isinstance(parent.parentWidget(), QTabWidget):
+                parent.parentWidget().setCurrentWidget(node)
+            node = parent
+
     def _add_tab_help_button(self, layout, help_key: str):
         """Adds a help button (❓) anchored to the bottom-right of the given layout."""
         row = QHBoxLayout()
@@ -641,7 +708,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Without these, all uploads will be blocked.<br><br>"
 
             "<b>3. Cloud Sync Must Be Enabled</b><br>"
-            "Cloud Sync must be turned on in the System tab, otherwise no data will be transmitted.<br><br>"
+            "Cloud Sync must be turned on in System → General, otherwise no data will be transmitted.<br><br>"
 
             "<b>4. Anti-Cheat &amp; Validation</b><br>"
             "Every upload is validated server-side. Submissions can receive the following status:<br>"

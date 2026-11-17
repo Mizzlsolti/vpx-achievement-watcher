@@ -563,7 +563,7 @@ class Watcher:
                     # notification because game_active can become False before the VPX window
                     # is detected by the poll.  Only _stop (watcher shutdown) should abort.
                     if _vpx_window_visible():
-                        msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
+                        msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Tables → NVRAM Maps' to assign."
                         dur = max(5, int(seconds))
                         try:
                             self.bridge.mini_info_show.emit(msg, dur)

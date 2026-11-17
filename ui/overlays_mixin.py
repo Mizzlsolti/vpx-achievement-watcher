@@ -12,7 +12,7 @@ class OverlaysMixin:
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
-        ("No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud. Go to 'Available Maps' tab to assign.", "#FF7F00"),
+        ("No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud. Go to 'Tables → NVRAM Maps' to assign.", "#FF7F00"),
         ("No NVRAM map found for ROM 'afm_113b'.", "#FF7F00"),
         ("No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.", "#FF7F00"),
     ]

@@ -688,9 +688,9 @@ class OverlayPagesMixin:
         try:
             from ui.vps import _load_vps_mapping
             if not _load_vps_mapping(self.cfg):
-                return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+                return "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         except Exception:
-            return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+            return "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         # Check 4: Available Maps loaded
         maps_cache = getattr(self, "_all_maps_cache", None)
         if not (isinstance(maps_cache, list) and len(maps_cache) > 0):

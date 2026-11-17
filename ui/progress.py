@@ -595,7 +595,4 @@ class ProgressMixin:
         dlg.navigate_to_available_maps.connect(lambda: setattr(dlg, "_navigate_requested", True))
         dlg.exec()
         if getattr(dlg, "_navigate_requested", False):
-            for i in range(self.main_tabs.count()):
-                if "Available Maps" in self.main_tabs.tabText(i):
-                    self.main_tabs.setCurrentIndex(i)
-                    break
+            self._go_to_tab("available_maps")

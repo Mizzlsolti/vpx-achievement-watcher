@@ -424,7 +424,7 @@ class DuelsMixin:
             "<p><b>📋 REQUIREMENTS</b><br>"
             "• NVRAM map must exist for the table<br>"
             "• Table must be locally installed (.vpx found)<br>"
-            "• VPS-ID must be assigned (see Available Maps tab)<br>"
+            "• VPS-ID must be assigned (see Tables → NVRAM Maps)<br>"
             "• All three conditions are mandatory<br>"
             "• Only players with a valid Player Name appear<br>"
             "• Players using the default name \"Player\" are hidden</p>"
@@ -658,7 +658,7 @@ class DuelsMixin:
         elif not cloud_ok:
             lock_msg = "🔒 Cloud Sync required – enable in System tab"
         elif not check3_ok:
-            lock_msg = "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+            lock_msg = "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         else:
             lock_msg = "🔒 Available Maps not loaded – load maps first"
 

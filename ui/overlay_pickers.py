@@ -115,7 +115,7 @@ class MiniInfoPositionPicker(_BasePositionPicker):
         candidate_messages = [
             f"<span style='color:{_accent};'>NVRAM map not found for afm_113b.</span><br><span style='color:#DDDDDD;'>closing in 10…</span>",
             f"<span style='color:{_accent};'>No NVRAM map found for ROM 'afm_113b'.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
-            f"<span style='color:{_accent};'>No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
+            f"<span style='color:{_accent};'>No VPS-ID set for afm_113b. Progress will NOT be uploaded to cloud.\nGo to 'Tables → NVRAM Maps' to assign.</span><br><span style='color:#DDDDDD;'>closing in 8…</span>",
             f"<span style='color:{_accent};'>No NVRAM map for 'afm_113b'. Use AWEditor for custom achievements.</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>NVRAM file not found or not readable</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
             f"<span style='color:{_accent};'>Overlay only available after VPX end</span><br><span style='color:#DDDDDD;'>closing in 5…</span>",
