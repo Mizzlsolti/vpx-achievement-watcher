@@ -1,0 +1,204 @@
+name: Build VPX Plugins (score-server + patched PinMAME)
+
+# Builds two Visual Pinball X 10.8.1 plugins for the Achievement Watcher's
+# multiplayer mode and publishes them as a pre-release (never "latest", so the
+# Watcher's own self-update is not affected):
+#
+#   * score-server by superhac  (https://github.com/superhac/score-server)
+#   * the official PinMAME plugin with superhac's "GetController" patch
+#     (https://github.com/vpinball/vpinball/commit/c1ca14346fc30c1ff883a28cf15ec0197a818a94)
+#
+# The Watcher downloads the newest "vpx-plugins-*" release, installs both
+# plugins and re-applies the patched PinMAME plugin if a VPX update overwrote it.
+# When VPX ships a new PinMAME plugin, re-run this workflow with the new VPX tag.
+
+on:
+  workflow_dispatch:
+    inputs:
+      vpx_ref:
+        description: "vpinball/vpinball tag or commit to build against (must be 10.8.1+)"
+        required: true
+        default: "v10.8.1-5436-af26b2d93"
+      score_server_ref:
+        description: "superhac/score-server branch or commit"
+        required: true
+        default: "main"
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    steps:
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Install MSYS2 build tools (same as upstream VPX CI)
+        run: |
+          /c/msys64/usr/bin/bash.exe -l -c "pacman -S --noconfirm make diffutils nasm bison git autoconf automake libtool"
+          /c/msys64/usr/bin/bash.exe -l -c "pacman -S --noconfirm mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-zlib mingw-w64-ucrt-x86_64-libwinpthread mingw-w64-ucrt-x86_64-libiconv mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-tools"
+
+      - name: Checkout Visual Pinball X
+        uses: actions/checkout@v4
+        with:
+          repository: vpinball/vpinball
+          ref: ${{ github.event.inputs.vpx_ref }}
+          path: vpinball
+
+      - name: Checkout score-server (with NVRAM maps)
+        uses: actions/checkout@v4
+        with:
+          repository: superhac/score-server
+          ref: ${{ github.event.inputs.score_server_ref }}
+          path: vpinball/plugins/score-server
+          submodules: true
+
+      - name: Patch PinMAME plugin (expose GetController) and register score-server
+        working-directory: vpinball
+        shell: python
+        run: |
+          import re, pathlib, sys
+
+          # 1) superhac's PinMAME patch (commit c1ca143), applied by anchors so it
+          #    survives line shifts between VPX builds.
+          p = pathlib.Path("plugins/pinmame/PinMAMEPlugin.cpp")
+          s = p.read_text(encoding="utf-8")
+          if '"GetController"' in s:
+              print("PinMAME plugin already exposes GetController - nothing to patch")
+          else:
+              a1 = "static Controller* controller = nullptr;\n"
+              a2 = "   msgApi->SubscribeMsg(endpointId, getAudioSrcId, OnGetAudioSrc, nullptr);\n"
+              a3 = "   scriptApi->SetCOMObjectOverride(\"VPinMAME.Controller\", nullptr);\n"
+              for a in (a1, a2, a3):
+                  if a not in s:
+                      sys.exit(f"Patch anchor not found in PinMAMEPlugin.cpp: {a!r}")
+              s = s.replace(a1, a1 + (
+                  "static unsigned int getControllerMsgId = 0;\n\n"
+                  "// Message handler to provide Controller pointer to other plugins (superhac, c1ca143)\n"
+                  "static void OnGetController(const unsigned int eventId, void* userData, void* eventData)\n"
+                  "{\n"
+                  "   void** ptrOut = static_cast<void**>(eventData);\n"
+                  "   if (ptrOut)\n"
+                  "      *ptrOut = static_cast<void*>(controller);\n"
+                  "}\n"), 1)
+              s = s.replace(a2, a2 + (
+                  "\n   // Provide a message for other plugins to get the Controller pointer\n"
+                  "   msgApi->SubscribeMsg(endpointId, getControllerMsgId = msgApi->GetMsgID(\"PinMAME\", \"GetController\"), OnGetController, nullptr);\n"), 1)
+              s = s.replace(a3, (
+                  "   msgApi->UnsubscribeMsg(getControllerMsgId, OnGetController);\n"
+                  "   msgApi->ReleaseMsgID(getControllerMsgId);\n") + a3, 1)
+              p.write_text(s, encoding="utf-8")
+              print("PinMAME plugin patched")
+
+          # 2) score-server CMake file: its variable names predate the current
+          #    VPX build system (PluginPlatform/PluginArch -> PLATFORM/ARCH).
+          src = pathlib.Path("plugins/score-server/CMakeLists_plugin_ScoreServer.txt").read_text(encoding="utf-8")
+          src = src.replace("PluginPlatform", "PLATFORM").replace("PluginArch", "ARCH")
+          pathlib.Path("make/CMakeLists_plugin_ScoreServer.txt").write_text(src, encoding="utf-8")
+
+          plugins = pathlib.Path("make/CMakeLists_plugins.txt")
+          t = plugins.read_text(encoding="utf-8")
+          line = 'include("${CMAKE_SOURCE_DIR}/make/CMakeLists_plugin_ScoreServer.txt")'
+          if line not in t:
+              plugins.write_text(t.rstrip("\n") + "\n" + line + "\n", encoding="utf-8")
+          print("score-server registered")
+
+      - name: Read VPX version
+        id: ver
+        working-directory: vpinball
+        run: |
+          MAJ=$(grep -Eo "VP_VERSION_MAJOR\s+[0-9]+" src/core/vpversion.h | grep -Eo "[0-9]+")
+          MIN=$(grep -Eo "VP_VERSION_MINOR\s+[0-9]+" src/core/vpversion.h | grep -Eo "[0-9]+")
+          REV=$(grep -Eo "VP_VERSION_REV\s+[0-9]+" src/core/vpversion.h | grep -Eo "[0-9]+")
+          echo "short=${MAJ}.${MIN}.${REV}" >> $GITHUB_OUTPUT
+          echo "VPX ${MAJ}.${MIN}.${REV}"
+
+      - name: Restore third-party cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: vpinball/external
+          key: vpx-plugins-external-${{ hashFiles('vpinball/platforms/config.sh', 'vpinball/platforms/windows-x64/external.sh') }}
+
+      - name: Build third-party libraries
+        working-directory: vpinball
+        run: BUILD_TYPE=Release ./platforms/windows-x64/external.sh
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        name: Save third-party cache
+        uses: actions/cache/save@v4
+        with:
+          path: vpinball/external
+          key: vpx-plugins-external-${{ hashFiles('vpinball/platforms/config.sh', 'vpinball/platforms/windows-x64/external.sh') }}
+
+      - name: Build plugins
+        working-directory: vpinball
+        run: |
+          cmake -DRENDERER=BGFX -DPLATFORM=windows -DARCH=x64 -G "Visual Studio 18 2026" -A x64 -B build
+          cmake --build build --config Release --target PinMAMEPlugin ScoreServerPlugin --parallel
+
+      - name: Package
+        id: pkg
+        run: |
+          set -e
+          OUT=out/package
+          mkdir -p "$OUT/score-server" "$OUT/pinmame"
+          PL=vpinball/build/Release/plugins
+          ls -R "$PL" | head -50
+          cp "$PL/score-server/plugin-score-server64.dll" "$OUT/score-server/"
+          cp "$PL/score-server/plugin.cfg" "$OUT/score-server/"
+          cp -r "$PL/score-server/nvram-maps" "$OUT/score-server/" || true
+          cp "$PL/pinmame/plugin-pinmame64.dll" "$OUT/pinmame/"
+          SS_SHA=$(git -C vpinball/plugins/score-server rev-parse --short HEAD)
+          VPX_SHA=$(git -C vpinball rev-parse --short HEAD)
+          PM_HASH=$(sha256sum "$OUT/pinmame/plugin-pinmame64.dll" | cut -d' ' -f1)
+          SS_HASH=$(sha256sum "$OUT/score-server/plugin-score-server64.dll" | cut -d' ' -f1)
+          TAG="vpx-plugins-${{ steps.ver.outputs.short }}-${VPX_SHA}-r${{ github.run_number }}"
+          cat > out/vpx-plugins-manifest.json <<EOF
+          {
+            "tag": "${TAG}",
+            "vpx_version": "${{ steps.ver.outputs.short }}",
+            "vpx_ref": "${{ github.event.inputs.vpx_ref }}",
+            "vpx_commit": "${VPX_SHA}",
+            "score_server_commit": "${SS_SHA}",
+            "pinmame_patch": "c1ca14346fc30c1ff883a28cf15ec0197a818a94",
+            "files": {
+              "pinmame/plugin-pinmame64.dll": "${PM_HASH}",
+              "score-server/plugin-score-server64.dll": "${SS_HASH}"
+            }
+          }
+          EOF
+          cp out/vpx-plugins-manifest.json "$OUT/manifest.json"
+          (cd "$OUT" && 7z a -r ../vpx-plugins-win64.zip .)
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          cat out/vpx-plugins-manifest.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpx-plugins-win64
+          path: |
+            out/vpx-plugins-win64.zip
+            out/vpx-plugins-manifest.json
+
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.pkg.outputs.tag }}
+          name: "VPX plugins ${{ steps.ver.outputs.short }} (score-server + patched PinMAME)"
+          prerelease: true
+          make_latest: false
+          body: |
+            Plugins for the Achievement Watcher multiplayer mode (VPX ${{ steps.ver.outputs.short }}, built from `${{ github.event.inputs.vpx_ref }}`).
+
+            - **score-server** by [superhac](https://github.com/superhac/score-server)
+            - **PinMAME plugin** with superhac's `GetController` patch ([c1ca143](https://github.com/vpinball/vpinball/commit/c1ca14346fc30c1ff883a28cf15ec0197a818a94))
+
+            Installed automatically by the Watcher – no manual steps needed.
+          files: |
+            out/vpx-plugins-win64.zip
+            out/vpx-plugins-manifest.json

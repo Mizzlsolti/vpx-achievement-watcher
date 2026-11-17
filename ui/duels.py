@@ -303,10 +303,13 @@ class DuelsMixin:
         self._duel_leaderboard_widget = DuelLeaderboardWidget(self.cfg)
         self._duels_subtabs.addTab(self._duel_leaderboard_widget, "🏆 Leaderboard")
 
-        # ── Sub-tab 4: Tournament ─────────────────────────────────────────────
-        from .duels_tournament import TournamentWidget
-        self._tournament_widget = TournamentWidget(self, self.cfg, self._duel_engine)
-        self._duels_subtabs.addTab(self._tournament_widget, "🏆 Tournament")
+        # ── Sub-tab 4: Tournament (hidden while TOURNAMENT_MODE_ENABLED is False)
+        self._tournament_widget = None
+        from core.config import TOURNAMENT_MODE_ENABLED
+        if TOURNAMENT_MODE_ENABLED:
+            from .duels_tournament import TournamentWidget
+            self._tournament_widget = TournamentWidget(self, self.cfg, self._duel_engine)
+            self._duels_subtabs.addTab(self._tournament_widget, "🏆 Tournament")
 
         # Connect sub-tab change to auto-refresh global feed on activation
         self._duels_subtabs.currentChanged.connect(self._on_duels_subtab_changed)
@@ -2196,11 +2199,6 @@ class DuelsMixin:
 
         If both checks pass, delegates to ``DuelEngine.submit_result()``.
         """
-        try:
-            self._pip_close()
-        except Exception:
-            pass
-
         if not rom:
             return
 

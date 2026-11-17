@@ -34,22 +34,6 @@ jobs:
         pyinstaller --noconfirm --onefile --windowed
         --icon="watcher.ico"
         --add-data "watcher.ico;."
-        --hidden-import="mss"
-        --hidden-import="mss.tools"
-        --hidden-import="PIL"
-        --hidden-import="PIL.Image"
-        --hidden-import="aiortc"
-        --hidden-import="aiortc.codecs"
-        --hidden-import="aiortc.codecs.h264"
-        --hidden-import="aiortc.codecs.opus"
-        --hidden-import="aiortc.contrib.media"
-        --hidden-import="av"
-        --hidden-import="cffi"
-        --hidden-import="cryptography"
-        --hidden-import="cryptography.hazmat.primitives"
-        --hidden-import="cryptography.hazmat.backends"
-        --hidden-import="cryptography.hazmat.backends.openssl"
-        --hidden-import="pylibsrtp"
         --name "Achievement_Watcher"
         "Achievement_watcher.py"
 
@@ -58,7 +42,10 @@ jobs:
 
     - name: Build Installer with Inno Setup
       run: |
-        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else { "2.6" }
+        $version = if ($env:GITHUB_REF -match '^refs/tags/v(.+)') { $Matches[1] } else {
+          (Select-String -Path core/watcher_core.py -Pattern '^WATCHER_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+        }
+        Write-Host "Installer version: $version"
         iscc /DMyAppVersion="$version" installer.iss
 
     - name: Upload Installer as Artifact

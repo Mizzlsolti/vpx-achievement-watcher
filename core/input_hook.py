@@ -178,13 +178,11 @@ def vsc_to_vk(scan_code: int) -> int:
     except Exception:
         return 0
 
-def get_vpx_ini_path_for_current_user() -> str | None:
+def get_vpx_ini_path_for_current_user(cfg=None) -> str | None:
+    """Return the VPinballX.ini VPX uses (10.8.1 per-version folder aware)."""
     try:
-        appdata = os.environ.get("APPDATA")
-        if not appdata:
-            return None
-        ini = os.path.join(appdata, "VPinballX", "VPinballX.ini")
-        return ini if os.path.isfile(ini) else None
+        from core.vpx_env import find_vpx_ini
+        return find_vpx_ini(cfg)
     except Exception:
         return None
 

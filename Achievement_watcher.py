@@ -241,6 +241,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             QTimer.singleShot(5000, self._check_app_active)
 
         self.watcher.start()
+        # Multiplayer plugins (VPX 10.8.1+): install/repair in the background.
+        QTimer.singleShot(4000, self._check_vpx_plugins)
 
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
             CloudSync.cleanup_legacy_progress(self.cfg)
@@ -543,12 +545,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay.<br>"
-            "• <b>📺 Duel Picture-in-Picture Stream</b>: During a duel, your playfield is "
-            "streamed to your opponent and their playfield appears in a small PiP window on your "
-            "screen. Use <b>FPS</b> and <b>Quality</b> to balance stream smoothness against CPU "
-            "load. Click <b>Place</b> to drag and resize the PiP window to your preferred position "
-            "(click again to save). Click <b>Test</b> to preview the PiP window with a placeholder "
-            "— no active duel required.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
             "(Pages 2–6). Page 1 (Highlights & Score) is always active. "
             "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
@@ -2544,6 +2540,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
     def _finish_restart(self):
         try:
             new_watcher = Watcher(self.cfg, self.bridge)
+            new_watcher.score_server_ready = bool(getattr(self, "_vpx_plugins_ready", False))
             new_watcher.start()
             self.watcher = new_watcher
             self._reset_status_label()

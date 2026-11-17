@@ -66,7 +66,7 @@ Global cloud leaderboard for achievement progress:
 
 Challenge other players to direct score duels on the same table!
 
-The Score Duels tab is organized into **4 sub-tabs**:
+The Score Duels tab is organized into **3 sub-tabs**:
 
 #### 🎯 My Duels
 - **📬 Incoming Invitations**: Inbox for duel challenges from other players — accept or decline with one click
@@ -82,14 +82,17 @@ Live feed of all active and recently completed duels across all players.
 #### 🏆 Leaderboard
 Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and Win Rate (%). Every player with at least one completed duel appears in the ranking. Your own row is highlighted with a ★. Medals for top 3: 🥇🥈🥉.
 
-#### 🏆 Tournament
-4-player single-elimination knockout tournaments:
-- **Join Queue**: Enter the tournament matchmaking queue (30 min timeout)
-- **Auto-Matching**: When 4 players sharing at least one table are queued, a tournament is automatically created
-- **Bracket**: 2 Semifinals → 1 Final, all played on the same randomly selected table
-- **2 hours per match** — each duel has a 2-hour time limit
-- **Notifications**: In-app alerts for tournament start, elimination, final reached, and final result
-- **History**: Completed tournaments are saved locally with your placement (🏆 Winner, #2, #3-4)
+---
+
+### 👥 Multiplayer (VPX 10.8.1+)
+
+With Visual Pinball X **10.8.1** the Watcher tracks games with **up to 4 players**:
+
+- The Watcher installs the required plugins automatically: superhac's **score-server** plugin and the **PinMAME plugin** with the `GetController` patch (built by this repo's *Build VPX Plugins* workflow). Both are enabled in `VPinballX.ini`.
+- **1 player**: everything works as before, including achievements.
+- **2–4 players**: no achievements are awarded. Page 1 of the overlay shows every player with score, best ball and average points per ball, and marks the winner. Table actions (ramps, modes …) are shown for all players combined.
+- If a VPX update replaces the PinMAME plugin, the Watcher restores the multiplayer version automatically when it is the same plugin version. A new PinMAME version is reported in the Dashboard – multiplayer stays off until a new plugin build is released.
+- VPX older than 10.8.1, or plugins not available: the Watcher runs exactly as before (single player).
 
 ---
 
@@ -191,7 +194,7 @@ The System tab has **2 sub-tabs**:
 ### 🛡️ Fair Play & Anti-Cheat
 
 To keep the leaderboards fair, local saves and scores are protected by hash signatures.
-Matches and tournaments use a feature called NVRAM tracking. Restarting from Ball 1, pressing F3, or restarting the VPX Player will result in disqualification.
+Duels use a feature called NVRAM tracking. Restarting from Ball 1, pressing F3, or restarting the VPX Player will result in disqualification.
 
 ---
 
@@ -205,6 +208,7 @@ Thanks to this people:
 |--------|-----------|
 | **NVRAM Maps** by tomlogic | [pinmame-nvram-maps](https://github.com/tomlogic/pinmame-nvram-maps) |
 | **vpxtool** by francisdb | [vpxtool](https://github.com/francisdb/vpxtool) |
+| **Score Server** by superhac | [score-server](https://github.com/superhac/score-server) — live scores, players and balls for the multiplayer mode (incl. his PinMAME `GetController` patch) |
 | **VPC Data** by emb417 | [vpc-data](https://github.com/emb417/vpc-data) |
 | **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
 | **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |

@@ -171,7 +171,7 @@ class DashboardMixin:
         lay_setup.addWidget(self._lbl_setup_all_good)
 
         self._lbl_setup_info = QLabel(
-            "ℹ️ All checks must pass for Duels, Tournaments and Leaderboards to work."
+            "ℹ️ All checks must pass for Duels and Leaderboards to work."
         )
         self._lbl_setup_info.setStyleSheet(
             "color: #888; font-size: 8pt; font-style: italic; padding: 2px 0;"
@@ -514,7 +514,6 @@ class DashboardMixin:
             ("notifications_saved",                None),
             ("duel_overlay_saved",                 None),
             ("status_overlay_saved",               "status_overlay_enabled"),
-            ("screen_capture_overlay_configured",  None),
         ]
         total_relevant = 0
         total_configured = 0
@@ -856,6 +855,12 @@ class DashboardMixin:
         """Called when a game session ends; triggers leaderboard rank check."""
         if rom and self.cfg.CLOUD_ENABLED:
             self._check_leaderboard_rank_after_upload(rom)
+        # VPX is closing now: re-check the multiplayer plugins (install postponed
+        # while VPX was running, or a VPX update replaced the PinMAME plugin).
+        try:
+            QTimer.singleShot(15000, self._check_vpx_plugins)
+        except Exception:
+            pass
 
     # ── Notification generation ───────────────────────────────────────────────
 
@@ -895,6 +900,81 @@ class DashboardMixin:
             action_tab="available_maps",
             dedup_key=f"vps_missing_{count}",
             extra=extra if extra else None,
+        )
+        try:
+            self._refresh_notification_feed()
+        except Exception:
+            pass
+
+    # ── VPX multiplayer plugins (score-server + patched PinMAME) ────────────
+
+    def _check_vpx_plugins(self):
+        """Install/repair the multiplayer plugins in the background (VPX 10.8.1+)."""
+        try:
+            from core.vpx_env import ensure_vpx_plugins_async
+        except Exception:
+            return
+        import json as _json
+
+        def _done(st: dict):
+            try:
+                QMetaObject.invokeMethod(
+                    self, "_on_vpx_plugin_status",
+                    Qt.ConnectionType.QueuedConnection,
+                    Q_ARG(str, _json.dumps(st)),
+                )
+            except Exception:
+                pass
+        ensure_vpx_plugins_async(self.cfg, on_done=_done)
+
+    @pyqtSlot(str)
+    def _on_vpx_plugin_status(self, payload: str):
+        """Apply the plugin check result (UI thread) and post dashboard notifications."""
+        import json as _json
+        try:
+            st = _json.loads(payload or "{}")
+        except Exception:
+            st = {}
+        ready = bool(st.get("ready"))
+        self._vpx_plugins_ready = ready
+        try:
+            if self.watcher is not None:
+                self.watcher.score_server_ready = ready
+                if ready:
+                    self.watcher._score_server_client()  # starts the background client
+        except Exception:
+            pass
+
+        event = str(st.get("event") or "")
+        version = str(st.get("version") or "")
+        detail = str(st.get("detail") or "")
+        spec = {
+            "installed": ("✅", "Multiplayer plugins installed",
+                          detail or f"score-server + PinMAME plugin for VPX {version}. Up to 4 players are now tracked."),
+            "reapplied": ("🔁", "PinMAME plugin restored for multiplayer",
+                          detail or "A VPX update had replaced the PinMAME plugin – the multiplayer version was re-applied."),
+            "rebuild_needed": ("⚠️", "New PinMAME version – multiplayer plugin build needed",
+                               detail or "Multiplayer is off until a new plugin build is released."),
+            "failed": ("❌", "Multiplayer plugins could not be installed",
+                       detail or "See the log for details. The Watcher keeps running in single-player mode."),
+        }.get(event)
+        if not spec:
+            return
+        icon, title, text = spec
+        key = f"vpx_plugin_{event}_{version}"
+        try:
+            if any(n.get("dedup_key") == key for n in _notif.load_notifications(self.cfg)):
+                return
+        except Exception:
+            pass
+        _notif.add_notification(
+            self.cfg,
+            type="vpx_plugin",
+            icon=icon,
+            title=title,
+            detail=text,
+            action_tab="system",
+            dedup_key=key,
         )
         try:
             self._refresh_notification_feed()
