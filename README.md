@@ -76,7 +76,7 @@ With Visual Pinball X **10.8.1** the Watcher tracks games with **up to 4 players
 
 ### 🎨 Appearance
 
-Customize the look and feel of the entire application, organized into **5 sub-tabs**:
+Customize the look and feel of the entire application, organized into **4 sub-tabs**:
 
 #### 🖼 Overlay
 - **Global Styling**: Font family, base font size, and overlay scale slider (30–300%)
@@ -103,13 +103,6 @@ Customize the look and feel of the entire application, organized into **5 sub-ta
 
 #### ✨ Effects
 - GPU-accelerated visual effects with automatic CPU fallback
-
-#### 🐾 Mascots
-- **🏆 Trophie** (GUI Mascot): Lives in the bottom-left corner of the main window
-- **🎱 Steely** (Desktop Overlay Mascot): A metallic chrome pinball that lives on your desktop as an always-on-top overlay. Reacts to game events
-- **Skins**: Multiple visual skins for both mascots
-- **Personality**: Unique speech bubbles, reactions, memory, and a "bickering" system between them
-- **Portrait Mode**: Steely supports 90° rotation for cabinet screens
 
 ---
 

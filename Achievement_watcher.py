@@ -79,7 +79,6 @@ from ui.available_maps import _AvailableMapsWorker
 import core.notifications as _notif
 import core.sound as sound
 
-from mascot.mascot import GUITrophie, OverlayTrophie, _TROPHIE_SHARED, _TrophieMemory
 
 from ui.overlay import (
     OverlayWindow,
@@ -260,55 +259,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         self._refresh_input_bindings()
 
-        # ── Trophie mascot ──────────────────────────────────────────────────
-        try:
-            _trophie_memory = _TrophieMemory(self.cfg.BASE)
-            self._trophie_gui = GUITrophie(self.centralWidget(), self.cfg)
-            self._trophie_gui.set_memory(_trophie_memory)
-            self._trophie_overlay = OverlayTrophie(self, self.cfg)
-            self._trophie_overlay.set_memory(_trophie_memory)
-
-            self.main_tabs.currentChanged.connect(self._trophie_gui.on_tab_changed)
-
-            # Connect sub-tab signals so Trophie also reacts to sub-tab changes
-            if hasattr(self, 'appearance_subtabs'):
-                self.appearance_subtabs.currentChanged.connect(self._on_subtab_changed_appearance)
-            if hasattr(self, 'system_subtabs'):
-                self.system_subtabs.currentChanged.connect(self._on_subtab_changed_system)
-            if hasattr(self, '_aw_inner_tabs'):
-                self._aw_inner_tabs.currentChanged.connect(self._on_subtab_changed_aweditor)
-
-            self.bridge.session_ended.connect(self._trophie_overlay.on_session_ended)
-            self.bridge.session_started.connect(
-                lambda rom, table: self._trophie_overlay.on_rom_start(rom, table or None)
-            )
-
-            # Duel mascot reactions
-            self.bridge.duel_received.connect(self._on_duel_received_mascot)
-            self.bridge.duel_result.connect(self._on_duel_result_mascot)
-            self.bridge.duel_expired.connect(self._on_duel_expired_mascot)
-
-            if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
-                self._trophie_gui.show()
-                QTimer.singleShot(800, self._trophie_gui.greet)
-            else:
-                self._trophie_gui.hide()
-            if self.cfg.OVERLAY.get("trophie_overlay_enabled", True):
-                self._trophie_overlay.show()
-                QTimer.singleShot(1200, self._trophie_overlay.greet)
-            else:
-                self._trophie_overlay.hide()
-            # Enable zank/bicker system when both trophies are visible
-            _TROPHIE_SHARED["gui_visible"] = (
-                bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)) and
-                bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True))
-            )
-        except Exception:
-            self._trophie_gui = None
-            self._trophie_overlay = None
-
-    # ── Duel mascot dispatchers ───────────────────────────────────────────────
-
     def _msgbox_topmost(self, kind: str, title: str, msg: str):
         """Show a top-most message box. *kind* is 'info' or 'warn'."""
         if kind == "warn":
@@ -317,60 +267,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             box = QMessageBox(QMessageBox.Icon.Information, title, msg, QMessageBox.StandardButton.Ok, self)
         box.setWindowFlags(box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         box.exec()
-
-    def _on_duel_received_mascot(self, opponent: str, table_name: str, duel_id: str) -> None:
-        """Trigger mascot duel-received reactions."""
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_duel_received()
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_duel_received()
-        except Exception:
-            pass
-
-    def _on_duel_result_mascot(self, duel_id: str, result: str, your_score: int, their_score: int) -> None:
-        """Trigger mascot reactions based on duel result."""
-        try:
-            trophie_gui = getattr(self, "_trophie_gui", None)
-            trophie_ov  = getattr(self, "_trophie_overlay", None)
-            if result == "won":
-                if trophie_gui:
-                    trophie_gui.on_duel_won()
-                if trophie_ov:
-                    trophie_ov.on_duel_won()
-            elif result == "lost":
-                if trophie_gui:
-                    trophie_gui.on_duel_lost()
-                if trophie_ov:
-                    trophie_ov.on_duel_lost()
-            elif result == "expired":
-                if trophie_gui:
-                    trophie_gui.on_duel_expired()
-                if trophie_ov:
-                    trophie_ov.on_duel_expired()
-            elif result == "declined":
-                if trophie_gui:
-                    trophie_gui.on_duel_declined()
-                if trophie_ov:
-                    trophie_ov.on_duel_declined()
-        except Exception:
-            pass
-
-    def _on_duel_expired_mascot(self, duel_id: str) -> None:
-        """Trigger mascot duel-expired reactions (bridge.duel_expired signal)."""
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_duel_expired()
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_duel_expired()
-        except Exception:
-            pass
 
     def _in_game_now(self) -> bool:
         try:
@@ -408,24 +304,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             return bool(w and w._vp_player_visible())
         except Exception:
             return False
-
-    def _on_subtab_changed_appearance(self, idx: int) -> None:
-        self._notify_trophie_subtab(self.appearance_subtabs.tabText(idx))
-
-    def _on_subtab_changed_system(self, idx: int) -> None:
-        self._notify_trophie_subtab(self.system_subtabs.tabText(idx))
-
-    def _on_subtab_changed_aweditor(self, _idx: int) -> None:
-        self._notify_trophie_subtab("aweditor")
-
-    def _notify_trophie_subtab(self, tab_name: str) -> None:
-        if not getattr(self, '_trophie_gui', None):
-            return
-        try:
-            self._trophie_gui.on_subtab_changed(tab_name)
-        except Exception:
-            pass
-
 
     def _fmt_hms(self, seconds: int) -> str:
         try:
@@ -729,21 +607,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• Generated scripts &amp; JSON: {BASE}/tools/AWeditor/<br>"
             "• Trigger files: {BASE}/tools/AWeditor/custom_events/<br>"
             "• Copy the aw_*.vbs to: Your Tables directory (next to .vpx)"
-        ),
-        "appearance_mascots": (
-            "<b>🏆 Mascots</b><br><br>"
-            "Customize your Trophie and Steely mascots.<br><br>"
-            "<b>🏆 Trophie (GUI Mascot)</b><br>"
-            "• <b>Show/Hide</b>: Toggle Trophie visibility in the main window.<br>"
-            "• <b>Skin Gallery</b>: Browse 22 unique skins. Click a skin card to preview it live. "
-            "Click <b>✓ Apply Skin</b> to make it permanent.<br>"
-            "• <b>Live Preview</b>: See the selected skin animated in real-time before applying.<br><br>"
-            "<b>🎱 Steely (Desktop Overlay Mascot)</b><br>"
-            "• <b>Show/Hide</b>: Toggle the desktop overlay widget.<br>"
-            "• <b>Portrait Mode</b>: Rotate Steely 90° for vertical cabinet screens.<br>"
-            "• <b>Skin Gallery</b>: Browse 22 unique skins with accessories. Click a card to preview, "
-            "then <b>✓ Apply Skin</b>.<br>"
-            "• <b>Live Preview</b>: See Steely animated with the selected skin before committing."
         ),
     }
 
@@ -2021,34 +1884,17 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
     def showEvent(self, event):
         super().showEvent(event)
-        _TROPHIE_SHARED["gui_visible"] = (
-            bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True)) and
-            bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True))
-        )
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.update_position(self.centralWidget().size())
-        except Exception:
-            pass
 
     def hideEvent(self, event):
         super().hideEvent(event)
-        _TROPHIE_SHARED["gui_visible"] = self.isVisible()
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        _TROPHIE_SHARED["gui_visible"] = self.isVisible()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.update_position(self.centralWidget().size())
-        except Exception:
-            pass
 
     def closeEvent(self, event):
-        _TROPHIE_SHARED["gui_visible"] = False
         self.cfg.save()
         try:
             if getattr(self, "tray", None) and self.tray and self.tray.isVisible():
@@ -2125,16 +1971,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             self._ach_toast_mgr.enqueue(title, rom, max(1, int(seconds)))
         except Exception:
             pass
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_achievement()
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_achievement()
-        except Exception:
-            pass
 
     def _on_level_up(self, level_name: str, level_number: int):
         try:
@@ -2144,16 +1980,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             pass
         try:
             self._refresh_level_display()
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_level_up()
-        except Exception:
-            pass
-        try:
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_level_up()
         except Exception:
             pass
 

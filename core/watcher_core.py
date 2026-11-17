@@ -2237,6 +2237,16 @@ class Watcher:
             log(self.cfg, f"[HIGHLIGHTS] analyze_session failed for P1: {e}", "WARN")
             highlights = {"Power": [], "Precision": [], "Fun": []}
 
+        # Best Ball (VPX 10.8.1 + score-server: real points per ball).
+        try:
+            _bb = self._live_best_ball()
+            if _bb and _bb.get("points", 0) > 0:
+                entry = f"🔥 Best Ball – {self._fmt_short(_bb['points'])} (B{_bb['ball']})"
+                highlights.setdefault("Power", [])
+                highlights["Power"] = [entry] + [x for x in highlights["Power"] if "Best Ball" not in x]
+        except Exception:
+            pass
+
         # For no-ROM custom-events tables, include unlocked custom achievements in highlights
         if not self.current_rom and self.current_table:
             try:
@@ -2718,12 +2728,26 @@ class Watcher:
         summary_path = os.path.join(p_highlights(self.cfg), self.SUMMARY_FILENAME)
         try:
             best_ball = None
+            _live_bb = None
             try:
-                balls = self.ball_track.get("balls", [])
-                if balls:
-                    best_ball = max(balls, key=lambda b: (int(b.get("score", 0)), int(b.get("duration", 0))))
+                _live_bb = self._live_best_ball()
             except Exception:
-                best_ball = None
+                _live_bb = None
+            if _live_bb:
+                best_ball = {"pid": 1, "num": _live_bb["ball"], "score": _live_bb["points"], "source": "score-server"}
+            else:
+                try:
+                    balls = self.ball_track.get("balls", [])
+                    if balls:
+                        best_ball = max(balls, key=lambda b: (int(b.get("score", 0)), int(b.get("duration", 0))))
+                except Exception:
+                    best_ball = None
+            try:
+                _final_score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
+            except Exception:
+                _final_score = 0
+            if not _final_score and _live_bb:
+                _final_score = int(_live_bb.get("score") or 0)
 
             try:
                 global_deltas = self._compute_session_deltas(self.start_audits, end_audits)
@@ -2748,7 +2772,7 @@ class Watcher:
                 "global_deltas": global_deltas,
                 "end_timestamp": datetime.now(timezone.utc).isoformat(),
                 # Convenience fields for dashboard display
-                "score": int(best_ball.get("score", 0)) if isinstance(best_ball, dict) else None,
+                "score": _final_score or (int(best_ball.get("score", 0)) if isinstance(best_ball, dict) else None),
             }
 
             save_json(summary_path, payload)
@@ -3356,6 +3380,129 @@ class Watcher:
         except Exception:
             pass
 
+    # ── Multiplayer: per-player actions from live NVRAM snapshots ───────────
+    @staticmethod
+    def _fmt_short(n) -> str:
+        try:
+            n = int(n)
+        except Exception:
+            return str(n)
+        for div, suf in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+            if abs(n) >= div:
+                v = n / div
+                return (f"{v:.2f}".rstrip("0").rstrip(".") if v < 10 else f"{v:.1f}".rstrip("0").rstrip(".")) + suf
+        return str(n)
+
+    def _decode_audits_raw(self, rom: str, raw: bytes) -> dict:
+        """Decode NVRAM bytes with the (auto-fixed) layout used for the .nv file."""
+        cached = self._load_cached_layout(rom)
+        if not cached:
+            try:
+                self.read_nvram_audits_with_autofix(rom)   # builds the cached layout
+            except Exception:
+                pass
+            cached = self._load_cached_layout(rom)
+        audits = {}
+        for fld in (cached or {}).get("fields", []) or []:
+            try:
+                val = self._decode_field_value(raw, fld)
+                if val is not None:
+                    audits[fld["label"]] = val
+            except Exception:
+                continue
+        return audits
+
+    @staticmethod
+    def _align_snapshot(file_raw: bytes, snap: bytes) -> Optional[int]:
+        """Find where the live NVRAM block sits inside the .nv file.
+
+        The plugin delivers the controller's NVRAM region; the .nv file may hold
+        more (or a header). Several 32-byte probes from the snapshot are searched
+        in the file and the most common offset wins.
+        """
+        if not file_raw or not snap:
+            return None
+        if len(snap) <= len(file_raw) and file_raw[:len(snap)] == snap:
+            return 0
+        votes: Dict[int, int] = {}
+        step = max(32, len(snap) // 64)
+        for pos in range(0, max(1, len(snap) - 32), step):
+            probe = snap[pos:pos + 32]
+            if len(set(probe)) < 4:      # skip blank/uniform areas, they match anywhere
+                continue
+            idx = file_raw.find(probe)
+            if idx >= 0:
+                k = idx - pos
+                votes[k] = votes.get(k, 0) + 1
+        if not votes:
+            return None
+        k, n = max(votes.items(), key=lambda kv: kv[1])
+        if n < 2 or k < 0 or k + 1 > len(file_raw):
+            return None
+        return k
+
+    def _mp_player_breakdown(self, rom: str, game: dict) -> Dict[int, dict]:
+        """Attribute NVRAM audit changes of one game to the players.
+
+        Every snapshot marks a player/ball change; everything that changed until
+        the next snapshot happened while ``snapshot.player`` was playing.
+        """
+        snaps = [x for x in (game.get("snapshots") or []) if x.get("data")]
+        if len(snaps) < 2 or not rom:
+            return {}
+        try:
+            with open(self._nv_path_for(rom), "rb") as f:
+                file_raw = f.read()
+        except Exception:
+            file_raw = b""
+        k = self._align_snapshot(file_raw, snaps[-1]["data"]) if file_raw else None
+        if k is None:
+            log(self.cfg, "[MULTIPLAYER] could not align live NVRAM with the .nv file – no per-player actions", "WARN")
+            return {}
+
+        def _as_file(data: bytes) -> bytes:
+            end = min(len(file_raw), k + len(data))
+            return file_raw[:k] + data[:end - k] + file_raw[end:]
+
+        decoded = [self._decode_audits_raw(rom, _as_file(x["data"])) for x in snaps]
+        out: Dict[int, dict] = {}
+        for i in range(len(snaps) - 1):
+            pid = int(snaps[i].get("player") or 0)
+            if pid < 1 or int(snaps[i].get("ball") or 0) < 1:
+                continue          # attract mode / game over
+            d = self._compute_session_deltas(decoded[i], decoded[i + 1])
+            rec = out.setdefault(pid, {"deltas": {}, "duration": 0.0})
+            for key, val in d.items():
+                if "score" in str(key).lower():
+                    continue
+                rec["deltas"][key] = int(rec["deltas"].get(key, 0)) + int(val)
+            rec["duration"] += max(0.0, float(snaps[i + 1].get("ts", 0)) - float(snaps[i].get("ts", 0)))
+        return out
+
+    def _live_best_ball(self) -> Optional[dict]:
+        """Best ball of player 1 in the last game (score-server data), if any."""
+        ss = getattr(self, "_ss_summary", None) or {}
+        games = [g for g in (ss.get("games") or []) if isinstance(g, dict)]
+        if not games:
+            return None
+        for ps in games[-1].get("player_stats") or []:
+            if int(ps.get("player") or 0) == 1 and int(ps.get("best_ball") or 0) > 0:
+                return {"points": int(ps["best_ball"]), "ball": int(ps.get("best_ball_no") or 0),
+                        "score": int(ps.get("score") or 0)}
+        return None
+
+    def _player_highlights(self, deltas: dict, score: int, duration_sec: int, best_ball: int = 0, best_ball_no: int = 0) -> dict:
+        try:
+            events = self._build_events_from_deltas(dict(deltas or {}))
+            hl = self.analyze_session({"score": int(score or 0), "duration_sec": int(duration_sec or 0), "events": events})
+        except Exception:
+            hl = {"Power": [], "Precision": [], "Fun": []}
+        if best_ball and int(best_ball) > 0:
+            entry = f"🔥 Best Ball – {self._fmt_short(best_ball)}" + (f" (B{int(best_ball_no)})" if best_ball_no else "")
+            hl.setdefault("Power", [])
+            hl["Power"] = [entry] + [x for x in hl["Power"] if "Best Ball" not in x]
+        return hl
+
     def _score_server_client(self):
         """Return the score-server client when the plugin is active, else None."""
         if not getattr(self, "score_server_ready", False):
@@ -3416,16 +3563,34 @@ class Watcher:
             # the overlay shows the player comparison instead.
             _is_multiplayer = False
             self._mp_summary = None
+            self._ss_summary = None
             try:
                 _ssc = self._score_server_client()
                 if _ssc is not None:
-                    _mp = _ssc.session_summary()
+                    _mp = _ssc.session_summary(include_snapshots=True)
+                    self._ss_summary = _mp
                     if _mp.get("multiplayer"):
+                        # Per-player actions + highlights for the last game.
+                        try:
+                            _g = (_mp.get("games") or [])[-1]
+                            _bd = self._mp_player_breakdown(self.current_rom or "", _g)
+                            for _ps in _g.get("player_stats") or []:
+                                _pid = int(_ps.get("player") or 0)
+                                _rec = _bd.get(_pid, {})
+                                _ps["deltas"] = _rec.get("deltas", {})
+                                _ps["highlights"] = self._player_highlights(
+                                    _ps["deltas"], _ps.get("score", 0), int(_rec.get("duration", 0)),
+                                    _ps.get("best_ball", 0), _ps.get("best_ball_no", 0))
+                            _g["per_player_actions"] = bool(_bd)
+                        except Exception as _e:
+                            log(self.cfg, f"[MULTIPLAYER] per-player breakdown failed: {_e}", "WARN")
                         _is_multiplayer = True
                         _mp["rom"] = self.current_rom or ""
                         _mp["table"] = self.current_table or ""
                         _mp["end_ts"] = time.time()
                         self._mp_summary = _mp
+                        for _g in _mp.get("games") or []:
+                            _g.pop("snapshots", None)
                         save_json(os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME), _mp)
                         log(self.cfg, f"[MULTIPLAYER] {_mp.get('max_players')} players, {len(_mp.get('games') or [])} game(s) – achievements disabled for this session")
                     _ssc.end_session()

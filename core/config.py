@@ -142,14 +142,6 @@ DEFAULT_OVERLAY.setdefault("sound_enabled", False)
 DEFAULT_OVERLAY.setdefault("sound_volume", 20)
 DEFAULT_OVERLAY.setdefault("sound_pack", "arcade")
 DEFAULT_OVERLAY.setdefault("sound_events", {})
-DEFAULT_OVERLAY.setdefault("trophie_gui_enabled", False)
-DEFAULT_OVERLAY.setdefault("trophie_overlay_enabled", False)
-DEFAULT_OVERLAY.setdefault("trophie_overlay_x", -1)
-DEFAULT_OVERLAY.setdefault("trophie_overlay_y", -1)
-DEFAULT_OVERLAY.setdefault("trophie_overlay_portrait", False)
-DEFAULT_OVERLAY.setdefault("trophie_overlay_rotate_ccw", False)
-DEFAULT_OVERLAY.setdefault("trophie_gui_skin", "classic")
-DEFAULT_OVERLAY.setdefault("trophie_overlay_skin", "classic")
 
 # Post-Processing
 DEFAULT_OVERLAY.setdefault("fx_post_bloom", False)
@@ -233,10 +225,6 @@ _ALLOWED_OVERLAY_KEYS = [
     "fx_duel_energy_flash",
     "fx_duel_color_morph",
     "fx_duel_glow_sweep",
-    "trophie_gui_enabled", "trophie_overlay_enabled",
-    "trophie_overlay_x", "trophie_overlay_y",
-    "trophie_overlay_portrait", "trophie_overlay_rotate_ccw",
-    "trophie_gui_skin", "trophie_overlay_skin",
 
     # Post-Processing effect toggles and intensities
     "fx_post_bloom", "fx_post_bloom_intensity",

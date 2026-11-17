@@ -21,12 +21,11 @@ from .overlay import (
     DuelOverlayPositionPicker,
 )
 from .effects import EffectsMixin
-from .mascots import MascotsMixin
 
 # Screen Capture dropdown option labels and their config values (index → value)
 
 
-class AppearanceMixin(MascotsMixin, EffectsMixin):
+class AppearanceMixin(EffectsMixin):
     """Mixin that provides the Appearance tab (Overlay, Theme, Sound sub-tabs) and all
     related placement, orientation, font, and theme handler methods.
 
@@ -320,11 +319,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self._style(getattr(self, "btn_quit", None), "QPushButton { background-color:#8a2525; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._style(getattr(self, "btn_restart", None), "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._update_theme_preview(theme_id)
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_theme_changed()
-        except Exception:
-            pass
 
     def _on_theme_combo_changed(self, _index: int):
         theme_id = self.cmb_theme.currentData()
@@ -855,8 +849,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         # ── Effects sub-tab ────────────────────────────────────────────────────
         self._build_effects_subtab()
 
-        # ── Mascots sub-tab ────────────────────────────────────────────────────
-        self._build_mascots_subtab()
 
         self.main_tabs.addTab(tab, "🎨 Appearance")
 

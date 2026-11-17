@@ -28,6 +28,3 @@ class TrayMixin:
         self.showNormal()
         self.activateWindow()
         self.raise_()
-        if getattr(self, "_trophie_gui", None):
-            if self.cfg.OVERLAY.get("trophie_gui_enabled", True):
-                QTimer.singleShot(400, self._trophie_gui.re_greet)
