@@ -2465,7 +2465,7 @@ class Watcher:
             global_rt = _keep([m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")])
             _mark(global_hits); _mark(global_rt)
             if global_hits or global_rt:
-                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
+                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt, skip_cloud=live)
             if global_hits:
                 self._emit_achievement_toasts(global_hits, seconds=5, rom_override="")
         except Exception as e:
@@ -2476,7 +2476,7 @@ class Watcher:
             session_hits, session_rt = _keep(session_hits), _keep(session_rt)
             _mark(session_hits); _mark(session_rt)
             if session_hits or session_rt:
-                self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
+                self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt), skip_cloud=live)
             if session_hits:
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
