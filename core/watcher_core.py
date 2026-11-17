@@ -248,6 +248,7 @@ class Watcher:
 
         # In-memory cache of the last overlay snapshot payload (avoids disk read race)
         self._overlay_snapshot_cache: Optional[dict] = None
+        self._rounds_reset()
 
         self._toasted_titles: set = set()
 
@@ -424,6 +425,85 @@ class Watcher:
         try:
             t = threading.Thread(target=_worker, daemon=True, name="MiniInfoMissingMap")
             t.start()
+        except Exception:
+            pass
+
+    def _emit_mini_info_if_no_live_status(self, rom: str, seconds: int = 5):
+        """VPX 10.8.1 + plugin: tell the player when the plugin cannot read the
+        game status of this ROM (no live tracking, no multiplayer). Same logic
+        as the "No NVRAM map" notice: once per ROM, when the VPX window shows."""
+        import threading
+        def _worker():
+            import time
+            try:
+                import win32gui
+            except ImportError:
+                return
+            try:
+                if not rom or not getattr(self, "score_server_ready", False):
+                    return
+                if not self._has_any_map(rom):
+                    return            # "No NVRAM map" covers this case
+                from .vpx_env import plugin_game_status_readable
+                if plugin_game_status_readable(self.cfg, rom) is not False:
+                    return
+                shown = getattr(self, "_mini_info_live_shown_for_rom", None)
+                if not isinstance(shown, set):
+                    shown = set()
+                if rom in shown:
+                    return
+                # The "No VPS-ID" notice uses the same window: show this one after it.
+                wait_vps = 0.0
+                try:
+                    if self.cfg.CLOUD_ENABLED:
+                        from ui.vps import _load_vps_mapping
+                        if not _load_vps_mapping(self.cfg).get(rom):
+                            wait_vps = 9.0
+                except Exception:
+                    pass
+
+                def _vpx_window_visible() -> bool:
+                    found = False
+                    def _cb(hwnd, _):
+                        nonlocal found
+                        try:
+                            title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
+                            if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
+                                found = True
+                                return False
+                        except Exception:
+                            pass
+                        return True
+                    try:
+                        win32gui.EnumWindows(_cb, None)
+                    except Exception:
+                        return False
+                    return found
+
+                for _ in range(120):  # max 60 s – VPX can take a while to show its window
+                    if self._stop.is_set() or not self.game_active:
+                        return
+                    if _vpx_window_visible():
+                        if wait_vps:
+                            time.sleep(wait_vps)
+                            if self._stop.is_set() or not self.game_active:
+                                return
+                        msg = (f"Live tracking & multiplayer not available for '{rom}'.\n"
+                               f"Close the table to see your results.")
+                        try:
+                            self.bridge.mini_info_show.emit(msg, max(3, int(seconds)))
+                            shown.add(rom)
+                            self._mini_info_live_shown_for_rom = shown
+                            log(self.cfg, f"[INFO] Mini overlay (no live game status) shown for {rom}")
+                        except Exception as e:
+                            log(self.cfg, f"[OVERLAY] mini info emit failed: {e}", "WARN")
+                        return
+                    time.sleep(0.5)
+            except Exception as e:
+                log(self.cfg, f"[OVERLAY] mini info live-status worker failed: {e}", "WARN")
+
+        try:
+            threading.Thread(target=_worker, daemon=True, name="MiniInfoNoLiveStatus").start()
         except Exception:
             pass
 
@@ -1491,7 +1571,7 @@ class Watcher:
         return audits, notes, False
 
     HIGHLIGHT_RULES = {
-        "multiball": {"cat": "Power", "emoji": "💥", "label": "Multiball Frenzy", "type": "count"},
+        "multiball": {"cat": "Power", "emoji": "💥", "label": "Multiball", "type": "count"},
         "jackpot": {"cat": "Power", "emoji": "🎯", "label": "Jackpot Hunter", "type": "count"},
         "super_jackpot": {"cat": "Power", "emoji": "💎", "label": "Super Jackpot", "type": "count"},
         "triple_jackpot": {"cat": "Power", "emoji": "👑", "label": "Triple Jackpot", "type": "count"},
@@ -1713,6 +1793,33 @@ class Watcher:
         val = (audits or {}).get("Score")
         return int(val) if _is_num(val) else 0
 
+    # Words in an audit name that mean "not a played multiball"
+    # (locks, lit/ready lamps, multiball jackpots, ball saves during multiball …).
+    _MB_EXCLUDE = ("lock", "lit", "ready", "light", "jackpot", " jp", "save", "qualif", "award", "score", "value")
+
+    @classmethod
+    def _multiball_count(cls, deltas: dict) -> int:
+        """Number of multiballs played. Tables keep several multiball audits
+        (starts, per-mode counters, totals); adding them up counts one
+        multiball several times, so take the best single counter instead,
+        preferring audits that count starts."""
+        words = cls.EVENT_KEYWORDS.get("multiball", [])
+        starts, others = [], []
+        for label, val in (deltas or {}).items():
+            try:
+                v = int(val)
+            except Exception:
+                continue
+            if v <= 0:
+                continue
+            l = str(label).lower()
+            if not any(w in l for w in words) or any(x in l for x in cls._MB_EXCLUDE):
+                continue
+            (starts if ("start" in l or "played" in l or "total" in l) else others).append(v)
+        if starts:
+            return max(starts)
+        return max(others) if others else 0
+
     def _build_events_from_deltas(self, deltas: dict) -> dict:
         events = {k: 0 for k in self.HIGHLIGHT_RULES.keys()}
         for label, val in deltas.items():
@@ -1745,8 +1852,11 @@ class Watcher:
                 matched_keys.remove("multiball")
                 
             for key in matched_keys:
+                if key == "multiball":
+                    continue
                 events[key] = events.get(key, 0) + int(val)
-                
+
+        events["multiball"] = self._multiball_count(deltas)
         return events
 
     def _attribute_events(self, audits: dict) -> bool:
@@ -1805,6 +1915,9 @@ class Watcher:
                 pass
             for ev_key, words in (self.EVENT_KEYWORDS or {}).items():
                 if any(w in ll for w in words):
+                    if ev_key == "multiball":
+                        # counted from the session deltas (see _multiball_count)
+                        break
                     try:
                         ec = player_rec.setdefault("event_counts", {})
                         ec[ev_key] = ec.get(ev_key, 0) + int(diff)
@@ -2293,7 +2406,30 @@ class Watcher:
             log(self.cfg, "[EXPORT] session-only activePlayers written (P1 only)")
         return active_dir
 
-    def _persist_and_toast_achievements(self, end_audits: dict, duration_sec: int):
+    def _persist_and_toast_achievements(self, end_audits: dict, duration_sec: int, live: bool = False):
+        """Evaluate, record and toast achievements.
+
+        With rounds (VPX 10.8.1 + plugin) this runs live during a round and once
+        at its end; titles already handled in the round are skipped so nothing
+        is counted or toasted twice. ``live`` skips the cloud upload and badge
+        check, which run at the end of the round.
+        """
+        _round = getattr(self, "_round", None)
+        _done = _round["done"] if isinstance(_round, dict) else None
+
+        def _t(m) -> str:
+            return (str(m.get("title", "")) if isinstance(m, dict) else str(m)).strip()
+
+        def _keep(items):
+            items = list(items or [])
+            if _done is None:
+                return items
+            return [m for m in items if _t(m) not in _done]
+
+        def _mark(items):
+            if _done is not None:
+                _done.update(_t(m) for m in (items or []))
+
         if not self.current_rom or not self._has_any_map(self.current_rom):
             log(self.cfg, f"[ACH] Evaluation skipped: No NVRAM map found for '{self.current_rom}'")
             return
@@ -2325,8 +2461,9 @@ class Watcher:
         log(self.cfg, f"[ACH] Evaluation result: {len(awarded_meta) if awarded_meta else 0} awarded, {len(retriggered_meta) if retriggered_meta else 0} retriggered")
 
         try:
-            global_hits = [m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")]
-            global_rt = [m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")]
+            global_hits = _keep([m for m in (awarded_meta or []) if (m.get("origin") == "global_achievements")])
+            global_rt = _keep([m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")])
+            _mark(global_hits); _mark(global_rt)
             if global_hits or global_rt:
                 self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
             if global_hits:
@@ -2336,12 +2473,17 @@ class Watcher:
 
         try:
             session_hits, session_rt = self._evaluate_player_session_achievements(1, self.current_rom)
+            session_hits, session_rt = _keep(session_hits), _keep(session_rt)
+            _mark(session_hits); _mark(session_rt)
             if session_hits or session_rt:
                 self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
             if session_hits:
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
             log(self.cfg, f"[ACH] persist session failed: {e}", "WARN")
+
+        if live:
+            return
 
         try:
             if self.cfg.CLOUD_ENABLED:
@@ -3357,6 +3499,7 @@ class Watcher:
         self.last_session_score = 0
         self.players.clear()
         self._toasted_titles = set()
+        self._rounds_reset()
 
         self.start_audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
 
@@ -3513,6 +3656,182 @@ class Watcher:
         except Exception:
             return None
 
+    # ── VPX 10.8.1 + plugin: every pinball game ("round") on its own ────────
+    ROUND_MIN_SEC = 60          # shorter rounds are ignored (same rule as the plugin)
+    ROUND_LIVE_EVAL_SEC = 2.0   # live achievement check at most every 2 s
+
+    def _rounds_reset(self) -> None:
+        self._rounds_mode = False      # the plugin reports rounds for this table
+        self._round = None             # round in progress
+        self._nv_file_raw = None
+        self._nv_align_k = None
+
+    def _snapshot_audits(self, data: bytes) -> dict:
+        """Decode a live NVRAM snapshot with the NVRAM map of the current ROM."""
+        rom = self.current_rom or ""
+        if not rom or not data:
+            return {}
+        if getattr(self, "_nv_file_raw", None) is None:
+            try:
+                with open(self._nv_path_for(rom), "rb") as f:
+                    self._nv_file_raw = f.read()
+            except Exception:
+                self._nv_file_raw = b""
+        file_raw = self._nv_file_raw or b""
+        if not file_raw:
+            return {}
+        if getattr(self, "_nv_align_k", None) is None:
+            self._nv_align_k = self._align_snapshot(file_raw, data)
+            if self._nv_align_k is None:
+                return {}
+        k = self._nv_align_k
+        end = min(len(file_raw), k + len(data))
+        return self._decode_audits_raw(rom, file_raw[:k] + data[:end - k] + file_raw[end:])
+
+    def _build_mp_summary(self, mp: dict) -> dict:
+        """Per-player actions and highlights for the last game of ``mp`` (needs
+        the raw snapshots); returns the JSON-safe summary that was saved."""
+        try:
+            g = (mp.get("games") or [])[-1]
+            bd = self._mp_player_breakdown(self.current_rom or "", g)
+            for ps in g.get("player_stats") or []:
+                pid = int(ps.get("player") or 0)
+                rec = bd.get(pid, {})
+                ps["deltas"] = rec.get("deltas", {})
+                ps["highlights"] = self._player_highlights(
+                    ps["deltas"], ps.get("score", 0), int(rec.get("duration", 0)),
+                    ps.get("best_ball", 0), ps.get("best_ball_no", 0))
+            g["per_player_actions"] = bool(bd)
+        except Exception as e:
+            log(self.cfg, f"[MULTIPLAYER] per-player breakdown failed: {e}", "WARN")
+        mp["rom"] = self.current_rom or ""
+        mp["table"] = self.current_table or ""
+        mp["end_ts"] = time.time()
+        for g in mp.get("games") or []:
+            g.pop("snapshots", None)
+        save_json(os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME), mp)
+        return mp
+
+    def _remove_mp_file(self) -> None:
+        try:
+            f = os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME)
+            if os.path.isfile(f):
+                os.remove(f)
+        except Exception:
+            pass
+
+    def _pump_rounds(self) -> None:
+        """Handle round start/end and live NVRAM snapshots from the plugin."""
+        ssc = self._score_server_client()
+        if ssc is None or not self.current_rom:
+            return
+        for kind, payload in ssc.pop_events():
+            try:
+                if kind == "round_start":
+                    self._round_begin(payload)
+                elif kind == "snapshot":
+                    g, snap = payload
+                    self._round_snapshot(g, snap)
+                elif kind == "round_end":
+                    self._round_end(ssc, payload)
+            except Exception as e:
+                log(self.cfg, f"[ROUND] {kind} failed: {e}", "WARN")
+
+    def _round_begin(self, game) -> None:
+        self._rounds_mode = True
+        self._round = {"game": game, "start_ts": time.time(), "start_audits": None,
+                       "done": set(), "last_eval": 0.0}
+        self._toasted_titles = set()
+        self.players[1] = {
+            "start_audits": {"P1 Score": 0}, "last_audits": {"P1 Score": 0},
+            "active_play_seconds": 0.0, "start_time": time.time(),
+            "session_deltas": {}, "event_counts": {},
+        }
+        log(self.cfg, f"[ROUND] new game started on {self.current_rom}")
+
+    def _round_snapshot(self, game, snap: dict) -> None:
+        r = getattr(self, "_round", None)
+        if not r or r["game"] is not game:
+            return
+        audits = self._snapshot_audits(snap.get("data") or b"")
+        if not audits:
+            return
+        if r["start_audits"] is None:
+            r["start_audits"] = audits          # first snapshot of the round = baseline
+            return
+        r["last_audits"] = audits
+        # Live achievements, 1 player only. During ball 1 another player can
+        # still join, so the check starts with ball 2 (ball-1 unlocks follow then).
+        if int(snap.get("players") or 1) > 1 or int(snap.get("ball") or 0) < 2:
+            return
+        now = time.time()
+        if now - r["last_eval"] < self.ROUND_LIVE_EVAL_SEC:
+            return
+        r["last_eval"] = now
+        self._round_apply(r, audits, now - r["start_ts"])
+        self._persist_and_toast_achievements(audits, int(now - r["start_ts"]), live=True)
+
+    def _round_apply(self, r: dict, end_audits: dict, duration: float) -> None:
+        """Make the round the current 'session' for highlights and achievements."""
+        self.start_audits = dict(r["start_audits"] or {})
+        p1 = self.players.setdefault(1, {"event_counts": {}})
+        p1["session_deltas"] = self._compute_session_deltas(self.start_audits, end_audits)
+        p1["active_play_seconds"] = float(duration)
+
+    def _round_end(self, ssc, game) -> None:
+        r = getattr(self, "_round", None)
+        if not r or r["game"] is not game:
+            log(self.cfg, "[ROUND] game end without a tracked start – ignored")
+            return
+        self._round = None
+        duration = float((game.ended or time.time()) - game.started)
+        if duration < self.ROUND_MIN_SEC:
+            log(self.cfg, f"[ROUND] game shorter than {self.ROUND_MIN_SEC}s ({int(duration)}s) – ignored")
+            return
+        summary = ssc.game_summary(game, include_snapshots=True)
+        snaps = [x for x in (summary.get("snapshots") or []) if x.get("data")]
+        end_audits = self._snapshot_audits(snaps[-1]["data"]) if snaps else {}
+        if r["start_audits"] is None and snaps:
+            r["start_audits"] = self._snapshot_audits(snaps[0]["data"])
+        if not end_audits or r["start_audits"] is None:
+            log(self.cfg, "[ROUND] no live NVRAM for this game – nothing to show", "WARN")
+            return
+        self._round_finish(r, summary, end_audits, int(duration))
+
+    def _round_finish(self, r: dict, summary: dict, end_audits: dict, duration: int) -> None:
+        """Results of one round: overlay page 1, achievements (1 player)."""
+        self._round_apply(r, end_audits, duration)
+        multiplayer = int(summary.get("players") or 1) > 1
+        mp = {"connected": True, "games": [summary], "max_players": int(summary.get("players") or 1),
+              "multiplayer": multiplayer}
+        self._ss_summary = {"games": [{k: v for k, v in summary.items() if k != "snapshots"}]}
+        if multiplayer:
+            self._mp_summary = self._build_mp_summary(mp)
+            log(self.cfg, f"[ROUND] multiplayer game finished ({mp['max_players']} players) – no achievements")
+        else:
+            self._mp_summary = None
+            self._remove_mp_file()
+            log(self.cfg, f"[ROUND] game finished ({duration}s)")
+        try:
+            self._export_summary(end_audits, duration)
+        except Exception as e:
+            log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
+        try:
+            self.export_overlay_snapshot(end_audits, duration)
+        except Exception as e:
+            log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
+        try:
+            if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True) and self._has_any_map(self.current_rom):
+                self.bridge.overlay_show.emit()
+        except Exception as e:
+            log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
+        if not multiplayer:
+            self._round = r                      # keep the round's 'done' titles for the filter
+            try:
+                self._persist_and_toast_achievements(end_audits, duration)
+            finally:
+                self._round = None
+
     def _ensure_singleplayer_min_playtime(self, nplayers: int, duration_sec: int) -> None:
         try:
             if int(nplayers) == 1:
@@ -3558,6 +3877,27 @@ class Watcher:
 
             log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
 
+            # VPX 10.8.1 + plugin: each game was shown when it ended. Closing the
+            # table only evaluates a game still running for at least
+            # ROUND_MIN_SEC (like 10.8.0); otherwise nothing is shown again.
+            _rounds_skip = False
+            _r = None
+            if getattr(self, "_rounds_mode", False):
+                try:
+                    self._pump_rounds()          # a game end that arrived just before closing
+                except Exception:
+                    pass
+                _r = getattr(self, "_round", None)
+                if _r and (time.time() - _r["start_ts"]) >= self.ROUND_MIN_SEC:
+                    if _r.get("start_audits") is not None:
+                        self.start_audits = dict(_r["start_audits"])
+                    duration_sec = int(time.time() - _r["start_ts"])
+                    self.players[1]["session_deltas"] = self._compute_session_deltas(self.start_audits, end_audits)
+                    self.players[1]["active_play_seconds"] = float(duration_sec)
+                    log(self.cfg, f"[ROUND] table closed during a game ({duration_sec}s) – evaluating it now")
+                else:
+                    _rounds_skip = True
+
             # Multiplayer detection (score-server plugin, VPX 10.8.1+).
             # More than one player in this session -> no achievements at all,
             # the overlay shows the player comparison instead.
@@ -3566,33 +3906,26 @@ class Watcher:
             self._ss_summary = None
             try:
                 _ssc = self._score_server_client()
-                if _ssc is not None:
-                    _mp = _ssc.session_summary(include_snapshots=True)
-                    self._ss_summary = _mp
+                if _ssc is not None and _rounds_skip:
+                    _ssc.end_session()
+                elif _ssc is not None:
+                    if getattr(self, "_rounds_mode", False) and _r:
+                        # Only the game that was still running counts here.
+                        _gs = _ssc.game_summary(_r["game"], include_snapshots=True)
+                        _np = int(_gs.get("players") or 1)
+                        _mp = {"connected": True, "games": [_gs], "max_players": _np, "multiplayer": _np > 1}
+                    else:
+                        _mp = _ssc.session_summary(include_snapshots=True)
                     if _mp.get("multiplayer"):
-                        # Per-player actions + highlights for the last game.
-                        try:
-                            _g = (_mp.get("games") or [])[-1]
-                            _bd = self._mp_player_breakdown(self.current_rom or "", _g)
-                            for _ps in _g.get("player_stats") or []:
-                                _pid = int(_ps.get("player") or 0)
-                                _rec = _bd.get(_pid, {})
-                                _ps["deltas"] = _rec.get("deltas", {})
-                                _ps["highlights"] = self._player_highlights(
-                                    _ps["deltas"], _ps.get("score", 0), int(_rec.get("duration", 0)),
-                                    _ps.get("best_ball", 0), _ps.get("best_ball_no", 0))
-                            _g["per_player_actions"] = bool(_bd)
-                        except Exception as _e:
-                            log(self.cfg, f"[MULTIPLAYER] per-player breakdown failed: {_e}", "WARN")
                         _is_multiplayer = True
-                        _mp["rom"] = self.current_rom or ""
-                        _mp["table"] = self.current_table or ""
-                        _mp["end_ts"] = time.time()
-                        self._mp_summary = _mp
+                        self._mp_summary = self._build_mp_summary(_mp)
+                        log(self.cfg, f"[MULTIPLAYER] {_mp.get('max_players')} players, {len(_mp.get('games') or [])} game(s) – achievements disabled for this session")
+                    else:
                         for _g in _mp.get("games") or []:
                             _g.pop("snapshots", None)
-                        save_json(os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME), _mp)
-                        log(self.cfg, f"[MULTIPLAYER] {_mp.get('max_players')} players, {len(_mp.get('games') or [])} game(s) – achievements disabled for this session")
+                        if getattr(self, "_rounds_mode", False):
+                            self._remove_mp_file()
+                    self._ss_summary = _mp
                     _ssc.end_session()
             except Exception as e:
                 log(self.cfg, f"[MULTIPLAYER] summary failed: {e}", "WARN")
@@ -3609,43 +3942,46 @@ class Watcher:
             if _duel_active:
                 log(self.cfg, f"[DUEL] Active duel for {self.current_rom} — skipping achievements, main overlay and cloud upload")
             else:
-                try:
-                    self._export_summary(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
-
-                try:
-                    self.export_overlay_snapshot(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
-
-                # Fire the overlay signal immediately after the snapshot data is ready,
-                # before slow achievement persistence and cloud uploads.
-                try:
-                    if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
-                        if self.current_rom and self._has_any_map(self.current_rom):
-                            self.bridge.overlay_show.emit()
-                        elif not self.current_rom and self.current_table:
-                            # No-ROM table: show overlay if custom events are configured
-                            _custom_json = os.path.join(
-                                p_aweditor(self.cfg), f"{self.current_table}.custom.json"
-                            )
-                            if os.path.isfile(_custom_json):
-                                self.bridge.overlay_show.emit()
-                            else:
-                                log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
-                        else:
-                            log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
-                except Exception as e:
-                    log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
-
-                if _is_multiplayer:
-                    log(self.cfg, "[ACH] Evaluation skipped: multiplayer game")
+                if _rounds_skip:
+                    log(self.cfg, "[ROUND] table closed – results were shown at the end of each game")
                 else:
                     try:
-                        self._persist_and_toast_achievements(end_audits, duration_sec)
+                        self._export_summary(end_audits, duration_sec)
                     except Exception as e:
-                        log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
+                        log(self.cfg, f"[SUMMARY] export failed: {e}", "WARN")
+
+                    try:
+                        self.export_overlay_snapshot(end_audits, duration_sec)
+                    except Exception as e:
+                        log(self.cfg, f"[OVERLAY] export snapshot failed: {e}", "WARN")
+
+                    # Fire the overlay signal immediately after the snapshot data is ready,
+                    # before slow achievement persistence and cloud uploads.
+                    try:
+                        if (self.cfg.OVERLAY or {}).get("auto_show_on_end", True):
+                            if self.current_rom and self._has_any_map(self.current_rom):
+                                self.bridge.overlay_show.emit()
+                            elif not self.current_rom and self.current_table:
+                                # No-ROM table: show overlay if custom events are configured
+                                _custom_json = os.path.join(
+                                    p_aweditor(self.cfg), f"{self.current_table}.custom.json"
+                                )
+                                if os.path.isfile(_custom_json):
+                                    self.bridge.overlay_show.emit()
+                                else:
+                                    log(self.cfg, f"[OVERLAY] Skipped auto-show: no NVRAM map and no custom events for '{self.current_table}'")
+                            else:
+                                log(self.cfg, f"[OVERLAY] Skipped auto-show because no NVRAM map exists for '{self.current_rom}'")
+                    except Exception as e:
+                        log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
+
+                    if _is_multiplayer:
+                        log(self.cfg, "[ACH] Evaluation skipped: multiplayer game")
+                    else:
+                        try:
+                            self._persist_and_toast_achievements(end_audits, duration_sec)
+                        except Exception as e:
+                            log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
 
                 if (not _is_multiplayer) and self.current_rom and self._has_any_map(self.current_rom):
                     try:
@@ -3704,6 +4040,7 @@ class Watcher:
 
 
         finally:
+            self._rounds_reset()
             self.current_table = None
             self.current_rom = None
             self.start_time = None
@@ -4005,6 +4342,7 @@ class Watcher:
                     self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
                         self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
+                        self._emit_mini_info_if_no_live_status(self.current_rom or rom, 5)
 
                 elif active_rom and session_key and session_key != active_rom:
                     self.on_session_end()
@@ -4017,6 +4355,7 @@ class Watcher:
                     self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
                         self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
+                        self._emit_mini_info_if_no_live_status(self.current_rom or rom, 5)
 
                 if active_rom:
                     if now_loop - float(getattr(self, "_last_vp_rect_ts", 0.0)) > 5.0:
@@ -4075,6 +4414,12 @@ class Watcher:
                         self._poll_custom_events()
                     except Exception as e:
                         log(self.cfg, f"[CUSTOM_EVENTS] poll failed: {e}", "WARN")
+
+                    # VPX 10.8.1 + plugin: game start/end and live NVRAM
+                    try:
+                        self._pump_rounds()
+                    except Exception as e:
+                        log(self.cfg, f"[ROUND] poll failed: {e}", "WARN")
             else:
                 if active_rom is not None:
 

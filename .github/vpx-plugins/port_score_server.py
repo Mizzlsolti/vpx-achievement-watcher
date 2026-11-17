@@ -148,18 +148,49 @@ static std::string getControllerGameName() {
     s = sub_once(s, "RegisterScoreServerClassSCD(", "RegisterScoreServerClass(", "RegisterScoreServerClassSCD")
     s = sub_once(s, "scriptApi->SubmitTypeLibrary();", "scriptApi->SubmitTypeLibrary(endpointId);", "SubmitTypeLibrary")
 
-    # 6) Achievement Watcher extension: NVRAM snapshot on every player / ball
-    #    change. The Watcher decodes these with its NVRAM maps and attributes
-    #    the audit changes (ramps, modes ...) to the player who was playing.
+    # 6) Achievement Watcher extension.
+    #    * round_start: a new pinball game begins (ball goes from 0 to 1+).
+    #      score-server only re-arms its game_end trigger here, it sends no
+    #      message, so the Watcher would not know where a round begins.
+    #    * nvram_snapshot: the live NVRAM, sent immediately on every player /
+    #      ball change and otherwise whenever it changed, at most once per
+    #      second. The Watcher decodes it with its NVRAM maps (live
+    #      achievements, per-round and per-player statistics).
     snap = r'''
-    // ---- Achievement Watcher: NVRAM snapshot on player/ball change ----
+    // ---- Achievement Watcher: round start + NVRAM snapshots ----
     {
+        static int awPrevBall = -1;
         static int awSnapPlayers = -1, awSnapPlayer = -1, awSnapBall = -1;
         static std::string awSnapRom;
-        if (playerCount != awSnapPlayers || currentPlayer != awSnapPlayer ||
-            currentBall != awSnapBall || awSnapRom != currentRomName) {
+        static std::vector<uint8_t> awSnapData;
+        static std::chrono::steady_clock::time_point awSnapTime;
+
+        if (awSnapRom != currentRomName) {
+            awPrevBall = -1;
+        }
+        if (awPrevBall == 0 && currentBall > 0) {
+            std::stringstream roundMsg;
+            roundMsg << "{\"type\":\"round_start\","
+                     << "\"timestamp\":\"" << getTimestamp() << "\","
+                     << "\"rom\":\"" << currentRomName << "\""
+                     << addMachineIdField() << ","
+                     << "\"players\":" << playerCount << ","
+                     << "\"current_player\":" << currentPlayer << ","
+                     << "\"current_ball\":" << currentBall << "}";
+            broadcastWebSocket(roundMsg.str());
+        }
+        awPrevBall = currentBall;
+
+        const auto awNow = std::chrono::steady_clock::now();
+        const bool awStateChanged = (playerCount != awSnapPlayers || currentPlayer != awSnapPlayer ||
+                                     currentBall != awSnapBall || awSnapRom != currentRomName);
+        const bool awDataChanged = (liveNvram != awSnapData);
+        const bool awThrottleOk = (awNow - awSnapTime) >= std::chrono::milliseconds(1000);
+        if (awStateChanged || (awDataChanged && awThrottleOk)) {
             awSnapPlayers = playerCount; awSnapPlayer = currentPlayer;
             awSnapBall = currentBall; awSnapRom = currentRomName;
+            awSnapData = liveNvram;
+            awSnapTime = awNow;
             std::stringstream snapMsg;
             snapMsg << "{\"type\":\"nvram_snapshot\","
                     << "\"timestamp\":\"" << getTimestamp() << "\","

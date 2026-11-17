@@ -83,8 +83,6 @@ import core.sound as sound
 from ui.overlay import (
     OverlayWindow,
     MiniInfoOverlay,
-    StatusOverlay,
-    StatusOverlayPositionPicker,
     read_active_players,
     ToastPositionPicker,
     MiniInfoPositionPicker,
@@ -152,7 +150,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.prefetch_finished.connect(self._on_prefetch_finished)
         self.bridge.level_up_show.connect(self._on_level_up)
         self.bridge.achievements_updated.connect(self._refresh_level_display)
-        self.bridge.status_overlay_show.connect(self._on_status_overlay_show)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
@@ -213,16 +210,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._overlay_page = 0  # current page: 0=Highlights/Score, 1=Achievement Progress, 2=Cloud Leaderboard, 3=Score Duels
 
         self._mini_test_idx = 0
-        self._status_overlay_test_idx = 0
         self._duel_overlay_test_idx = 0
-        # Transient state flags for the status badge
-        self._status_badge_state: str | None = None
-        self._status_badge_explicit: tuple[str, str] | None = None
-        # Poll timer: updates/hides the status badge based on game state (~2 s interval)
-        self._status_badge_timer = QTimer(self)
-        self._status_badge_timer.setInterval(2000)
-        self._status_badge_timer.timeout.connect(self._poll_status_badge)
-        self._status_badge_timer.start()
 
         # Periodic app-signals poll timer: picks up duel accept/decline signals from
         # the Android app (30s). Only started when the Android app is actively open
@@ -354,8 +342,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status and the latest session information.<br><br>"
             "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
-            "• <b>Session Summary</b>: Overview of the last and current play session including "
-            "score, achievements, and cloud status.<br>"
+            "• <b>Session Summary</b>: Overview of the last play session "
+            "(table, score, achievements and result).<br>"
             "• <b>Notifications</b>: System messages and event notifications.<br>"
             "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
         ),
@@ -419,14 +407,15 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, System Notifications, Status Overlay).<br>"
+            "(Main Overlay, Toast, System Notifications).<br>"
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
             "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
-            "(Pages 2–4). Page 1 (Highlights & Score) is always active. "
+            + ("(Pages 2–4). " if DUELS_MODE_ENABLED else "(Pages 2 and 3). ") +
+            "Page 1 (Highlights & Score) is always active. "
             "Disabled pages are skipped when cycling through the overlay with the navigation hotkeys."
         ),
         "appearance_theme": (
@@ -466,14 +455,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "enabled effects running for 6 seconds, then auto-closes.<br><br>"
             "<b>Effects are grouped by overlay:</b><br>"
             "• 🖥️ Main Overlay — glow border, particles, transitions, score spin, shine sweep…<br>"
-            "• 🏆 Achievement Toast — burst particles, neon rings, typewriter, god rays, confetti…<br>"
-            "• 🔢 Flip Counter — breathing glow, counter spin, milestone burst, firework…<br><br>"
-            "• <b>Enable All / Disable All</b>: Quick toggle for all 60 effects at once.<br><br>"
+            "• 🏆 Achievement Toast — burst particles, neon rings, typewriter, god rays, confetti…<br><br>"
+            "• <b>Enable All / Disable All</b>: Quick toggle for all effects at once.<br><br>"
             "<b>🎬 Post-Processing</b><br>"
             "Screen-space effects applied on top of overlay windows. Require OpenGL. "
             "Disabled automatically in Low Performance Mode. Use the toggle buttons below "
             "the effect controls to choose which overlays receive post-processing "
-            "(Main, Toast, Flip).<br>"
+            "(Main, Toast).<br>"
             "• <b>Bloom</b>: Makes bright and neon elements glow and bleed light into surrounding areas.<br>"
             "• <b>Motion Blur</b>: Adds a directional blur trail to animated elements to simulate motion speed.<br>"
             "• <b>Chromatic Aberration</b>: Slightly offsets the red and blue color channels for a lens distortion or glitch effect.<br>"
@@ -481,8 +469,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Film Grain</b>: Adds subtle random noise over the overlay for a retro analog film or CRT look.<br>"
             "• <b>Scanlines</b>: Overlays horizontal lines to simulate a classic CRT monitor screen.<br>"
             "• <b>Overlay Toggles</b>: Use the buttons below the post-processing effects to enable or disable "
-            "post-processing per overlay (Main, Toast, Flip Counter). "
-            "By default, only Main and Toast are enabled.<br><br>"
+            "post-processing per overlay (Main, Toast).<br><br>"
             "All settings are saved to config.json and persist across restarts.<br>"
             "Effects use OpenGL GPU acceleration when available, with automatic "
             "QPainter CPU fallback on systems without GPU drivers."
@@ -2189,7 +2176,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                     "Spinner": 45
                 },
                 "highlights": {
-                    "Power": ["🔥 Best Ball – 12.5M", "💥 Multiball Frenzy – 2", "➕ Extra Balls – 1"],
+                    "Power": ["🔥 Best Ball – 12.5M", "💥 Multiball – 2", "➕ Extra Balls – 1"],
                     "Precision": ["🏹 Rampage – 15", "🎯 Combo King – 4", "🌀 Spinner Madness – 45"],
                     "Fun": ["💀 Tilted – 1"]
                 }

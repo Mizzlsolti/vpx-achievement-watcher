@@ -17,7 +17,6 @@ from .overlay import (
     ToastPositionPicker,
     OverlayPositionPicker,
     MiniInfoPositionPicker,
-    StatusOverlayPositionPicker,
     DuelOverlayPositionPicker,
 )
 from .effects import EffectsMixin
@@ -157,62 +156,6 @@ class AppearanceMixin(EffectsMixin):
         
         self._mini_info_picker = MiniInfoPositionPicker(self)
         self.btn_mini_info_place.setText("Save position")
-
-    def _on_status_overlay_enabled_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["status_overlay_enabled"] = bool(is_checked)
-        self.cfg.save()
-
-    def _on_status_overlay_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["status_overlay_portrait"] = bool(is_checked)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_status_overlay_picker") and isinstance(self._status_overlay_picker, StatusOverlayPositionPicker):
-                self._status_overlay_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-        self._update_switch_all_button_label()
-
-    def _on_status_overlay_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["status_overlay_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-        try:
-            if hasattr(self, "_status_overlay_picker") and isinstance(self._status_overlay_picker, StatusOverlayPositionPicker):
-                self._status_overlay_picker.apply_portrait_from_cfg()
-        except Exception:
-            pass
-
-    def _on_status_overlay_place_clicked(self):
-        picker = getattr(self, "_status_overlay_picker", None)
-        if picker and isinstance(picker, StatusOverlayPositionPicker):
-            try:
-                x, y = picker.current_top_left()
-            except Exception:
-                g = picker.geometry()
-                x, y = g.x(), g.y()
-            ov = self.cfg.OVERLAY or {}
-            portrait = bool(ov.get("status_overlay_portrait", False))
-            if portrait:
-                self.cfg.OVERLAY["status_overlay_x_portrait"] = int(x)
-                self.cfg.OVERLAY["status_overlay_y_portrait"] = int(y)
-            else:
-                self.cfg.OVERLAY["status_overlay_x_landscape"] = int(x)
-                self.cfg.OVERLAY["status_overlay_y_landscape"] = int(y)
-            self.cfg.OVERLAY["status_overlay_saved"] = True
-            self.cfg.save()
-            try:
-                picker.close()
-                picker.deleteLater()
-            except Exception:
-                pass
-            self._status_overlay_picker = None
-            self.btn_status_overlay_place.setText("Place / Save position")
-            return
-
-        self._status_overlay_picker = StatusOverlayPositionPicker(self)
-        self.btn_status_overlay_place.setText("Save position")
 
     def _on_duel_overlay_portrait_toggle(self, state: int):
         is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -461,22 +404,7 @@ class AppearanceMixin(EffectsMixin):
         self.btn_mini_info_test = QPushButton("Test"); self.btn_mini_info_test.clicked.connect(self._on_mini_info_test)
         box_mini_info = create_overlay_box("System Notifications", self.chk_mini_info_portrait, self.chk_mini_info_ccw, self.btn_mini_info_place, self.btn_mini_info_test)
 
-        # 5) Status Overlay (cloud / leaderboard status messages)
-        self.chk_status_overlay_enabled = QCheckBox("Enabled"); self.chk_status_overlay_enabled.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_enabled", True))); self.chk_status_overlay_enabled.stateChanged.connect(self._on_status_overlay_enabled_toggle)
-        self.chk_status_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_status_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_portrait", False))); self.chk_status_overlay_portrait.stateChanged.connect(self._on_status_overlay_portrait_toggle)
-        self.chk_status_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_status_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("status_overlay_rotate_ccw", False))); self.chk_status_overlay_ccw.stateChanged.connect(self._on_status_overlay_ccw_toggle)
-        self.btn_status_overlay_place = QPushButton("Place"); self.btn_status_overlay_place.clicked.connect(self._on_status_overlay_place_clicked)
-        self.btn_status_overlay_test = QPushButton("Test"); self.btn_status_overlay_test.clicked.connect(self._on_status_overlay_test)
-        box_status_overlay = QVBoxLayout()
-        box_status_overlay.addWidget(QLabel("<b>Status Overlay</b>"))
-        box_status_overlay.addWidget(self.chk_status_overlay_enabled)
-        box_status_overlay.addWidget(self.chk_status_overlay_portrait)
-        box_status_overlay.addWidget(self.chk_status_overlay_ccw)
-        _btns_status = QHBoxLayout(); _btns_status.addWidget(self.btn_status_overlay_place); _btns_status.addWidget(self.btn_status_overlay_test)
-        box_status_overlay.addLayout(_btns_status)
-        box_status_overlay.addStretch(1)
-
-        # 6) Duel Overlay (dedicated overlay for all duel/tournament messages)
+        # 5) Duel Overlay (dedicated overlay for all duel/tournament messages)
         self.chk_duel_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_duel_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_portrait", True))); self.chk_duel_overlay_portrait.stateChanged.connect(self._on_duel_overlay_portrait_toggle)
         self.chk_duel_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_duel_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_rotate_ccw", True))); self.chk_duel_overlay_ccw.stateChanged.connect(self._on_duel_overlay_ccw_toggle)
         self.btn_duel_overlay_place = QPushButton("Place"); self.btn_duel_overlay_place.clicked.connect(self._on_duel_overlay_place_clicked)
@@ -484,7 +412,7 @@ class AppearanceMixin(EffectsMixin):
         box_duel_overlay = create_overlay_box("⚔️ Duel Notifications", self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw, self.btn_duel_overlay_place, self.btn_duel_overlay_test)
 
         lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
-        lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
+        lay_pos.addLayout(box_mini_info, 2, 0)
         from core.config import DUELS_MODE_ENABLED
         if DUELS_MODE_ENABLED:
             lay_pos.addLayout(box_duel_overlay, 3, 0)
@@ -858,7 +786,6 @@ class AppearanceMixin(EffectsMixin):
             self.chk_portrait,
             self.chk_ach_toast_portrait,
             self.chk_mini_info_portrait,
-            self.chk_status_overlay_portrait,
             self.chk_duel_overlay_portrait,
         ]
 
@@ -868,7 +795,6 @@ class AppearanceMixin(EffectsMixin):
             self.chk_portrait_ccw,
             self.chk_ach_toast_ccw,
             self.chk_mini_info_ccw,
-            self.chk_status_overlay_ccw,
             self.chk_duel_overlay_ccw,
         ]
 
@@ -926,13 +852,6 @@ class AppearanceMixin(EffectsMixin):
             "btn_mini_info_place": "Set and save the screen position for system notifications.",
             "btn_mini_info_test": "Trigger a test notification to check your placement.",
             
-            # Appearance Tab - Status Overlay (cloud / leaderboard status)
-            "chk_status_overlay_enabled": "Show or hide the Status Overlay for cloud and leaderboard submission feedback.",
-            "chk_status_overlay_portrait": "Rotate the Status Overlay 90 degrees for portrait/cabinet screens.",
-            "chk_status_overlay_ccw": "Rotate the Status Overlay counter-clockwise.",
-            "btn_status_overlay_place": "Set and save the screen position for the Status Overlay.",
-            "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement.",
-
             # Appearance Tab - Duel Overlay
             "chk_duel_overlay_portrait": "Rotate duel notifications for portrait/cabinet screens.",
             "chk_duel_overlay_ccw": "Rotate duel notifications counter-clockwise.",
@@ -1029,9 +948,6 @@ class AppearanceMixin(EffectsMixin):
         mini = getattr(self, "_mini_overlay", None)
         if mini is not None:
             mini.update_font()
-        status = getattr(self, "_status_overlay", None)
-        if status is not None:
-            status.update_font()
         for attr in ("_flip_total_win", "_flip_total_test_win"):
             flip = getattr(self, attr, None)
             if flip is not None:

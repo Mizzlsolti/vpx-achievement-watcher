@@ -2,7 +2,7 @@
 
 Provides the EffectsMixin class which builds the Effects sub-tab containing
 granular enable/disable controls and intensity sliders for every visual effect
-on every overlay (60 effects total: 10 per overlay × 6 overlays).
+on every overlay (10 effects per overlay).
 
 The mixin expects the host class to provide:
     self.cfg            – AppConfig instance
@@ -64,7 +64,7 @@ _OVERLAY_GROUPS = [
     ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
 ] + ([("⚔️ Duel Overlay",        "duel",      _DUEL_EFFECTS)] if _DUELS_ON else [])
 
-# All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
+# All fx_* boolean keys of the shown groups (for Enable All / Disable All / Reset)
 _ALL_FX_KEYS = [key for _, _otype, effects in _OVERLAY_GROUPS for key, _ in effects]
 
 # Effects where the intensity slider has no visible impact — show only Checkbox
@@ -154,10 +154,10 @@ class EffectsMixin:
         # --- Bottom buttons: Enable All / Disable All / Preview All ---
         btn_row = QHBoxLayout()
         self._fx_btn_enable = QPushButton("Enable All")
-        self._fx_btn_enable.setToolTip("Enable all 60 individual effects")
+        self._fx_btn_enable.setToolTip("Enable all individual effects")
         self._fx_btn_enable.clicked.connect(lambda: self._fx_set_all(True))
         self._fx_btn_disable = QPushButton("Disable All")
-        self._fx_btn_disable.setToolTip("Disable all 60 individual effects")
+        self._fx_btn_disable.setToolTip("Disable all individual effects")
         self._fx_btn_disable.clicked.connect(lambda: self._fx_set_all(False))
         for b in (self._fx_btn_enable, self._fx_btn_disable):
             b.setStyleSheet(

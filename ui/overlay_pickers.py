@@ -142,73 +142,7 @@ class MiniInfoPositionPicker(_BasePositionPicker):
 
 
 # ---------------------------------------------------------------------------
-# 6. StatusOverlayPositionPicker
-# ---------------------------------------------------------------------------
-
-class StatusOverlayPositionPicker(_BasePositionPicker):
-    """Draggable position picker for StatusOverlay, uses ``status_overlay_*`` config keys."""
-
-    def _picker_label(self) -> str:
-        return "Status Overlay"
-
-    def _config_saved_key(self) -> str:
-        return "status_overlay_saved"
-
-    def _config_fallback_saved_key(self) -> str | None:
-        return None
-
-    def _config_x_portrait_key(self) -> str:
-        return "status_overlay_x_portrait"
-
-    def _config_y_portrait_key(self) -> str:
-        return "status_overlay_y_portrait"
-
-    def _config_x_landscape_key(self) -> str:
-        return "status_overlay_x_landscape"
-
-    def _config_y_landscape_key(self) -> str:
-        return "status_overlay_y_landscape"
-
-    def _sync_from_cfg(self):
-        try:
-            ov = self.parent_gui.cfg.OVERLAY or {}
-            self._portrait = bool(ov.get("status_overlay_portrait", False))
-            self._ccw = bool(ov.get("status_overlay_rotate_ccw", False))
-        except Exception:
-            self._portrait = False
-            self._ccw = False
-
-    def _calc_overlay_size(self) -> tuple[int, int]:
-        ov = self.parent_gui.cfg.OVERLAY or {}
-        font_family = str(ov.get("font_family", "Segoe UI"))
-        badge_font_pt = 13
-        pad_w = 22
-        pad_h = 14
-        max_text_width = 340
-        status_text = "Online · Tracking"
-        html = (
-            f"<span style='font-size:{badge_font_pt}pt;font-family:\"{font_family}\";'>"
-            f"<span style='color:#00C853;'>&#9679;</span>"
-            f"&nbsp;<span style='color:#EEEEEE;'>{status_text}</span>"
-            f"</span>"
-        )
-        tmp = QLabel()
-        tmp.setTextFormat(Qt.TextFormat.RichText)
-        tmp.setStyleSheet("color:#EEEEEE;background:transparent;")
-        tmp.setFont(QFont(font_family, badge_font_pt))
-        tmp.setWordWrap(False)
-        tmp.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-        tmp.setText(html)
-        sh = tmp.sizeHint()
-        text_w = max(60, min(sh.width(), max_text_width))
-        text_h = max(1, sh.height())
-        W = max(120, text_w + pad_w)
-        H = max(36, text_h + pad_h)
-        return W, H
-
-
-# ---------------------------------------------------------------------------
-# 7. OverlayPositionPicker  (special case – uses use_xy / pos_x / pos_y)
+# 6. OverlayPositionPicker  (special case – uses use_xy / pos_x / pos_y)
 # ---------------------------------------------------------------------------
 
 class OverlayPositionPicker(_BasePositionPicker):

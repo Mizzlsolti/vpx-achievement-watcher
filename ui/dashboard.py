@@ -59,7 +59,7 @@ class DashboardMixin:
         lay_status.addWidget(self.status_label)
         layout.addWidget(grp_status)
 
-        # ── Session Summary: Last Run & Run Status cards ────────────────────────────
+        # ── Session Summary: Last Run card ────────────────────────────
         grp_run_cards = QGroupBox("Session Summary")
         lay_run_cards = QHBoxLayout(grp_run_cards)
 
@@ -75,21 +75,7 @@ class DashboardMixin:
             lay_last.addWidget(lbl)
         lay_last.addStretch(1)
 
-        # Right card: Run Status
-        grp_run_status = QGroupBox("Run Status")
-        lay_rs = QVBoxLayout(grp_run_status)
-        self.lbl_rs_table = QLabel("Table:  —")
-        self.lbl_rs_session = QLabel("Session:  —")
-        self.lbl_rs_cloud = QLabel("Cloud:  —")
-        self.lbl_rs_leaderboard = QLabel("Leaderboard:  —")
-        for lbl in (self.lbl_rs_table, self.lbl_rs_session, self.lbl_rs_cloud, self.lbl_rs_leaderboard):
-            lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
-            lbl.setTextFormat(Qt.TextFormat.RichText)
-            lay_rs.addWidget(lbl)
-        lay_rs.addStretch(1)
-
         lay_run_cards.addWidget(grp_last)
-        lay_run_cards.addWidget(grp_run_status)
         layout.addWidget(grp_run_cards)
 
         # ── 📬 Notifications ────────────────────────────────────────────────────
@@ -209,17 +195,6 @@ class DashboardMixin:
         lay_actions.addWidget(self.btn_quit)
 
         # Legend
-        lbl_legend = QLabel(
-            "<span style='color:#00C853;'>●</span> Green = online/verified"
-            "&nbsp;&nbsp;&nbsp;"
-            "<span style='color:#FFA500;'>●</span> Yellow = pending/local"
-            "&nbsp;&nbsp;&nbsp;"
-            "<span style='color:#FF3B30;'>●</span> Red = cloud off and table off"
-        )
-        lbl_legend.setTextFormat(Qt.TextFormat.RichText)
-        lbl_legend.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl_legend.setStyleSheet("color: #888; font-size: 9pt; padding: 4px;")
-        layout.addWidget(lbl_legend)
 
         layout.addWidget(grp_actions)
 
@@ -242,7 +217,7 @@ class DashboardMixin:
         )
 
     def _refresh_dashboard_cards(self):
-        """Populate the Last Run and Run Status cards in the Dashboard tab."""
+        """Populate the Last Run card in the Dashboard tab."""
         import json as _json
         try:
             # ── Last Run card ────────────────────────────────────────────
@@ -343,69 +318,6 @@ class DashboardMixin:
             self.lbl_lr_score.setText(f"Score:  {lr_score}")
             self.lbl_lr_achievements.setText(f"Achievements:  {lr_achievements}")
             self.lbl_lr_result.setText(f"Last run:  {lr_result}")
-        except Exception:
-            pass
-
-        try:
-            # ── Run Status card ──────────────────────────────────────────
-            w = getattr(self, "watcher", None)
-            game_active = bool(w and getattr(w, "game_active", False))
-            current_rom = str(getattr(w, "current_rom", "") or "").strip() if w else ""
-            romnames = getattr(w, "ROMNAMES", {}) or {}
-
-            cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
-            cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
-
-            if game_active and current_rom:
-                table_title = _strip_version_from_name(romnames.get(current_rom, current_rom.upper()))
-                rs_table = table_title or current_rom.upper()
-                try:
-                    state = w._ach_state_load()
-                    session_ach = state.get("session", {}).get(current_rom, [])
-                    rs_session = f"{len(session_ach)} achievement{'s' if len(session_ach) != 1 else ''}"
-                except Exception:
-                    rs_session = "Active"
-                if cloud_enabled and cloud_url:
-                    pending_state = getattr(self, "_status_badge_state", None)
-                    if pending_state == "pending":
-                        rs_cloud = "Pending"
-                    elif pending_state == "verified":
-                        rs_cloud = "Verified"
-                    else:
-                        rs_cloud = "Online"
-                else:
-                    rs_cloud = "Disabled"
-                rs_lb = "Ready" if (cloud_enabled and cloud_url) else "Local only"
-            else:
-                rs_table = "No active game"
-                rs_session = "Idle"
-                if cloud_enabled and cloud_url:
-                    rs_cloud = "Online"
-                    rs_lb = "Ready"
-                elif cloud_enabled:
-                    rs_cloud = "Offline"
-                    rs_lb = "Pending"
-                else:
-                    rs_cloud = "Disabled"
-                    rs_lb = "Local only"
-
-            # Table: green when active, red when no game
-            tbl_color = "#00C853" if (game_active and current_rom) else "#FF3B30"
-            # Session: green when active/counting, yellow when idle
-            ses_color = "#FFA500" if rs_session == "Idle" else "#00C853"
-            # Cloud: green=online/verified, yellow=pending/offline, red=disabled
-            cld_color = (
-                "#00C853" if rs_cloud in ("Online", "Verified")
-                else "#FF3B30" if rs_cloud == "Disabled"
-                else "#FFA500"
-            )
-            # Leaderboard: green=ready, yellow=pending/local
-            lb_color = "#00C853" if rs_lb == "Ready" else "#FFA500"
-
-            self.lbl_rs_table.setText(self._dot(tbl_color, "Table:", rs_table))
-            self.lbl_rs_session.setText(self._dot(ses_color, "Session:", rs_session))
-            self.lbl_rs_cloud.setText(self._dot(cld_color, "Cloud:", rs_cloud))
-            self.lbl_rs_leaderboard.setText(self._dot(lb_color, "Leaderboard:", rs_lb))
         except Exception:
             pass
 
@@ -528,7 +440,6 @@ class DashboardMixin:
             ("ach_toast_saved",                    None),
             ("notifications_saved",                None),
             ("duel_overlay_saved",                 "_duels_enabled"),
-            ("status_overlay_saved",               "status_overlay_enabled"),
         ]
         total_relevant = 0
         total_configured = 0

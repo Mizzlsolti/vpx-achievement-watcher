@@ -1,14 +1,14 @@
-"""Overlays mixin: mini info, status overlay, close secondary overlays, and nav (duel) handlers."""
+"""Overlays mixin: mini info, close secondary overlays, and nav (duel) handlers."""
 from __future__ import annotations
 from PyQt6.QtCore import QTimer
-from .overlay import MiniInfoOverlay, StatusOverlay
+from .overlay import MiniInfoOverlay
 from .overlay_duel import DuelInfoOverlay
 from .overlay_pages import PAGE_DUELS
 import core.sound as sound
 
 
 class OverlaysMixin:
-    """Mixin that provides mini info, status overlay, and nav (duel accept/decline) handler methods."""
+    """Mixin that provides mini info and nav (duel accept/decline) handler methods."""
 
     _MINI_TEST_MESSAGES = [
         ("NVRAM map not found for afm_113b.", "#FF3B30"),
@@ -114,16 +114,11 @@ class OverlaysMixin:
         ),
     ]
 
-    _STATUS_TEST_MESSAGES = [
-        ("Online · Tracking",  "#00C853"),
-        ("Online · Pending",   "#FFA500"),
-        ("Online · Verified",  "#00C853"),
-        ("Offline · Local",    "#FFA500"),
-        ("Cloud Off · Local",  "#FF3B30"),
-    ]
-
     def _on_mini_info_show(self, rom: str, seconds: int = 10):
-        msg = f"NVRAM map not found for {rom}."
+        # The watcher sends complete sentences (no NVRAM map, no VPS-ID, no live
+        # game status); only the map sampler sends a bare ROM name.
+        text = str(rom or "").strip()
+        msg = text if (" " in text or "\n" in text) else f"NVRAM map not found for {text}."
         try:
             sound.play_sound(self.cfg, "toast_info")
         except Exception:
@@ -199,84 +194,9 @@ class OverlaysMixin:
         except Exception:
             pass
 
-    def _on_status_overlay_test(self):
-        if not hasattr(self, "_status_overlay") or self._status_overlay is None:
-            self._status_overlay = StatusOverlay(self)
-        msg, color = self._STATUS_TEST_MESSAGES[self._status_overlay_test_idx % len(self._STATUS_TEST_MESSAGES)]
-        self._status_overlay_test_idx = (self._status_overlay_test_idx + 1) % len(self._STATUS_TEST_MESSAGES)
-        self._status_overlay.update_status(msg, color)
-
-    def _determine_status_state(self) -> tuple[str, str]:
-        cloud_enabled = bool(getattr(self.cfg, "CLOUD_ENABLED", False))
-        if not cloud_enabled:
-            return ("Cloud Off · Local", "#FF3B30")
-        cloud_url = str(getattr(self.cfg, "CLOUD_URL", "") or "").strip()
-        if not cloud_url:
-            return ("Offline · Local", "#FFA500")
-        w = getattr(self, "watcher", None)
-        game_active = bool(w and getattr(w, "game_active", False))
-        if not game_active:
-            return ("Offline · Local", "#FFA500")
-        pending_state = getattr(self, "_status_badge_state", None)
-        if pending_state == "pending":
-            return ("Online · Pending", "#FFA500")
-        if pending_state == "verified":
-            return ("Online · Verified", "#00C853")
-        if pending_state == "flagged":
-            return ("Online · Flagged", "#FFA500")
-        if pending_state == "rejected":
-            return ("Online · Rejected", "#FF3B30")
-        return ("Online · Tracking", "#00C853")
-
-    def _on_status_overlay_show(self, message: str, seconds: int = 5, color_hex: str = ""):
-        if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
-            return
-        lc = str(message or "").lower()
-        if "pending" in lc:
-            self._status_badge_state = "pending"
-        elif "verified" in lc or "accepted" in lc:
-            self._status_badge_state = "verified"
-        elif "flagged" in lc:
-            self._status_badge_state = "flagged"
-        elif "rejected" in lc:
-            self._status_badge_state = "rejected"
-        else:
-            self._status_badge_state = None
-        if color_hex:
-            txt = str(message or "").strip()
-            self._status_badge_explicit = (txt, color_hex)
-        else:
-            self._status_badge_explicit = None
-        self._poll_status_badge()
-
-    def _poll_status_badge(self):
-        try:
-            if not bool(self.cfg.OVERLAY.get("status_overlay_enabled", True)):
-                return
-            in_game = self._in_game_now()
-            if not in_game:
-                self._status_badge_state = None
-                self._status_badge_explicit = None
-                return
-            explicit = getattr(self, "_status_badge_explicit", None)
-            if explicit:
-                msg, color = explicit
-            else:
-                msg, color = self._determine_status_state()
-            if not hasattr(self, "_status_overlay") or self._status_overlay is None:
-                self._status_overlay = StatusOverlay(self)
-            self._status_overlay.update_status(msg, color)
-        except Exception:
-            pass
-
     def _close_secondary_overlays(self):
         """Close all secondary overlay windows (NOT the main overlay) when VPX exits."""
         # NOTE: _ach_toast_mgr and _mini_overlay are intentionally NOT cleared here.
-        try:
-            if hasattr(self, "_status_overlay") and self._status_overlay is not None:
-                self._status_overlay.hide()
-        except Exception:
-            pass
         # Clear any pending in-game duel Accept/Later overlay so the duel stays
         # ACCEPTED and the overlay reappears on the next VPX start.
         if getattr(self, "_duel_ingame_notify_state", None) is not None:

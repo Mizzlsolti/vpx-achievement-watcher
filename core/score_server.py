@@ -2,8 +2,12 @@
 
 The plugin (VPX 10.8.1+) broadcasts JSON messages on ``ws://127.0.0.1:3131``:
 
-* ``game_start`` / ``game_end``            – a pinball game begins / ends
+* ``game_start``                           – the table (ROM) was loaded
+* ``round_start``                          – a pinball game begins (Watcher build of the plugin)
+* ``game_end``                             – a pinball game ends (``reason: game_over``)
+                                             or the table is closed (``reason: plugin_unload``)
 * ``current_scores``                       – players, current player, ball, scores
+* ``nvram_snapshot``                       – live NVRAM (Watcher build of the plugin)
 * ``high_scores`` / ``table_loaded`` / ``badge`` – ignored here
 
 This module keeps a lightweight background connection and records, per
@@ -18,6 +22,7 @@ enough because the server is local and only sends unmasked text frames.
 from __future__ import annotations
 
 import base64
+import collections
 import json
 import os
 import socket
@@ -69,6 +74,8 @@ class _Game:
         # Raw NVRAM snapshots from the plugin, taken on every player/ball change:
         # [{"ts", "player", "ball", "players", "data": bytes}]
         self.snapshots: List[dict] = []
+        self.end_reason = ""               # "game_over" (round end) / "plugin_unload" (table closed)
+        self.from_round_start = False      # started by a round_start message
 
     def update(self, players: int, cur_player: int, cur_ball: int, scores: Dict[int, int]) -> None:
         if players > self.players:
@@ -126,6 +133,7 @@ class _Game:
             "players": players,
             "player_stats": out_players,
             "winner": winner,
+            "end_reason": self.end_reason,
             **({"snapshots": list(self.snapshots)} if include_snapshots else {}),
         }
 
@@ -146,6 +154,22 @@ class ScoreServerClient:
         self._current: Optional[_Game] = None
         self._session_start = 0.0
         self._last_snapshot: Optional[dict] = None
+        # Events for the Watcher thread: ("round_start"|"snapshot"|"round_end", payload)
+        self._events: "collections.deque" = collections.deque(maxlen=2000)
+        self._round_protocol = False       # plugin sends round_start (Watcher build)
+
+    def pop_events(self) -> list:
+        """Return and clear the queued round/snapshot events."""
+        with self._lock:
+            out = list(self._events)
+            self._events.clear()
+        return out
+
+    def game_summary(self, game: "_Game", include_snapshots: bool = False) -> dict:
+        with self._lock:
+            if game.ended is None:
+                game._close_ball()
+            return game.summary(include_snapshots)
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def start(self) -> None:
@@ -169,6 +193,8 @@ class ScoreServerClient:
         with self._lock:
             self._session_start = float(ts or time.time()) - 90.0  # plugin queues ~60 s
             self._games = [g for g in self._games if (g.ended is None) or (g.ended >= self._session_start)]
+            # Events are kept: a game may already have started before the
+            # Watcher noticed the table window (end_session clears them).
 
     def session_summary(self, include_snapshots: bool = False) -> dict:
         """Games recorded since :meth:`begin_session` (running game included).
@@ -197,6 +223,7 @@ class ScoreServerClient:
     def end_session(self) -> None:
         with self._lock:
             self._games = []
+            self._events.clear()
             if self._current is not None and self._current.ended is not None:
                 self._current = None
 
@@ -335,12 +362,19 @@ class ScoreServerClient:
             if rom:
                 self.last_rom = rom
             if mtype == "game_start":
+                # Table (ROM) loaded. A pinball game only starts with round_start
+                # (or, with older plugin builds, with the first live scores).
                 if self._current is not None and self._current.ended is None:
                     self._current.finish(now)
+                self._current = None
+            elif mtype == "round_start":
+                self._round_protocol = True
+                if self._current is not None and self._current.ended is None:
+                    self._current.finish(now)        # end of the previous game was missed
                 self._current = _Game(rom, now)
-                if self._last_snapshot is not None:
-                    self._current.snapshots.append(dict(self._last_snapshot))  # baseline
+                self._current.from_round_start = True
                 self._games.append(self._current)
+                self._events.append(("round_start", self._current))
             elif mtype == "nvram_snapshot":
                 try:
                     data = base64.b64decode(str(msg.get("data") or ""), validate=False)
@@ -359,11 +393,17 @@ class ScoreServerClient:
                     # Also accept the final snapshot that may arrive just after game_end.
                     if g is not None and (g.ended is None or now - g.ended < 5.0):
                         g.snapshots.append(snap)
-                        if len(g.snapshots) > 400:   # safety cap
+                        if len(g.snapshots) > 400:   # safety cap (keeps the baseline)
                             del g.snapshots[1:101]
+                        if g.ended is None:
+                            self._events.append(("snapshot", (g, snap)))
             elif mtype == "current_scores":
                 if self._current is None or self._current.ended is not None:
-                    # Joined mid-game (or game_start missed): start tracking now.
+                    if self._round_protocol and _to_int(msg.get("current_ball")) <= 0:
+                        return   # attract mode after a game: wait for the next round_start
+                    if self._round_protocol and self._current is not None:
+                        return   # game over: the next game starts with round_start
+                    # Joined mid-game (or an older plugin build): start tracking now.
                     self._current = _Game(rom, now)
                     self._games.append(self._current)
                 scores = {}
@@ -383,6 +423,9 @@ class ScoreServerClient:
                         if isinstance(e, dict):
                             final[_player_index(e, i + 1)] = _to_int(e.get("score"))
                     self._current.finish(now, final)
+                    self._current.end_reason = str(msg.get("reason") or "")
+                    if self._current.end_reason == "game_over":
+                        self._events.append(("round_end", self._current))
 
 
 _client: Optional[ScoreServerClient] = None

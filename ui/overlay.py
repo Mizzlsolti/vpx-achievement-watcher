@@ -54,7 +54,6 @@ from ui.overlay_base import (
 from ui.overlay_pickers import (
     ToastPositionPicker,
     MiniInfoPositionPicker,
-    StatusOverlayPositionPicker,
     OverlayPositionPicker,
     DuelOverlayPositionPicker,
 )
@@ -62,7 +61,7 @@ from ui.overlay_toast import AchToastWindow, AchToastManager, read_active_player
 
 
 
-from ui.overlay_info import MiniInfoOverlay, StatusOverlay, OverlayNavArrows
+from ui.overlay_info import MiniInfoOverlay, OverlayNavArrows
 
 # Per-page accent colours for the main overlay – kept only as a last-resort
 # emergency fallback.  All themes now define their own ``page_accents`` list
@@ -357,6 +356,12 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             visible = getattr(self, '_p2_visible', 10)
             if len(self._p2_rows) > visible and not self._p2_timer.isActive():
                 self._p2_timer.start()
+        if getattr(self, '_p1_rows', None) and self._current_combined and hasattr(self, '_p1_timer'):
+            try:
+                if not self._p1_timer.isActive() and self._p1_max_offset() > 0:
+                    self._p1_timer.start()
+            except Exception:
+                pass
 
     def hideEvent(self, e):
         super().hideEvent(e)
@@ -376,6 +381,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             self._highlight_timer.stop()
         if hasattr(self, '_p2_timer'):
             self._p2_timer.stop()
+        if hasattr(self, '_p1_timer'):
+            self._p1_timer.stop()
 
 
     def _alpha_bbox(self, img: QImage, min_alpha: int = 8) -> QRect:
@@ -498,6 +505,14 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self._p2_timer = QTimer(self)
         self._p2_timer.setInterval(1500)
         self._p2_timer.timeout.connect(self._p2_tick)
+        self._p1_timer = QTimer(self)
+        self._p1_timer.setInterval(1500)
+        self._p1_timer.timeout.connect(self._p1_tick)
+        self._p1_rows: list = []
+        self._p1_offset: int = 0
+        self._p1_header: str = ""
+        self._p1_style: str = ""
+        self._p1_pinned: list = []
         self._p2_rows: list = []
         self._p2_offset: int = 0
         self._p2_visible: int = 10
@@ -948,6 +963,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
     def set_html(self, html: str, session_title: Optional[str] = None):
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
+        self._p1_stop()
         self._current_combined = None
         self._current_html = html
         self._p2_rows = None
@@ -964,6 +980,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self._current_combined = combined or {}
         self._current_html = None
         self._p2_rows = None
+        self._p1_key = None
+        self._p1_offset = 0
         self._current_title = "Highlights" if session_title is None else session_title
         self._render_fixed_columns()
 
@@ -972,6 +990,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         """Display a list of table rows with Python QTimer-based scrolling."""
         if hasattr(self, "_p2_timer"):
             self._p2_timer.stop()
+        self._p1_stop()
         self._current_combined = None
         self._current_html = None
         self._current_title = session_title or "Achievement Progress"
@@ -1270,94 +1289,16 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             else:
                 lines.append("<div style='margin-bottom: 1.8em;'></div>")
 
-            lines.append("<table align='center' style='border-collapse: collapse; margin: 0 auto; width: 100%;'><tr>")
-
-            lines.append(f"<td valign='top' style='padding-right: 20px; border-right: 1px solid rgba({_bdr_r}, {_bdr_g}, {_bdr_b}, 0.4);'>")
-            lines.append("<table class='hltable'>")
-            has_high = False
-
-            if is_custom_table and custom_rules:
-                # Show custom achievement list: unlocked first with ✅, then locked with ⬜
-                has_high = True
-                lines.append(f"<tr><th colspan='2'>Achievements</th></tr>")
-                unlocked_rules = [r for r in custom_rules if str(r.get("title") or "").strip() in custom_unlocked_titles]
-                locked_rules = [r for r in custom_rules if str(r.get("title") or "").strip() not in custom_unlocked_titles]
-                for r in unlocked_rules[:max(1, limit)]:
-                    t = esc(str(r.get("title") or "").strip())
-                    lines.append(f"<tr><td class='center'>✅ {t}</td><td class='right'></td></tr>")
-                for r in locked_rules[:max(1, limit)]:
-                    t = esc(str(r.get("title") or "").strip())
-                    lines.append(f"<tr><td class='center'>⬜ {t}</td><td class='right'></td></tr>")
-            else:
-                for cat in ["Power", "Precision", "Fun"]:
-                    arr = hld.get(cat, [])
-                    if arr:
-                        has_high = True
-                        lines.append(f"<tr><th colspan='2'>{esc(cat)}</th></tr>")
-                        for x in arr[:max(1, limit)]:
-                            parts = x.rsplit(" – ", 1)
-                            if len(parts) == 2:
-                                name, val = parts[0], parts[1]
-                            else:
-                                name, val = x, ""
-                            lines.append(f"<tr><td class='left'>{esc(name)}</td><td class='right'>{esc(val)}</td></tr>")
-            lines.append("</table>")
-            if not has_high:
-                lines.append("<div style='text-align:center; color:#888; margin-top:1em;'>(No Highlights yet)</div>")
-            lines.append("</td>")
-
-            lines.append("<td valign='top' style='padding-left: 20px; border:none;'>")
-            lines.append("<table class='hltable'>")
-
-            if not deltas:
-                lines.append("<tr><td colspan='2' style='text-align:center; color:#888; border:none;'>(No actions yet)</td></tr>")
-            else:
-                items = sorted(list(deltas.items()), key=lambda x: int(x[1]), reverse=True)
-
-                max_rows = 20
-                cols = 2
-
-                max_items = max_rows * cols
-                display_items = items[:max_items]
-
-                header_html = ""
-                for c in range(cols):
-                    border = f" style='border-left: 2px solid rgba({_bdr_r},{_bdr_g},{_bdr_b},0.2); padding-left: 0.55em;'" if c > 0 else ""
-                    header_html += f"<th{border}>Action</th><th>Count</th>"
-                lines.append(f"<tr>{header_html}</tr>")
-
-                for i in range(0, len(display_items), cols):
-                    row_html = ""
-                    for c in range(cols):
-                        idx = i + c
-                        border = f" style='border-left: 2px solid rgba({_bdr_r},{_bdr_g},{_bdr_b},0.2); padding-left: 0.55em;'" if c > 0 else ""
-                        if idx < len(display_items):
-                            k, v = display_items[idx]
-                            v_str = f"+{v:,}".replace(",", ".")
-                            row_html += f"<td class='left'{border}>{esc(k)}</td><td class='right'>{esc(v_str)}</td>"
-                        else:
-                            row_html += f"<td class='left'{border}></td><td class='right'></td>"
-
-                    lines.append(f"<tr>{row_html}</tr>")
-
-                if len(items) > max_items:
-                    lines.append(f"<tr><td colspan='{cols * 2}' style='text-align:center; color:#888; font-size:0.9em;'>(+ {len(items)-max_items} more actions)</td></tr>")
-
-            lines.append("</table>")
-            lines.append("</td>")
-
-            lines.append("</tr></table>")
-            return "".join(lines)
+            # Compact layout: header (title, progress, score) stays in place,
+            # everything below scrolls like page 2 when it does not fit.
+            rows = self._single_player_rows(hld, deltas, limit, esc)
+            return ("".join(lines), rows)
 
         mp = (self._current_combined or {}).get("multiplayer")
         if isinstance(mp, dict) and mp.get("games"):
-            html = style + "<div align='center' style='width:100%;'>" + \
-                self._multiplayer_block_html(mp, players, custom_table_name or table_title or rom_name, esc,
-                                             (_bdr_r, _bdr_g, _bdr_b), _tc_accent, _tc_primary) + "</div>"
-            body_pt = getattr(self, "_body_pt", 20)
-            css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
-            self.body.setText(f"<div style='{css}'>{html}</div>")
-            self._layout_positions()
+            header, rows, pinned = self._multiplayer_rows(mp, custom_table_name or table_title or rom_name, esc,
+                                                          limit, _tc_accent, _tc_primary)
+            self._p1_set(style, header, rows, pinned)
             return
 
         if not players:
@@ -1365,27 +1306,139 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 # CAT tables have no NVRAM players entry — render from custom data directly.
                 players = [{}]
             else:
+                self._p1_stop()
                 self.body.setText("<div>-</div>")
                 self._layout_positions()
                 return
 
-        html = style + "<div align='center' style='width:100%;'>" + \
-               "".join(f"{block(p)}" for p in players) + \
-               "</div>"
+        result = block(players[0])
+        if isinstance(result, tuple):
+            header, rows = result
+        else:
+            header, rows = result, []
+        self._p1_set(style, header, rows)
 
-        body_pt = getattr(self, "_body_pt", 20)
-        css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
-        self.body.setText(f"<div style='{css}'>{html}</div>")
-        self._layout_positions()
-        
-    def _multiplayer_block_html(self, mp: dict, players: list, display_title: str, esc,
-                                border_rgb: tuple, accent: str, primary: str) -> str:
+    # ── Page 1 rows (compact layout, scrolls like page 2) ────────────────────
+
+    @staticmethod
+    def _nb(text) -> str:
+        """Escape-free helper: keep emoji and title on one line."""
+        return str(text).replace(" ", "&nbsp;")
+
+    def _p1_styles(self) -> dict:
+        """Inline cell styles for page 1 (Qt rich text: inline styles are the
+        reliable way to style cells of the shared page grid)."""
+        def rgb(h):
+            h = str(h).lstrip("#")
+            return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        cfg = self.parent_gui.cfg
+        primary = get_theme_color(cfg, "primary")
+        accent = get_theme_color(cfg, "accent")
+        pr, pg, pb = rgb(primary)
+        br, bg, bb = rgb(get_theme_color(cfg, "border"))
+        line = f"border-bottom:1px solid rgba({br},{bg},{bb},0.15);"
+        pad = "padding:0.2em 0.3em;"
+        return {
+            "th": (f"text-align:center; background:rgba({pr},{pg},{pb},0.20); color:{primary}; font-weight:bold; {pad}"
+                   f"border-bottom:2px solid rgba({pr},{pg},{pb},0.35);"),
+            "l": f"text-align:left; color:#E0E0E0; {pad}{line}",
+            "ld": f"text-align:left; color:#BBBBBB; {pad}{line}",
+            "ln": f"text-align:left; color:#E0E0E0; {pad}",
+            "lnd": f"text-align:left; color:#BBBBBB; {pad}",
+            "r": f"text-align:right; font-weight:bold; color:{accent}; {pad}padding-left:0.6em; {line}",
+            "score": f"text-align:center; color:{primary}; font-weight:bold; font-size:1.15em; {pad}",
+            "sep": f"border-left:1px solid rgba({br},{bg},{bb},0.4);",
+            "primary": primary, "accent": accent,
+        }
+
+    def _p1_rows_fit_width(self, rows: list) -> bool:
+        """True when these grid rows fit the page width without squeezing."""
+        try:
+            avail_w, _ = self._p1_area()
+            body_pt = getattr(self, "_body_pt", 20)
+            css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+            probe = QLabel()
+            probe.setFont(self.body.font())
+            probe.setText(f"<div style='{css}'><table width='100%' cellspacing='0' cellpadding='0' "
+                          f"style='border-collapse:collapse;'>{''.join(rows)}</table></div>")
+            return probe.sizeHint().width() <= avail_w
+        except Exception:
+            return True
+
+    def _single_player_rows(self, hld: dict, deltas: dict, limit: int, esc) -> list:
+        """Rows below the score on a 6-column grid: highlight categories side
+        by side, then the NVRAM actions in two columns."""
+        st = self._p1_styles()
+        nb = self._nb
+        rows = []
+        cats = [(c, list((hld.get(c) or []))[:max(1, limit)]) for c in ("Power", "Precision", "Fun")]
+        cats = [(c, items) for c, items in cats if items]
+
+        def split(entry: str):
+            parts = str(entry).rsplit(" – ", 1)
+            return (parts[0], parts[1]) if len(parts) == 2 else (str(entry), "")
+
+        # (name span, value span) per slot so every row adds up to 6 columns
+        spans = {1: [(4, 2)], 2: [(2, 1), (2, 1)], 3: [(1, 1), (1, 1), (1, 1)]}
+
+        def pair_cells(name, val, ns, vs, first, dim=False) -> str:
+            sep = "" if first else st["sep"]
+            if name is None:
+                return f"<td colspan='{ns}' style='{sep}'></td><td colspan='{vs}'></td>"
+            return (f"<td colspan='{ns}' nowrap style='{st['ld' if dim else 'l']}{sep}'>{nb(esc(name))}</td>"
+                    f"<td colspan='{vs}' nowrap style='{st['r']}'>{nb(esc(val))}</td>")
+
+        if cats:
+            sp = spans[len(cats)]
+            head = "<tr>" + "".join(
+                f"<td colspan='{ns + vs}' style='{st['th']}{'' if i == 0 else st['sep']}'>{esc(c)}</td>"
+                for i, ((c, _), (ns, vs)) in enumerate(zip(cats, sp))) + "</tr>"
+            side, stacked = [head], [head]
+            for k in range(max(len(items) for _, items in cats)):
+                cells, top, bottom = [], [], []
+                for i, ((_, items), (ns, vs)) in enumerate(zip(cats, sp)):
+                    sep = "" if i == 0 else st["sep"]
+                    if k < len(items):
+                        n, v = split(items[k])
+                        cells.append(pair_cells(n, v, ns, vs, i == 0))
+                        top.append(f"<td colspan='{ns + vs}' nowrap style='{st['ln']}{sep}'>{nb(esc(n))}</td>")
+                        bottom.append(f"<td colspan='{ns + vs}' nowrap style='{st['r']}{sep}'>{nb(esc(v))}</td>")
+                    else:
+                        cells.append(pair_cells(None, None, ns, vs, i == 0))
+                        top.append(f"<td colspan='{ns + vs}' style='{sep}'></td>")
+                        bottom.append(f"<td colspan='{ns + vs}' style='{sep}'></td>")
+                side.append("<tr>" + "".join(cells) + "</tr>")
+                stacked.append("<tr>" + "".join(top) + "</tr><tr>" + "".join(bottom) + "</tr>")
+            # Name and value side by side when the columns fit (landscape);
+            # otherwise (e.g. portrait) the value goes below the name.
+            rows.extend(side if self._p1_rows_fit_width(side) else stacked)
+        else:
+            rows.append("<tr><td colspan='6' style='text-align:center; color:#888;'>(No Highlights yet)</td></tr>")
+
+        items = sorted(((k, v) for k, v in (deltas or {}).items() if int(v or 0) > 0),
+                       key=lambda kv: int(kv[1]), reverse=True)
+        rows.append(f"<tr><td colspan='6' style='{st['th']}'>NVRAM Actions</td></tr>")
+        if not items:
+            rows.append("<tr><td colspan='6' style='text-align:center; color:#888;'>(No actions yet)</td></tr>")
+        for i in range(0, len(items), 2):
+            cells = []
+            for j, (k, v) in enumerate(items[i:i + 2]):
+                cells.append(pair_cells(k, f"+{int(v):,}".replace(",", "."), 2, 1, j == 0))
+            if len(cells) == 1:
+                cells.append(pair_cells(None, None, 2, 1, False))
+            rows.append("<tr>" + "".join(cells) + "</tr>")
+        return rows
+
+    def _multiplayer_rows(self, mp: dict, display_title: str, esc, limit: int,
+                          accent: str, primary: str) -> tuple:
         """Page 1 for multiplayer sessions (score-server plugin, VPX 10.8.1+).
 
-        Same content as the single-player page, per player: score, best ball,
-        highlights and the NVRAM actions this player made (attributed from the
-        live NVRAM snapshots). Landscape shows all players side by side,
-        portrait uses two columns. No achievements in multiplayer games.
+        Returns (header_html, rows, pinned_rows). The header (table name,
+        players, winner) and the pinned rows (player name and score per column)
+        stay in place; the rest of the player columns scrolls like page 2. One column per
+        player: score, Best Ball, highlights and the NVRAM actions of that
+        player. With 1-2 players name and value share a line, with 3-4 players
+        the value goes below the name. No achievements in multiplayer games.
         """
         def fmt(n) -> str:
             try:
@@ -1393,116 +1446,213 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             except Exception:
                 return "0"
 
-        portrait = bool(getattr(self, "portrait_mode", False))
-        br, bg, bb = border_rgb
         games = [g for g in (mp.get("games") or []) if isinstance(g, dict)]
         game = games[-1] if games else {}
         stats = sorted([p for p in (game.get("player_stats") or []) if isinstance(p, dict)],
-                       key=lambda x: int(x.get("player") or 0))
+                       key=lambda x: int(x.get("player") or 0))[:4]
         winner = int(game.get("winner") or 0)
         n_players = int(game.get("players") or len(stats) or 0)
         per_player_actions = bool(game.get("per_player_actions"))
 
-        lines = [f"<div class='rom-title'>{esc(display_title or 'Unknown ROM')}</div>"]
+        header = [f"<div class='rom-title'>{esc(display_title or 'Unknown ROM')}</div>"]
         status = f"👥 {n_players} Players"
         if winner:
             status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🏆 Player {winner} wins!</span>"
         elif stats and len({int(p.get('score') or 0) for p in stats}) == 1:
             status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🤝 Tie</span>"
-        if len(games) > 1:
-            status += f" &nbsp;·&nbsp; Game {len(games)} of {len(games)}"
-        lines.append(f"<div style='text-align:center; color:#CCCCCC; margin-bottom:0.4em;'>{status}</div>")
+        header.append(f"<div style='text-align:center; color:#CCCCCC; margin-bottom:0.4em;'>{status}</div>")
 
-        # All players side by side (in portrait the content area is rotated, so
-        # it is also wide). Text size shrinks with the number of players so the
-        # page keeps the size of the single-player page.
-        cols = max(1, min(4, len(stats)))
-        crowded = len(stats) > 2
-        n_hl = 1 if crowded else 2
-        n_act = 2 if crowded else 3
-        fs = {1: 0.9, 2: 0.8, 3: 0.84, 4: 0.7}.get(cols, 0.7) * ({2: 0.95, 3: 0.72, 4: 0.64}.get(cols, 0.95) if portrait else 1.0)
-        max_label = {3: 13, 4: 10}.get(cols, 18)
-        best_label = "🔥 Best" if cols >= 4 else "🔥 Best Ball"
-
-        def short(text: str) -> str:
-            text = str(text)
-            return text if len(text) <= max_label else text[:max_label - 1].rstrip() + "…"
+        cols = max(1, len(stats))
+        stacked = cols > 2
 
         def split(entry: str):
             parts = str(entry).rsplit(" – ", 1)
             return (parts[0], parts[1]) if len(parts) == 2 else (str(entry), "")
 
-        # Inline styles only: Qt rich text does not reliably apply a <style>
-        # block placed in the middle of the body.
-        body_pt = float(getattr(self, "_body_pt", 20) or 20)
-        pt = max(6.0, body_pt * fs * 1.1)
-        cell = (f"font-size:{pt:.1f}pt; padding:1px 4px; "
-                f"border-bottom:1px solid rgba({br},{bg},{bb},0.12);")
-        td_l = f"<td nowrap style='{cell} text-align:left; color:#E0E0E0;'>"
-        td_la = f"<td nowrap style='{cell} text-align:left; color:#BBBBBB;'>"
-        td_r = f"<td nowrap style='{cell} text-align:right; font-weight:bold; color:{accent};'>"
+        st = self._p1_styles()
+        nb = self._nb
 
-        def card(p: dict) -> str:
-            pid = int(p.get("player") or 0)
-            crown = " 👑" if pid == winner else ""
-            hl = p.get("highlights") or {}
-            best = ""
+        def entries(p: dict) -> list:
+            out = []
             if int(p.get("best_ball") or 0) > 0:
                 best_no = int(p.get("best_ball_no") or 0)
-                best = (f"<tr>{td_l}{best_label}</td>{td_r}{esc(self._short_num(p.get('best_ball')))}"
-                        + (f" <span style='color:#888; font-size:{pt * 0.8:.1f}pt;'>B{best_no}</span>" if best_no else "")
-                        + "</td></tr>")
-            hl_items = []
+                out.append(("item", "🔥 Best Ball",
+                            self._short_num(p.get("best_ball")) + (f" (B{best_no})" if best_no else ""), False))
+            hl = p.get("highlights") or {}
             for cat in ("Power", "Precision", "Fun"):
-                for x in (hl.get(cat) or []):
-                    if "Best Ball" not in x:
-                        hl_items.append(x)
-            hl_rows = "".join(
-                f"<tr>{td_l}{esc(short(n))}</td>{td_r}{esc(v)}</td></tr>"
-                for n, v in (split(x) for x in hl_items[:n_hl]))
-            act_rows = ""
+                items = [x for x in (hl.get(cat) or []) if "Best Ball" not in x]
+                for x in items[:max(1, limit)]:
+                    n, v = split(x)
+                    out.append(("item", n, v, False))
             if per_player_actions:
-                items = sorted((p.get("deltas") or {}).items(), key=lambda kv: int(kv[1]), reverse=True)[:n_act]
-                act_rows = "".join(
-                    f"<tr>{td_la}{esc(short(k))}</td>{td_r}+{fmt(v)}</td></tr>"
-                    for k, v in items)
-            return (
-                "<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;'>"
-                f"<tr><th colspan='2' nowrap style='font-size:{pt * 1.05:.1f}pt; text-align:center; padding:2px 4px;"
-                f" color:{primary}; font-weight:bold; background:rgba({br},{bg},{bb},0.18);"
-                f" border-bottom:2px solid rgba({br},{bg},{bb},0.35);'>Player {pid}{crown}</th></tr>"
-                f"<tr><td colspan='2' nowrap style='font-size:{pt * 1.2:.1f}pt; text-align:center; color:{primary};"
-                f" font-weight:bold; padding:1px 4px;'>{fmt(p.get('score'))}</td></tr>"
-                + best + hl_rows + act_rows +
-                "</table>"
-            )
+                out.append(("head", "NVRAM Actions"))
+                acts = sorted(((k, v) for k, v in (p.get("deltas") or {}).items() if int(v or 0) > 0),
+                              key=lambda kv: int(kv[1]), reverse=True)
+                for k, v in acts:
+                    out.append(("item", k, f"+{fmt(v)}", True))
+            return out
 
-        lines.append("<table align='center' cellspacing='0' style='border-collapse: collapse; margin: 0 auto; width: 100%;'>")
-        for i in range(0, len(stats), cols):
-            lines.append("<tr>")
-            for j, p in enumerate(stats[i:i + cols]):
-                sep = (f"border-left: 1px solid rgba({br},{bg},{bb},0.4); " if j > 0 else "")
-                lines.append(f"<td valign='top' width='{100 // cols}%' style='{sep}padding: 0 5px 3px 5px;'>{card(p)}</td>")
-            lines.append("</tr>")
-        lines.append("</table>")
+        # Grid: 1-2 players -> 2 cells per player (name | value);
+        #       3-4 players -> 1 cell per player, value on the line below.
+        per = 1 if stacked else 2
 
-        if not per_player_actions:
-            deltas = {}
-            try:
-                deltas = dict((players[0] if players else {}).get("deltas") or {})
-            except Exception:
-                deltas = {}
-            if deltas:
-                items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:3]
-                txt = " &nbsp;·&nbsp; ".join(
-                    f"<span style='white-space:nowrap;'>{esc(k)}&nbsp;<span style='color:{accent};'>+{fmt(v)}</span></span>"
-                    for k, v in items)
-                lines.append(f"<div style='text-align:center; color:#BBBBBB; font-size:0.85em; margin-top:0.4em;'>"
-                             f"All players: {txt}</div>")
+        def sep(j):
+            return st["sep"] if j else ""
 
-        lines.append("<div style='text-align:center; color:#777; font-size:0.8em; margin-top:0.3em;'>"
-                     "Multiplayer game – no achievements</div>")
-        return "".join(lines)
+        # Pinned rows (always visible): player name and score per column.
+        pinned = ["<tr>" + "".join(
+            f"<td colspan='{per}' style='{st['th']}{sep(j)}'>{nb('Player ' + str(int(p.get('player') or 0)))}"
+            + (" 👑" if int(p.get("player") or 0) == winner else "") + "</td>"
+            for j, p in enumerate(stats)) + "</tr>",
+            "<tr>" + "".join(
+            f"<td colspan='{per}' style='{st['score']}{sep(j)}'>{fmt(p.get('score'))}</td>"
+            for j, p in enumerate(stats)) + "</tr>"]
+
+        lists = [entries(p) for p in stats]
+        rows = []
+        for i in range(max((len(x) for x in lists), default=0)):
+            top, bottom = [], []
+            for j, lst in enumerate(lists):
+                e = lst[i] if i < len(lst) else None
+                if e is None:
+                    top.append(f"<td colspan='{per}' style='{sep(j)}'></td>")
+                    bottom.append(f"<td style='{sep(j)}'></td>")
+                elif e[0] == "head":
+                    top.append(f"<td colspan='{per}' style='{st['th']}{sep(j)}'>{nb(esc(e[1]))}</td>")
+                    bottom.append(f"<td style='{sep(j)}'></td>")
+                else:
+                    _, name, val, dim = e
+                    if stacked:
+                        top.append(f"<td nowrap style='{st['lnd' if dim else 'ln']}{sep(j)}'>{nb(esc(name))}</td>")
+                        bottom.append(f"<td nowrap style='{st['r']}{sep(j)}'>{nb(esc(val))}</td>")
+                    else:
+                        top.append(f"<td nowrap style='{st['ld' if dim else 'l']}{sep(j)}'>{nb(esc(name))}</td>"
+                                   f"<td nowrap style='{st['r']}'>{nb(esc(val))}</td>")
+            row = "<tr>" + "".join(top) + "</tr>"
+            if stacked and any(lst[i][0] == "item" for lst in lists if i < len(lst)):
+                row += "<tr>" + "".join(bottom) + "</tr>"
+            rows.append(row)
+        return "".join(header), rows, pinned
+
+    # ── Page 1 scrolling ──────────────────────────────────────────────────────
+
+    def _p1_area(self) -> tuple:
+        """Width/height the body label has when page 1 is drawn (portrait pages
+        are laid out in the rotated frame, so width and height swap)."""
+        w, h = self.width(), self.height()
+        if self.portrait_mode:
+            w, h = h, w
+        pad = 24
+        try:
+            t_h = self.title.sizeHint().height()
+        except Exception:
+            t_h = 40
+        body_w = int(w * (0.92 if self.portrait_mode else 0.9))
+        body_h = h - (pad + t_h + 10) - pad
+        return max(80, body_w), max(80, body_h)
+
+    def _p1_stop(self):
+        if hasattr(self, "_p1_timer"):
+            self._p1_timer.stop()
+        self._p1_rows = []
+        self._p1_pinned = []
+        self._p1_set_top_aligned(False)
+
+    def _p1_set_top_aligned(self, top: bool):
+        """While page 1 scrolls the content is top-aligned, so the header does
+        not jump when rows of different height move through."""
+        try:
+            v = Qt.AlignmentFlag.AlignTop if top else Qt.AlignmentFlag.AlignVCenter
+            self.body.setAlignment(Qt.AlignmentFlag.AlignLeft | v)
+        except Exception:
+            pass
+
+    def _p1_set(self, style: str, header: str, rows: list, pinned: Optional[list] = None):
+        """Show page 1: header fixed, rows scroll when they do not fit. Re-renders
+        during the score/progress animations keep the scroll position."""
+        # Score / progress animations only change digits in the header; any
+        # other change means new content and starts again from the top.
+        key = (hash(tuple(rows)), hash(re.sub(r"[0-9.,%]", "", header + "".join(pinned or []))))
+        if key != getattr(self, "_p1_key", None):
+            self._p1_offset = 0
+            self._p1_key = key
+        self._p1_style = style
+        self._p1_header = header
+        self._p1_pinned = list(pinned or [])
+        self._p1_rows = list(rows)
+        scrolls = self._p1_max_offset() > 0
+        self._p1_set_top_aligned(scrolls)
+        self._p1_render()
+        self._layout_positions()
+        if scrolls:
+            if not self._p1_timer.isActive():
+                self._p1_timer.start()
+        else:
+            self._p1_timer.stop()
+
+    def _p1_html(self, offset: int, count: int) -> str:
+        body_pt = getattr(self, "_body_pt", 20)
+        css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+        table = ("<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;'>"
+                 + "".join(getattr(self, "_p1_pinned", []) or [])
+                 + "".join(self._p1_rows[offset:offset + count]) + "</table>")
+        return (f"<div style='{css}'>{self._p1_style}<div align='center' style='width:100%;'>"
+                f"{self._p1_header}{table}</div></div>")
+
+    def _p1_fits(self, offset: int, count: int) -> bool:
+        avail_w, avail_h = self._p1_area()
+        self.body.setText(self._p1_html(offset, count))
+        return self.body.heightForWidth(avail_w) <= avail_h
+
+    def _p1_visible(self, offset: int) -> int:
+        """How many rows starting at offset fit below the header."""
+        total = len(self._p1_rows) - offset
+        if total <= 0:
+            return 0
+        if self._p1_fits(offset, total):
+            return total
+        lo, hi = 1, total          # largest count that fits (at least one row)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if self._p1_fits(offset, mid):
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo
+
+    def _p1_max_offset(self) -> int:
+        n = len(self._p1_rows)
+        if n == 0 or self._p1_fits(0, n):
+            return 0
+        off = n - 1
+        while off > 0 and self._p1_fits(off - 1, n - off + 1):
+            off -= 1
+        return off
+
+    def _p1_render(self):
+        off = max(0, min(getattr(self, "_p1_offset", 0), len(self._p1_rows)))
+        self.body.setText(self._p1_html(off, self._p1_visible(off)))
+
+    def _p1_tick(self):
+        """Advance by one row; pause at the end, then start again from the top."""
+        if not self._p1_rows or not self._current_combined:
+            self._p1_timer.stop()
+            return
+        max_off = self._p1_max_offset()
+        if max_off <= 0:
+            self._p1_timer.stop()
+            return
+        self._p1_offset = getattr(self, "_p1_offset", 0) + 1
+        if self._p1_offset > max_off:
+            self._p1_timer.stop()
+            self._p1_offset = 0
+            self._p1_render()
+            self.request_rotation(force=True)
+            QTimer.singleShot(3000, lambda: self._p1_timer.start()
+                              if (self._p1_rows and self._current_combined and self.isVisible()) else None)
+            return
+        self._p1_render()
+        self.request_rotation(force=True)
 
     @staticmethod
     def _short_num(n) -> str:

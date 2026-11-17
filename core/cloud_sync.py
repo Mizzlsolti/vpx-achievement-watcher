@@ -86,7 +86,6 @@ class CloudSync:
     _RARITY_DISK_CACHE_TTL_SEC: int = 3600  # 1 hour
 
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
-    _BLOCKED_NO_VPS_MESSAGE: str = "Cloud Upload Blocked · No VPS-ID assigned\nGo to 'Available Maps' to assign this table"
 
     # Minimum client version enforcement.
     # Cached once per process after the first fetch; None means not yet fetched or fetch failed.
@@ -156,45 +155,6 @@ class CloudSync:
                     CloudSync._upload_skip_warned = True
             return True
         return False
-
-    @staticmethod
-    def _emit_submission_state(cfg: "AppConfig", resp_body: str, bridge: Optional["Bridge"]) -> None:
-        """Parse a server response body for submission_state and emit the status overlay signal.
-
-        Handles structured responses: ``{"submission_state": "accepted"|"flagged"|"rejected"}``.
-        Silently ignores empty bodies, plain-text, or legacy Firebase-style responses so that
-        backwards compatibility with servers that do not return structured state is preserved.
-        """
-        if not bridge:
-            return
-        try:
-            resp_data = json.loads(resp_body)
-            if not isinstance(resp_data, dict):
-                return
-            state = str(resp_data.get("submission_state", "") or "").lower().strip()
-            if state == "accepted":
-                bridge.status_overlay_show.emit("Online · Verified", 0, "#00C853")
-            elif state == "flagged":
-                bridge.status_overlay_show.emit("Online · Flagged", 0, "#FFA500")
-            elif state == "rejected":
-                bridge.status_overlay_show.emit("Online · Rejected", 0, "#FF3B30")
-        except Exception:
-            pass
-
-    @staticmethod
-    def _notify_cloud_blocked(bridge: Optional["Bridge"], message: str) -> None:
-        """Emit a status overlay badge when a cloud upload is locally blocked.
-
-        Uses the same status_overlay_show signal as _emit_submission_state so the
-        in-game badge reflects the blocked state with a consistent visual style.
-        Silently no-ops when bridge is None (e.g. headless / test contexts).
-        """
-        if not bridge:
-            return
-        try:
-            bridge.status_overlay_show.emit(message, 0, "#FFA500")
-        except Exception:
-            pass
 
     @staticmethod
     def validate_player_identity(cfg: AppConfig, player_id: str, player_name: str) -> dict:
@@ -410,7 +370,6 @@ class CloudSync:
             _vps_id = (_vps_mapping.get(rom) or "").strip()
             if not _vps_id:
                 log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: no VPS-ID assigned", "WARN")
-                CloudSync._notify_cloud_blocked(bridge, CloudSync._BLOCKED_NO_VPS_MESSAGE)
                 return
             _extra_vps_id = _vps_id
         except Exception as e:
@@ -507,7 +466,6 @@ class CloudSync:
                 with urllib.request.urlopen(put_req, timeout=5) as resp:
                     resp_body = resp.read().decode()
                     log(cfg, f"[CLOUD] Uploaded Achievement Progress for {rom}: {unlocked}/{total} ({percentage}%)")
-                    CloudSync._emit_submission_state(cfg, resp_body, bridge)
             except Exception as e:
                 log(cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
         threading.Thread(target=_task, daemon=True).start()

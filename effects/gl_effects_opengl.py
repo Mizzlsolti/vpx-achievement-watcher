@@ -1017,7 +1017,7 @@ class HeatPulse:
 class ScanIn:
     """Slide-in with opacity ramp using ease-out-cubic.
 
-    Extracted from ``StatusOverlay`` scan-in logic.
+    Slide-in helper for overlay widgets.
     """
 
     def __init__(self, duration: float = 220.0, distance: int = 30):
@@ -1058,7 +1058,7 @@ class ScanIn:
 class GlowSweep:
     """Horizontal glow line sweeping across a widget after scan-in.
 
-    Extracted from ``StatusOverlay`` glow sweep logic.
+    Glow sweep helper for overlay widgets.
     """
 
     def __init__(self, duration: float = 350.0):
@@ -1105,7 +1105,7 @@ class GlowSweep:
 class ColorMorph:
     """Smooth RGB interpolation between two colors over time.
 
-    Extracted from ``StatusOverlay`` color morph logic.
+    Color morph helper for overlay widgets.
     """
 
     def __init__(self, duration: float = 200.0):

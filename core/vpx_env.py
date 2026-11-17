@@ -401,6 +401,48 @@ def find_score_server_plugin(vpx_dir: str) -> Optional[str]:
     return None
 
 
+_GAME_STATUS_CACHE: dict = {}
+
+
+def plugin_game_status_readable(cfg, rom: str) -> Optional[bool]:
+    """Can the score-server plugin read the game status of this ROM?
+
+    The plugin needs the ``game_state`` section (scores and current ball) in
+    its bundled NVRAM map to see games start and end. Returns None when this
+    cannot be checked (plugin folder or its maps not found).
+    """
+    rom = (rom or "").strip()
+    if not rom:
+        return None
+    vpx_dir = str(getattr(cfg, "VPX_DIR", "") or "")
+    plug = find_score_server_plugin(vpx_dir)
+    if not plug:
+        return None
+    key = (plug, rom.lower())
+    if key in _GAME_STATUS_CACHE:
+        return _GAME_STATUS_CACHE[key]
+    maps = os.path.join(plug, "nvram-maps")
+    result: Optional[bool] = None
+    try:
+        with open(os.path.join(maps, "index.json"), "r", encoding="utf-8") as f:
+            index = json.load(f)
+        rel = index.get(rom)
+        if rel is None:
+            low = {str(k).lower(): v for k, v in index.items()}
+            rel = low.get(rom.lower())
+        if not rel:
+            result = False
+        else:
+            with open(os.path.join(maps, str(rel)), "r", encoding="utf-8") as f:
+                m = json.load(f)
+            gs = m.get("game_state") if isinstance(m, dict) else None
+            result = bool(isinstance(gs, dict) and gs.get("scores") and gs.get("current_ball"))
+    except Exception:
+        result = None
+    _GAME_STATUS_CACHE[key] = result
+    return result
+
+
 def _latest_plugin_release() -> Optional[dict]:
     """Newest 'vpx-plugins-*' release of the Watcher repo (pre-releases included)."""
     try:
