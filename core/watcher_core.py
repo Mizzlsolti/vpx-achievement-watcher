@@ -428,6 +428,85 @@ class Watcher:
         except Exception:
             pass
 
+    def _emit_mini_info_if_no_live_status(self, rom: str, seconds: int = 5):
+        """VPX 10.8.1 + plugin: tell the player when the plugin cannot read the
+        game status of this ROM (no live tracking, no multiplayer). Same logic
+        as the "No NVRAM map" notice: once per ROM, when the VPX window shows."""
+        import threading
+        def _worker():
+            import time
+            try:
+                import win32gui
+            except ImportError:
+                return
+            try:
+                if not rom or not getattr(self, "score_server_ready", False):
+                    return
+                if not self._has_any_map(rom):
+                    return            # "No NVRAM map" covers this case
+                from .vpx_env import plugin_game_status_readable
+                if plugin_game_status_readable(self.cfg, rom) is not False:
+                    return
+                shown = getattr(self, "_mini_info_live_shown_for_rom", None)
+                if not isinstance(shown, set):
+                    shown = set()
+                if rom in shown:
+                    return
+                # The "No VPS-ID" notice uses the same window: show this one after it.
+                wait_vps = 0.0
+                try:
+                    if self.cfg.CLOUD_ENABLED:
+                        from ui.vps import _load_vps_mapping
+                        if not _load_vps_mapping(self.cfg).get(rom):
+                            wait_vps = 9.0
+                except Exception:
+                    pass
+
+                def _vpx_window_visible() -> bool:
+                    found = False
+                    def _cb(hwnd, _):
+                        nonlocal found
+                        try:
+                            title = (win32gui.GetWindowText(hwnd) or "").strip().lower()
+                            if "visual pinball player" in title and win32gui.IsWindowVisible(hwnd):
+                                found = True
+                                return False
+                        except Exception:
+                            pass
+                        return True
+                    try:
+                        win32gui.EnumWindows(_cb, None)
+                    except Exception:
+                        return False
+                    return found
+
+                for _ in range(120):  # max 60 s – VPX can take a while to show its window
+                    if self._stop.is_set() or not self.game_active:
+                        return
+                    if _vpx_window_visible():
+                        if wait_vps:
+                            time.sleep(wait_vps)
+                            if self._stop.is_set() or not self.game_active:
+                                return
+                        msg = (f"Live tracking & multiplayer not available for '{rom}'.\n"
+                               f"Close the table to see your results.")
+                        try:
+                            self.bridge.mini_info_show.emit(msg, max(3, int(seconds)))
+                            shown.add(rom)
+                            self._mini_info_live_shown_for_rom = shown
+                            log(self.cfg, f"[INFO] Mini overlay (no live game status) shown for {rom}")
+                        except Exception as e:
+                            log(self.cfg, f"[OVERLAY] mini info emit failed: {e}", "WARN")
+                        return
+                    time.sleep(0.5)
+            except Exception as e:
+                log(self.cfg, f"[OVERLAY] mini info live-status worker failed: {e}", "WARN")
+
+        try:
+            threading.Thread(target=_worker, daemon=True, name="MiniInfoNoLiveStatus").start()
+        except Exception:
+            pass
+
     def _emit_mini_info_if_missing_vps_id(self, rom: str, seconds: int = 8):
         """Non-blocking: spawns a background thread to warn if cloud sync is enabled but no VPS-ID is set for the ROM."""
         import threading
@@ -4263,6 +4342,7 @@ class Watcher:
                     self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
                         self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
+                        self._emit_mini_info_if_no_live_status(self.current_rom or rom, 5)
 
                 elif active_rom and session_key and session_key != active_rom:
                     self.on_session_end()
@@ -4275,6 +4355,7 @@ class Watcher:
                     self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
                         self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
+                        self._emit_mini_info_if_no_live_status(self.current_rom or rom, 5)
 
                 if active_rom:
                     if now_loop - float(getattr(self, "_last_vp_rect_ts", 0.0)) > 5.0:

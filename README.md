@@ -67,8 +67,10 @@ Global cloud leaderboard for achievement progress:
 With Visual Pinball X **10.8.1** the Watcher tracks games with **up to 4 players**:
 
 - The Watcher installs the required plugins automatically: superhac's **score-server** plugin and the **PinMAME plugin** with the `GetController` patch (built by this repo's *Build VPX Plugins* workflow). Both are enabled in `VPinballX.ini`.
-- **1 player**: everything works as before, including achievements.
-- **2–4 players**: no achievements are awarded. Page 1 of the overlay shows every player with score, best ball and average points per ball, and marks the winner. Table actions (ramps, modes …) are shown for all players combined.
+- **Every game counts on its own.** Page 1 of the overlay opens when a game ends – not again when the table is closed. A game still running when the table is closed is shown then (if it lasted 60 s or longer); games shorter than 60 s are ignored.
+- **1 player**: achievements unlock live during the game (from ball 2 on), counted per game.
+- **2–4 players**: no achievements are awarded. Page 1 shows one column per player with score, Best Ball, highlights and that player's table actions (ramps, modes …), and marks the winner.
+- ROMs whose game status the plugin cannot read show a short notice at table start and then work exactly like 10.8.0 (results after closing the table).
 - If a VPX update replaces the PinMAME plugin, the Watcher restores the multiplayer version automatically when it is the same plugin version. A new PinMAME version is reported in the Dashboard – multiplayer stays off until a new plugin build is released.
 - VPX older than 10.8.1, or plugins not available: the Watcher runs exactly as before (single player).
 
