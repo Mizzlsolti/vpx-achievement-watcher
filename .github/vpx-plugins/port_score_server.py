@@ -148,6 +148,40 @@ static std::string getControllerGameName() {
     s = sub_once(s, "RegisterScoreServerClassSCD(", "RegisterScoreServerClass(", "RegisterScoreServerClassSCD")
     s = sub_once(s, "scriptApi->SubmitTypeLibrary();", "scriptApi->SubmitTypeLibrary(endpointId);", "SubmitTypeLibrary")
 
+    # 6) Achievement Watcher extension: NVRAM snapshot on every player / ball
+    #    change. The Watcher decodes these with its NVRAM maps and attributes
+    #    the audit changes (ramps, modes ...) to the player who was playing.
+    snap = r'''
+    // ---- Achievement Watcher: NVRAM snapshot on player/ball change ----
+    {
+        static int awSnapPlayers = -1, awSnapPlayer = -1, awSnapBall = -1;
+        static std::string awSnapRom;
+        if (playerCount != awSnapPlayers || currentPlayer != awSnapPlayer ||
+            currentBall != awSnapBall || awSnapRom != currentRomName) {
+            awSnapPlayers = playerCount; awSnapPlayer = currentPlayer;
+            awSnapBall = currentBall; awSnapRom = currentRomName;
+            std::stringstream snapMsg;
+            snapMsg << "{\"type\":\"nvram_snapshot\","
+                    << "\"timestamp\":\"" << getTimestamp() << "\","
+                    << "\"rom\":\"" << currentRomName << "\""
+                    << addMachineIdField() << ","
+                    << "\"players\":" << playerCount << ","
+                    << "\"current_player\":" << currentPlayer << ","
+                    << "\"current_ball\":" << currentBall << ","
+                    << "\"base\":" << nvramBaseAddress << ","
+                    << "\"size\":" << liveNvram.size() << ","
+                    << "\"data\":\"" << base64_encode(liveNvram.data(), liveNvram.size()) << "\"}";
+            broadcastWebSocket(snapMsg.str());
+        }
+    }
+'''
+    anchor = "    int currentBall = decodeValue(liveNvram, currentBallObj);\n"
+    fn = "void checkAndBroadcastCurrentScores() {"
+    if fn not in s:
+        sys.exit("[port] anchor not found: checkAndBroadcastCurrentScores")
+    pos = s.index(anchor, s.index(fn))  # hook the per-frame function, not the logger
+    s = s[:pos + len(anchor)] + snap + s[pos + len(anchor):]
+
     s = "// VPX 10.8.1 port applied by vpx-achievement-watcher/.github/vpx-plugins/port_score_server.py\n" + s
     p.write_text(s, encoding="utf-8")
     print("[port] score-server ported to the VPX 10.8.1 plugin API")

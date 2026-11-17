@@ -954,13 +954,6 @@ class OverlayPagesMixin:
         self._overlay_page6_init_timers()
         self._p6_poll_timer.start()
         self._p6_tick_timer.start()
-        # Notify mascot
-        try:
-            trophie = getattr(self, "_trophie_overlay", None)
-            if trophie is not None:
-                trophie.on_automatch_started()
-        except Exception:
-            pass
         # Refresh display and disable auto-close
         if getattr(self, "_overlay_page", -1) == PAGE_DUELS:
             self._overlay_page6_show()
@@ -1023,13 +1016,6 @@ class OverlayPagesMixin:
             try:
                 from core.sound import play_sound
                 play_sound(self.cfg, "duel_received")
-            except Exception:
-                pass
-            # Notify mascot
-            try:
-                trophie = getattr(self, "_trophie_overlay", None)
-                if trophie is not None:
-                    trophie.on_automatch_found()
             except Exception:
                 pass
             if getattr(self, "_overlay_page", -1) == PAGE_DUELS and self.overlay and self.overlay.isVisible():

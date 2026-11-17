@@ -28,7 +28,7 @@ class AutoMatchWidget(QWidget):
     Parameters
     ----------
     main_window : QWidget
-        The main application window.  Used to reach the Trophie mascot.
+        The main application window.
     cfg : AppConfig
         Application configuration.
     duel_engine : DuelEngine
@@ -168,13 +168,6 @@ class AutoMatchWidget(QWidget):
         self._update_countdown_label()
         self._poll_timer.start()
         self._countdown_timer.start()
-        # Notify Trophie.
-        try:
-            trophie = getattr(self._mw, "_trophie_gui", None)
-            if trophie is not None:
-                trophie.on_automatch_started()
-        except Exception:
-            pass
         # First poll immediately.
         self._do_poll()
 
@@ -199,13 +192,6 @@ class AutoMatchWidget(QWidget):
         if self._elapsed >= _TIMEOUT_SECONDS:
             self._stop_search()
             self._show_result("⏰ No match found. Try again later.", "#FFAA00")
-            # Notify Trophie.
-            try:
-                trophie = getattr(self._mw, "_trophie_gui", None)
-                if trophie is not None:
-                    trophie.on_automatch_timeout()
-            except Exception:
-                pass
             return
         self._update_countdown_label()
 
@@ -289,13 +275,6 @@ class AutoMatchWidget(QWidget):
                     from PyQt6.QtCore import QTimer
                     QTimer.singleShot(200, lambda: _force_topmost(ov))
                     self._mw._automatch_notify_state = {"duel_id": duel_id}
-            except Exception:
-                pass
-            # Notify Trophie.
-            try:
-                trophie = getattr(self._mw, "_trophie_gui", None)
-                if trophie is not None:
-                    trophie.on_automatch_found()
             except Exception:
                 pass
             # Play match-found sound.

@@ -21,7 +21,6 @@ from core.watcher_core import (
 )
 from .dialogs import FeedbackDialog
 from .vps import _load_vps_mapping, _save_vps_mapping
-from mascot.mascot import _TROPHIE_SHARED
 
 
 def _parse_version(v_str):
@@ -305,54 +304,6 @@ class SystemMixin:
     # ==========================================
     # CLEAN SAVE METHODS
     # ==========================================
-    def _on_trophie_gui_toggled(self):
-        enabled = self.chk_trophie_gui.isChecked()
-        self.cfg.OVERLAY["trophie_gui_enabled"] = enabled
-        self.cfg.save()
-        try:
-            if enabled:
-                self._trophie_gui.show()
-            else:
-                self._trophie_gui._dismiss_bubble()
-                self._trophie_gui.hide()
-        except Exception:
-            pass
-        ov_enabled = bool(self.cfg.OVERLAY.get("trophie_overlay_enabled", True))
-        _TROPHIE_SHARED["gui_visible"] = enabled and ov_enabled
-
-    def _on_trophie_overlay_toggled(self):
-        enabled = self.chk_trophie_overlay.isChecked()
-        self.cfg.OVERLAY["trophie_overlay_enabled"] = enabled
-        self.cfg.save()
-        try:
-            if enabled:
-                self._trophie_overlay.show()
-            else:
-                self._trophie_overlay._dismiss_bubble()
-                self._trophie_overlay.hide()
-        except Exception:
-            pass
-        gui_enabled = bool(self.cfg.OVERLAY.get("trophie_gui_enabled", True))
-        _TROPHIE_SHARED["gui_visible"] = enabled and gui_enabled
-
-    def _on_trophie_overlay_portrait_toggled(self):
-        enabled = self.chk_trophie_overlay_portrait.isChecked()
-        self.cfg.OVERLAY["trophie_overlay_portrait"] = enabled
-        self.cfg.save()
-        try:
-            self._trophie_overlay.apply_portrait_from_cfg()
-        except Exception:
-            pass
-
-    def _on_trophie_overlay_ccw_toggled(self):
-        enabled = self.chk_trophie_overlay_ccw.isChecked()
-        self.cfg.OVERLAY["trophie_overlay_rotate_ccw"] = enabled
-        self.cfg.save()
-        try:
-            self._trophie_overlay.apply_portrait_from_cfg()
-        except Exception:
-            pass
-
     def _save_cloud_settings(self):
         QTimer.singleShot(0, self._apply_cloud_settings)
 
@@ -500,11 +451,6 @@ class SystemMixin:
                 "✅ Cloud Sync enabled!",
                 "Your player profile has been saved and Cloud Sync is now active.",
             )
-            try:
-                if getattr(self, "_trophie_gui", None):
-                    self._trophie_gui.on_cloud_enabled()
-            except Exception:
-                pass
             return
 
         # Validation failed — uncheck the checkbox and keep cloud disabled

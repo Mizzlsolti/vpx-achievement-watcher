@@ -395,13 +395,6 @@ class DuelsMixin:
         """Auto-refresh global feed or leaderboard when the user switches to them."""
         try:
             tab_text = self._duels_subtabs.tabText(index).lower()
-            # Notify Trophie of sub-tab switch
-            try:
-                trophie = getattr(self, "_trophie_gui", None)
-                if trophie is not None:
-                    trophie.on_subtab_changed(tab_text)
-            except Exception:
-                pass
             if "global" in tab_text:
                 feed = getattr(self, "_global_feed_widget", None)
                 if feed is not None:
@@ -1038,13 +1031,6 @@ class DuelsMixin:
                     "#CC5500",
                     seconds=5,
                 )
-                try:
-                    if getattr(self, "_trophie_gui", None):
-                        self._trophie_gui.on_duel_declined()
-                    if getattr(self, "_trophie_overlay", None):
-                        self._trophie_overlay.on_duel_declined()
-                except Exception:
-                    pass
                 return
         except Exception:
             pass
@@ -1074,13 +1060,6 @@ class DuelsMixin:
         self._duel_engine.accept_duel(duel_id)
         self._refresh_invitation_inbox()
         self._refresh_active_duels()
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_duel_accepted()
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_duel_accepted()
-        except Exception:
-            pass
 
     def _on_inbox_decline(self, duel_id: str) -> None:
         """Decline an incoming duel invitation from the inbox table."""
@@ -1092,13 +1071,6 @@ class DuelsMixin:
         self._duel_engine.decline_duel(duel_id)
         self._refresh_invitation_inbox()
         self._refresh_active_duels()
-        try:
-            if getattr(self, "_trophie_gui", None):
-                self._trophie_gui.on_duel_declined()
-            if getattr(self, "_trophie_overlay", None):
-                self._trophie_overlay.on_duel_declined()
-        except Exception:
-            pass
 
     def _on_duel_accept(self) -> None:
         """Legacy method: kept for backwards compatibility. Delegates to _on_inbox_accept."""
@@ -1475,23 +1447,6 @@ class DuelsMixin:
             except Exception:
                 pass
 
-    def _notify_trophies_duel_aborted(self) -> None:
-        """Trigger duel-aborted reactions on both Trophie instances."""
-        try:
-            t = getattr(self, "_trophie_gui", None)
-            if t:
-                t.on_duel_aborted()
-        except Exception:
-            pass
-        try:
-            t = getattr(self, "_trophie_overlay", None)
-            if t:
-                t.on_duel_aborted()
-        except Exception:
-            pass
-
-    # ── Do-Not-Disturb handler ─────────────────────────────────────────────────
-
     def _on_duels_dnd_toggled(self, state: int) -> None:
         """Toggle Do-Not-Disturb for duel invitations."""
         enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -1704,7 +1659,7 @@ class DuelsMixin:
         Delegates to DuelEngine.check_expiry() which moves any overdue
         PENDING/ACCEPTED/ACTIVE duels to history with DuelStatus.EXPIRED.
         If any duels were expired, both the Active Duels and Duel History
-        tables are refreshed, bridge.duel_expired is emitted for mascot
+        tables are refreshed, bridge.duel_expired is emitted for listeners
         reactions, and a brief expiry overlay is shown per expired duel.
         Also re-checks ACTIVE duels for opponent score availability.
         Called every 30 seconds by self._duel_expiry_timer.
@@ -1756,7 +1711,7 @@ class DuelsMixin:
         self._refresh_active_duels()
         self._refresh_duel_history()
         for duel in expired_duels:
-            # Emit bridge signal so mascot dispatchers fire.
+            # Emit bridge signal for listeners.
             try:
                 self.bridge.duel_expired.emit(duel.duel_id)
             except Exception:
@@ -2242,7 +2197,6 @@ class DuelsMixin:
                 "⚠️ Duel aborted:\nSession too short.",
                 "#FFAA00", 8,
             )
-            self._notify_trophies_duel_aborted()
             self._refresh_active_duels()
             return
 
@@ -2304,7 +2258,6 @@ class DuelsMixin:
                             " Only one game per duel allowed!",
                             "#FF3B30", 8,
                         )
-                        self._notify_trophies_duel_aborted()
                         self._refresh_active_duels()
                         self._duel_baseline_games_started = -1
                         self._duel_baseline_rom = ""

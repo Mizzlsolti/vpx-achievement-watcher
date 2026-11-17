@@ -1382,11 +1382,10 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                                 border_rgb: tuple, accent: str, primary: str) -> str:
         """Page 1 for multiplayer sessions (score-server plugin, VPX 10.8.1+).
 
-        Compact layout so it fits the same overlay size as the single-player
-        page: table title, one status line (players + winner), a scoreboard
-        (score, best ball, average per ball) and one short line with the
-        table-wide action counts from NVRAM (those cannot be split per player).
-        No achievements are awarded in multiplayer sessions, so no progress bar.
+        Same content as the single-player page, per player: score, best ball,
+        highlights and the NVRAM actions this player made (attributed from the
+        live NVRAM snapshots). Landscape shows all players side by side,
+        portrait uses two columns. No achievements in multiplayer games.
         """
         def fmt(n) -> str:
             try:
@@ -1395,14 +1394,16 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 return "0"
 
         portrait = bool(getattr(self, "portrait_mode", False))
+        br, bg, bb = border_rgb
         games = [g for g in (mp.get("games") or []) if isinstance(g, dict)]
         game = games[-1] if games else {}
-        stats = [p for p in (game.get("player_stats") or []) if isinstance(p, dict)]
+        stats = sorted([p for p in (game.get("player_stats") or []) if isinstance(p, dict)],
+                       key=lambda x: int(x.get("player") or 0))
         winner = int(game.get("winner") or 0)
         n_players = int(game.get("players") or len(stats) or 0)
+        per_player_actions = bool(game.get("per_player_actions"))
 
         lines = [f"<div class='rom-title'>{esc(display_title or 'Unknown ROM')}</div>"]
-
         status = f"👥 {n_players} Players"
         if winner:
             status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🏆 Player {winner} wins!</span>"
@@ -1410,42 +1411,110 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🤝 Tie</span>"
         if len(games) > 1:
             status += f" &nbsp;·&nbsp; Game {len(games)} of {len(games)}"
-        lines.append(f"<div style='text-align:center; color:#CCCCCC; margin-bottom:0.5em;'>{status}</div>")
+        lines.append(f"<div style='text-align:center; color:#CCCCCC; margin-bottom:0.4em;'>{status}</div>")
 
-        lines.append("<table class='hltable'>")
-        head = "<tr><th>Player</th><th>Score</th><th>Best Ball</th>"
-        head += "</tr>" if portrait else "<th>Ø per Ball</th></tr>"
-        lines.append(head)
-        for p in sorted(stats, key=lambda x: int(x.get("score") or 0), reverse=True):
+        # All players side by side (in portrait the content area is rotated, so
+        # it is also wide). Text size shrinks with the number of players so the
+        # page keeps the size of the single-player page.
+        cols = max(1, min(4, len(stats)))
+        crowded = len(stats) > 2
+        n_hl = 1 if crowded else 2
+        n_act = 2 if crowded else 3
+        fs = {1: 0.9, 2: 0.8, 3: 0.84, 4: 0.7}.get(cols, 0.7) * ({2: 0.95, 3: 0.72, 4: 0.64}.get(cols, 0.95) if portrait else 1.0)
+        max_label = {3: 13, 4: 10}.get(cols, 18)
+        best_label = "🔥 Best" if cols >= 4 else "🔥 Best Ball"
+
+        def short(text: str) -> str:
+            text = str(text)
+            return text if len(text) <= max_label else text[:max_label - 1].rstrip() + "…"
+
+        def split(entry: str):
+            parts = str(entry).rsplit(" – ", 1)
+            return (parts[0], parts[1]) if len(parts) == 2 else (str(entry), "")
+
+        # Inline styles only: Qt rich text does not reliably apply a <style>
+        # block placed in the middle of the body.
+        body_pt = float(getattr(self, "_body_pt", 20) or 20)
+        pt = max(6.0, body_pt * fs * 1.1)
+        cell = (f"font-size:{pt:.1f}pt; padding:1px 4px; "
+                f"border-bottom:1px solid rgba({br},{bg},{bb},0.12);")
+        td_l = f"<td nowrap style='{cell} text-align:left; color:#E0E0E0;'>"
+        td_la = f"<td nowrap style='{cell} text-align:left; color:#BBBBBB;'>"
+        td_r = f"<td nowrap style='{cell} text-align:right; font-weight:bold; color:{accent};'>"
+
+        def card(p: dict) -> str:
             pid = int(p.get("player") or 0)
             crown = " 👑" if pid == winner else ""
-            best_no = int(p.get("best_ball_no") or 0)
-            best_txt = fmt(p.get("best_ball")) + (f" <span style='color:#888;'>B{best_no}</span>" if best_no else "")
-            row = (f"<tr><td class='left' nowrap>P{pid}{crown}</td>"
-                   f"<td class='right' nowrap>{fmt(p.get('score'))}</td>"
-                   f"<td class='center' nowrap>{best_txt}</td>")
-            if not portrait:
-                row += f"<td class='center' nowrap>{fmt(p.get('avg_ball'))}</td>"
-            lines.append(row + "</tr>")
+            hl = p.get("highlights") or {}
+            best = ""
+            if int(p.get("best_ball") or 0) > 0:
+                best_no = int(p.get("best_ball_no") or 0)
+                best = (f"<tr>{td_l}{best_label}</td>{td_r}{esc(self._short_num(p.get('best_ball')))}"
+                        + (f" <span style='color:#888; font-size:{pt * 0.8:.1f}pt;'>B{best_no}</span>" if best_no else "")
+                        + "</td></tr>")
+            hl_items = []
+            for cat in ("Power", "Precision", "Fun"):
+                for x in (hl.get(cat) or []):
+                    if "Best Ball" not in x:
+                        hl_items.append(x)
+            hl_rows = "".join(
+                f"<tr>{td_l}{esc(short(n))}</td>{td_r}{esc(v)}</td></tr>"
+                for n, v in (split(x) for x in hl_items[:n_hl]))
+            act_rows = ""
+            if per_player_actions:
+                items = sorted((p.get("deltas") or {}).items(), key=lambda kv: int(kv[1]), reverse=True)[:n_act]
+                act_rows = "".join(
+                    f"<tr>{td_la}{esc(short(k))}</td>{td_r}+{fmt(v)}</td></tr>"
+                    for k, v in items)
+            return (
+                "<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;'>"
+                f"<tr><th colspan='2' nowrap style='font-size:{pt * 1.05:.1f}pt; text-align:center; padding:2px 4px;"
+                f" color:{primary}; font-weight:bold; background:rgba({br},{bg},{bb},0.18);"
+                f" border-bottom:2px solid rgba({br},{bg},{bb},0.35);'>Player {pid}{crown}</th></tr>"
+                f"<tr><td colspan='2' nowrap style='font-size:{pt * 1.2:.1f}pt; text-align:center; color:{primary};"
+                f" font-weight:bold; padding:1px 4px;'>{fmt(p.get('score'))}</td></tr>"
+                + best + hl_rows + act_rows +
+                "</table>"
+            )
+
+        lines.append("<table align='center' cellspacing='0' style='border-collapse: collapse; margin: 0 auto; width: 100%;'>")
+        for i in range(0, len(stats), cols):
+            lines.append("<tr>")
+            for j, p in enumerate(stats[i:i + cols]):
+                sep = (f"border-left: 1px solid rgba({br},{bg},{bb},0.4); " if j > 0 else "")
+                lines.append(f"<td valign='top' width='{100 // cols}%' style='{sep}padding: 0 5px 3px 5px;'>{card(p)}</td>")
+            lines.append("</tr>")
         lines.append("</table>")
 
-        # Table-wide NVRAM actions (all players combined) as one short line.
-        deltas = {}
-        try:
-            deltas = dict((players[0] if players else {}).get("deltas") or {})
-        except Exception:
+        if not per_player_actions:
             deltas = {}
-        if deltas:
-            items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:3]
-            txt = " &nbsp;·&nbsp; ".join(
-                f"<span style='white-space:nowrap;'>{esc(k)}&nbsp;<span style='color:{accent};'>+{fmt(v)}</span></span>"
-                for k, v in items)
-            lines.append(f"<div style='text-align:center; color:#BBBBBB; font-size:0.85em; margin-top:0.6em;'>"
-                         f"All players: {txt}</div>")
+            try:
+                deltas = dict((players[0] if players else {}).get("deltas") or {})
+            except Exception:
+                deltas = {}
+            if deltas:
+                items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:3]
+                txt = " &nbsp;·&nbsp; ".join(
+                    f"<span style='white-space:nowrap;'>{esc(k)}&nbsp;<span style='color:{accent};'>+{fmt(v)}</span></span>"
+                    for k, v in items)
+                lines.append(f"<div style='text-align:center; color:#BBBBBB; font-size:0.85em; margin-top:0.4em;'>"
+                             f"All players: {txt}</div>")
 
-        lines.append("<div style='text-align:center; color:#777; font-size:0.8em; margin-top:0.4em;'>"
+        lines.append("<div style='text-align:center; color:#777; font-size:0.8em; margin-top:0.3em;'>"
                      "Multiplayer game – no achievements</div>")
         return "".join(lines)
+
+    @staticmethod
+    def _short_num(n) -> str:
+        try:
+            n = int(n)
+        except Exception:
+            return str(n)
+        for div, suf in ((1_000_000_000, "B"), (1_000_000, "M"), (1_000, "K")):
+            if abs(n) >= div:
+                v = n / div
+                return (f"{v:.2f}".rstrip("0").rstrip(".") if v < 10 else f"{v:.1f}".rstrip("0").rstrip(".")) + suf
+        return str(n)
 
     def _score_spin_tick(self):
         """Animate score display value toward _score_target (slot-machine style)."""

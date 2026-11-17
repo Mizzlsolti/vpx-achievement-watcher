@@ -66,6 +66,9 @@ class _Game:
         self.ball_points: Dict[tuple, int] = {}
         self._cur: Optional[tuple] = None          # (player, ball) currently in play
         self._cur_start_score = 0
+        # Raw NVRAM snapshots from the plugin, taken on every player/ball change:
+        # [{"ts", "player", "ball", "players", "data": bytes}]
+        self.snapshots: List[dict] = []
 
     def update(self, players: int, cur_player: int, cur_ball: int, scores: Dict[int, int]) -> None:
         if players > self.players:
@@ -97,7 +100,7 @@ class _Game:
         self._close_ball()
         self.ended = ts
 
-    def summary(self) -> dict:
+    def summary(self, include_snapshots: bool = False) -> dict:
         players = max(1, int(self.players or 1), max(self.scores.keys(), default=1))
         out_players = []
         for p in range(1, players + 1):
@@ -123,6 +126,7 @@ class _Game:
             "players": players,
             "player_stats": out_players,
             "winner": winner,
+            **({"snapshots": list(self.snapshots)} if include_snapshots else {}),
         }
 
 
@@ -141,6 +145,7 @@ class ScoreServerClient:
         self._games: List[_Game] = []
         self._current: Optional[_Game] = None
         self._session_start = 0.0
+        self._last_snapshot: Optional[dict] = None
 
     # ── lifecycle ────────────────────────────────────────────────────────
     def start(self) -> None:
@@ -165,8 +170,12 @@ class ScoreServerClient:
             self._session_start = float(ts or time.time()) - 90.0  # plugin queues ~60 s
             self._games = [g for g in self._games if (g.ended is None) or (g.ended >= self._session_start)]
 
-    def session_summary(self) -> dict:
-        """Games recorded since :meth:`begin_session` (running game included)."""
+    def session_summary(self, include_snapshots: bool = False) -> dict:
+        """Games recorded since :meth:`begin_session` (running game included).
+
+        ``include_snapshots`` adds the raw NVRAM snapshots (bytes, not JSON
+        serialisable) per game for the per-player action breakdown.
+        """
         with self._lock:
             games = [g for g in self._games if g.started >= self._session_start or g.ended is None
                      or (g.ended or 0) >= self._session_start]
@@ -176,7 +185,7 @@ class ScoreServerClient:
             for g in games:
                 if g.ended is None:
                     g._close_ball()
-                summaries.append(g.summary())
+                summaries.append(g.summary(include_snapshots))
         max_players = max((s["players"] for s in summaries), default=0)
         return {
             "connected": self.connected,
@@ -329,7 +338,29 @@ class ScoreServerClient:
                 if self._current is not None and self._current.ended is None:
                     self._current.finish(now)
                 self._current = _Game(rom, now)
+                if self._last_snapshot is not None:
+                    self._current.snapshots.append(dict(self._last_snapshot))  # baseline
                 self._games.append(self._current)
+            elif mtype == "nvram_snapshot":
+                try:
+                    data = base64.b64decode(str(msg.get("data") or ""), validate=False)
+                except Exception:
+                    data = b""
+                if data:
+                    snap = {
+                        "ts": now,
+                        "player": _to_int(msg.get("current_player")),
+                        "ball": _to_int(msg.get("current_ball")),
+                        "players": _to_int(msg.get("players")),
+                        "data": data,
+                    }
+                    self._last_snapshot = snap
+                    g = self._current
+                    # Also accept the final snapshot that may arrive just after game_end.
+                    if g is not None and (g.ended is None or now - g.ended < 5.0):
+                        g.snapshots.append(snap)
+                        if len(g.snapshots) > 400:   # safety cap
+                            del g.snapshots[1:101]
             elif mtype == "current_scores":
                 if self._current is None or self._current.ended is not None:
                     # Joined mid-game (or game_start missed): start tracking now.
