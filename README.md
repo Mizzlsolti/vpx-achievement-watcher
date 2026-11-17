@@ -1,182 +1,134 @@
 # 🎯 VPX Achievement Watcher
 
-A companion app for Visual Pinball X (VPX) that adds modern achievements, live overlays, and challenges by reading VPinMAME NVRAM data.
+A companion app for Visual Pinball X (VPX) that adds achievements, live overlays, multiplayer results and cloud leaderboards by reading VPinMAME NVRAM data.
 
 ---
 
-## Features
+## Highlights
+
+- **Achievements** for every table with an NVRAM map – per table and across all tables, with levels, prestige and badges
+- **In-game overlay** at the end of every game: highlights, score, Best Ball, NVRAM actions, achievement progress and the cloud leaderboard
+- **Multiplayer (VPX 10.8.1+)**: up to 4 players per game, one column per player
+- **Cloud leaderboards** and achievement rarity, protected against cheating
+- **AWEditor** to create achievements for tables without a ROM
+
+---
+
+## Main window
+
+The window is split into 6 tabs: **Dashboard, Player, Tables, Stats, Appearance, System**. A setup wizard guides you through the first start. Every tab has a ❓ button with help for that page.
 
 ### 🏠 Dashboard
 
-Your control center at a glance:
-- **System Status**: Is the watcher running? Is VPX active?
-- **Session Summary**: Two cards side by side:
-  - **Last Run**: Last table played, score, achievements unlocked, and date
-  - **Run Status**: Live status indicators (green/yellow/red) for Table, Session, Cloud, and Leaderboard connection
-- **📬 Notifications**: Clickable feed with alerts for leaderboard ranks, beaten achievement records, missing VPS-IDs, and available updates. Unread count shown on tab badge. Clear All button to dismiss
-- **📋 Setup Status**: Checklist that verifies your setup is complete — Player Name set, Cloud Sync enabled, VPS-IDs assigned, Maps loaded, Overlays configured, and Widget Controls bound. Red/yellow/green indicators with direct links to fix missing items. Shows "✅ All set!" when everything passes
-- **Quick Actions**: Restart Engine, Minimize to Tray, Quit
-
----
+- **Status**: Is the Watcher running? Quick actions: Restart, Minimize to Tray, Quit
+- **Last Run**: last table played, score, achievements unlocked, date
+- **📋 Setup Status**: checklist (player name, Cloud Sync, VPS-IDs, NVRAM maps, overlays, controls) with direct links to fix missing items
+- **📬 Notifications**: leaderboard ranks, beaten records, missing VPS-IDs, available updates and plugin notices
 
 ### 👤 Player
 
-Your personal player profile and summary:
-- **Player Level**: Current level and XP progress bar based on unlocked achievements
-- **Prestige System**: Reach Prestige 1–5 by unlocking 2000 achievements per star (☆ → ★)
-- **Level Table**: All levels from Rookie to VPX Elite with their achievement thresholds
-- **🏅 Badges**: 37 collectible badges earned through gameplay milestones — unlock achievements, complete challenges, reach levels, accumulate playtime, and more
-- **Display Badge**: Choose which badge icon appears next to your name on cloud leaderboards
+- **Level & Badges**
+  - Player level from Rookie to VPX Elite, based on unlocked achievements
+  - Prestige 1–5: one star per 2000 achievements (☆ → ★)
+  - 31 collectible badges; choose the badge shown next to your name on the leaderboards
+- **Achievements**
+  - Per table: every achievement with ✅ unlocked / 🔒 locked and an ℹ️ info (condition, VPS table, unlock time)
+  - Global achievements across all tables (playtime, tables played, manufacturers …) with progress bars
+  - Rarity tiers (Common → Legendary), based on how many cloud players unlocked an achievement
+  - Custom tables (AWEditor) have their own progress view
 
----
+### 📚 Tables
 
-### 📈 Progress
+- **NVRAM Maps**: all supported tables and their map status
+  - ✅ NVRAM map = achievement tracking supported, ❌ = not supported yet, 🟠 = `.vpx` found in your tables folder
+  - Filter and search by name or ROM
+  - Assign **VPS-IDs** (Virtual Pinball Spreadsheet) – needed for cloud uploads
+- **🎯 AWEditor**: create achievements for tables without a VPinMAME ROM
+  - Scans your tables folder for tables without NVRAM maps
+  - Analyzes the table script, detects events and creates achievement rules
+  - Exports VBScript + JSON; the full script export inserts all `FireAchievement` calls automatically
 
-Track your achievement progress per table:
-- **Select Table**: Dropdown with all played tables (ROM-based and custom/non-ROM tables)
-- **Global Achievements**: Cross-table achievements like total playtime, tables played, manufacturer milestones — with progress bars (e.g. 12/25)
-- **Per-Table Achievements**: Each achievement listed with status (✅ unlocked / 🔒 locked)
-- **ℹ️ Info Links**: Click the info icon on any achievement to see its unlock condition, VPS table info, and unlock timestamp
-- **Rarity Tiers**: Common, Uncommon, Rare, Epic, Legendary — color-coded based on how many cloud players have unlocked each one. Rarity legend shown below progress bar
-- **Custom Table Progress**: AWEditor-created achievements are tracked separately with their own progress view
+### 📊 Stats
 
----
-
-### 📊 Records & Stats
-
-Records every round played, session duration, and scores in the background:
-- **🌍 Global NVRAM Dumps**: Full raw NVRAM data overview per table — all fields and values in a multi-column table
-- **👤 Player Session Deltas**: What changed during your session — actions, score differences, playtime, and field-by-field changes (only shows values > 0)
-
----
-
-### ☁️ Cloud
-
-Global cloud leaderboard for achievement progress:
-- **Category**: Achievement Progress leaderboard per table
-- **Search**: Enter a table or ROM name with autocomplete (resolves table titles to ROM keys)
-- **Fetch**: Load the leaderboard — ranked list with progress bars, medals (🏆🥈🥉), player badges, date, and ℹ️ VPS info links
-- **VPS Info Dialog**: Click ℹ️ on any leaderboard entry to see linked VPS table details and achievement breakdown
-
-> 💡 **Tip**: You can find your personal 4-digit player ID in the "System" tab. Make a note of it! If you ever install Watcher on a new PC, you can use it to restore your cloud progress.
-
----
-
-### 👥 Multiplayer (VPX 10.8.1+)
-
-With Visual Pinball X **10.8.1** the Watcher tracks games with **up to 4 players**:
-
-- The Watcher installs the required plugins automatically: superhac's **score-server** plugin and the **PinMAME plugin** with the `GetController` patch (built by this repo's *Build VPX Plugins* workflow). Both are enabled in `VPinballX.ini`.
-- **Every game counts on its own.** Page 1 of the overlay opens when a game ends – not again when the table is closed. A game still running when the table is closed is shown then (if it lasted 60 s or longer); games shorter than 60 s are ignored.
-- **1 player**: achievements unlock live during the game (from ball 2 on), counted per game.
-- **2–4 players**: no achievements are awarded. Page 1 shows one column per player with score, Best Ball, highlights and that player's table actions (ramps, modes …), and marks the winner.
-- ROMs whose game status the plugin cannot read show a short notice at table start and then work exactly like 10.8.0 (results after closing the table).
-- If a VPX update replaces the PinMAME plugin, the Watcher restores the multiplayer version automatically when it is the same plugin version. A new PinMAME version is reported in the Dashboard – multiplayer stays off until a new plugin build is released.
-- VPX older than 10.8.1, or plugins not available: the Watcher runs exactly as before (single player).
-
----
+- **🌍 Global NVRAM Dumps**: all NVRAM fields and values per table
+- **👤 Player Session Deltas**: what changed during your last session (actions, score, playtime)
+- **☁️ Cloud Leaderboard**
+  - Global overview: top 50 players by number of different achievements, plus your own place
+  - Per table: enter a table or ROM name (autocomplete) – top 25 with progress, medals, badges and ℹ️ VPS info, plus your own place
 
 ### 🎨 Appearance
 
-Customize the look and feel of the entire application, organized into **4 sub-tabs**:
-
-#### 🖼 Overlay
-- **Global Styling**: Font family, base font size, and overlay scale slider (30–300%)
-- **Widget Placement & Orientation**: Place and save screen positions for each overlay independently. Each widget has Portrait Mode (90°), Rotate CCW, Place, and Test buttons:
-  - Main Stats Overlay (with auto-close option)
-  - Achievement Toasts
-  - System Notifications
-  - Status Overlay (cloud/leaderboard feedback, can be disabled)
-- **🔄 Switch All → Portrait/Landscape**: Toggle all overlay orientations at once
-- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard) can be toggled
-- **Custom Background**: Place an `overlay_bg.jpg/png` next to the executable for a custom overlay background
-
-#### 🎨 Theme
-- **Active Theme**: Select and apply a color theme from the dropdown
-- **Color Preview**: Live preview of Primary, Accent, Border, and BG colors
-- **Overlay Preview / Test**: Test Main Stats Overlay and Achievement Toast with the current theme
-- **Available Themes**: Full list of all themes with icon, name, and description
-
-#### 🔊 Sound
-- **Enable/Disable**: Master toggle for sound effects
-- **Volume**: Slider (0–100%)
-- **Sound Pack**: Choose from multiple packs (Zaptron, Vex Machina, Retro, etc.)
-- **Events Table**: Per-event enable/disable toggle and preview button for each sound event
-
-#### ✨ Effects
-- GPU-accelerated visual effects with automatic CPU fallback
-
----
-
-### 🕹️ Controls
-
-Configure hotkeys and input bindings for the overlay and challenges:
-- Supports keyboard keys and joystick buttons
-- Bindings for overlay toggle and system tray show/hide
-- 💡 Flipper buttons or MagnaSave buttons work best
-
----
-
-### 🗺️ Available Maps
-
-Browse all supported tables and their NVRAM map status:
-- ✅ **NVRAM Map** = achievement tracking supported
-- ❌ **No NVRAM Map** = not supported yet
-- 🟠 **Local** = .vpx file found in your tables folder
-- Filter by local tables with NVRAM maps, search by name or ROM
-- Assign **VPS-IDs** to link tables to the Virtual Pinball Spreadsheet database
-- View table author extracted from .vpx file metadata
-
----
-
-### 🎯 AWEditor — Custom Achievement Editor
-
-Create custom achievements for tables that don't use VPinMAME ROMs (Non-ROM / Original tables):
-- **📋 Tables**: Scan your tables directory for tables without NVRAM maps
-- **✏️ Codes**: Analyze table scripts, detect events, and create custom achievement rules
-- **Export**: Generates VBScript + JSON files — the table writes trigger files that the watcher detects instantly
-- **Full Script Export**: Zero manual work — AWEditor inserts all FireAchievement calls automatically
-
----
+- **🖼 Overlay**
+  - Font, base size and overlay scale (30–300 %)
+  - Per overlay (Main Stats Overlay, Achievement Toasts, System Notifications): Portrait mode, Rotate CCW, **Place** / **Save** position, Test
+  - Switch all overlays to portrait or landscape at once
+  - Overlay pages: page 1 (Highlights & Score) is always on; page 2 (Achievement Progress) and page 3 (Cloud Leaderboard) can be switched off
+  - Custom background: place `overlay_bg.jpg/png` next to the executable
+- **🎨 Theme**: 15 themes as clickable color tiles, color preview, overlay test
+- **✨ Sound & Effects**
+  - Sound: on/off, volume, 20 sound packs, every event can be switched off and previewed
+  - Animations and visual effects for all overlays, low-performance mode
+- **🕹️ Controls**: hotkeys for the overlay and the tray; keyboard keys and joystick buttons (flipper or MagnaSave buttons work best)
 
 ### ⚙️ System
 
-The System tab has **2 sub-tabs**:
-
-#### ⚙️ General
-- **👤 Player Profile**: Set your display name and 4-character player ID. Identity fields are locked while Cloud Sync is active
-- **☁️ Cloud Sync & Backup**: Enable/disable Cloud Sync (validates player name and ID against cloud for uniqueness). Auto-Backup toggle, manual Backup to Cloud, and Restore from Cloud (restores achievements, VPS mapping, and CAT progress)
-- **🐛 Feedback & Bug Reports**: Report bugs or suggestions directly from the app
-
-#### 🔧 Maintenance
-- **📁 Directory Setup**: Configure BASE, NVRAM, and Tables directories
-- **Repair Data Folders**: Fix broken or missing data directories
-- **Force Cache NVRAM Maps**: Re-download and cache all NVRAM map files
-- **🔄 Update Databases**: Force re-download of index.json, romnames.json, vpsdb.json, and VPXTool
-- **⬆️ Watcher Update**: Check GitHub for newer releases — downloads and installs the Setup automatically with release notes preview
+- **General**
+  - **Player Profile**: display name, 4-character Player ID and your **Recovery Key** (see *Cloud & Fair Play*). Name and ID are locked while Cloud Sync is on
+  - **Cloud Sync**: enable/disable, Restore from Cloud (achievements, VPS mapping, custom-table progress)
+  - **Local Backup & Restore**: everything in one ZIP file (signed), including your Recovery Key
+  - **Feedback & Bug Reports** directly from the app
+- **Maintenance**
+  - Folders (Watcher, NVRAM, Tables), Repair Data Folders
+  - Force Cache NVRAM Maps, Update Databases (index, ROM names, VPS DB, vpxtool)
+  - Watcher Update: checks GitHub for a new release, shows the release notes and installs the setup
 
 ---
 
-### 🛡️ Fair Play & Anti-Cheat
+## 🖥️ In-game overlay
 
-To keep the leaderboards fair, local saves and scores are protected by hash signatures.
+Opens automatically at the end of a game (or with your hotkey) and has up to 3 pages:
+
+1. **Highlights & Score** – score, Best Ball, highlights and the NVRAM actions of the game. Content that does not fit scrolls automatically, the text size stays the same.
+2. **Achievement Progress** – all achievements of the table with rarity
+3. **Cloud Leaderboard** – top 25 of the table
+
+Achievement toasts pop up when an achievement is unlocked; system notifications show short notices (e.g. a table without NVRAM map).
 
 ---
 
-## Data Sources
+## 👥 Multiplayer & live tracking (VPX 10.8.1+)
 
-The Achievement Watcher uses the following open-source projects and data sources:
+With Visual Pinball X **10.8.1** the Watcher tracks every game on its own, with **up to 4 players**:
 
-Thanks to this people:
+- The Watcher installs and enables the required plugins automatically: superhac's **score-server** plugin and the **PinMAME plugin** with his `GetController` patch (built by this repo's *Build VPX Plugins* workflow).
+- The overlay opens at the end of each game – not again when the table is closed. A game still running when you close the table is shown then, if it lasted 60 s or longer. Games shorter than 60 s are ignored.
+- **1 player**: achievements unlock live during the game (from ball 2 on – what you reached on ball 1 follows then). Every stage reached in a game is unlocked.
+- **2–4 players**: no achievements. Page 1 shows one column per player – score, Best Ball, highlights and that player's table actions – and the winner.
+- ROMs whose game status the plugin cannot read: a short notice at table start, then everything works like 10.8.0.
+- If a VPX update replaces the PinMAME plugin, the multiplayer version is restored automatically (same plugin version). A new PinMAME version is reported in the Dashboard.
+- **VPX older than 10.8.1** or plugins not available: single player, results after closing the table – exactly as before.
 
-| Source | Repository |
+---
+
+## ☁️ Cloud & Fair Play
+
+- Every Watcher signs in to the cloud automatically – no account or password needed.
+- Your **Player ID belongs to your PC**: nobody else can upload for it. To use it on another PC, enter your **Recovery Key** (System → General, also stored in *Backup to ZIP*). Keep it safe and never share it.
+- The cloud checks every upload (valid values, matching leaderboard entry, upload rate), and player names are unique.
+- Save files changed outside the Watcher still load, but cloud uploads pause until you restore from the cloud or from a backup. A damaged save file falls back to its last good copy.
+- Uploads need a player name (not "Player"), Cloud Sync switched on and a VPS-ID for the table.
+- Older Watcher versions cannot upload – keep the Watcher up to date.
+
+---
+
+## Credits
+
+The Achievement Watcher builds on these open-source projects – thanks to everyone involved:
+
+| Project | Repository |
 |--------|-----------|
-| **NVRAM Maps** by tomlogic | [pinmame-nvram-maps](https://github.com/tomlogic/pinmame-nvram-maps) |
-| **vpxtool** by francisdb | [vpxtool](https://github.com/francisdb/vpxtool) |
-| **Score Server** by superhac | [score-server](https://github.com/superhac/score-server) — live scores, players and balls for the multiplayer mode (incl. his PinMAME `GetController` patch) |
-| **VPS Database** by VPS Team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) |
-| **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) — The official Visual Pinball and PinMAME hub |
-
-## GitHub Actions cleanup workflow
-
-The repository includes `.github/workflows/cleanup-artifacts.yml` to delete old Actions artifacts and workflow runs across all `Mizzlsolti` repositories. Before running it, add a repository secret named `CLEANUP_TOKEN` with a PAT that has `Actions: Read and write` and `Metadata: Read` access to the owner's repositories.
+| **NVRAM Maps** by tomlogic | [pinmame-nvram-maps](https://github.com/tomlogic/pinmame-nvram-maps) – the base of all achievements and table statistics |
+| **Score Server** by superhac | [score-server](https://github.com/superhac/score-server) – live scores, players and balls for multiplayer, incl. his PinMAME `GetController` patch |
+| **vpxtool** by francisdb | [vpxtool](https://github.com/francisdb/vpxtool) – reads table scripts and metadata from `.vpx` files |
+| **VPS Database** by the VPS team | [vps-db](https://github.com/VirtualPinballSpreadsheet/vps-db) – table names, authors and versions |
+| **Visual Pinball & PinMAME** | [vpinball](https://github.com/vpinball) – the official Visual Pinball and PinMAME hub |
