@@ -164,6 +164,7 @@ jobs:
           cp "$PL/score-server/plugin-score-server64.dll" "$OUT/score-server/"
           cp "$PL/score-server/plugin.cfg" "$OUT/score-server/"
           cp -r "$PL/score-server/nvram-maps" "$OUT/score-server/" || true
+          rm -rf "$OUT/score-server/nvram-maps/.git" "$OUT/score-server/nvram-maps/.gitattributes" "$OUT/score-server/nvram-maps/.github"
           cp "$PL/pinmame/plugin-pinmame64.dll" "$OUT/pinmame/"
           SS_SHA=$(git -C vpinball/plugins/score-server rev-parse --short HEAD)
           VPX_SHA=$(git -C vpinball rev-parse --short HEAD)
