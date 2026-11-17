@@ -56,12 +56,13 @@ _DUEL_EFFECTS = [
 ]
 
 
+from core.config import DUELS_MODE_ENABLED as _DUELS_ON
+
 # Ordered list of (title, overlay_type, effects_list) for the 2×3 grid
 _OVERLAY_GROUPS = [
     ("🖥️ Main Overlay",         "main",      _MAIN_EFFECTS),
     ("🏆 Achievement Toast",     "toast",     _TOAST_EFFECTS),
-    ("⚔️ Duel Overlay",          "duel",      _DUEL_EFFECTS),
-]
+] + ([("⚔️ Duel Overlay",        "duel",      _DUEL_EFFECTS)] if _DUELS_ON else [])
 
 # All 60 fx_* boolean keys (for Enable All / Disable All / Reset)
 _ALL_FX_KEYS = [key for _, _otype, effects in _OVERLAY_GROUPS for key, _ in effects]
@@ -346,6 +347,8 @@ class EffectsMixin:
             ("pp_overlay_toast",     "🏆 Toast",     True),
             ("pp_overlay_duel",      "⚔️ Duel",      True),
         ]
+        if not _DUELS_ON:
+            _OVERLAY_TOGGLES = [t for t in _OVERLAY_TOGGLES if t[0] != "pp_overlay_duel"]
         _style_on = (
             "QPushButton { background-color: #1a1a1a; color: #FF7F00;"
             " border: 2px solid #FF7F00; padding: 2px 6px; border-radius: 3px;"
@@ -502,7 +505,7 @@ class EffectsMixin:
 
     def _preview_all_overlays(self):
         """▶ Preview All — open all overlay windows simultaneously for 6 seconds."""
-        for overlay_type in ("main", "toast", "duel"):
+        for overlay_type in (("main", "toast", "duel") if _DUELS_ON else ("main", "toast")):
             self._open_demo_overlay(overlay_type, duration_ms=6000)
 
     def _open_demo_overlay(self, overlay_type: str, duration_ms: int = 6000):

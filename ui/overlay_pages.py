@@ -84,8 +84,10 @@ class OverlayPagesMixin:
         cfg_key = PAGE_ENABLED_KEYS.get(page_idx)
         if cfg_key and not bool(ov.get(cfg_key, True)):
             return False
-        if page_idx == PAGE_DUELS and bool(ov.get("duels_do_not_disturb", False)):
-            return False
+        if page_idx == PAGE_DUELS:
+            from core.config import DUELS_MODE_ENABLED
+            if not DUELS_MODE_ENABLED or bool(ov.get("duels_do_not_disturb", False)):
+                return False
         return True
 
     # ── Content check helper ─────────────────────────────────────────────────

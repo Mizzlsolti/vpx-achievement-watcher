@@ -67,6 +67,7 @@ from ui.progress import ProgressMixin
 from ui.dashboard import DashboardMixin
 from ui.overlay_pages import OverlayPagesMixin
 from ui.duels import DuelsMixin
+from core.config import DUELS_MODE_ENABLED
 
 from ui.vps import (
     VpsPickerDialog, VpsAchievementInfoDialog, CloudProgressVpsInfoDialog,
@@ -156,10 +157,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
-        self.bridge.session_ended.connect(self._on_session_ended_duels)
-        self.bridge.session_started.connect(self._on_session_started_duels)
-        self.bridge.duel_result.connect(self._on_duel_result)
-        self.bridge.duel_info_show.connect(self._on_duel_info_show)
+        if DUELS_MODE_ENABLED:
+            self.bridge.session_ended.connect(self._on_session_ended_duels)
+            self.bridge.session_started.connect(self._on_session_started_duels)
+            self.bridge.duel_result.connect(self._on_duel_result)
+            self.bridge.duel_info_show.connect(self._on_duel_info_show)
         
         self._prefetch_blink_timer = QTimer(self)
         self._prefetch_blink_timer.setInterval(600)  # Blink-Intervall in ms
@@ -174,7 +176,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._build_tab_controls()
         self._build_tab_stats()
         self._build_tab_progress()
-        self._build_tab_duels()
+        if DUELS_MODE_ENABLED:
+            self._build_tab_duels()
         self._build_tab_available_maps()   
         self._build_tab_cloud() 
         self._build_tab_system()
@@ -538,8 +541,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "The Overlay sub-tab lets you configure the visual style of all overlays.<br><br>"
             "• <b>Style</b>: Choose the font family and base size for the overlays.<br>"
             "• <b>Widget Placement</b>: Position and rotate each overlay window "
-            "(Main Overlay, Toast, System Notifications, Status Overlay, "
-            "Duel Notifications).<br>"
+            "(Main Overlay, Toast, System Notifications, Status Overlay).<br>"
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
@@ -627,18 +629,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
         "controls": (
             "<b>🕹️ Controls</b><br><br>"
-            "The Controls tab lets you configure hotkeys and input bindings for the overlay and Score Duels.<br><br>"
+            "The Controls tab lets you configure hotkeys and input bindings for the overlay.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
-            "• <b>Duel Accept / Left</b>: Starts the Auto-Match search on the Score Duels overlay page. "
-            "On the mini overlay for incoming duel invitations, this key accepts the invitation.<br>"
-            "• <b>Duel Decline / Right</b>: Cancels the Auto-Match search on the Score Duels overlay page. "
-            "On the mini overlay for incoming duel invitations, this key declines the invitation.<br>"
             "• <b>Show/Hide GUI (Systray)</b>: Enable this binding to toggle the main GUI window between visible "
             "and minimized-to-systray using a keyboard key or joystick button. Disabled by default — "
             "check <b>Enable</b> and click <b>Bind…</b> to assign a key.<br>"
             "• Select <b>keyboard</b> or <b>joystick</b> as the input source for each binding, then click <b>Bind…</b> and press your desired key or button.<br>"
             "• <b>Mute</b>: Silence all voice announcements.<br><br>"
-            "💡 Tip: Flipper buttons or MagnaSave buttons work best for the Duel Accept / Left and Duel Decline / Right bindings.<br>"
+            "💡 Tip: Flipper buttons or MagnaSave buttons work best for these bindings.<br>"
             "💡 You can also combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
         ),
         "cloud": (
@@ -934,6 +932,10 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.cmb_ch_right_src = QComboBox(); self.cmb_ch_right_src.addItems(["keyboard", "joystick"]); self.cmb_ch_right_src.setCurrentText(self.cfg.OVERLAY.get("duel_right_input_source", "keyboard")); self.cmb_ch_right_src.currentTextChanged.connect(lambda s: self._on_nav_src_changed("right", s))
         self.btn_ch_right_bind = QPushButton("Bind..."); self.btn_ch_right_bind.clicked.connect(lambda: self._on_bind_ch_clicked("right"))
         self.lbl_ch_right_binding = QLabel(self._nav_binding_label_text("right"))
+        if not DUELS_MODE_ENABLED:
+            for _w in (self.cmb_ch_left_src, self.btn_ch_left_bind, self.lbl_ch_left_binding,
+                       self.cmb_ch_right_src, self.btn_ch_right_bind, self.lbl_ch_right_binding):
+                _w.setParent(grp_inputs); _w.hide()
 
         self.chk_tray_toggle_enabled = QCheckBox("Enable"); self.chk_tray_toggle_enabled.setChecked(bool(self.cfg.OVERLAY.get("tray_toggle_enabled", False))); self.chk_tray_toggle_enabled.stateChanged.connect(self._on_tray_toggle_enabled_changed)
         self.cmb_tray_toggle_src = QComboBox(); self.cmb_tray_toggle_src.addItems(["keyboard", "joystick"]); self.cmb_tray_toggle_src.setCurrentText(self.cfg.OVERLAY.get("tray_toggle_input_source", "keyboard")); self.cmb_tray_toggle_src.currentTextChanged.connect(self._on_tray_toggle_src_changed)
@@ -942,9 +944,9 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         lay_inputs.addWidget(QLabel("<b>Show/Hide Stats Overlay:</b>"), 0, 0); lay_inputs.addWidget(self.cmb_toggle_src, 0, 1); lay_inputs.addWidget(self.btn_bind_toggle, 0, 2); lay_inputs.addWidget(self.lbl_toggle_binding, 0, 3)
         lay_inputs.addWidget(QLabel("<hr>"), 1, 0, 1, 4)
-        lay_inputs.addWidget(QLabel("<b>Duel Accept / Left:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
-        lay_inputs.addWidget(QLabel("<b>Duel Decline / Right:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
-        lay_inputs.addWidget(QLabel("<hr>"), 4, 0, 1, 4)
+        if DUELS_MODE_ENABLED: lay_inputs.addWidget(QLabel("<b>Duel Accept / Left:</b>"), 2, 0); lay_inputs.addWidget(self.cmb_ch_left_src, 2, 1); lay_inputs.addWidget(self.btn_ch_left_bind, 2, 2); lay_inputs.addWidget(self.lbl_ch_left_binding, 2, 3)
+        if DUELS_MODE_ENABLED: lay_inputs.addWidget(QLabel("<b>Duel Decline / Right:</b>"), 3, 0); lay_inputs.addWidget(self.cmb_ch_right_src, 3, 1); lay_inputs.addWidget(self.btn_ch_right_bind, 3, 2); lay_inputs.addWidget(self.lbl_ch_right_binding, 3, 3)
+        if DUELS_MODE_ENABLED: lay_inputs.addWidget(QLabel("<hr>"), 4, 0, 1, 4)
         _tray_row0_w = QWidget(); _tray_row0_lay = QHBoxLayout(_tray_row0_w); _tray_row0_lay.setContentsMargins(0, 0, 4, 0); _tray_row0_lay.setSpacing(4); _tray_row0_lay.addWidget(self.chk_tray_toggle_enabled); _tray_row0_lay.addWidget(QLabel("<b>Show/Hide GUI (Systray):</b>")); _tray_row0_lay.addStretch()
         lay_inputs.addWidget(_tray_row0_w, 5, 0); lay_inputs.addWidget(self.cmb_tray_toggle_src, 5, 1); lay_inputs.addWidget(self.btn_bind_tray_toggle, 5, 2); lay_inputs.addWidget(self.lbl_tray_toggle_binding, 5, 3)
         lay_inputs.setColumnStretch(3, 1); layout.addWidget(grp_inputs)
@@ -954,6 +956,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         layout.addWidget(lbl_hint)
 
         lbl_hint2 = QLabel("💡 Tip: These bindings are used to accept or decline duel invitations when the app is minimized to the system tray.")
+        lbl_hint2.setVisible(DUELS_MODE_ENABLED)
         lbl_hint2.setStyleSheet("color: #888; font-size: 9pt; padding: 4px 0px;")
         lbl_hint2.setWordWrap(True)
         layout.addWidget(lbl_hint2)

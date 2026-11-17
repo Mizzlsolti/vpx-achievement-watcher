@@ -386,7 +386,6 @@ class SetupWizardDialog(QDialog):
 
         lbl_required = QLabel(
             "Required for:\n"
-            "  • Score Duels\n"
             "  • Global Leaderboards\n"
             "  • Sharing progress with others"
         )
@@ -464,9 +463,9 @@ class SetupWizardDialog(QDialog):
             "  2. Load the map list\n"
             "  3. Assign VPS-IDs to your tables\n"
             "  4. Configure your hotkeys in the 🕹️ Controls tab\n\n"
-            "VPS-IDs are required for Duels & Leaderboards.\n\n"
-            "🕹️ The Controls tab lets you bind the overlay toggle key,\n"
-            "duel accept/decline keys, and the show/hide GUI hotkey.\n"
+            "VPS-IDs are required for the Leaderboards.\n\n"
+            "🕹️ The Controls tab lets you bind the overlay toggle key\n"
+            "and the show/hide GUI hotkey.\n"
             "Cabinet users: map these to flipper or MagnaSave buttons!\n\n"
             "💡 Use the ❓ Help buttons in each tab for detailed explanations."
         )

@@ -491,7 +491,13 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
-        lay_pos.addLayout(box_duel_overlay, 3, 0)
+        from core.config import DUELS_MODE_ENABLED
+        if DUELS_MODE_ENABLED:
+            lay_pos.addLayout(box_duel_overlay, 3, 0)
+        else:
+            for _w in (self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw,
+                       self.btn_duel_overlay_place, self.btn_duel_overlay_test):
+                _w.setParent(grp_pos); _w.hide()
 
         layout.addWidget(grp_pos)
 
@@ -530,6 +536,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         self.chk_overlay_page4.setChecked(bool(self.cfg.OVERLAY.get("overlay_page4_enabled", True)))
         self.chk_overlay_page4.stateChanged.connect(self._save_overlay_page_settings)
         lay_pages.addWidget(self.chk_overlay_page4)
+        self.chk_overlay_page4.setVisible(DUELS_MODE_ENABLED)
 
         layout.addWidget(grp_pages)
 
@@ -756,7 +763,9 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lbl_events.setStyleSheet("font-size: 11pt; font-weight: bold; color: #00E5FF; margin-top: 6px;")
         sound_layout.addWidget(lbl_events)
 
-        tbl_sound = QTableWidget(len(sound.SOUND_EVENTS), 3)
+        from core.config import DUELS_MODE_ENABLED as _duels_on
+        _sound_events = [e for e in sound.SOUND_EVENTS if _duels_on or not str(e[0]).startswith("duel_")]
+        tbl_sound = QTableWidget(len(_sound_events), 3)
         tbl_sound.setHorizontalHeaderLabels(["Event", "Enabled", "Test"])
         tbl_sound.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         tbl_sound.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -776,7 +785,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
 
         cur_events = self.cfg.OVERLAY.get("sound_events") or {}
 
-        for row, (event_id, event_label) in enumerate(sound.SOUND_EVENTS):
+        for row, (event_id, event_label) in enumerate(_sound_events):
             lbl_item = QTableWidgetItem(event_label)
             lbl_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             tbl_sound.setItem(row, 0, lbl_item)
@@ -834,7 +843,7 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         _total_w = (sum(tbl_sound.columnWidth(c) for c in range(3))
                     + tbl_sound.frameWidth() * 2 + 20)
         tbl_sound.setMaximumWidth(_total_w)
-        tbl_sound.setMinimumHeight(len(sound.SOUND_EVENTS) * 32 + 30)
+        tbl_sound.setMinimumHeight(len(_sound_events) * 32 + 30)
         sound_layout.addWidget(tbl_sound)
 
         sound_layout.addStretch(1)

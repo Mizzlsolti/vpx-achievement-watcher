@@ -2052,6 +2052,9 @@ class DuelsMixin:
         If so, shows a persistent interactive overlay (Accept / Later) and
         waits for the user to press Accept before activating the duel.
         """
+        from core.config import DUELS_MODE_ENABLED
+        if not DUELS_MODE_ENABLED:
+            return
         if not rom:
             return
         rom_lower = rom.lower().strip()
@@ -2199,6 +2202,9 @@ class DuelsMixin:
 
         If both checks pass, delegates to ``DuelEngine.submit_result()``.
         """
+        from core.config import DUELS_MODE_ENABLED
+        if not DUELS_MODE_ENABLED:
+            return
         if not rom:
             return
 

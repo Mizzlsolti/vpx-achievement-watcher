@@ -118,6 +118,10 @@ DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
 # re-enabled later by switching this flag to True.
 TOURNAMENT_MODE_ENABLED = False
 
+# Score Duels are hidden for now (tab, overlay page, duel notifications,
+# Controls bindings). The code stays in place; set True to re-enable.
+DUELS_MODE_ENABLED = False
+
 DEFAULT_OVERLAY.setdefault("duel_overlay_portrait", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_rotate_ccw", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)

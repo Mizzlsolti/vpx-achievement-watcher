@@ -171,7 +171,7 @@ class DashboardMixin:
         lay_setup.addWidget(self._lbl_setup_all_good)
 
         self._lbl_setup_info = QLabel(
-            "ℹ️ All checks must pass for Duels and Leaderboards to work."
+            "ℹ️ All checks must pass for Leaderboards to work."
         )
         self._lbl_setup_info.setStyleSheet(
             "color: #888; font-size: 8pt; font-style: italic; padding: 2px 0;"
@@ -423,6 +423,27 @@ class DashboardMixin:
 
     # ── Notification feed ────────────────────────────────────────────────────
 
+    _MAIN_TAB_LABELS = {
+        "dashboard": "Dashboard",
+        "player": "Player",
+        "appearance": "Appearance",
+        "controls": "Controls",
+        "available_maps": "Available Maps",
+        "cloud": "Cloud",
+        "system": "System",
+    }
+
+    def _main_tab_index(self, key: str) -> int:
+        """Index of a main tab by name (tabs can be hidden, so no fixed numbers)."""
+        label = self._MAIN_TAB_LABELS.get(key, key)
+        try:
+            for i in range(self.main_tabs.count()):
+                if label.lower() in self.main_tabs.tabText(i).lower():
+                    return i
+        except Exception:
+            pass
+        return 0
+
     def _refresh_notification_feed(self):
         """Rebuild the notification list widget and update the Dashboard tab title."""
         if not hasattr(self, "_notif_list_layout"):
@@ -439,15 +460,9 @@ class DashboardMixin:
             if w:
                 w.deleteLater()
 
-        # Tab indices (order matches addTab calls in __init__:
-        #   0=Dashboard, 1=Player, 2=Appearance, 3=Controls, 4=Records&Stats,
-        #   5=Progress, 6=Score Duels, 7=Available Maps, 8=Cloud, 9=System)
-        # Only tabs used as notification action_tab destinations are listed here.
-        _TAB_MAP = {
-            "cloud": 8,
-            "system": 9,
-            "available_maps": 7,
-        }
+        # Tabs used as notification action_tab destinations (looked up by name,
+        # because optional tabs such as Score Duels may be hidden).
+        _TAB_MAP = {k: self._main_tab_index(k) for k in ("cloud", "system", "available_maps")}
 
         if not display:
             lbl_empty = QLabel("No notifications")
@@ -480,8 +495,8 @@ class DashboardMixin:
             return
 
         # Tab indices matching addTab call order in the main window.
-        _IDX_SYSTEM = 9
-        _IDX_MAPS = 7
+        _IDX_SYSTEM = self._main_tab_index("system")
+        _IDX_MAPS = self._main_tab_index("available_maps")
 
         # ── Check 1: Player Name ──────────────────────────────────────────────
         pname = str(self.cfg.OVERLAY.get("player_name", "Player") or "").strip()
@@ -512,13 +527,17 @@ class DashboardMixin:
             ("overlay_pos_saved",                  None),
             ("ach_toast_saved",                    None),
             ("notifications_saved",                None),
-            ("duel_overlay_saved",                 None),
+            ("duel_overlay_saved",                 "_duels_enabled"),
             ("status_overlay_saved",               "status_overlay_enabled"),
         ]
         total_relevant = 0
         total_configured = 0
+        from core.config import DUELS_MODE_ENABLED
         for saved_key, enabled_key in _OVERLAY_CHECKS:
-            if enabled_key and not bool(self.cfg.OVERLAY.get(enabled_key, True)):
+            if enabled_key == "_duels_enabled":
+                if not DUELS_MODE_ENABLED:
+                    continue
+            elif enabled_key and not bool(self.cfg.OVERLAY.get(enabled_key, True)):
                 continue
             total_relevant += 1
             if bool(self.cfg.OVERLAY.get(saved_key, False)):
@@ -526,12 +545,14 @@ class DashboardMixin:
         overlay_all_ok = (total_configured == total_relevant)
 
         # ── Check 6: Widget Controls configured ───────────────────────────────
-        _IDX_CONTROLS = 3
+        _IDX_CONTROLS = self._main_tab_index("controls")
         _CONTROLS = [
             ("toggle_input_source",     "toggle_vk",       "toggle_joy_button"),
             ("duel_left_input_source",  "duel_left_vk",    "duel_left_joy_button"),
             ("duel_right_input_source", "duel_right_vk",   "duel_right_joy_button"),
         ]
+        if not DUELS_MODE_ENABLED:
+            _CONTROLS = _CONTROLS[:1]  # duel accept/decline bindings are hidden
         controls_configured = 0
         for _src_key, _kbd_key, _joy_key in _CONTROLS:
             _src = str(self.cfg.OVERLAY.get(_src_key, "keyboard")).lower()
@@ -541,7 +562,7 @@ class DashboardMixin:
                 _val = int(self.cfg.OVERLAY.get(_kbd_key, 0) or 0)
             if _val != 0:
                 controls_configured += 1
-        controls_all_ok = (controls_configured == 3)
+        controls_all_ok = (controls_configured == len(_CONTROLS))
 
         all_ok = check1_ok and cloud_ok and check3_ok and maps_ok and overlay_all_ok and controls_all_ok
 
@@ -610,7 +631,7 @@ class DashboardMixin:
         )
 
         # ── Row 5: Overlays ───────────────────────────────────────────────
-        _IDX_APPEARANCE = 2
+        _IDX_APPEARANCE = self._main_tab_index("appearance")
         lbl5, btn5 = self._setup_check_rows[4]
         if overlay_all_ok:
             lbl5.setText("✅ All overlays configured")
@@ -638,16 +659,16 @@ class DashboardMixin:
         # ── Row 6: Widget Controls ────────────────────────────────────────────
         lbl6, btn6 = self._setup_check_rows[5]
         if controls_all_ok:
-            lbl6.setText("✅ 3/3 Widget Controls configured")
+            lbl6.setText(f"✅ {len(_CONTROLS)}/{len(_CONTROLS)} Widget Controls configured")
             lbl6.setStyleSheet(_GREEN)
             if btn6 is not None:
                 btn6.hide()
         else:
             if controls_configured > 0:
-                lbl6.setText(f"⚠️ {controls_configured}/3 Widget Controls configured")
+                lbl6.setText(f"⚠️ {controls_configured}/{len(_CONTROLS)} Widget Controls configured")
                 lbl6.setStyleSheet(_YELLOW)
             else:
-                lbl6.setText("❌ 0/3 Widget Controls configured")
+                lbl6.setText(f"❌ 0/{len(_CONTROLS)} Widget Controls configured")
                 lbl6.setStyleSheet(_RED)
             if btn6 is not None:
                 btn6.setText("[→ Configure]")
@@ -739,7 +760,7 @@ class DashboardMixin:
         # ── system_maintenance → System tab + Maintenance sub-tab ────────────
         if action_tab == "system_maintenance":
             try:
-                self.main_tabs.setCurrentIndex(9)  # System tab
+                self.main_tabs.setCurrentIndex(self._main_tab_index("system"))
             except Exception:
                 pass
             try:
@@ -765,7 +786,7 @@ class DashboardMixin:
         # ── leaderboard_rank → Cloud tab + auto-fetch ROM ────────────────────
         if notif_type == "leaderboard_rank" and action_tab == "cloud":
             try:
-                self.main_tabs.setCurrentIndex(8)  # Cloud tab
+                self.main_tabs.setCurrentIndex(self._main_tab_index("cloud"))
             except Exception:
                 pass
             try:
@@ -780,7 +801,7 @@ class DashboardMixin:
         # ── available_maps → switch tab + highlight missing ROMs ─────────────
         if action_tab == "available_maps":
             try:
-                self.main_tabs.setCurrentIndex(7)  # Available Maps tab
+                self.main_tabs.setCurrentIndex(self._main_tab_index("available_maps"))
             except Exception:
                 pass
             try:
@@ -792,11 +813,7 @@ class DashboardMixin:
             return
 
         # ── generic tab switch ────────────────────────────────────────────────
-        _TAB_MAP = {
-            "cloud": 8,
-            "system": 9,
-            "available_maps": 7,
-        }
+        _TAB_MAP = {k: self._main_tab_index(k) for k in ("cloud", "system", "available_maps")}
         if action_tab and action_tab in _TAB_MAP:
             try:
                 self.main_tabs.setCurrentIndex(_TAB_MAP[action_tab])

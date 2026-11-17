@@ -1382,10 +1382,11 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                                 border_rgb: tuple, accent: str, primary: str) -> str:
         """Page 1 for multiplayer sessions (score-server plugin, VPX 10.8.1+).
 
-        Shows every player of the last game with score, best ball and average
-        per ball, marks the winner, and keeps the table-wide action counts from
-        NVRAM below (those cannot be split per player).  No achievements are
-        awarded in multiplayer sessions, so no progress bar is shown.
+        Compact layout so it fits the same overlay size as the single-player
+        page: table title, one status line (players + winner), a scoreboard
+        (score, best ball, average per ball) and one short line with the
+        table-wide action counts from NVRAM (those cannot be split per player).
+        No achievements are awarded in multiplayer sessions, so no progress bar.
         """
         def fmt(n) -> str:
             try:
@@ -1393,64 +1394,57 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             except Exception:
                 return "0"
 
-        br, bg, bb = border_rgb
+        portrait = bool(getattr(self, "portrait_mode", False))
         games = [g for g in (mp.get("games") or []) if isinstance(g, dict)]
         game = games[-1] if games else {}
         stats = [p for p in (game.get("player_stats") or []) if isinstance(p, dict)]
         winner = int(game.get("winner") or 0)
+        n_players = int(game.get("players") or len(stats) or 0)
 
         lines = [f"<div class='rom-title'>{esc(display_title or 'Unknown ROM')}</div>"]
-        sub = f"👥 {int(game.get('players') or len(stats) or 0)} Players"
-        if len(games) > 1:
-            sub += f" &nbsp;·&nbsp; Game {len(games)} of {len(games)} this session"
-        lines.append(f"<div style='text-align:center; color:#AAAAAA; font-size:0.95em; margin-bottom:0.6em;'>{sub}</div>")
 
+        status = f"👥 {n_players} Players"
         if winner:
-            lines.append(f"<div class='score-box'>🏆 Player {winner} wins!</div>")
-        else:
-            lines.append("<div class='score-box'>🤝 Tie</div>" if stats and len({p.get('score') for p in stats}) == 1
-                         else "<div style='margin-bottom:1.0em;'></div>")
+            status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🏆 Player {winner} wins!</span>"
+        elif stats and len({int(p.get('score') or 0) for p in stats}) == 1:
+            status += f" &nbsp;·&nbsp; <span style='color:{primary}; font-weight:bold;'>🤝 Tie</span>"
+        if len(games) > 1:
+            status += f" &nbsp;·&nbsp; Game {len(games)} of {len(games)}"
+        lines.append(f"<div style='text-align:center; color:#CCCCCC; margin-bottom:0.5em;'>{status}</div>")
 
         lines.append("<table class='hltable'>")
-        lines.append("<tr><th>Player</th><th>Score</th><th>Best Ball</th><th>Ø per Ball</th></tr>")
+        head = "<tr><th>Player</th><th>Score</th><th>Best Ball</th>"
+        head += "</tr>" if portrait else "<th>Ø per Ball</th></tr>"
+        lines.append(head)
         for p in sorted(stats, key=lambda x: int(x.get("score") or 0), reverse=True):
             pid = int(p.get("player") or 0)
             crown = " 👑" if pid == winner else ""
             best_no = int(p.get("best_ball_no") or 0)
-            best_txt = fmt(p.get("best_ball")) + (f" <span style='color:#888;'>(B{best_no})</span>" if best_no else "")
-            lines.append(
-                f"<tr><td class='left'>Player {pid}{crown}</td>"
-                f"<td class='right'>{fmt(p.get('score'))}</td>"
-                f"<td class='center'>{best_txt}</td>"
-                f"<td class='center'>{fmt(p.get('avg_ball'))}</td></tr>"
-            )
+            best_txt = fmt(p.get("best_ball")) + (f" <span style='color:#888;'>B{best_no}</span>" if best_no else "")
+            row = (f"<tr><td class='left' nowrap>P{pid}{crown}</td>"
+                   f"<td class='right' nowrap>{fmt(p.get('score'))}</td>"
+                   f"<td class='center' nowrap>{best_txt}</td>")
+            if not portrait:
+                row += f"<td class='center' nowrap>{fmt(p.get('avg_ball'))}</td>"
+            lines.append(row + "</tr>")
         lines.append("</table>")
 
-        # Table-wide NVRAM actions (all players combined)
+        # Table-wide NVRAM actions (all players combined) as one short line.
         deltas = {}
         try:
             deltas = dict((players[0] if players else {}).get("deltas") or {})
         except Exception:
             deltas = {}
         if deltas:
-            items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:16]
-            lines.append(f"<div class='divider'></div>")
-            lines.append("<table class='hltable'>")
-            lines.append("<tr><th colspan='4'>Actions (all players)</th></tr>")
-            for i in range(0, len(items), 2):
-                row = ""
-                for c in range(2):
-                    border = f" style='border-left: 2px solid rgba({br},{bg},{bb},0.2); padding-left: 0.55em;'" if c else ""
-                    if i + c < len(items):
-                        k, v = items[i + c]
-                        row += f"<td class='left'{border}>{esc(k)}</td><td class='right'>+{fmt(v)}</td>"
-                    else:
-                        row += f"<td class='left'{border}></td><td class='right'></td>"
-                lines.append(f"<tr>{row}</tr>")
-            lines.append("</table>")
+            items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:3]
+            txt = " &nbsp;·&nbsp; ".join(
+                f"<span style='white-space:nowrap;'>{esc(k)}&nbsp;<span style='color:{accent};'>+{fmt(v)}</span></span>"
+                for k, v in items)
+            lines.append(f"<div style='text-align:center; color:#BBBBBB; font-size:0.85em; margin-top:0.6em;'>"
+                         f"All players: {txt}</div>")
 
-        lines.append("<div style='text-align:center; color:#888; font-size:0.9em; margin-top:0.8em;'>"
-                     "Multiplayer game – no achievements awarded</div>")
+        lines.append("<div style='text-align:center; color:#777; font-size:0.8em; margin-top:0.4em;'>"
+                     "Multiplayer game – no achievements</div>")
         return "".join(lines)
 
     def _score_spin_tick(self):

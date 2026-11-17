@@ -62,28 +62,6 @@ Global cloud leaderboard for achievement progress:
 
 ---
 
-### ⚔️ Score Duels
-
-Challenge other players to direct score duels on the same table!
-
-The Score Duels tab is organized into **3 sub-tabs**:
-
-#### 🎯 My Duels
-- **📬 Incoming Invitations**: Inbox for duel challenges from other players — accept or decline with one click
-- **🔕 Do Not Disturb**: Toggle to stop receiving new duel invitations
-- **⚔️ Start New Duel**: Pick an opponent and table, then send a challenge
-- **🔀 Auto-Match**: Join the matchmaking queue — automatically matched with a player who shares at least one table (by VPS-ID). Search times out after 5 minutes
-- **🟢 Active Duels**: Overview of all running duels with status, time remaining, and cancel option
-- **📜 Duel History**: Past duel results with opponent, table, scores, and date
-
-#### 🌍 Global Feed
-Live feed of all active and recently completed duels across all players.
-
-#### 🏆 Leaderboard
-Top 50 players ranked by duel wins. Shows Rank, Player Name, Wins, Losses, and Win Rate (%). Every player with at least one completed duel appears in the ranking. Your own row is highlighted with a ★. Medals for top 3: 🥇🥈🥉.
-
----
-
 ### 👥 Multiplayer (VPX 10.8.1+)
 
 With Visual Pinball X **10.8.1** the Watcher tracks games with **up to 4 players**:
@@ -107,9 +85,8 @@ Customize the look and feel of the entire application, organized into **5 sub-ta
   - Achievement Toasts
   - System Notifications
   - Status Overlay (cloud/leaderboard feedback, can be disabled)
-  - ⚔️ Duel Notifications
 - **🔄 Switch All → Portrait/Landscape**: Toggle all overlay orientations at once
-- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard), Page 4 (Score Duels) can be toggled
+- **📄 Overlay Pages**: Enable/disable individual overlay pages — Page 1 (Highlights & Score) is always active; Page 2 (Achievement Progress), Page 3 (Cloud Leaderboard) can be toggled
 - **Custom Background**: Place an `overlay_bg.jpg/png` next to the executable for a custom overlay background
 
 #### 🎨 Theme
@@ -140,7 +117,7 @@ Customize the look and feel of the entire application, organized into **5 sub-ta
 
 Configure hotkeys and input bindings for the overlay and challenges:
 - Supports keyboard keys and joystick buttons
-- Bindings for overlay toggle, duel accept (left), duel decline (right), and system tray show/hide
+- Bindings for overlay toggle and system tray show/hide
 - 💡 Flipper buttons or MagnaSave buttons work best
 
 ---
@@ -188,7 +165,6 @@ The System tab has **2 sub-tabs**:
 ### 🛡️ Fair Play & Anti-Cheat
 
 To keep the leaderboards fair, local saves and scores are protected by hash signatures.
-Duels use a feature called NVRAM tracking. Restarting from Ball 1, pressing F3, or restarting the VPX Player will result in disqualification.
 
 ---
 
