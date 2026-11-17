@@ -628,25 +628,16 @@ class OverlayPagesMixin:
         # Fetch cloud data in background
         def _do_fetch():
             try:
-                player_ids = CloudSync.fetch_player_ids(self.cfg)
-                data = []
-                paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-                for path in paths:
-                    entry = batch.get(path)
-                    if entry and isinstance(entry, dict):
-                        data.append(entry)
-                if data:
-                    data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
+                data = CloudSync.fetch_rom_leaderboard(self.cfg, rom)
                 selected_diff = None
                 cat_for_html = "progress"
 
                 if not data:
                     final_html = header_html + (
-                        "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
+                        "<div style='color:#888;text-align:center;padding:16px;'>No cloud records for this table yet.</div>"
                     )
                 else:
-                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff, include_info_badges=False)
+                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, include_info_badges=False)
                     final_html = header_html + cloud_body
 
                 QMetaObject.invokeMethod(
@@ -657,7 +648,7 @@ class OverlayPagesMixin:
             except Exception as e:
                 print(f"[CLOUD OVERLAY] fetch failed: {e}")
                 error_html = header_html + (
-                    "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
+                    "<div style='color:#888;text-align:center;padding:16px;'>No cloud records for this table yet.</div>"
                 )
                 QMetaObject.invokeMethod(
                     self, "_overlay_set_cloud_html",
@@ -688,9 +679,9 @@ class OverlayPagesMixin:
         try:
             from ui.vps import _load_vps_mapping
             if not _load_vps_mapping(self.cfg):
-                return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+                return "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         except Exception:
-            return "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+            return "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         # Check 4: Available Maps loaded
         maps_cache = getattr(self, "_all_maps_cache", None)
         if not (isinstance(maps_cache, list) and len(maps_cache) > 0):

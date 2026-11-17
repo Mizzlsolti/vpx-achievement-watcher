@@ -109,6 +109,10 @@ class SystemMixin:
         # ── General sub-tab ────────────────────────────────────────────────────
         general_tab = QWidget()
         layout = QVBoxLayout(general_tab)
+        _gen_cols = QHBoxLayout()
+        _gen_cols.setSpacing(8)
+        _gen_left = QVBoxLayout()
+        _gen_right = QVBoxLayout()
 
         # --- 👤 Player Profile ---
         grp_profile = QGroupBox("👤 Player Profile")
@@ -131,9 +135,9 @@ class SystemMixin:
         lay_profile.addWidget(self.txt_player_id, 0, 3)
 
         lbl_id_warning = QLabel(
-            "⚠️ <b>IMPORTANT: Keep your Player ID safe!</b><br>"
-            "Do not share your 4-character Player ID with anyone. "
-            "Please write it down or save it somewhere safe!"
+            "⚠️ <b>IMPORTANT: Keep your Recovery Key safe!</b><br>"
+            "Your Player ID is linked to this PC. To use it on another PC you need the "
+            "Recovery Key below (it is also stored in Backup to ZIP). Never share it."
         )
         lbl_id_warning.setWordWrap(True)
         lbl_id_warning.setStyleSheet("color: #FF7F00; margin-top: 8px; font-size: 10pt; background: #111; padding: 10px; border: 1px solid #FF7F00; border-radius: 5px;")
@@ -146,7 +150,27 @@ class SystemMixin:
         lbl_name_hint.setStyleSheet("color: #888888; margin-top: 4px; font-size: 9pt; padding: 4px 8px;")
         lay_profile.addWidget(lbl_name_hint, 2, 0, 1, 4)
 
-        layout.addWidget(grp_profile)
+        # Recovery key: moves the Player ID to another PC (cloud sign-in).
+        self.lbl_recovery_key = QLabel("")
+        self.lbl_recovery_key.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.lbl_recovery_key.setStyleSheet("font-family: Consolas, monospace; color: #DDDDDD;")
+        self.btn_recovery_show = QPushButton("👁 Show")
+        self.btn_recovery_show.setCheckable(True)
+        self.btn_recovery_show.toggled.connect(lambda _c: self._refresh_recovery_key_ui())
+        self.btn_recovery_copy = QPushButton("📋 Copy")
+        self.btn_recovery_copy.clicked.connect(self._copy_recovery_key)
+        self.btn_recovery_enter = QPushButton("🔑 Enter Key…")
+        self.btn_recovery_enter.clicked.connect(self._enter_recovery_key)
+        _rk_row = QHBoxLayout()
+        _rk_row.addWidget(self.lbl_recovery_key, 1)
+        _rk_row.addWidget(self.btn_recovery_show)
+        _rk_row.addWidget(self.btn_recovery_copy)
+        _rk_row.addWidget(self.btn_recovery_enter)
+        lay_profile.addWidget(QLabel("Recovery Key:"), 3, 0)
+        lay_profile.addLayout(_rk_row, 3, 1, 1, 3)
+        self._refresh_recovery_key_ui()
+
+        _gen_left.addWidget(grp_profile)
 
         # --- ☁️ Cloud Sync & Backup ---
         grp_cloud = QGroupBox("☁️ Cloud Sync & Backup")
@@ -177,7 +201,7 @@ class SystemMixin:
             self._cloud_btns_overlay.raise_()
 
         lay_cloud.addWidget(cloud_btns_wrapper)
-        layout.addWidget(grp_cloud)
+        _gen_left.addWidget(grp_cloud)
 
         # --- 📦 Local Backup & Restore ---
         grp_zip = QGroupBox("📦 Local Backup & Restore")
@@ -209,7 +233,7 @@ class SystemMixin:
         self.btn_restore_zip.clicked.connect(self._restore_from_zip)
         zip_btns_row.addWidget(self.btn_restore_zip)
         lay_zip.addLayout(zip_btns_row)
-        layout.addWidget(grp_zip)
+        _gen_right.addWidget(grp_zip)
 
         # Lock player identity fields on startup if Cloud Sync is already enabled
         if self.cfg.CLOUD_ENABLED:
@@ -232,8 +256,13 @@ class SystemMixin:
         )
         btn_feedback.clicked.connect(lambda: FeedbackDialog(self).exec())
         lay_feedback.addWidget(btn_feedback)
-        layout.addWidget(grp_feedback)
+        _gen_right.addWidget(grp_feedback)
 
+        _gen_left.addStretch(1)
+        _gen_right.addStretch(1)
+        _gen_cols.addLayout(_gen_left, 1)
+        _gen_cols.addLayout(_gen_right, 1)
+        layout.addLayout(_gen_cols)
         layout.addStretch(1)
 
         # ── Bottom row: Help ❓ (right) ───────────────────────────────────────
@@ -275,23 +304,23 @@ class SystemMixin:
 
         # --- 🔧 Maintenance & Updates ---
         grp_maint = QGroupBox("🔧 Maintenance & Updates")
-        lay_maint = QVBoxLayout(grp_maint)
+        lay_maint = QGridLayout(grp_maint)
         self.btn_repair = QPushButton("Repair Data Folders")
         self.btn_repair.clicked.connect(self._repair_data_folders)
         self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
         self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
-        lay_maint.addWidget(self.btn_repair)
-        lay_maint.addWidget(self.btn_prefetch)
+        lay_maint.addWidget(self.btn_repair, 0, 0)
+        lay_maint.addWidget(self.btn_prefetch, 0, 1)
 
         self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
         self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
         self.btn_update_dbs.clicked.connect(self._update_databases_now)
-        lay_maint.addWidget(self.btn_update_dbs)
+        lay_maint.addWidget(self.btn_update_dbs, 1, 0)
 
         self.btn_self_update = QPushButton("⬆️ Watcher Update")
         self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
         self.btn_self_update.clicked.connect(self._check_for_app_update)
-        lay_maint.addWidget(self.btn_self_update)
+        lay_maint.addWidget(self.btn_self_update, 1, 1)
 
         maint_layout.addWidget(grp_maint)
 
@@ -373,10 +402,6 @@ class SystemMixin:
         self.cfg.CLOUD_ENABLED = False
         self.cfg.save()
         self._lock_player_identity_fields(False)
-        if hasattr(self, "_app_lifecycle_timer"):
-            self._app_lifecycle_timer.stop()
-        if hasattr(self, "_app_signals_timer"):
-            self._app_signals_timer.stop()
         if getattr(self, "btn_backup_cloud", None):
             self.btn_backup_cloud.setEnabled(False)
         if getattr(self, "btn_restore_cloud", None):
@@ -411,10 +436,15 @@ class SystemMixin:
                 _pid = new_id.strip().lower()
                 _name = new_name.strip()
                 if _pid and _name and _name.lower() != "player":
-                    _threading.Thread(
-                        target=lambda: _CloudSync.set_node(self.cfg, f"players/{_pid}/achievements/name", _name),
-                        daemon=True,
-                    ).start()
+                    def _link_and_publish_name(_n=_name, _p=_pid):
+                        _CloudSync.set_node(self.cfg, f"players/{_p}/achievements/name", _n)
+                        _CloudSync.claim_name(self.cfg, _n)
+                        try:
+                            from PyQt6.QtCore import QMetaObject as _QMO, Qt as _Qt
+                            _QMO.invokeMethod(self, "_refresh_recovery_key_ui", _Qt.ConnectionType.QueuedConnection)
+                        except Exception:
+                            pass
+                    _threading.Thread(target=_link_and_publish_name, daemon=True).start()
                 # Also upload VPS mapping so new players' tables are visible in duel dropdowns
                 if _pid:
                     try:
@@ -433,16 +463,6 @@ class SystemMixin:
                 self.btn_restore_cloud.setEnabled(True)
             if getattr(self, "_cloud_btns_overlay", None):
                 self._cloud_btns_overlay.hide()
-            # Start the lifecycle timer so app_active is checked periodically.
-            if hasattr(self, "_app_lifecycle_timer"):
-                if not self._app_lifecycle_timer.isActive():
-                    self._app_lifecycle_timer.start()
-                # Check app_active immediately now that cloud is enabled.
-                try:
-                    self._check_app_active()
-                except Exception as _e:
-                    from core.watcher_core import log as _log
-                    _log(self.cfg, f"[CLOUD] app_active check on enable failed: {_e}", "WARN")
             if self.cfg.CLOUD_URL:
                 CloudSync.cleanup_legacy_progress(self.cfg)
             self._lock_player_identity_fields(True)
@@ -685,6 +705,8 @@ class SystemMixin:
             _add(f_vps_mapping(self.cfg), "vps_id_mapping.json")
             _add(f_progress_upload_log(self.cfg), "progress_upload_log.json")
             _add(f_custom_achievements_progress(self.cfg), "custom_achievements_progress.json")
+            # Cloud identity (Player-ID link + recovery key) for moving to a new PC
+            _add(os.path.join(base, "cloud_identity.json"), "cloud_identity.json")
 
             # Session highlights
             highlights_dir = p_highlights(self.cfg)
@@ -775,13 +797,44 @@ class SystemMixin:
                 return
 
             from core.config import CONFIG_FILE
+            import hashlib
+            import hmac as _hmac
 
             base = self.cfg.BASE
             restored = 0
             failed_restore: list[str] = []
             with zipfile.ZipFile(zip_path, "r") as zf:
+                # Verify the backup signature (written by "Backup to ZIP").
+                sig_ok = False
+                try:
+                    pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
+                    h = _hmac.new(hashlib.sha256(f"{pid}|vpxaw-backup-v1".encode("utf-8")).digest(),
+                                  digestmod=hashlib.sha256)
+                    for name in zf.namelist():
+                        if name == "_backup.sig":
+                            continue
+                        h.update(name.encode("utf-8"))
+                        h.update(zf.read(name))
+                    sig_ok = _hmac.compare_digest(h.hexdigest(), zf.read("_backup.sig").decode("ascii", "ignore").strip())
+                except Exception:
+                    sig_ok = False
+                if not sig_ok:
+                    go_on = QMessageBox.question(
+                        self, "Restore from ZIP",
+                        "The backup signature does not match this Player ID (or the backup was modified).\n\n"
+                        "You can restore it anyway, but cloud uploads stay blocked until you restore from the cloud.\n\n"
+                        "Restore anyway?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No,
+                    )
+                    if go_on != QMessageBox.StandardButton.Yes:
+                        return
+                base_abs = os.path.abspath(base)
                 for name in zf.namelist():
                     if name == "_backup.sig":
+                        continue
+                    if name != "config.json" and not os.path.abspath(os.path.join(base, name)).startswith(base_abs + os.sep):
+                        failed_restore.append(f"{name}: outside the Watcher folder")
                         continue
                     # Map arcname back to absolute path
                     if name == "config.json":
@@ -797,6 +850,12 @@ class SystemMixin:
                         failed_restore.append(f"{name}: {re}")
                         log(self.cfg, f"[RESTORE] Failed to restore {name}: {re}", "WARN")
 
+            if sig_ok and not failed_restore:
+                try:
+                    from core.watcher_io import clear_integrity_failure
+                    clear_integrity_failure(base)
+                except Exception:
+                    pass
             msg = (f"✅ Restore completed!\n\n"
                    f"{restored} file(s) restored from:\n{zip_path}\n\n"
                    "Please restart the application for all changes to take effect.")
@@ -806,6 +865,116 @@ class SystemMixin:
         except Exception as e:
             self._msgbox_topmost("warn", "Restore from ZIP", f"Restore failed:\n\n{e}")
 
+
+    # ── Cloud identity (Player-ID link + recovery key) ─────────────────────
+
+    @pyqtSlot()
+    def _refresh_recovery_key_ui(self):
+        try:
+            from core import cloud_auth
+            key = cloud_auth.recovery_key(self.cfg)
+            pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+            if not cloud_auth.available():
+                txt = "(cloud sign-in not configured)"
+            elif not key or not cloud_auth.is_owner(self.cfg, pid):
+                txt = "(not linked yet – enable Cloud Sync)"
+            elif getattr(self, "btn_recovery_show", None) and self.btn_recovery_show.isChecked():
+                txt = key
+            else:
+                txt = "•" * 12
+            self.lbl_recovery_key.setText(txt)
+            linked = bool(key) and cloud_auth.is_owner(self.cfg, pid)
+            self.btn_recovery_show.setEnabled(linked)
+            self.btn_recovery_copy.setEnabled(linked)
+            self.btn_recovery_enter.setEnabled(cloud_auth.available())
+        except Exception:
+            pass
+
+    def _copy_recovery_key(self):
+        try:
+            from core import cloud_auth
+            from PyQt6.QtWidgets import QApplication
+            QApplication.clipboard().setText(cloud_auth.recovery_key(self.cfg))
+            self._msgbox_topmost("info", "Recovery Key", "Recovery key copied to the clipboard.\n\n"
+                                 "Store it somewhere safe – you need it to use your Player ID on another PC.")
+        except Exception:
+            pass
+
+    def _enter_recovery_key(self):
+        from PyQt6.QtWidgets import QInputDialog, QLineEdit as _QLE
+        pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+        if not pid or pid == "unknown":
+            self._msgbox_topmost("warn", "Recovery Key", "Set your Player ID first.")
+            return
+        key, ok = QInputDialog.getText(self, "Recovery Key",
+                                       f"Recovery key for Player ID '{pid}':", _QLE.EchoMode.Normal, "")
+        key = (key or "").strip()
+        if not ok or not key:
+            return
+        self._claim_player_id(key)
+
+    def _claim_player_id(self, key: str = None):
+        """Link the Player ID to this installation in the background."""
+        import threading as _th
+
+        def _bg():
+            from core import cloud_auth
+            pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+            ok, reason = cloud_auth.claim(self.cfg, pid, key)
+            if ok:
+                try:
+                    self.cfg._cloud_claim_failed = False
+                except Exception:
+                    pass
+                try:
+                    CloudSync.claim_name(self.cfg, self.cfg.OVERLAY.get("player_name", ""))
+                except Exception:
+                    pass
+            from PyQt6.QtCore import QMetaObject, Qt, Q_ARG
+            QMetaObject.invokeMethod(self, "_on_claim_result", Qt.ConnectionType.QueuedConnection,
+                                     Q_ARG(str, reason), Q_ARG(bool, key is not None))
+
+        _th.Thread(target=_bg, daemon=True, name="CloudClaim").start()
+
+    @pyqtSlot(str, bool)
+    def _on_claim_result(self, reason: str, interactive: bool):
+        self._refresh_recovery_key_ui()
+        if reason == "ok":
+            if interactive:
+                self._msgbox_topmost("info", "Recovery Key", "✅ Your Player ID is now linked to this PC.")
+            return
+        if reason == "owned":
+            if interactive:
+                self._msgbox_topmost("warn", "Recovery Key",
+                                     "⛔ The recovery key is not correct for this Player ID.")
+            else:
+                try:
+                    from core import notifications as _notif
+                    _notif.add_notification(
+                        self.cfg, type="cloud_identity", icon="🔑",
+                        title="Player ID is linked to another PC — cloud uploads paused",
+                        detail="Open System → General and enter your Recovery Key",
+                        action_tab="system", dedup_key="cloud_identity_owned")
+                    self._refresh_notification_feed()
+                except Exception:
+                    pass
+        elif interactive:
+            self._msgbox_topmost("warn", "Recovery Key", "Could not reach the cloud. Please try again later.")
+
+    def _cloud_identity_startup(self):
+        """On start: link the Player ID (first start of 3.2 for existing players)."""
+        try:
+            from core import cloud_auth
+            if not (self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL and cloud_auth.available()):
+                return
+            pid = str(self.cfg.OVERLAY.get("player_id", "")).strip().lower()
+            if not pid or pid == "unknown":
+                return
+            if cloud_auth.is_owner(self.cfg, pid):
+                return
+            self._claim_player_id(None)
+        except Exception:
+            pass
 
     def _cloud_upload_vps_mapping(self):
         """Upload vps_id_mapping.json to cloud under players/{pid}/vps_mapping."""

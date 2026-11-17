@@ -105,8 +105,8 @@ class CloudStatsMixin:
         )
         self.btn_cloud_fetch.clicked.connect(self._fetch_cloud_leaderboard)
         
-        lay_ctrl.addWidget(QLabel("Category:"))
-        lay_ctrl.addWidget(self.cmb_cloud_category)
+        # Only one category exists – the selector is not shown.
+        self.cmb_cloud_category.setVisible(False)
         lay_ctrl.addWidget(QLabel("Table/ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)
@@ -132,58 +132,7 @@ class CloudStatsMixin:
 
         def _bg_fetch():
             try:
-                player_ids = CloudSync.fetch_player_ids(self.cfg)
-                if not player_ids:
-                    html = "<div style='text-align:center; color:#888; margin-top:20px;'>No players found in cloud.</div>"
-                    QMetaObject.invokeMethod(self.cloud_view, "setHtml", Qt.ConnectionType.QueuedConnection, Q_ARG(str, html))
-                    return
-
-                # Fetch achievements node for each player
-                paths = [f"players/{pid}/achievements" for pid in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-
-                entries = []
-                for pid, path in zip(player_ids, paths):
-                    data = batch.get(path)
-                    if not data or not isinstance(data, dict):
-                        continue
-                    name = str(data.get("name", pid) or pid).strip()
-                    badge_id = str(data.get("selected_badge") or "").strip()
-
-                    # Count unique achievements across global + session
-                    seen = set()
-                    global_node = data.get("global")
-                    if isinstance(global_node, dict):
-                        for cat_entries in global_node.values():
-                            if isinstance(cat_entries, (list, dict)):
-                                items = cat_entries if isinstance(cat_entries, list) else cat_entries.values()
-                                for e in items:
-                                    t = ""
-                                    if isinstance(e, dict):
-                                        t = str(e.get("title", "")).strip()
-                                    elif isinstance(e, str):
-                                        t = e.strip()
-                                    if t:
-                                        seen.add(t)
-                    session_node = data.get("session")
-                    if isinstance(session_node, dict):
-                        for rom_entries in session_node.values():
-                            if isinstance(rom_entries, (list, dict)):
-                                items = rom_entries if isinstance(rom_entries, list) else rom_entries.values()
-                                for e in items:
-                                    t = ""
-                                    if isinstance(e, dict):
-                                        t = str(e.get("title", "")).strip()
-                                    elif isinstance(e, str):
-                                        t = e.strip()
-                                    if t:
-                                        seen.add(t)
-
-                    total = len(seen)
-                    if total > 0:
-                        entries.append({"name": name, "badge_id": badge_id, "total": total})
-
-                entries.sort(key=lambda x: x["total"], reverse=True)
+                entries = CloudSync.fetch_global_leaderboard(self.cfg)
                 html = self._generate_global_leaderboard_html(entries)
             except Exception:
                 html = "<div style='text-align:center; color:#888; margin-top:20px;'>Failed to load global leaderboard.</div>"
@@ -214,7 +163,9 @@ class CloudStatsMixin:
         html.append("<table><tr><th>Rank</th><th style='text-align:left;'>Player</th><th>Total Achievements</th></tr>")
 
         for i, row in enumerate(entries):
-            rank = i + 1
+            rank = row.get("_rank") or (i + 1)
+            if row.get("_rank"):
+                html.append("<tr><td colspan='3' style='color:#888;'>⋯</td></tr>")
             name = _html.escape(str(row.get("name", "Unknown")))
             total = int(row.get("total", 0))
             medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"
@@ -318,18 +269,8 @@ class CloudStatsMixin:
         self.cloud_view.setHtml(f"<div style='color:{get_theme_color(self.cfg, 'primary')};'>Fetching data from cloud...</div>")
         
         def _bg_fetch():
-            player_ids = CloudSync.fetch_player_ids(self.cfg)
-            data = []
-            paths = [f"players/{pid}/progress/{rom}" for pid in player_ids]
-            batch = CloudSync.fetch_parallel(self.cfg, paths)
-            for path in paths:
-                entry = batch.get(path)
-                if entry and isinstance(entry, dict):
-                    data.append(entry)
+            data = CloudSync.fetch_rom_leaderboard(self.cfg, rom)
 
-            if data:
-                data.sort(key=lambda x: float(x.get("percentage", 0)), reverse=True)
-                    
             html = self._generate_cloud_html(data, category, rom)
             QMetaObject.invokeMethod(self.cloud_view, "setHtml", Qt.ConnectionType.QueuedConnection, Q_ARG(str, html))
             
@@ -402,7 +343,9 @@ class CloudStatsMixin:
             return f" <span title='{tooltip}' style='cursor:help;'>ℹ️</span>"
 
         for i, row in enumerate(data):
-            rank = i + 1
+            rank = row.get("_rank") or (i + 1)
+            if row.get("_rank"):
+                html.append("<tr><td colspan='4' style='color:#888;'>⋯</td></tr>")
             name = _html.escape(str(row.get("name", "Unknown")))
             ts = row.get("ts", "")[:10]
             medal = "🏆" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"#{rank}"

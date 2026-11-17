@@ -1146,7 +1146,7 @@ class VpsAchievementInfoDialog(QDialog):
             lbl_no = QLabel("No VPS-ID at unlock time")
             lbl_no.setStyleSheet("color:#666;")
             right_lay.addWidget(lbl_no)
-            lbl_hint = QLabel("<a href='#available_maps' style='color:#00E5FF;'>→ Assign in 'Available Maps' tab</a>")
+            lbl_hint = QLabel("<a href='#available_maps' style='color:#00E5FF;'>→ Assign in 'Tables → NVRAM Maps'</a>")
             lbl_hint.setStyleSheet("color:#00E5FF;")
             lbl_hint.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
             lbl_hint.setOpenExternalLinks(False)

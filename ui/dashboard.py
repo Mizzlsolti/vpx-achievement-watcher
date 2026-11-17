@@ -52,18 +52,22 @@ class DashboardMixin:
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
+        # ── Top bar: watcher status + quick actions ───────────────────────────
         grp_status = QGroupBox("System Status")
-        lay_status = QVBoxLayout(grp_status)
+        lay_status = QHBoxLayout(grp_status)
+        lay_status.setContentsMargins(8, 6, 8, 6)
         self.status_label = QLabel("🟢 Watcher: RUNNING...")
-        self.status_label.setStyleSheet("font-size: 14pt; font-weight: bold; color: #00E5FF; padding: 10px;")
-        lay_status.addWidget(self.status_label)
+        self.status_label.setStyleSheet("font-size: 11pt; font-weight: bold; color: #00E5FF; padding: 2px 4px;")
+        lay_status.addWidget(self.status_label, 1)
         layout.addWidget(grp_status)
 
-        # ── Session Summary: Last Run card ────────────────────────────
-        grp_run_cards = QGroupBox("Session Summary")
-        lay_run_cards = QHBoxLayout(grp_run_cards)
+        # Two columns: Last Run + Setup Status (left), Notifications (right)
+        cols = QHBoxLayout()
+        cols.setSpacing(8)
+        left = QVBoxLayout()
+        left.setSpacing(8)
 
-        # Left card: Last Run
+        # ── Last Run ──────────────────────────────────────────────────────────
         grp_last = QGroupBox("Last Run")
         lay_last = QVBoxLayout(grp_last)
         self.lbl_lr_table = QLabel("Table:  —")
@@ -73,10 +77,7 @@ class DashboardMixin:
         for lbl in (self.lbl_lr_table, self.lbl_lr_score, self.lbl_lr_achievements, self.lbl_lr_result):
             lbl.setStyleSheet("color: #CCC; font-size: 9pt; padding: 2px 0;")
             lay_last.addWidget(lbl)
-        lay_last.addStretch(1)
-
-        lay_run_cards.addWidget(grp_last)
-        layout.addWidget(grp_run_cards)
+        left.addWidget(grp_last)
 
         # ── 📬 Notifications ────────────────────────────────────────────────────
         grp_notif = QGroupBox("📬 Notifications")
@@ -103,7 +104,7 @@ class DashboardMixin:
         notif_scroll.setWidgetResizable(True)
         notif_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         notif_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        notif_scroll.setFixedHeight(180)
+        notif_scroll.setMinimumHeight(180)
         notif_scroll.setStyleSheet(
             "QScrollArea { background: #0e0e0e; border: 1px solid #2a2a2a; border-radius: 4px; }"
         )
@@ -114,9 +115,7 @@ class DashboardMixin:
         self._notif_list_layout.setSpacing(2)
         self._notif_list_layout.addStretch(1)
         notif_scroll.setWidget(self._notif_container)
-        lay_notif_outer.addWidget(notif_scroll)
-
-        layout.addWidget(grp_notif)
+        lay_notif_outer.addWidget(notif_scroll, 1)
 
         # ── 📋 Setup Status ────────────────────────────────────────────────────
         grp_setup = QGroupBox("📋 Setup Status")
@@ -166,10 +165,12 @@ class DashboardMixin:
         self._lbl_setup_info.setWordWrap(True)
         lay_setup.addWidget(self._lbl_setup_info)
 
-        layout.addWidget(grp_setup)
+        left.addWidget(grp_setup)
+        left.addStretch(1)
+        cols.addLayout(left, 1)
+        cols.addWidget(grp_notif, 1)
+        layout.addLayout(cols, 1)
 
-        grp_actions = QGroupBox("Quick Actions")
-        lay_actions = QHBoxLayout(grp_actions)
         self.btn_restart = QPushButton("Restart Engine")
         self.btn_restart.setStyleSheet(
             "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold;"
@@ -189,16 +190,9 @@ class DashboardMixin:
         )
         self.btn_quit.clicked.connect(self.quit_all)
 
-        lay_actions.addWidget(self.btn_restart)
-        lay_actions.addStretch(1)
-        lay_actions.addWidget(self.btn_minimize)
-        lay_actions.addWidget(self.btn_quit)
+        for b in (self.btn_restart, self.btn_minimize, self.btn_quit):
+            lay_status.addWidget(b)
 
-        # Legend
-
-        layout.addWidget(grp_actions)
-
-        layout.addStretch(1)
         self._add_tab_help_button(layout, "dashboard")
 
         self.main_tabs.addTab(tab, "🏠 Dashboard")
@@ -345,16 +339,9 @@ class DashboardMixin:
         "system": "System",
     }
 
-    def _main_tab_index(self, key: str) -> int:
-        """Index of a main tab by name (tabs can be hidden, so no fixed numbers)."""
-        label = self._MAIN_TAB_LABELS.get(key, key)
-        try:
-            for i in range(self.main_tabs.count()):
-                if label.lower() in self.main_tabs.tabText(i).lower():
-                    return i
-        except Exception:
-            pass
-        return 0
+    def _main_tab_index(self, key: str) -> str:
+        """Pages are found by key (see _go_to_tab); kept for older callers."""
+        return key
 
     def _refresh_notification_feed(self):
         """Rebuild the notification list widget and update the Dashboard tab title."""
@@ -429,7 +416,7 @@ class DashboardMixin:
             vps_count = 0
         check3_ok = vps_count > 0
 
-        # ── Check 4: Available Maps loaded ────────────────────────────────────
+        # ── Check 4: NVRAM Maps loaded ────────────────────────────────────
         maps_cache = getattr(self, "_all_maps_cache", None)
         maps_ok = isinstance(maps_cache, list) and len(maps_cache) > 0
         maps_count = len(maps_cache) if maps_ok else 0
@@ -494,7 +481,7 @@ class DashboardMixin:
         _RED    = "color: #FF3B30; font-size: 9pt; padding: 1px 0;"
 
         def _apply_row(idx: int, ok: bool, ok_text: str, fail_text: str,
-                       link_text: str | None, link_target: int | None) -> None:
+                       link_text: str | None, link_target: str | None) -> None:
             lbl, btn = self._setup_check_rows[idx]
             if ok:
                 lbl.setText(f"✅ {ok_text}")
@@ -511,7 +498,7 @@ class DashboardMixin:
                     except Exception:
                         pass
                     _target = link_target
-                    btn.clicked.connect(lambda _=False, t=_target: self.main_tabs.setCurrentIndex(t))
+                    btn.clicked.connect(lambda _=False, t=_target: self._go_to_tab(t))
                     btn.show()
                 elif btn is not None:
                     btn.hide()
@@ -537,7 +524,7 @@ class DashboardMixin:
         _apply_row(
             3, maps_ok,
             f"{maps_count} map{'s' if maps_count != 1 else ''} loaded",
-            "Available Maps not loaded",
+            "NVRAM Maps not loaded",
             "Load Maps", _IDX_MAPS,
         )
 
@@ -563,7 +550,7 @@ class DashboardMixin:
                 except Exception:
                     pass
                 btn5.clicked.connect(
-                    lambda _=False, t=_IDX_APPEARANCE: self.main_tabs.setCurrentIndex(t)
+                    lambda _=False, t=_IDX_APPEARANCE: self._go_to_tab(t)
                 )
                 btn5.show()
 
@@ -588,7 +575,7 @@ class DashboardMixin:
                 except Exception:
                     pass
                 btn6.clicked.connect(
-                    lambda _=False, t=_IDX_CONTROLS: self.main_tabs.setCurrentIndex(t)
+                    lambda _=False, t=_IDX_CONTROLS: self._go_to_tab(t)
                 )
                 btn6.show()
 
@@ -671,7 +658,7 @@ class DashboardMixin:
         # ── system_maintenance → System tab + Maintenance sub-tab ────────────
         if action_tab == "system_maintenance":
             try:
-                self.main_tabs.setCurrentIndex(self._main_tab_index("system"))
+                self._go_to_tab("system")
             except Exception:
                 pass
             try:
@@ -697,7 +684,7 @@ class DashboardMixin:
         # ── leaderboard_rank → Cloud tab + auto-fetch ROM ────────────────────
         if notif_type == "leaderboard_rank" and action_tab == "cloud":
             try:
-                self.main_tabs.setCurrentIndex(self._main_tab_index("cloud"))
+                self._go_to_tab("cloud")
             except Exception:
                 pass
             try:
@@ -712,7 +699,7 @@ class DashboardMixin:
         # ── available_maps → switch tab + highlight missing ROMs ─────────────
         if action_tab == "available_maps":
             try:
-                self.main_tabs.setCurrentIndex(self._main_tab_index("available_maps"))
+                self._go_to_tab("available_maps")
             except Exception:
                 pass
             try:
@@ -727,7 +714,7 @@ class DashboardMixin:
         _TAB_MAP = {k: self._main_tab_index(k) for k in ("cloud", "system", "available_maps")}
         if action_tab and action_tab in _TAB_MAP:
             try:
-                self.main_tabs.setCurrentIndex(_TAB_MAP[action_tab])
+                self._go_to_tab(_TAB_MAP[action_tab])
             except Exception:
                 pass
 
@@ -824,7 +811,7 @@ class DashboardMixin:
             type="vps_missing",
             icon="⚠️",
             title=title,
-            detail="Open Available Maps to assign VPS IDs",
+            detail="Open Tables → NVRAM Maps to assign VPS IDs",
             action_tab="available_maps",
             dedup_key=f"vps_missing_{count}",
             extra=extra if extra else None,
@@ -969,25 +956,8 @@ class DashboardMixin:
 
         def _bg():
             try:
-                player_ids = CloudSync.fetch_player_ids(self.cfg)
-                if not player_ids:
-                    return
-                paths = [f"players/{p}/progress/{rom}" for p in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-
-                scores = []
-                for path, entry in batch.items():
-                    if entry and isinstance(entry, dict):
-                        pct = float(entry.get("percentage", 0))
-                        p_id = path.split("/")[1] if "/" in path else ""
-                        scores.append((pct, p_id))
-                scores.sort(reverse=True)
-
-                rank = None
-                for i, (_, p_id) in enumerate(scores, start=1):
-                    if p_id == pid:
-                        rank = i
-                        break
+                # Own place in the ROM leaderboard index (only the top 5 matter here).
+                rank, _own = CloudSync.fetch_lb_rank(self.cfg, f"lb/{rom}", "p", pid, cap=5)
 
                 if rank is not None and rank <= 5:
                     from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

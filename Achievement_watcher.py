@@ -108,7 +108,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.watcher = watcher
         self.bridge = bridge
         self.setWindowTitle("VPX Achievement Watcher")
-        self.resize(1720, 1290)
+        self.resize(1100, 720)
         
         icon = self._get_icon()
         self.setWindowIcon(icon)
@@ -151,6 +151,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.level_up_show.connect(self._on_level_up)
         self.bridge.achievements_updated.connect(self._refresh_level_display)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
+        self.bridge.achievements_updated.connect(self._refresh_overlay_progress)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
         if DUELS_MODE_ENABLED:
@@ -178,6 +179,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._build_tab_cloud() 
         self._build_tab_system()
         self._build_tab_aweditor()
+        self._regroup_main_tabs()
 
         self.timer_stats = QTimer(self)
         self.timer_stats.timeout.connect(self.update_stats)
@@ -212,29 +214,18 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._mini_test_idx = 0
         self._duel_overlay_test_idx = 0
 
-        # Periodic app-signals poll timer: picks up duel accept/decline signals from
-        # the Android app (30s). Only started when the Android app is actively open
-        # (app_active flag in Firebase). Lifecycle management is handled by
-        # _check_app_active (startup check) and _app_lifecycle_timer (periodic check).
-        # The Android app sets players/{pid}/app_active: true on open and false on close.
-        self._app_signals_timer = QTimer(self)
-        self._app_signals_timer.setInterval(30000)
-        self._app_signals_timer.timeout.connect(self._poll_app_signals)
-
-        # Slower lifecycle check (60s): reads app_active and starts/stops _app_signals_timer.
-        self._app_lifecycle_timer = QTimer(self)
-        self._app_lifecycle_timer.setInterval(60000)
-        self._app_lifecycle_timer.timeout.connect(self._check_app_active)
-        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
-            self._app_lifecycle_timer.start()
-            # One-time startup check after a short delay so the UI is ready.
-            QTimer.singleShot(5000, self._check_app_active)
 
         self.watcher.start()
         # Multiplayer plugins (VPX 10.8.1+): install/repair in the background.
         QTimer.singleShot(4000, self._check_vpx_plugins)
 
+        try:
+            from core.watcher_io import init_integrity
+            init_integrity(self.cfg.BASE)
+        except Exception:
+            pass
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            QTimer.singleShot(3000, self._cloud_identity_startup)
             CloudSync.cleanup_legacy_progress(self.cfg)
             CloudSync.cleanup_uppercase_rom_progress(self.cfg)
 
@@ -341,11 +332,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         "dashboard": (
             "<b>🏠 Dashboard</b><br><br>"
             "The Dashboard gives you a quick overview of the watcher status and the latest session information.<br><br>"
-            "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active.<br>"
-            "• <b>Session Summary</b>: Overview of the last play session "
+            "• <b>System Status</b>: Shows whether the watcher engine is running and VPX is active. "
+            "The buttons next to it restart the engine, minimize to tray or quit the application.<br>"
+            "• <b>Last Run</b>: Overview of the last play session "
             "(table, score, achievements and result).<br>"
-            "• <b>Notifications</b>: System messages and event notifications.<br>"
-            "• <b>Quick Actions</b>: Restart the engine, minimize to tray, or quit the application."
+            "• <b>Setup Status</b>: What is still missing for leaderboards (click a link to go there).<br>"
+            "• <b>Notifications</b>: System messages and event notifications."
         ),
         "player": (
             "<b>👤 Player</b><br><br>"
@@ -360,8 +352,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "your name on cloud leaderboards."
         ),
         "progress": (
-            "<b>📈 Progress</b><br><br>"
-            "The Progress tab shows your local achievement progress for each table.<br><br>"
+            "<b>📈 Achievements</b><br><br>"
+            "The Achievements sub-tab (Player) shows your local achievement progress for each table.<br><br>"
             "• Select a ROM from the dropdown at the top.<br>"
             "• The view lists all available achievements with their current status "
             "(unlocked ✅ / locked 🔒).<br>"
@@ -411,7 +403,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
-            "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
+            "• Use <b>Place</b> to open a positioning window, drag it where you want it and click "
+            "<b>Save</b> to store the position. <b>Test</b> previews "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
             + ("(Pages 2–4). " if DUELS_MODE_ENABLED else "(Pages 2 and 3). ") +
@@ -421,12 +414,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         "appearance_theme": (
             "<b>🎨 Theme</b><br><br>"
             "Customize the visual appearance of the app and overlays.<br><br>"
-            "• <b>Active Theme</b>: Select a theme from the dropdown and click <b>Apply Theme</b> to switch.<br>"
+            "• <b>Themes</b>: Click a tile to switch the theme. The active theme is outlined in white; "
+            "hover a tile to read its description.<br>"
             "• <b>Color Preview</b>: Shows the four main colors of the selected theme "
             "(Primary, Accent, Border, Background).<br>"
             "• <b>Overlay Preview / Test</b>: Preview each overlay with the current theme. "
             "Click <b>Test</b> to open a live preview.<br>"
-            "• <b>Available Themes</b>: Browse all 15 built-in themes with their color schemes and descriptions.<br><br>"
+            "<br>"
             "Theme changes affect the main application window, all overlay windows, achievement toasts, "
             "and overlay windows. The default theme is <b>Neon Blue</b> (cyan + orange)."
         ),
@@ -444,8 +438,10 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Overlay Close</b>: Plays when the stats overlay closes."
         ),
         "appearance_effects": (
-            "<b>✨ Visual Effects</b><br><br>"
-            "Control every animation and visual effect across all overlays.<br><br>"
+            "<b>✨ Sound &amp; Effects</b><br><br>"
+            "<b>🔊 Sound</b> (top of the page): enable sound effects, set the volume, choose a "
+            "sound pack and switch single events on or off (▶ plays a preview).<br><br>"
+            "<b>Visual effects</b>: control every animation and visual effect across all overlays.<br><br>"
             "• <b>Low Performance Mode</b>: Master switch — disables all effects at once.<br>"
             "• <b>Checkbox</b>: Enable or disable individual effects.<br>"
             "• <b>Slider</b>: Adjust effect intensity (particle count, glow strength, "
@@ -475,7 +471,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "QPainter CPU fallback on systems without GPU drivers."
         ),
         "available_maps": (
-            "<b>📚 Available Maps</b><br><br>"
+            "<b>📚 NVRAM Maps</b><br><br>"
             "This tab lists all known tables from the cloud index and your local VPX installation.<br><br>"
             "• <b>Search</b>: Filter by table name or ROM name.<br>"
             "• <b>🎯 Local tables with nvram map</b>: Show only locally installed tables that have an NVRAM mapping.<br>"
@@ -494,7 +490,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
         "controls": (
             "<b>🕹️ Controls</b><br><br>"
-            "The Controls tab lets you configure hotkeys and input bindings for the overlay.<br><br>"
+            "The Controls sub-tab (Appearance) lets you configure hotkeys and input bindings for the overlay.<br><br>"
             "• <b>Show/Hide Stats Overlay</b>: Bind a keyboard key or joystick button to toggle the stats overlay.<br>"
             "• <b>Show/Hide GUI (Systray)</b>: Enable this binding to toggle the main GUI window between visible "
             "and minimized-to-systray using a keyboard key or joystick button. Disabled by default — "
@@ -505,8 +501,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "💡 You can also combine keys with Shift, Ctrl, or Alt — just hold the modifier while pressing your key."
         ),
         "cloud": (
-            "<b>☁️ Cloud</b><br><br>"
-            "The Cloud tab lets you browse the global leaderboard stored in the cloud.<br><br>"
+            "<b>☁️ Cloud Leaderboard</b><br><br>"
+            "The Cloud Leaderboard sub-tab (Stats) lets you browse the global leaderboard stored in the cloud.<br><br>"
             "• <b>Category</b>: Choose Achievement Progress to view progress leaderboards.<br>"
             "• <b>ROM</b>: Enter the ROM name of the table you want to look up (e.g. <i>afm_113b</i>).<br>"
             "• Click <b>Fetch Highscores ☁️</b> to load the leaderboard for that ROM."
@@ -533,11 +529,12 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "or install an app update."
         ),
         "stats": (
-            "<b>📊 Records &amp; Stats</b><br><br>"
-            "The Records &amp; Stats tab gives you an overview of high scores and statistics.<br><br>"
+            "<b>📊 Stats</b><br><br>"
+            "The Stats tab gives you an overview of high scores and statistics.<br><br>"
             "• <b>🌍 Global NVRAM Dumps</b>: All saved NVRAM scores for the selected table "
             "across all players.<br>"
-            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session."
+            "• <b>👤 Player Session Deltas</b>: Your personal score changes per session.<br>"
+            "• <b>☁️ Cloud Leaderboard</b>: The global leaderboard (see the help on that sub-tab)."
         ),
         "aweditor": (
             "<b>🎯 AWEditor – Custom Achievement System for Non-ROM Tables</b><br><br>"
@@ -597,6 +594,88 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         ),
     }
 
+    def _regroup_main_tabs(self):
+        """Group the pages into fewer main tabs (compact window):
+        Dashboard · Player · Tables · Stats · Appearance · System."""
+        tabs = self.main_tabs
+        pages = {}
+        for i in range(tabs.count()):
+            pages[tabs.tabText(i)] = tabs.widget(i)
+
+        def find(word):
+            for t, w in pages.items():
+                if word.lower() in t.lower():
+                    return t, w
+            return None, None
+
+        keys = {
+            "dashboard": "Dashboard", "player": "Player", "appearance": "Appearance",
+            "controls": "Controls", "stats": "Records", "progress": "Progress",
+            "available_maps": "Available Maps", "cloud": "Cloud", "system": "System",
+            "aweditor": "AWEditor", "duels": "Score Duels",
+        }
+        found = {k: find(v) for k, v in keys.items()}
+        self._tab_pages = {k: w for k, (_t, w) in found.items() if w is not None}
+        while tabs.count():
+            tabs.removeTab(0)
+
+        def group(items):
+            box = QWidget()
+            lay = QVBoxLayout(box)
+            lay.setContentsMargins(0, 4, 0, 0)
+            sub = QTabWidget()
+            for widget, label in items:
+                if widget is not None:
+                    sub.addTab(widget, label)
+            lay.addWidget(sub)
+            return box, sub
+
+        p = self._tab_pages
+        tabs.addTab(p["dashboard"], found["dashboard"][0])
+        box, self.player_subtabs = group([(p.get("player"), "👤 Level && Badges"),
+                                          (p.get("progress"), "📈 Achievements")])
+        tabs.addTab(box, "👤 Player")
+        box, self.tables_subtabs = group([(p.get("available_maps"), "📚 NVRAM Maps"),
+                                          (p.get("aweditor"), "🎯 AWEditor")])
+        tabs.addTab(box, "📚 Tables")
+        if p.get("cloud") is not None:
+            self.stats_tabs.addTab(p["cloud"], "☁️ Cloud Leaderboard")
+            # The Stats page has one ❓ for all its sub-tabs (it shows the
+            # help of the open one), so the Cloud page's own button goes.
+            for b in p["cloud"].findChildren(QPushButton):
+                if b.text() == "❓":
+                    b.hide()
+        tabs.addTab(p["stats"], "📊 Stats")
+        if p.get("controls") is not None:
+            self.appearance_subtabs.addTab(p["controls"], "🕹️ Controls")
+        tabs.addTab(p["appearance"], found["appearance"][0])
+        tabs.addTab(p["system"], found["system"][0])
+        if p.get("duels") is not None:
+            tabs.addTab(p["duels"], found["duels"][0])
+
+    def _refresh_overlay_progress(self):
+        """Achievements were saved after the overlay appeared: redraw page 1 so its
+        progress bar includes this game's unlocks (scroll position is kept)."""
+        try:
+            ov = getattr(self, "overlay", None)
+            if ov is None or not ov.isVisible() or int(getattr(self, "_overlay_page", 0) or 0) != 0:
+                return
+            if not getattr(ov, "_current_combined", None):
+                return
+            ov._render_fixed_columns()
+        except Exception:
+            pass
+
+    def _go_to_tab(self, key: str) -> None:
+        """Show the page registered under ``key``, switching main and sub tab."""
+        from PyQt6.QtWidgets import QStackedWidget
+        node = getattr(self, "_tab_pages", {}).get(key)
+        while node is not None:
+            parent = node.parentWidget()
+            if isinstance(parent, QStackedWidget) and isinstance(parent.parentWidget(), QTabWidget):
+                parent.parentWidget().setCurrentWidget(node)
+            node = parent
+
     def _add_tab_help_button(self, layout, help_key: str):
         """Adds a help button (❓) anchored to the bottom-right of the given layout."""
         row = QHBoxLayout()
@@ -615,6 +694,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
     def _show_tab_help(self, help_key: str):
         """Displays a tab-specific help dialog."""
+        if help_key == "stats":
+            try:
+                cloud = getattr(self, "_tab_pages", {}).get("cloud")
+                if cloud is not None and self.stats_tabs.currentWidget() is cloud:
+                    help_key = "cloud"
+            except Exception:
+                pass
         text = self._TAB_HELP.get(help_key, "No help available.")
         box = QMessageBox(self)
         box.setWindowTitle("Help")
@@ -641,13 +727,14 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Without these, all uploads will be blocked.<br><br>"
 
             "<b>3. Cloud Sync Must Be Enabled</b><br>"
-            "Cloud Sync must be turned on in the System tab, otherwise no data will be transmitted.<br><br>"
+            "Cloud Sync must be turned on in System → General, otherwise no data will be transmitted.<br><br>"
 
             "<b>4. Anti-Cheat &amp; Validation</b><br>"
-            "Every upload is validated server-side. Submissions can receive the following status:<br>"
-            "• 🟢 <b>Accepted</b> – All good, score counts on the leaderboard<br>"
-            "• 🟠 <b>Flagged</b> – Suspicious, held for manual review (not visible on the leaderboard until cleared)<br>"
-            "• 🔴 <b>Rejected</b> – Invalid (missing data, duplicate, outdated version, etc.)<br><br>"
+            "Your Player ID is linked to this PC. Only this PC can upload for it; the cloud checks every "
+            "upload (valid values, matching leaderboard entry, upload rate). To move to another PC, use the "
+            "<b>Recovery Key</b> from System → General (it is also stored in Backup to ZIP).<br>"
+            "If a local save file was modified outside the Watcher, uploads pause until you restore from the "
+            "cloud or from a backup.<br><br>"
 
             "<b>5. Keep Your Watcher Version Up To Date</b><br>"
             "Outdated Watcher versions will be rejected by the server. Always keep the app updated.<br><br>"
@@ -2248,80 +2335,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                 threading.Thread(target=_bg_prescan, daemon=True).start()
         except Exception:
             pass
-
-    def _fetch_app_active(self) -> bool:
-        """Return True if players/{pid}/app_active is truthy in Firebase, False otherwise.
-        This is a blocking call — always invoke from a background thread."""
-        try:
-            pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-            if not pid or pid == "unknown":
-                return False
-            return bool(CloudSync.fetch_node(self.cfg, f"players/{pid}/app_active"))
-        except Exception:
-            return False
-
-    def _check_app_active(self):
-        """Check players/{pid}/app_active in Firebase and start/stop _app_signals_timer
-        accordingly.  Called once on startup (after a short delay) and every 60 seconds
-        by _app_lifecycle_timer.  The Android app sets this flag to true when it opens
-        and to false (or removes it) when it closes."""
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
-            return
-
-        def _bg():
-            try:
-                from PyQt6.QtCore import QMetaObject, Qt
-                if self._fetch_app_active():
-                    QMetaObject.invokeMethod(self, "_start_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-                else:
-                    QMetaObject.invokeMethod(self, "_stop_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-            except Exception:
-                pass
-
-        threading.Thread(target=_bg, daemon=True, name="AppActiveCheck").start()
-
-    @pyqtSlot()
-    def _start_app_signals_timer(self):
-        """Start _app_signals_timer if not already running (called from UI thread)."""
-        if not self._app_signals_timer.isActive():
-            self._app_signals_timer.start()
-
-    @pyqtSlot()
-    def _stop_app_signals_timer(self):
-        """Stop _app_signals_timer if running (called from UI thread)."""
-        if self._app_signals_timer.isActive():
-            self._app_signals_timer.stop()
-
-    def _poll_app_signals(self):
-        """Poll Firebase for app signals (duel accept/decline, backup/restore triggers).
-        Runs the network IO in a background thread to avoid blocking the UI.
-        Also checks app_active: if the Android app has closed, stops the poll timer."""
-        def _bg():
-            try:
-                signals = CloudSync.poll_app_signals(self.cfg)
-                for sig in signals:
-                    action = sig.get("action", "")
-                    if action == "backup":
-                        try:
-                            state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
-                            pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
-                            CloudSync.upload_full_achievements(self.cfg, state, pname)
-                        except Exception:
-                            pass
-                    elif action == "restore":
-                        try:
-                            CloudSync.restore_from_cloud(self.cfg)
-                        except Exception:
-                            pass
-                # After processing signals, verify the Android app is still active.
-                # If app_active is falsy the Android app has closed — stop polling to save traffic.
-                if not self._fetch_app_active():
-                    from PyQt6.QtCore import QMetaObject, Qt
-                    QMetaObject.invokeMethod(self, "_stop_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-            except Exception:
-                pass
-
-        threading.Thread(target=_bg, daemon=True, name="AppSignalsPoll").start()
 
     def _reset_status_label(self):
         self.status_label.setText("🟢 Watcher: RUNNING...")

@@ -325,7 +325,8 @@ class DuelsMixin:
         self.main_tabs.currentChanged.connect(self._on_duels_tab_activated)
 
         # ── Fetch opponent players from cloud in background ──────────────────
-        if getattr(self.cfg, "CLOUD_ENABLED", False):
+        from core.config import DUELS_MODE_ENABLED as _DUELS_ON
+        if _DUELS_ON and getattr(self.cfg, "CLOUD_ENABLED", False):
             self._fetch_duel_opponents()
 
         # ── Polling timers ───────────────────────────────────────────────────
@@ -334,20 +335,21 @@ class DuelsMixin:
         self._duel_poll_timer.setInterval(5_000)
         self._duel_poll_timer.timeout.connect(self._poll_duel_invitations)
         dnd = bool(self.cfg.OVERLAY.get("duels_do_not_disturb", False))
-        if getattr(self.cfg, "CLOUD_ENABLED", False) and not dnd:
+        if _DUELS_ON and getattr(self.cfg, "CLOUD_ENABLED", False) and not dnd:
             self._duel_poll_timer.start()
 
         # Check duel expiry every 30 seconds.
         self._duel_expiry_timer = QTimer(self)
         self._duel_expiry_timer.setInterval(30_000)
         self._duel_expiry_timer.timeout.connect(self._check_duel_expiry)
-        self._duel_expiry_timer.start()
+        if _DUELS_ON:
+            self._duel_expiry_timer.start()
 
         # Periodic refresh of inbox and active duels tables every 5 seconds.
         self._duel_refresh_timer = QTimer(self)
         self._duel_refresh_timer.setInterval(5_000)
         self._duel_refresh_timer.timeout.connect(self._periodic_duel_refresh)
-        if getattr(self.cfg, "CLOUD_ENABLED", False):
+        if _DUELS_ON and getattr(self.cfg, "CLOUD_ENABLED", False):
             self._duel_refresh_timer.start()
 
         # Write-amplification cooldown dict: duel_id → last_recheck_timestamp
@@ -424,7 +426,7 @@ class DuelsMixin:
             "<p><b>📋 REQUIREMENTS</b><br>"
             "• NVRAM map must exist for the table<br>"
             "• Table must be locally installed (.vpx found)<br>"
-            "• VPS-ID must be assigned (see Available Maps tab)<br>"
+            "• VPS-ID must be assigned (see Tables → NVRAM Maps)<br>"
             "• All three conditions are mandatory<br>"
             "• Only players with a valid Player Name appear<br>"
             "• Players using the default name \"Player\" are hidden</p>"
@@ -658,7 +660,7 @@ class DuelsMixin:
         elif not cloud_ok:
             lock_msg = "🔒 Cloud Sync required – enable in System tab"
         elif not check3_ok:
-            lock_msg = "🔒 No VPS-IDs assigned – assign in Available Maps tab"
+            lock_msg = "🔒 No VPS-IDs assigned – assign in Tables → NVRAM Maps"
         else:
             lock_msg = "🔒 Available Maps not loaded – load maps first"
 

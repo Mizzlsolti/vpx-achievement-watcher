@@ -87,7 +87,7 @@ from .watcher_migrate import (
     _migrate_rom_keys_to_lowercase,
 )
 
-WATCHER_VERSION = "3.1"
+WATCHER_VERSION = "3.2"
 
 # Custom-events polling constants
 _CUSTOM_EVENT_COOLDOWN_SECS = 3.0    # minimum seconds between repeated triggers of the same event
@@ -563,7 +563,7 @@ class Watcher:
                     # notification because game_active can become False before the VPX window
                     # is detected by the poll.  Only _stop (watcher shutdown) should abort.
                     if _vpx_window_visible():
-                        msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Available Maps' tab to assign."
+                        msg = f"No VPS-ID set for {rom}. Progress will NOT be uploaded to cloud.\nGo to 'Tables → NVRAM Maps' to assign."
                         dur = max(5, int(seconds))
                         try:
                             self.bridge.mini_info_show.emit(msg, dur)
@@ -2246,6 +2246,11 @@ class Watcher:
                 else:
                     awarded.append(title)
 
+        # VPX 10.8.1 game (round protocol): every stage reached is awarded right
+        # away. Otherwise (10.8.0) only the highest stage per field per session.
+        if isinstance(getattr(self, "_round", None), dict):
+            return awarded, retriggered
+
         best_per_field = {}
         non_field_titles = []
 
@@ -2465,7 +2470,7 @@ class Watcher:
             global_rt = _keep([m for m in (retriggered_meta or []) if (m.get("origin") == "global_achievements")])
             _mark(global_hits); _mark(global_rt)
             if global_hits or global_rt:
-                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt)
+                self._ach_record_unlocks("global", self.current_rom, global_hits, retriggered=global_rt, skip_cloud=live)
             if global_hits:
                 self._emit_achievement_toasts(global_hits, seconds=5, rom_override="")
         except Exception as e:
@@ -2476,7 +2481,7 @@ class Watcher:
             session_hits, session_rt = _keep(session_hits), _keep(session_rt)
             _mark(session_hits); _mark(session_rt)
             if session_hits or session_rt:
-                self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt))
+                self._ach_record_unlocks("session", self.current_rom, list(session_hits), retriggered=list(session_rt), skip_cloud=live)
             if session_hits:
                 self._emit_achievement_toasts(session_hits, seconds=5)
         except Exception as e:
