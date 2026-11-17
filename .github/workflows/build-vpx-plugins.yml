@@ -35,6 +35,9 @@ jobs:
   build:
     runs-on: windows-2025-vs2026
     steps:
+      - name: Enable long paths for git (third-party submodules)
+        run: git config --global core.longpaths true
+
       - uses: microsoft/setup-msbuild@v2
 
       - name: Install MSYS2 build tools (same as upstream VPX CI)
