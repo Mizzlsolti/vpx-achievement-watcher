@@ -2246,6 +2246,11 @@ class Watcher:
                 else:
                     awarded.append(title)
 
+        # VPX 10.8.1 game (round protocol): every stage reached is awarded right
+        # away. Otherwise (10.8.0) only the highest stage per field per session.
+        if isinstance(getattr(self, "_round", None), dict):
+            return awarded, retriggered
+
         best_per_field = {}
         non_field_titles = []
 

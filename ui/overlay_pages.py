@@ -646,7 +646,7 @@ class OverlayPagesMixin:
                         "<div style='color:#FF3B30;text-align:center;padding:16px;'>Failed to fetch cloud data.</div>"
                     )
                 else:
-                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, selected_diff, include_info_badges=False)
+                    cloud_body = self._generate_cloud_html(data, cat_for_html, rom, include_info_badges=False)
                     final_html = header_html + cloud_body
 
                 QMetaObject.invokeMethod(

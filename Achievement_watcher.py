@@ -151,6 +151,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self.bridge.level_up_show.connect(self._on_level_up)
         self.bridge.achievements_updated.connect(self._refresh_level_display)
         self.bridge.achievements_updated.connect(self._refresh_dashboard_cards)
+        self.bridge.achievements_updated.connect(self._refresh_overlay_progress)
         self.bridge.close_secondary_overlays.connect(self._close_secondary_overlays)
         self.bridge.session_ended.connect(self._on_session_ended)
         if DUELS_MODE_ENABLED:
@@ -662,6 +663,19 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         tabs.addTab(p["system"], found["system"][0])
         if p.get("duels") is not None:
             tabs.addTab(p["duels"], found["duels"][0])
+
+    def _refresh_overlay_progress(self):
+        """Achievements were saved after the overlay appeared: redraw page 1 so its
+        progress bar includes this game's unlocks (scroll position is kept)."""
+        try:
+            ov = getattr(self, "overlay", None)
+            if ov is None or not ov.isVisible() or int(getattr(self, "_overlay_page", 0) or 0) != 0:
+                return
+            if not getattr(ov, "_current_combined", None):
+                return
+            ov._render_fixed_columns()
+        except Exception:
+            pass
 
     def _go_to_tab(self, key: str) -> None:
         """Show the page registered under ``key``, switching main and sub tab."""
