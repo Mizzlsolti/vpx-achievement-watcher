@@ -109,6 +109,10 @@ class SystemMixin:
         # ── General sub-tab ────────────────────────────────────────────────────
         general_tab = QWidget()
         layout = QVBoxLayout(general_tab)
+        _gen_cols = QHBoxLayout()
+        _gen_cols.setSpacing(8)
+        _gen_left = QVBoxLayout()
+        _gen_right = QVBoxLayout()
 
         # --- 👤 Player Profile ---
         grp_profile = QGroupBox("👤 Player Profile")
@@ -146,7 +150,7 @@ class SystemMixin:
         lbl_name_hint.setStyleSheet("color: #888888; margin-top: 4px; font-size: 9pt; padding: 4px 8px;")
         lay_profile.addWidget(lbl_name_hint, 2, 0, 1, 4)
 
-        layout.addWidget(grp_profile)
+        _gen_left.addWidget(grp_profile)
 
         # --- ☁️ Cloud Sync & Backup ---
         grp_cloud = QGroupBox("☁️ Cloud Sync & Backup")
@@ -177,7 +181,7 @@ class SystemMixin:
             self._cloud_btns_overlay.raise_()
 
         lay_cloud.addWidget(cloud_btns_wrapper)
-        layout.addWidget(grp_cloud)
+        _gen_left.addWidget(grp_cloud)
 
         # --- 📦 Local Backup & Restore ---
         grp_zip = QGroupBox("📦 Local Backup & Restore")
@@ -209,7 +213,7 @@ class SystemMixin:
         self.btn_restore_zip.clicked.connect(self._restore_from_zip)
         zip_btns_row.addWidget(self.btn_restore_zip)
         lay_zip.addLayout(zip_btns_row)
-        layout.addWidget(grp_zip)
+        _gen_right.addWidget(grp_zip)
 
         # Lock player identity fields on startup if Cloud Sync is already enabled
         if self.cfg.CLOUD_ENABLED:
@@ -232,8 +236,13 @@ class SystemMixin:
         )
         btn_feedback.clicked.connect(lambda: FeedbackDialog(self).exec())
         lay_feedback.addWidget(btn_feedback)
-        layout.addWidget(grp_feedback)
+        _gen_right.addWidget(grp_feedback)
 
+        _gen_left.addStretch(1)
+        _gen_right.addStretch(1)
+        _gen_cols.addLayout(_gen_left, 1)
+        _gen_cols.addLayout(_gen_right, 1)
+        layout.addLayout(_gen_cols)
         layout.addStretch(1)
 
         # ── Bottom row: Help ❓ (right) ───────────────────────────────────────
@@ -275,23 +284,23 @@ class SystemMixin:
 
         # --- 🔧 Maintenance & Updates ---
         grp_maint = QGroupBox("🔧 Maintenance & Updates")
-        lay_maint = QVBoxLayout(grp_maint)
+        lay_maint = QGridLayout(grp_maint)
         self.btn_repair = QPushButton("Repair Data Folders")
         self.btn_repair.clicked.connect(self._repair_data_folders)
         self.btn_prefetch = QPushButton("Force Cache NVRAM Maps")
         self.btn_prefetch.clicked.connect(self._prefetch_maps_now)
-        lay_maint.addWidget(self.btn_repair)
-        lay_maint.addWidget(self.btn_prefetch)
+        lay_maint.addWidget(self.btn_repair, 0, 0)
+        lay_maint.addWidget(self.btn_prefetch, 0, 1)
 
         self.btn_update_dbs = QPushButton("🔄 Update Databases (Index, NVRAM Maps, VPS DB, VPXTool)")
         self.btn_update_dbs.setToolTip("Force re-download of index.json, romnames.json, vpsdb.json and vpxtool, then reload.")
         self.btn_update_dbs.clicked.connect(self._update_databases_now)
-        lay_maint.addWidget(self.btn_update_dbs)
+        lay_maint.addWidget(self.btn_update_dbs, 1, 0)
 
         self.btn_self_update = QPushButton("⬆️ Watcher Update")
         self.btn_self_update.setToolTip("Checks GitHub for a newer release and downloads + installs it automatically.")
         self.btn_self_update.clicked.connect(self._check_for_app_update)
-        lay_maint.addWidget(self.btn_self_update)
+        lay_maint.addWidget(self.btn_self_update, 1, 1)
 
         maint_layout.addWidget(grp_maint)
 

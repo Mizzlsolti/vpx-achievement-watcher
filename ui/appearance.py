@@ -263,6 +263,14 @@ class AppearanceMixin(EffectsMixin):
         self._style(getattr(self, "btn_restart", None), "QPushButton { background-color:#008040; color:#FFFFFF; font-weight:bold; border:none; border-radius:5px; padding:7px 16px; }")
         self._update_theme_preview(theme_id)
 
+    def _on_theme_tile_clicked(self, theme_id: str):
+        idx = self.cmb_theme.findData(theme_id)
+        if idx >= 0:
+            self.cmb_theme.setCurrentIndex(idx)
+        self._on_apply_theme()
+        for tid, tile in getattr(self, "_theme_tiles", {}).items():
+            tile.setChecked(tid == theme_id)
+
     def _on_theme_combo_changed(self, _index: int):
         theme_id = self.cmb_theme.currentData()
         if theme_id:
@@ -506,7 +514,32 @@ class AppearanceMixin(EffectsMixin):
         )
         self.btn_apply_theme.clicked.connect(self._on_apply_theme)
         row_active.addWidget(self.btn_apply_theme)
-        theme_layout.addLayout(row_active)
+        # Themes are picked from the tiles below; the combo stays as the
+        # internal selection (other code reads it), the row is not shown.
+        for _w in (self.lbl_active_theme, self.cmb_theme, self.btn_apply_theme):
+            _w.setVisible(False)
+
+        grp_tiles = QGroupBox("Themes")
+        lay_tiles = QGridLayout(grp_tiles)
+        lay_tiles.setSpacing(6)
+        self._theme_tiles: dict = {}
+        for n, (tid, tdata) in enumerate(list_themes()):
+            tile = QPushButton(f"{tdata['icon']}  {tdata['name']}")
+            tile.setCheckable(True)
+            tile.setChecked(tid == current_theme_id)
+            tile.setToolTip(tdata.get("description", ""))
+            tile.setMinimumHeight(34)
+            tile.setStyleSheet(
+                f"QPushButton {{ background-color: {tdata.get('bg', '#111')}; color: {tdata.get('primary', '#FFF')};"
+                f" border: 2px solid {tdata.get('accent', '#555')}; border-radius: 6px; font-weight: bold;"
+                " padding: 4px 8px; text-align: left; }"
+                "QPushButton:hover { border-color: #FFFFFF; }"
+                "QPushButton:checked { border: 3px solid #FFFFFF; }"
+            )
+            tile.clicked.connect(lambda _=False, t=tid: self._on_theme_tile_clicked(t))
+            lay_tiles.addWidget(tile, n // 5, n % 5)
+            self._theme_tiles[tid] = tile
+        theme_layout.addWidget(grp_tiles)
 
         # ── 2. Color Preview ───────────────────────────────────────────────────
         grp_preview = QGroupBox("Color Preview")
@@ -582,27 +615,6 @@ class AppearanceMixin(EffectsMixin):
             self._on_theme_toast_test, track_dot=True))
         theme_layout.addWidget(grp_ov_test)
 
-        # ── 4. Available Themes ────────────────────────────────────────────────
-        grp_themes = QGroupBox("Available Themes")
-        lay_themes = QVBoxLayout(grp_themes)
-
-        for tid, tdata in list_themes():
-            row = QHBoxLayout()
-            row.setSpacing(10)
-            lbl_icon = QLabel(tdata["icon"])
-            lbl_icon.setFixedWidth(28)
-            lbl_icon.setStyleSheet("font-size: 16pt;")
-            row.addWidget(lbl_icon)
-            lbl_tname = QLabel(f"<b>{tdata['name']}</b>")
-            lbl_tname.setStyleSheet("color: #FFFFFF; font-size: 10pt;")
-            lbl_tname.setFixedWidth(150)
-            row.addWidget(lbl_tname)
-            lbl_tdesc = QLabel(tdata.get("description", ""))
-            lbl_tdesc.setStyleSheet("color: #888888; font-size: 9pt;")
-            row.addWidget(lbl_tdesc, 1)
-            lay_themes.addLayout(row)
-        theme_layout.addWidget(grp_themes)
-
         theme_layout.addStretch(1)
         self._add_tab_help_button(theme_tab_outer, "appearance_theme")
         self.appearance_subtabs.addTab(theme_tab, "🎨 Theme")
@@ -620,10 +632,6 @@ class AppearanceMixin(EffectsMixin):
         sound_layout = QVBoxLayout(sound_inner)
         sound_layout.setContentsMargins(8, 8, 8, 8)
 
-        # Title
-        lbl_sound_title = QLabel("🔊 Sound Effects")
-        lbl_sound_title.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF7F00; padding: 4px 0;")
-        sound_layout.addWidget(lbl_sound_title)
 
         # Enable + Volume row
         row_enable = QHBoxLayout()
@@ -768,11 +776,25 @@ class AppearanceMixin(EffectsMixin):
         tbl_sound.setMinimumHeight(len(_sound_events) * 32 + 30)
         sound_layout.addWidget(tbl_sound)
 
+        # Sound has no page of its own any more: the Effects page shows it on
+        # top – settings on the left, the event list on the right.
+        sound_layout.removeWidget(tbl_sound)
+        sound_layout.removeWidget(lbl_events)
+        lbl_events.hide()
+        tbl_sound.setMinimumHeight(0)
+        tbl_sound.setFixedHeight(tbl_sound.horizontalHeader().height() + len(_sound_events) * 32 + 4)
+        tbl_sound.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tbl_sound.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tbl_sound.resizeColumnsToContents()
+        tbl_sound.setFixedWidth(tbl_sound.verticalHeader().width()
+                                + sum(tbl_sound.columnWidth(c) for c in range(tbl_sound.columnCount())) + 24)
+        self._sound_group = QGroupBox("🔊 Sound")
+        _sg = QHBoxLayout(self._sound_group)
+        _sg.setContentsMargins(4, 4, 4, 4)
         sound_layout.addStretch(1)
-        self._add_tab_help_button(sound_layout, "appearance_sound")
-        sound_scroll.setWidget(sound_inner)
-        sound_outer.addWidget(sound_scroll)
-        self.appearance_subtabs.addTab(sound_tab, "🔊 Sound")
+        _sg.addWidget(sound_inner, 1)
+        _sg.addWidget(tbl_sound, 0, Qt.AlignmentFlag.AlignTop)
+        sound_tab.deleteLater()
 
         # ── Effects sub-tab ────────────────────────────────────────────────────
         self._build_effects_subtab()

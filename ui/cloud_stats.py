@@ -105,8 +105,8 @@ class CloudStatsMixin:
         )
         self.btn_cloud_fetch.clicked.connect(self._fetch_cloud_leaderboard)
         
-        lay_ctrl.addWidget(QLabel("Category:"))
-        lay_ctrl.addWidget(self.cmb_cloud_category)
+        # Only one category exists – the selector is not shown.
+        self.cmb_cloud_category.setVisible(False)
         lay_ctrl.addWidget(QLabel("Table/ROM:"))
         lay_ctrl.addWidget(self.txt_cloud_rom)
         lay_ctrl.addWidget(self.btn_cloud_fetch)

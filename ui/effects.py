@@ -121,6 +121,10 @@ class EffectsMixin:
         scroll.setWidget(inner)
         outer.addWidget(scroll)
 
+        # --- Sound (built by the Appearance tab) ---
+        if getattr(self, "_sound_group", None) is not None:
+            layout.addWidget(self._sound_group)
+
         # --- Master: Low Performance Mode ---
         grp_master = QGroupBox()
         lay_master = QHBoxLayout(grp_master)
@@ -184,7 +188,7 @@ class EffectsMixin:
         # Initial enabled-state of all controls based on low_performance_mode
         self._fx_apply_low_perf_state(bool(self.cfg.OVERLAY.get("low_performance_mode", False)))
 
-        self.appearance_subtabs.addTab(tab, "✨ Effects")
+        self.appearance_subtabs.addTab(tab, "✨ Sound && Effects")
 
     # ------------------------------------------------------------------
     # Group-box builder

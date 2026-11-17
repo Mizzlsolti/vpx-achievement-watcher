@@ -423,12 +423,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         "appearance_theme": (
             "<b>🎨 Theme</b><br><br>"
             "Customize the visual appearance of the app and overlays.<br><br>"
-            "• <b>Active Theme</b>: Select a theme from the dropdown and click <b>Apply Theme</b> to switch.<br>"
+            "• <b>Themes</b>: Click a tile to switch the theme. The active theme is outlined in white; "
+            "hover a tile to read its description.<br>"
             "• <b>Color Preview</b>: Shows the four main colors of the selected theme "
             "(Primary, Accent, Border, Background).<br>"
             "• <b>Overlay Preview / Test</b>: Preview each overlay with the current theme. "
             "Click <b>Test</b> to open a live preview.<br>"
-            "• <b>Available Themes</b>: Browse all 15 built-in themes with their color schemes and descriptions.<br><br>"
+            "<br>"
             "Theme changes affect the main application window, all overlay windows, achievement toasts, "
             "and overlay windows. The default theme is <b>Neon Blue</b> (cyan + orange)."
         ),
@@ -446,8 +447,10 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Overlay Close</b>: Plays when the stats overlay closes."
         ),
         "appearance_effects": (
-            "<b>✨ Visual Effects</b><br><br>"
-            "Control every animation and visual effect across all overlays.<br><br>"
+            "<b>✨ Sound &amp; Effects</b><br><br>"
+            "<b>🔊 Sound</b> (top of the page): enable sound effects, set the volume, choose a "
+            "sound pack and switch single events on or off (▶ plays a preview).<br><br>"
+            "<b>Visual effects</b>: control every animation and visual effect across all overlays.<br><br>"
             "• <b>Low Performance Mode</b>: Master switch — disables all effects at once.<br>"
             "• <b>Checkbox</b>: Enable or disable individual effects.<br>"
             "• <b>Slider</b>: Adjust effect intensity (particle count, glow strength, "
@@ -638,7 +641,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
         p = self._tab_pages
         tabs.addTab(p["dashboard"], found["dashboard"][0])
-        box, self.player_subtabs = group([(p.get("player"), "👤 Level & Badges"),
+        box, self.player_subtabs = group([(p.get("player"), "👤 Level && Badges"),
                                           (p.get("progress"), "📈 Achievements")])
         tabs.addTab(box, "👤 Player")
         box, self.tables_subtabs = group([(p.get("available_maps"), "📚 NVRAM Maps"),
@@ -646,6 +649,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         tabs.addTab(box, "📚 Tables")
         if p.get("cloud") is not None:
             self.stats_tabs.addTab(p["cloud"], "☁️ Cloud Leaderboard")
+            # The Stats page has one ❓ for all its sub-tabs (it shows the
+            # help of the open one), so the Cloud page's own button goes.
+            for b in p["cloud"].findChildren(QPushButton):
+                if b.text() == "❓":
+                    b.hide()
         tabs.addTab(p["stats"], "📊 Stats")
         if p.get("controls") is not None:
             self.appearance_subtabs.addTab(p["controls"], "🕹️ Controls")
@@ -682,6 +690,13 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
 
     def _show_tab_help(self, help_key: str):
         """Displays a tab-specific help dialog."""
+        if help_key == "stats":
+            try:
+                cloud = getattr(self, "_tab_pages", {}).get("cloud")
+                if cloud is not None and self.stats_tabs.currentWidget() is cloud:
+                    help_key = "cloud"
+            except Exception:
+                pass
         text = self._TAB_HELP.get(help_key, "No help available.")
         box = QMessageBox(self)
         box.setWindowTitle("Help")
