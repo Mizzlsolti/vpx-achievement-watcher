@@ -12,7 +12,7 @@
 
 ; Normally passed in by the build workflow (tag name or WATCHER_VERSION).
 #ifndef MyAppVersion
-  #define MyAppVersion "3.1"
+  #define MyAppVersion "3.2"
 #endif
 
 [Setup]
