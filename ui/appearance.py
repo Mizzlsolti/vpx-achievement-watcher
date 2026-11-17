@@ -100,11 +100,11 @@ class AppearanceMixin(EffectsMixin):
             except Exception:
                 pass
             self._toast_picker = None
-            self.btn_ach_toast_place.setText("Place / Save position")
+            self.btn_ach_toast_save.setEnabled(False)
             return
 
         self._toast_picker = ToastPositionPicker(self)
-        self.btn_ach_toast_place.setText("Save position")
+        self.btn_ach_toast_save.setEnabled(True)
 
     def _on_mini_info_portrait_toggle(self, state: int):
         is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -151,11 +151,11 @@ class AppearanceMixin(EffectsMixin):
             except Exception:
                 pass
             self._mini_info_picker = None
-            self.btn_mini_info_place.setText("Place / Save position")
+            self.btn_mini_info_save.setEnabled(False)
             return
         
         self._mini_info_picker = MiniInfoPositionPicker(self)
-        self.btn_mini_info_place.setText("Save position")
+        self.btn_mini_info_save.setEnabled(True)
 
     def _on_duel_overlay_portrait_toggle(self, state: int):
         is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
@@ -202,11 +202,17 @@ class AppearanceMixin(EffectsMixin):
             except Exception:
                 pass
             self._duel_overlay_picker = None
-            self.btn_duel_overlay_place.setText("Place / Save position")
+            self.btn_duel_overlay_save.setEnabled(False)
             return
 
         self._duel_overlay_picker = DuelOverlayPositionPicker(self)
-        self.btn_duel_overlay_place.setText("Save position")
+        self.btn_duel_overlay_save.setEnabled(True)
+
+    def _place_or_save(self, picker_attr: str, handler, save: bool):
+        """Place opens the picker (no-op while it is open); Save stores the
+        position and closes it (no-op while no picker is open)."""
+        if (getattr(self, picker_attr, None) is not None) == save:
+            handler()
 
     def _on_overlay_place_clicked(self):
         picker = getattr(self, "_overlay_picker", None)
@@ -228,7 +234,7 @@ class AppearanceMixin(EffectsMixin):
             except Exception:
                 pass
             self._overlay_picker = None
-            self.btn_overlay_place.setText("Place / Save overlay position")
+            self.btn_overlay_save.setEnabled(False)
 
             if self.overlay:
                 self.overlay._apply_geometry()
@@ -236,7 +242,7 @@ class AppearanceMixin(EffectsMixin):
                 self.overlay.request_rotation(force=True)
             return
         self._overlay_picker = OverlayPositionPicker(self)
-        self.btn_overlay_place.setText("Save position")
+        self.btn_overlay_save.setEnabled(True)
 
     def _apply_theme(self):
         app = QApplication.instance()
@@ -377,11 +383,12 @@ class AppearanceMixin(EffectsMixin):
         _row_switch.addStretch(1)
         lay_pos.addLayout(_row_switch, 0, 0, 1, 2)
 
-        def create_overlay_box(title, chk_port, chk_ccw, btn_place, btn_test=None, btn_hide=None, extra=None):
+        def create_overlay_box(title, chk_port, chk_ccw, btn_place, btn_save, btn_test=None, btn_hide=None, extra=None):
             box = QVBoxLayout()
             box.addWidget(QLabel(f"<b>{title}</b>"))
             box.addWidget(chk_port); box.addWidget(chk_ccw)
-            btns = QHBoxLayout(); btns.addWidget(btn_place)
+            btn_save.setStyleSheet("QPushButton:disabled { color: #555555; border-color: #333333; }")
+            btns = QHBoxLayout(); btns.addWidget(btn_place); btns.addWidget(btn_save)
             if btn_test: btns.addWidget(btn_test)
             if btn_hide: btns.addWidget(btn_hide)
             box.addLayout(btns)
@@ -392,32 +399,36 @@ class AppearanceMixin(EffectsMixin):
         # 1) Main Overlay
         self.chk_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_portrait.setChecked(bool(self.cfg.OVERLAY.get("portrait_mode", True))); self.chk_portrait.stateChanged.connect(self._on_portrait_toggle)
         self.chk_portrait_ccw = QCheckBox("Rotate CCW"); self.chk_portrait_ccw.setChecked(bool(self.cfg.OVERLAY.get("portrait_rotate_ccw", True))); self.chk_portrait_ccw.stateChanged.connect(self._on_portrait_ccw_toggle)
-        self.btn_overlay_place = QPushButton("Place"); self.btn_overlay_place.clicked.connect(self._on_overlay_place_clicked)
+        self.btn_overlay_place = QPushButton("Place"); self.btn_overlay_place.clicked.connect(lambda: self._place_or_save("_overlay_picker", self._on_overlay_place_clicked, False))
+        self.btn_overlay_save = QPushButton("Save"); self.btn_overlay_save.setEnabled(False); self.btn_overlay_save.clicked.connect(lambda: self._place_or_save("_overlay_picker", self._on_overlay_place_clicked, True))
         self.btn_toggle_now = QPushButton("Test"); self.btn_toggle_now.clicked.connect(self._on_overlay_test_clicked)
         self.btn_hide = QPushButton("Hide"); self.btn_hide.clicked.connect(self._hide_overlay)
         self.chk_overlay_auto_close = QCheckBox("Auto-Close 1 min"); self.chk_overlay_auto_close.setChecked(bool(self.cfg.OVERLAY.get("overlay_auto_close", False))); self.chk_overlay_auto_close.stateChanged.connect(self._on_overlay_auto_close_toggle)
-        box_main = create_overlay_box("Main Stats Overlay", self.chk_portrait, self.chk_portrait_ccw, self.btn_overlay_place, self.btn_toggle_now, self.btn_hide, self.chk_overlay_auto_close)
+        box_main = create_overlay_box("Main Stats Overlay", self.chk_portrait, self.chk_portrait_ccw, self.btn_overlay_place, self.btn_overlay_save, self.btn_toggle_now, self.btn_hide, self.chk_overlay_auto_close)
 
         # 2) Toasts
         self.chk_ach_toast_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_ach_toast_portrait.setChecked(bool(self.cfg.OVERLAY.get("ach_toast_portrait", True))); self.chk_ach_toast_portrait.stateChanged.connect(self._on_ach_toast_portrait_toggle)
         self.chk_ach_toast_ccw = QCheckBox("Rotate CCW"); self.chk_ach_toast_ccw.setChecked(bool(self.cfg.OVERLAY.get("ach_toast_rotate_ccw", True))); self.chk_ach_toast_ccw.stateChanged.connect(self._on_ach_toast_ccw_toggle)
-        self.btn_ach_toast_place = QPushButton("Place"); self.btn_ach_toast_place.clicked.connect(self._on_ach_toast_place_clicked)
+        self.btn_ach_toast_place = QPushButton("Place"); self.btn_ach_toast_place.clicked.connect(lambda: self._place_or_save("_toast_picker", self._on_ach_toast_place_clicked, False))
+        self.btn_ach_toast_save = QPushButton("Save"); self.btn_ach_toast_save.setEnabled(False); self.btn_ach_toast_save.clicked.connect(lambda: self._place_or_save("_toast_picker", self._on_ach_toast_place_clicked, True))
         self.btn_test_toast = QPushButton("Test"); self.btn_test_toast.clicked.connect(lambda: self._ach_toast_mgr.enqueue("TEST – Achievement", "test_rom", 5))
-        box_toast = create_overlay_box("Achievement Toasts", self.chk_ach_toast_portrait, self.chk_ach_toast_ccw, self.btn_ach_toast_place, self.btn_test_toast)
+        box_toast = create_overlay_box("Achievement Toasts", self.chk_ach_toast_portrait, self.chk_ach_toast_ccw, self.btn_ach_toast_place, self.btn_ach_toast_save, self.btn_test_toast)
 
         # 4) Mini Info / Notifications Overlay
         self.chk_mini_info_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_mini_info_portrait.setChecked(bool(self.cfg.OVERLAY.get("notifications_portrait", True))); self.chk_mini_info_portrait.stateChanged.connect(self._on_mini_info_portrait_toggle)
         self.chk_mini_info_ccw = QCheckBox("Rotate CCW"); self.chk_mini_info_ccw.setChecked(bool(self.cfg.OVERLAY.get("notifications_rotate_ccw", True))); self.chk_mini_info_ccw.stateChanged.connect(self._on_mini_info_ccw_toggle)
-        self.btn_mini_info_place = QPushButton("Place"); self.btn_mini_info_place.clicked.connect(self._on_mini_info_place_clicked)
+        self.btn_mini_info_place = QPushButton("Place"); self.btn_mini_info_place.clicked.connect(lambda: self._place_or_save("_mini_info_picker", self._on_mini_info_place_clicked, False))
+        self.btn_mini_info_save = QPushButton("Save"); self.btn_mini_info_save.setEnabled(False); self.btn_mini_info_save.clicked.connect(lambda: self._place_or_save("_mini_info_picker", self._on_mini_info_place_clicked, True))
         self.btn_mini_info_test = QPushButton("Test"); self.btn_mini_info_test.clicked.connect(self._on_mini_info_test)
-        box_mini_info = create_overlay_box("System Notifications", self.chk_mini_info_portrait, self.chk_mini_info_ccw, self.btn_mini_info_place, self.btn_mini_info_test)
+        box_mini_info = create_overlay_box("System Notifications", self.chk_mini_info_portrait, self.chk_mini_info_ccw, self.btn_mini_info_place, self.btn_mini_info_save, self.btn_mini_info_test)
 
         # 5) Duel Overlay (dedicated overlay for all duel/tournament messages)
         self.chk_duel_overlay_portrait = QCheckBox("Portrait Mode (90°)"); self.chk_duel_overlay_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_portrait", True))); self.chk_duel_overlay_portrait.stateChanged.connect(self._on_duel_overlay_portrait_toggle)
         self.chk_duel_overlay_ccw = QCheckBox("Rotate CCW"); self.chk_duel_overlay_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_overlay_rotate_ccw", True))); self.chk_duel_overlay_ccw.stateChanged.connect(self._on_duel_overlay_ccw_toggle)
-        self.btn_duel_overlay_place = QPushButton("Place"); self.btn_duel_overlay_place.clicked.connect(self._on_duel_overlay_place_clicked)
+        self.btn_duel_overlay_place = QPushButton("Place"); self.btn_duel_overlay_place.clicked.connect(lambda: self._place_or_save("_duel_overlay_picker", self._on_duel_overlay_place_clicked, False))
+        self.btn_duel_overlay_save = QPushButton("Save"); self.btn_duel_overlay_save.setEnabled(False); self.btn_duel_overlay_save.clicked.connect(lambda: self._place_or_save("_duel_overlay_picker", self._on_duel_overlay_place_clicked, True))
         self.btn_duel_overlay_test = QPushButton("Test"); self.btn_duel_overlay_test.clicked.connect(self._on_duel_overlay_test)
-        box_duel_overlay = create_overlay_box("⚔️ Duel Notifications", self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw, self.btn_duel_overlay_place, self.btn_duel_overlay_test)
+        box_duel_overlay = create_overlay_box("⚔️ Duel Notifications", self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw, self.btn_duel_overlay_place, self.btn_duel_overlay_save, self.btn_duel_overlay_test)
 
         lay_pos.addLayout(box_main, 1, 0); lay_pos.addLayout(box_toast, 1, 1)
         lay_pos.addLayout(box_mini_info, 2, 0)
@@ -426,7 +437,7 @@ class AppearanceMixin(EffectsMixin):
             lay_pos.addLayout(box_duel_overlay, 3, 0)
         else:
             for _w in (self.chk_duel_overlay_portrait, self.chk_duel_overlay_ccw,
-                       self.btn_duel_overlay_place, self.btn_duel_overlay_test):
+                       self.btn_duel_overlay_place, self.btn_duel_overlay_save, self.btn_duel_overlay_test):
                 _w.setParent(grp_pos); _w.hide()
 
         layout.addWidget(grp_pos)
@@ -857,7 +868,8 @@ class AppearanceMixin(EffectsMixin):
             # Appearance Tab - Main Stats Overlay
             "chk_portrait": "Rotate the main overlay 90 degrees for portrait/cabinet screens.",
             "chk_portrait_ccw": "Rotate counter-clockwise (instead of clockwise) for portrait mode.",
-            "btn_overlay_place": "Open a draggable window to set and save the position of the main overlay.",
+            "btn_overlay_place": "Open a draggable window to set the position of the main overlay.",
+            "btn_overlay_save": "Save the position of the open placement window and close it.",
             "btn_toggle_now": "Instantly show or hide the main overlay for testing.",
             "btn_hide": "Forcefully hide the main overlay if it's currently visible.",
             "chk_overlay_auto_close": "Automatically hide the main overlay after 60 seconds of inactivity.",
@@ -865,19 +877,22 @@ class AppearanceMixin(EffectsMixin):
             # Appearance Tab - Achievement Toasts
             "chk_ach_toast_portrait": "Rotate achievement unlock popups for portrait screens.",
             "chk_ach_toast_ccw": "Rotate achievement popups counter-clockwise.",
-            "btn_ach_toast_place": "Set and save the screen position for achievement popups.",
+            "btn_ach_toast_place": "Open a draggable window to set the position of achievement popups.",
+            "btn_ach_toast_save": "Save the position of the open placement window and close it.",
             "btn_test_toast": "Trigger a test achievement popup to check your placement.",
             
             # Appearance Tab - System Notifications (Mini Info Overlay)
             "chk_mini_info_portrait": "Rotate system notifications (errors, warnings, info) for portrait screens.",
             "chk_mini_info_ccw": "Rotate system notifications counter-clockwise.",
-            "btn_mini_info_place": "Set and save the screen position for system notifications.",
+            "btn_mini_info_place": "Open a draggable window to set the position of system notifications.",
+            "btn_mini_info_save": "Save the position of the open placement window and close it.",
             "btn_mini_info_test": "Trigger a test notification to check your placement.",
             
             # Appearance Tab - Duel Overlay
             "chk_duel_overlay_portrait": "Rotate duel notifications for portrait/cabinet screens.",
             "chk_duel_overlay_ccw": "Rotate duel notifications counter-clockwise.",
-            "btn_duel_overlay_place": "Set and save the screen position for duel notifications.",
+            "btn_duel_overlay_place": "Open a draggable window to set the position of duel notifications.",
+            "btn_duel_overlay_save": "Save the position of the open placement window and close it.",
             "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
 
             # Appearance Tab - Switch All button

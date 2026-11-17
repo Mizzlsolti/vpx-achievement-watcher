@@ -413,7 +413,8 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "• <b>Switch All Portrait ↔ Landscape</b>: Use the orange button at the top of the "
             "Widget Placement section to toggle <i>all</i> overlay orientations between Portrait and "
             "Landscape mode in one click.<br>"
-            "• Use <b>Place</b> to open a positioning window and <b>Test</b> to preview "
+            "• Use <b>Place</b> to open a positioning window, drag it where you want it and click "
+            "<b>Save</b> to store the position. <b>Test</b> previews "
             "the overlay.<br>"
             "• <b>Overlay Pages</b>: Enable or disable individual pages of the main stats overlay "
             + ("(Pages 2–4). " if DUELS_MODE_ENABLED else "(Pages 2 and 3). ") +
