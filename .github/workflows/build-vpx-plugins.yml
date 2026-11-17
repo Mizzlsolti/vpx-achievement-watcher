@@ -57,6 +57,15 @@ jobs:
           path: vpinball/plugins/score-server
           submodules: true
 
+      - name: Checkout Watcher repo (port scripts)
+        uses: actions/checkout@v4
+        with:
+          path: watcher
+          sparse-checkout: .github/vpx-plugins
+
+      - name: Port score-server to the VPX 10.8.1 plugin API
+        run: python watcher/.github/vpx-plugins/port_score_server.py vpinball/plugins/score-server/score-server.cpp
+
       - name: Patch PinMAME plugin (expose GetController) and register score-server
         working-directory: vpinball
         shell: python
