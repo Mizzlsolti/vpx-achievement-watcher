@@ -22,7 +22,7 @@ import urllib.request
 from typing import Optional, Tuple
 
 # Web API key of the Firebase project (not a secret – it only names the project).
-FIREBASE_API_KEY = ""
+FIREBASE_API_KEY = "AIzaSyAZ9SeiU90dSS0rHK1tETOkA07YvcqAMK8"
 
 _AUTH_HOST = "https://identitytoolkit.googleapis.com"
 _TOKEN_HOST = "https://securetoken.googleapis.com"
