@@ -2189,7 +2189,7 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                     "Spinner": 45
                 },
                 "highlights": {
-                    "Power": ["🔥 Best Ball – 12.5M", "💥 Multiball Frenzy – 2", "➕ Extra Balls – 1"],
+                    "Power": ["🔥 Best Ball – 12.5M", "💥 Multiball – 2", "➕ Extra Balls – 1"],
                     "Precision": ["🏹 Rampage – 15", "🎯 Combo King – 4", "🌀 Spinner Madness – 45"],
                     "Fun": ["💀 Tilted – 1"]
                 }

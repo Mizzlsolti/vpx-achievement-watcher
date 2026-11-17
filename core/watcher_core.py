@@ -1491,7 +1491,7 @@ class Watcher:
         return audits, notes, False
 
     HIGHLIGHT_RULES = {
-        "multiball": {"cat": "Power", "emoji": "💥", "label": "Multiball Frenzy", "type": "count"},
+        "multiball": {"cat": "Power", "emoji": "💥", "label": "Multiball", "type": "count"},
         "jackpot": {"cat": "Power", "emoji": "🎯", "label": "Jackpot Hunter", "type": "count"},
         "super_jackpot": {"cat": "Power", "emoji": "💎", "label": "Super Jackpot", "type": "count"},
         "triple_jackpot": {"cat": "Power", "emoji": "👑", "label": "Triple Jackpot", "type": "count"},
@@ -1713,6 +1713,33 @@ class Watcher:
         val = (audits or {}).get("Score")
         return int(val) if _is_num(val) else 0
 
+    # Words in an audit name that mean "not a played multiball"
+    # (locks, lit/ready lamps, multiball jackpots, ball saves during multiball …).
+    _MB_EXCLUDE = ("lock", "lit", "ready", "light", "jackpot", " jp", "save", "qualif", "award", "score", "value")
+
+    @classmethod
+    def _multiball_count(cls, deltas: dict) -> int:
+        """Number of multiballs played. Tables keep several multiball audits
+        (starts, per-mode counters, totals); adding them up counts one
+        multiball several times, so take the best single counter instead,
+        preferring audits that count starts."""
+        words = cls.EVENT_KEYWORDS.get("multiball", [])
+        starts, others = [], []
+        for label, val in (deltas or {}).items():
+            try:
+                v = int(val)
+            except Exception:
+                continue
+            if v <= 0:
+                continue
+            l = str(label).lower()
+            if not any(w in l for w in words) or any(x in l for x in cls._MB_EXCLUDE):
+                continue
+            (starts if ("start" in l or "played" in l or "total" in l) else others).append(v)
+        if starts:
+            return max(starts)
+        return max(others) if others else 0
+
     def _build_events_from_deltas(self, deltas: dict) -> dict:
         events = {k: 0 for k in self.HIGHLIGHT_RULES.keys()}
         for label, val in deltas.items():
@@ -1745,8 +1772,11 @@ class Watcher:
                 matched_keys.remove("multiball")
                 
             for key in matched_keys:
+                if key == "multiball":
+                    continue
                 events[key] = events.get(key, 0) + int(val)
-                
+
+        events["multiball"] = self._multiball_count(deltas)
         return events
 
     def _attribute_events(self, audits: dict) -> bool:
@@ -1805,6 +1835,9 @@ class Watcher:
                 pass
             for ev_key, words in (self.EVENT_KEYWORDS or {}).items():
                 if any(w in ll for w in words):
+                    if ev_key == "multiball":
+                        # counted from the session deltas (see _multiball_count)
+                        break
                     try:
                         ec = player_rec.setdefault("event_counts", {})
                         ec[ev_key] = ec.get(ev_key, 0) + int(diff)

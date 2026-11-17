@@ -704,6 +704,71 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             pass
         self.body.setGeometry(body_x, body_top, body_w, max(80, body_h))
 
+    def _body_area_size(self) -> tuple[int, int]:
+        """Size the body label will have when the page is drawn (portrait pages
+        are laid out in the rotated frame, so width and height swap)."""
+        w, h = self.width(), self.height()
+        if self.portrait_mode:
+            w, h = h, w
+        pad = 24
+        try:
+            t_h = self.title.sizeHint().height()
+        except Exception:
+            t_h = 40
+        body_w = int(w * (0.92 if self.portrait_mode else 0.9))
+        body_h = h - (pad + t_h + 10) - pad
+        return max(80, body_w), max(80, body_h)
+
+    def _set_body_fitted(self, build):
+        """Render page HTML with the configured text size and shrink it step by
+        step until it fits into the body area, so nothing gets cut off (for
+        example portrait pages with many actions). build() reads self._body_pt."""
+        base_pt = float(getattr(self, "_body_pt", 20) or 20)
+        avail_w, avail_h = self._body_area_size()
+        html = ""
+        try:
+            def render(pt: float) -> str:
+                self._body_pt = pt
+                # em sizes (paddings, headings) follow the label font, so it
+                # has to shrink together with the text.
+                self.body.setFont(QFont(self.font_family, max(1, int(round(pt)))))
+                self.body.setStyleSheet(f"color:#FFFFFF;background:transparent;font-size:{pt:.1f}pt;font-family:'{self.font_family}';")
+                css = f"font-size:{pt:.1f}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+                return f"<div style='{css}'>{build()}</div>"
+
+            # The page is re-rendered during the score count-up; only digits
+            # change then, so the fitted size is cached per layout.
+            self._fit_compact = False
+            html = render(base_pt)
+            key = (avail_w, avail_h, round(base_pt, 1), hash(re.sub(r"[0-9.,]", "", html)))
+            cache = getattr(self, "_fit_cache", None)
+            if cache and cache[0] == key:
+                self._fit_compact = cache[2]
+                if cache[1] != base_pt or cache[2]:
+                    html = render(cache[1])
+            else:
+                # First shrink the text a little; if the page is still too
+                # wide, switch to the compact layout (one action column).
+                fitted, compact = base_pt, False
+                tries = [(False, 0.95 ** i) for i in range(6)] + [(True, 0.95 ** i) for i in range(26)]
+                for n, (cmp_, f) in enumerate(tries):
+                    pt = max(5.0, base_pt * f)
+                    self._fit_compact = cmp_
+                    if n:
+                        html = render(pt)
+                    fitted, compact = pt, cmp_
+                    self.body.setText(html)
+                    if (self.body.minimumSizeHint().width() <= avail_w + 2
+                            and self.body.heightForWidth(avail_w) <= avail_h + 2):
+                        break
+                self._fit_cache = (key, fitted, compact)
+        except Exception:
+            pass
+        finally:
+            self._body_pt = base_pt
+            self._fit_compact = False
+        self.body.setText(html)
+
     def _apply_scale(self, scale_pct: int):
         r = scale_pct / 100.0
         body_pt = max(4, int(round(self._base_body_size * r)))
@@ -1315,7 +1380,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 items = sorted(list(deltas.items()), key=lambda x: int(x[1]), reverse=True)
 
                 max_rows = 20
-                cols = 2
+                cols = 1 if getattr(self, "_fit_compact", False) else 2
 
                 max_items = max_rows * cols
                 display_items = items[:max_items]
@@ -1351,12 +1416,9 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
 
         mp = (self._current_combined or {}).get("multiplayer")
         if isinstance(mp, dict) and mp.get("games"):
-            html = style + "<div align='center' style='width:100%;'>" + \
-                self._multiplayer_block_html(mp, players, custom_table_name or table_title or rom_name, esc,
-                                             (_bdr_r, _bdr_g, _bdr_b), _tc_accent, _tc_primary) + "</div>"
-            body_pt = getattr(self, "_body_pt", 20)
-            css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
-            self.body.setText(f"<div style='{css}'>{html}</div>")
+            self._set_body_fitted(lambda: style + "<div align='center' style='width:100%;'>" +
+                                  self._multiplayer_block_html(mp, players, custom_table_name or table_title or rom_name, esc,
+                                                               (_bdr_r, _bdr_g, _bdr_b), _tc_accent, _tc_primary) + "</div>")
             self._layout_positions()
             return
 
@@ -1369,13 +1431,8 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
                 self._layout_positions()
                 return
 
-        html = style + "<div align='center' style='width:100%;'>" + \
-               "".join(f"{block(p)}" for p in players) + \
-               "</div>"
-
-        body_pt = getattr(self, "_body_pt", 20)
-        css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
-        self.body.setText(f"<div style='{css}'>{html}</div>")
+        self._set_body_fitted(lambda: style + "<div align='center' style='width:100%;'>" +
+                              "".join(f"{block(p)}" for p in players) + "</div>")
         self._layout_positions()
         
     def _multiplayer_block_html(self, mp: dict, players: list, display_title: str, esc,
@@ -1421,12 +1478,13 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         n_hl = 1 if crowded else 2
         n_act = 2 if crowded else 3
         fs = {1: 0.9, 2: 0.8, 3: 0.84, 4: 0.7}.get(cols, 0.7) * ({2: 0.95, 3: 0.72, 4: 0.64}.get(cols, 0.95) if portrait else 1.0)
-        max_label = {3: 13, 4: 10}.get(cols, 18)
+        max_label = {3: 13, 4: 11}.get(cols, 18)
         best_label = "🔥 Best" if cols >= 4 else "🔥 Best Ball"
 
-        def short(text: str) -> str:
+        def short(text: str, limit: int = 0) -> str:
+            limit = limit or max_label
             text = str(text)
-            return text if len(text) <= max_label else text[:max_label - 1].rstrip() + "…"
+            return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
         def split(entry: str):
             parts = str(entry).rsplit(" – ", 1)
@@ -1464,7 +1522,7 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             if per_player_actions:
                 items = sorted((p.get("deltas") or {}).items(), key=lambda kv: int(kv[1]), reverse=True)[:n_act]
                 act_rows = "".join(
-                    f"<tr>{td_la}{esc(short(k))}</td>{td_r}+{fmt(v)}</td></tr>"
+                    f"<tr>{td_la}{esc(short(k, max_label - 1 if cols >= 4 else 0))}</td>{td_r}+{fmt(v)}</td></tr>"
                     for k, v in items)
             return (
                 "<table width='100%' cellspacing='0' cellpadding='0' style='border-collapse:collapse;'>"
