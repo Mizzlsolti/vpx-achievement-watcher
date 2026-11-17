@@ -115,26 +115,13 @@ DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
 DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
 
 # Duel Overlay position
+# Tournament mode is hidden for now. The code stays in place so it can be
+# re-enabled later by switching this flag to True.
+TOURNAMENT_MODE_ENABLED = False
+
 DEFAULT_OVERLAY.setdefault("duel_overlay_portrait", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_rotate_ccw", True)
 DEFAULT_OVERLAY.setdefault("duel_overlay_saved", False)
-
-# Screen Capture / Live View
-DEFAULT_OVERLAY.setdefault("screen_capture_overlay_configured", False)
-
-# Duel PiP
-DEFAULT_OVERLAY.setdefault("duel_pip_enabled", True)
-DEFAULT_OVERLAY.setdefault("duel_pip_saved", False)
-DEFAULT_OVERLAY.setdefault("duel_pip_follow_vpx", True)
-
-# WebRTC STUN/TURN configuration for Duel PiP
-DEFAULT_OVERLAY.setdefault(
-    "webrtc_stun_servers",
-    ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"],
-)
-DEFAULT_OVERLAY.setdefault("webrtc_turn_server", "")
-DEFAULT_OVERLAY.setdefault("webrtc_turn_username", "")
-DEFAULT_OVERLAY.setdefault("webrtc_turn_credential", "")
 
 DEFAULT_OVERLAY.setdefault("duel_overlay_x_portrait", 100)
 DEFAULT_OVERLAY.setdefault("duel_overlay_y_portrait", 100)
@@ -210,14 +197,6 @@ _ALLOWED_OVERLAY_KEYS = [
     "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",
     "duel_overlay_x_landscape", "duel_overlay_y_landscape",
-    "screen_capture_overlay_configured",
-    "duel_pip_enabled",
-    "duel_pip_saved",
-    "duel_pip_portrait", "duel_pip_rotate_ccw",
-    "duel_pip_x", "duel_pip_y", "duel_pip_w", "duel_pip_h",
-    "duel_pip_follow_vpx",
-    "webrtc_stun_servers", "webrtc_turn_server",
-    "webrtc_turn_username", "webrtc_turn_credential",
     "low_performance_mode",
     "anim_main_transitions", "anim_main_glow", "anim_main_score_progress",
     "overlay_page2_enabled", "overlay_page3_enabled",
@@ -358,13 +337,7 @@ class AppConfig:
     CLOUD_ENABLED: bool = False
     CLOUD_URL: str = "https://vpx-achievements-watcher-lb-default-rtdb.europe-west1.firebasedatabase.app/"
     POPPER_DB_PATH: str = ""
-    SCREEN_CAPTURE_PORT: int = 9876
-    SCREEN_CAPTURE_FPS: str = "auto"
-    SCREEN_CAPTURE_QUALITY: str = "auto"
-    DUEL_PIP_X: int = -1
-    DUEL_PIP_Y: int = -1
-    DUEL_PIP_W: int = 480
-    DUEL_PIP_H: int = 270
+    VPX_DIR: str = ""  # Folder of VPinballX*.exe (auto-detected, used for plugins)
     _load_error: bool = field(default=False, repr=False, compare=False)
 
     @property
@@ -403,13 +376,7 @@ class AppConfig:
             FIRST_RUN=bool(data.get("FIRST_RUN", False)),
             CLOUD_ENABLED=cloud_enabled,
             POPPER_DB_PATH=str(data.get("POPPER_DB_PATH", "")),
-            SCREEN_CAPTURE_PORT=int(data.get("SCREEN_CAPTURE_PORT", 9876)),
-            SCREEN_CAPTURE_FPS=str(data.get("SCREEN_CAPTURE_FPS", "auto")),
-            SCREEN_CAPTURE_QUALITY=str(data.get("SCREEN_CAPTURE_QUALITY", "auto")),
-            DUEL_PIP_X=int(data.get("DUEL_PIP_X", -1)),
-            DUEL_PIP_Y=int(data.get("DUEL_PIP_Y", -1)),
-            DUEL_PIP_W=int(data.get("DUEL_PIP_W", 480)),
-            DUEL_PIP_H=int(data.get("DUEL_PIP_H", 270)),
+            VPX_DIR=str(data.get("VPX_DIR", "") or ""),
         )
 
     @staticmethod
@@ -462,13 +429,7 @@ class AppConfig:
                 "FIRST_RUN": getattr(self, "FIRST_RUN", False),
                 "OVERLAY": clean_overlay,
                 "POPPER_DB_PATH": getattr(self, "POPPER_DB_PATH", ""),
-                "SCREEN_CAPTURE_PORT": getattr(self, "SCREEN_CAPTURE_PORT", 9876),
-                "SCREEN_CAPTURE_FPS": getattr(self, "SCREEN_CAPTURE_FPS", "auto"),
-                "SCREEN_CAPTURE_QUALITY": getattr(self, "SCREEN_CAPTURE_QUALITY", "auto"),
-                "DUEL_PIP_X": getattr(self, "DUEL_PIP_X", -1),
-                "DUEL_PIP_Y": getattr(self, "DUEL_PIP_Y", -1),
-                "DUEL_PIP_W": getattr(self, "DUEL_PIP_W", 480),
-                "DUEL_PIP_H": getattr(self, "DUEL_PIP_H", 270),
+                "VPX_DIR": getattr(self, "VPX_DIR", "") or "",
             }
 
             d = os.path.dirname(path)

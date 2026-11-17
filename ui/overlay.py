@@ -1334,6 +1334,17 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             lines.append("</tr></table>")
             return "".join(lines)
 
+        mp = (self._current_combined or {}).get("multiplayer")
+        if isinstance(mp, dict) and mp.get("games"):
+            html = style + "<div align='center' style='width:100%;'>" + \
+                self._multiplayer_block_html(mp, players, custom_table_name or table_title or rom_name, esc,
+                                             (_bdr_r, _bdr_g, _bdr_b), _tc_accent, _tc_primary) + "</div>"
+            body_pt = getattr(self, "_body_pt", 20)
+            css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+            self.body.setText(f"<div style='{css}'>{html}</div>")
+            self._layout_positions()
+            return
+
         if not players:
             if is_custom_table:
                 # CAT tables have no NVRAM players entry — render from custom data directly.
@@ -1352,6 +1363,81 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
         self.body.setText(f"<div style='{css}'>{html}</div>")
         self._layout_positions()
         
+    def _multiplayer_block_html(self, mp: dict, players: list, display_title: str, esc,
+                                border_rgb: tuple, accent: str, primary: str) -> str:
+        """Page 1 for multiplayer sessions (score-server plugin, VPX 10.8.1+).
+
+        Shows every player of the last game with score, best ball and average
+        per ball, marks the winner, and keeps the table-wide action counts from
+        NVRAM below (those cannot be split per player).  No achievements are
+        awarded in multiplayer sessions, so no progress bar is shown.
+        """
+        def fmt(n) -> str:
+            try:
+                return f"{int(n):,d}".replace(",", ".")
+            except Exception:
+                return "0"
+
+        br, bg, bb = border_rgb
+        games = [g for g in (mp.get("games") or []) if isinstance(g, dict)]
+        game = games[-1] if games else {}
+        stats = [p for p in (game.get("player_stats") or []) if isinstance(p, dict)]
+        winner = int(game.get("winner") or 0)
+
+        lines = [f"<div class='rom-title'>{esc(display_title or 'Unknown ROM')}</div>"]
+        sub = f"👥 {int(game.get('players') or len(stats) or 0)} Players"
+        if len(games) > 1:
+            sub += f" &nbsp;·&nbsp; Game {len(games)} of {len(games)} this session"
+        lines.append(f"<div style='text-align:center; color:#AAAAAA; font-size:0.95em; margin-bottom:0.6em;'>{sub}</div>")
+
+        if winner:
+            lines.append(f"<div class='score-box'>🏆 Player {winner} wins!</div>")
+        else:
+            lines.append("<div class='score-box'>🤝 Tie</div>" if stats and len({p.get('score') for p in stats}) == 1
+                         else "<div style='margin-bottom:1.0em;'></div>")
+
+        lines.append("<table class='hltable'>")
+        lines.append("<tr><th>Player</th><th>Score</th><th>Best Ball</th><th>Ø per Ball</th></tr>")
+        for p in sorted(stats, key=lambda x: int(x.get("score") or 0), reverse=True):
+            pid = int(p.get("player") or 0)
+            crown = " 👑" if pid == winner else ""
+            best_no = int(p.get("best_ball_no") or 0)
+            best_txt = fmt(p.get("best_ball")) + (f" <span style='color:#888;'>(B{best_no})</span>" if best_no else "")
+            lines.append(
+                f"<tr><td class='left'>Player {pid}{crown}</td>"
+                f"<td class='right'>{fmt(p.get('score'))}</td>"
+                f"<td class='center'>{best_txt}</td>"
+                f"<td class='center'>{fmt(p.get('avg_ball'))}</td></tr>"
+            )
+        lines.append("</table>")
+
+        # Table-wide NVRAM actions (all players combined)
+        deltas = {}
+        try:
+            deltas = dict((players[0] if players else {}).get("deltas") or {})
+        except Exception:
+            deltas = {}
+        if deltas:
+            items = sorted(deltas.items(), key=lambda x: int(x[1]), reverse=True)[:16]
+            lines.append(f"<div class='divider'></div>")
+            lines.append("<table class='hltable'>")
+            lines.append("<tr><th colspan='4'>Actions (all players)</th></tr>")
+            for i in range(0, len(items), 2):
+                row = ""
+                for c in range(2):
+                    border = f" style='border-left: 2px solid rgba({br},{bg},{bb},0.2); padding-left: 0.55em;'" if c else ""
+                    if i + c < len(items):
+                        k, v = items[i + c]
+                        row += f"<td class='left'{border}>{esc(k)}</td><td class='right'>+{fmt(v)}</td>"
+                    else:
+                        row += f"<td class='left'{border}></td><td class='right'></td>"
+                lines.append(f"<tr>{row}</tr>")
+            lines.append("</table>")
+
+        lines.append("<div style='text-align:center; color:#888; font-size:0.9em; margin-top:0.8em;'>"
+                     "Multiplayer game – no achievements awarded</div>")
+        return "".join(lines)
+
     def _score_spin_tick(self):
         """Animate score display value toward _score_target (slot-machine style)."""
         if self._score_display == self._score_target:

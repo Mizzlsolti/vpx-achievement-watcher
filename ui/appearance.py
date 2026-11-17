@@ -24,10 +24,6 @@ from .effects import EffectsMixin
 from .mascots import MascotsMixin
 
 # Screen Capture dropdown option labels and their config values (index → value)
-_SC_FPS_OPTIONS = ["Auto (dynamic)", "30", "20", "10"]
-_SC_FPS_VALUES  = ["auto", "30", "20", "10"]
-_SC_QUAL_OPTIONS = ["Auto (dynamic)", "95", "80", "60"]
-_SC_QUAL_VALUES  = ["auto", "95", "80", "60"]
 
 
 class AppearanceMixin(MascotsMixin, EffectsMixin):
@@ -497,75 +493,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
         lay_pos.addLayout(box_mini_info, 2, 0); lay_pos.addLayout(box_status_overlay, 2, 1)
         lay_pos.addLayout(box_duel_overlay, 3, 0)
 
-        # 7) Duel Picture-in-Picture Stream (Row 3, Col 1)
-        self.chk_pip_enabled = QCheckBox("📺 Enable Duel PIP Stream")
-        self.chk_pip_enabled.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_enabled", True)))
-        self.chk_pip_enabled.stateChanged.connect(self._on_pip_enabled_toggle)
-
-        self.chk_pip_portrait = QCheckBox("Portrait Mode (90°)")
-        self.chk_pip_portrait.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_portrait", True)))
-        self.chk_pip_portrait.stateChanged.connect(self._on_pip_portrait_toggle)
-
-        self.chk_pip_ccw = QCheckBox("Rotate CCW")
-        self.chk_pip_ccw.setChecked(bool(self.cfg.OVERLAY.get("duel_pip_rotate_ccw", True)))
-        self.chk_pip_ccw.stateChanged.connect(self._on_pip_ccw_toggle)
-
-        self.cmb_sc_fps = QComboBox()
-        self.cmb_sc_fps.addItems(_SC_FPS_OPTIONS)
-        _sc_fps_val = str(getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto")).lower()
-        self.cmb_sc_fps.setCurrentIndex(_SC_FPS_VALUES.index(_sc_fps_val) if _sc_fps_val in _SC_FPS_VALUES else 0)
-        self.cmb_sc_fps.currentIndexChanged.connect(self._on_sc_fps_changed)
-
-        self.cmb_sc_quality = QComboBox()
-        self.cmb_sc_quality.addItems(_SC_QUAL_OPTIONS)
-        _sc_qual_val = str(getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto")).lower()
-        self.cmb_sc_quality.setCurrentIndex(_SC_QUAL_VALUES.index(_sc_qual_val) if _sc_qual_val in _SC_QUAL_VALUES else 0)
-        self.cmb_sc_quality.currentIndexChanged.connect(self._on_sc_quality_changed)
-
-        self.lbl_sc_fps = QLabel("FPS (outgoing + PIP render):")
-        self.lbl_sc_quality = QLabel("Quality (outgoing + PIP render):")
-
-        self.lbl_sc_cpu_warning = QLabel("⚠️ Quality reduced: CPU usage high")
-        self.lbl_sc_cpu_warning.setVisible(False)
-
-        self.btn_pip_place = QPushButton("Place")
-        self.btn_pip_place.clicked.connect(self._on_pip_place_clicked)
-
-        self.btn_pip_test = QPushButton("Test")
-        self.btn_pip_test.clicked.connect(self._on_pip_test)
-
-        box_pip = QVBoxLayout()
-        box_pip.addWidget(QLabel("<b>📺 Duel Picture-in-Picture Stream</b>"))
-        box_pip.addWidget(self.chk_pip_enabled)
-        box_pip.addWidget(self.chk_pip_portrait)
-        box_pip.addWidget(self.chk_pip_ccw)
-        _fps_row = QHBoxLayout()
-        _fps_row.addWidget(self.lbl_sc_fps)
-        _fps_row.addWidget(self.cmb_sc_fps)
-        box_pip.addLayout(_fps_row)
-        _qual_row = QHBoxLayout()
-        _qual_row.addWidget(self.lbl_sc_quality)
-        _qual_row.addWidget(self.cmb_sc_quality)
-        box_pip.addLayout(_qual_row)
-        box_pip.addWidget(self.lbl_sc_cpu_warning)
-        _pip_btns = QHBoxLayout()
-        _pip_btns.addWidget(self.btn_pip_place)
-        _pip_btns.addWidget(self.btn_pip_test)
-        box_pip.addLayout(_pip_btns)
-        box_pip.addStretch(1)
-
-        lay_pos.addLayout(box_pip, 3, 1)
-
-        # Apply initial enabled state to PIP sub-controls
-        self._apply_pip_enabled_state(bool(self.cfg.OVERLAY.get("duel_pip_enabled", True)))
-
-        # CPU monitor timer (2 s interval) to update the SC warning label
-        self._sc_cpu_timer = QTimer(self)
-        _cpu_interval = getattr(type(self), "CPU_MONITOR_INTERVAL_MS", 2000)
-        self._sc_cpu_timer.setInterval(_cpu_interval)
-        self._sc_cpu_timer.timeout.connect(self._update_sc_cpu_warning)
-        self._sc_cpu_timer.start()
-
         layout.addWidget(grp_pos)
 
         lbl_overlay_bg_tip = QLabel(
@@ -937,7 +864,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_portrait,
             self.chk_status_overlay_portrait,
             self.chk_duel_overlay_portrait,
-            self.chk_pip_portrait,
         ]
 
     def _ccw_checkboxes(self):
@@ -948,7 +874,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             self.chk_mini_info_ccw,
             self.chk_status_overlay_ccw,
             self.chk_duel_overlay_ccw,
-            self.chk_pip_ccw,
         ]
 
     def _update_switch_all_button_label(self):
@@ -976,140 +901,6 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
     # ------------------------------------------------------------------
     # Screen Capture / Live View handlers
     # ------------------------------------------------------------------
-
-    def _on_sc_fps_changed(self):
-        idx = self.cmb_sc_fps.currentIndex()
-        val = _SC_FPS_VALUES[idx] if 0 <= idx < len(_SC_FPS_VALUES) else "auto"
-        self.cfg.SCREEN_CAPTURE_FPS = val
-        self.cfg.save()
-        scs = self._get_screen_capture_server()
-        if scs is not None:
-            scs.set_fps_cfg(val)
-
-    def _on_sc_quality_changed(self):
-        idx = self.cmb_sc_quality.currentIndex()
-        val = _SC_QUAL_VALUES[idx] if 0 <= idx < len(_SC_QUAL_VALUES) else "auto"
-        self.cfg.SCREEN_CAPTURE_QUALITY = val
-        self.cfg.save()
-        scs = self._get_screen_capture_server()
-        if scs is not None:
-            scs.set_quality_cfg(val)
-
-    def _update_sc_cpu_warning(self):
-        try:
-            scs = self._get_screen_capture_server()
-            if scs is None or not scs.is_running:
-                self.lbl_sc_cpu_warning.setVisible(False)
-                return
-            cpu = getattr(scs, "_cached_cpu", 0.0)
-            if cpu > 90:
-                self.lbl_sc_cpu_warning.setStyleSheet("color: #FF3B30;")
-                self.lbl_sc_cpu_warning.setVisible(True)
-            elif cpu > 80:
-                self.lbl_sc_cpu_warning.setStyleSheet("color: #FFD60A;")
-                self.lbl_sc_cpu_warning.setVisible(True)
-            else:
-                self.lbl_sc_cpu_warning.setVisible(False)
-        except Exception:
-            pass
-
-    def _on_pip_portrait_toggle(self, state: int):
-        is_checked = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["duel_pip_portrait"] = bool(is_checked)
-        self.cfg.save()
-        self._update_switch_all_button_label()
-
-    def _on_pip_ccw_toggle(self, state: int):
-        is_ccw = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["duel_pip_rotate_ccw"] = bool(is_ccw)
-        self.cfg.save()
-
-    def _apply_pip_enabled_state(self, enabled: bool):
-        """Enable or disable the dependent PIP controls based on *enabled*.
-
-        ``btn_pip_test`` is intentionally omitted so the user can always
-        preview the PIP window placement even when the stream is disabled.
-        """
-        for widget in (
-            self.chk_pip_portrait,
-            self.chk_pip_ccw,
-            self.cmb_sc_fps,
-            self.cmb_sc_quality,
-            self.lbl_sc_fps,
-            self.lbl_sc_quality,
-            self.btn_pip_place,
-        ):
-            try:
-                widget.setEnabled(enabled)
-            except Exception:
-                pass
-
-    def _on_pip_enabled_toggle(self, state: int):
-        enabled = (Qt.CheckState(state) == Qt.CheckState.Checked)
-        self.cfg.OVERLAY["duel_pip_enabled"] = bool(enabled)
-        self.cfg.save()
-        self._apply_pip_enabled_state(enabled)
-        # When toggled OFF while a duel PIP is active, close it immediately
-        if not enabled:
-            try:
-                pip = getattr(self, "_pip_overlay", None)
-                if pip is not None and pip.isVisible():
-                    pip.close_pip()
-            except Exception:
-                pass
-
-    def _on_pip_place_clicked(self):
-        """Open the PiP overlay in placement mode (no stream). Second click saves position."""
-        from ui.overlay_pip import DuelPiPOverlay
-        pip = getattr(self, "_pip_place_overlay", None)
-        if pip is not None:
-            try:
-                pip._save_geometry_to_cfg()
-                pip.close_pip()
-                pip.deleteLater()
-            except Exception:
-                pass
-            self._pip_place_overlay = None
-            self.btn_pip_place.setText("Place")
-            return
-
-        try:
-            self._pip_place_overlay = DuelPiPOverlay(self)
-            self._pip_place_overlay.show()
-            self.btn_pip_place.setText("Save position")
-        except Exception as exc:
-            QMessageBox.warning(self, "Duel PiP", f"PiP open failed:\n{exc}")
-
-    def _on_pip_test(self):
-        """Open PiP overlay for 5 seconds as a preview at the saved position/size."""
-        try:
-            from ui.overlay_pip import DuelPiPOverlay
-            # Always create a fresh overlay so _restore_geometry() reads the
-            # latest saved position and size — reusing an existing instance
-            # would show it wherever it was last moved/hidden.
-            pip = getattr(self, "_pip_test_overlay", None)
-            if pip is not None:
-                try:
-                    pip.close_pip()
-                    pip.deleteLater()
-                except Exception:
-                    pass
-                self._pip_test_overlay = None
-            self._pip_test_overlay = DuelPiPOverlay(self)
-            self._pip_test_overlay.open()
-            QTimer.singleShot(5000, self._pip_test_overlay.close_pip)
-        except Exception as exc:
-            QMessageBox.warning(self, "Duel PiP", f"PiP test failed:\n{exc}")
-
-    def _get_screen_capture_server(self):
-        """Return the running ScreenCaptureServer from the watcher, or None."""
-        try:
-            w = getattr(self, "watcher", None)
-            if w is None:
-                return None
-            return getattr(w, "_screen_capture_server", None)
-        except Exception:
-            return None
 
     def _init_overlay_tooltips(self):
         tips = {
@@ -1147,20 +938,10 @@ class AppearanceMixin(MascotsMixin, EffectsMixin):
             "btn_status_overlay_test": "Trigger a test Status Overlay message to check your placement.",
 
             # Appearance Tab - Duel Overlay
-            "chk_duel_overlay_portrait": "Rotate duel/tournament notifications for portrait/cabinet screens.",
-            "chk_duel_overlay_ccw": "Rotate duel/tournament notifications counter-clockwise.",
+            "chk_duel_overlay_portrait": "Rotate duel notifications for portrait/cabinet screens.",
+            "chk_duel_overlay_ccw": "Rotate duel notifications counter-clockwise.",
             "btn_duel_overlay_place": "Set and save the screen position for duel notifications.",
             "btn_duel_overlay_test": "Trigger a test duel notification to check your placement.",
-
-            # Appearance Tab - Duel Picture-in-Picture Stream
-            "chk_pip_enabled": "Enable or disable the Duel PiP stream window. When off, no PIP window opens during duels.",
-            "chk_pip_portrait": "Rotate the Duel PiP video 90 degrees for portrait/cabinet screens.",
-            "chk_pip_ccw": "Rotate the Duel PiP video counter-clockwise instead of clockwise.",
-            "cmb_sc_fps": "'Auto (dynamic)' tunes FPS and quality based on CPU load — defaults to 10 fps / quality 60 and drops further as CPU usage rises. Applies to both outgoing stream and PIP render.",
-            "cmb_sc_quality": "Stream is captured from the Visual Pinball Player window only, so it is much lighter than a full-screen capture. 'Auto (dynamic)' reduces quality when CPU usage is high. Applies to both outgoing stream and PIP render.",
-            "lbl_sc_cpu_warning": "CPU usage is high — stream quality has been automatically reduced to reduce load.",
-            "btn_pip_place": "Open a draggable PiP window to set and save the position and size for the opponent's live feed during duels. Click again to save.",
-            "btn_pip_test": "Open the Duel PiP overlay with a placeholder to preview its position and size. No stream connection required.",
 
             # Appearance Tab - Switch All button
             "btn_switch_all_orientation": "Toggle all overlay widgets between Portrait and Landscape mode at once.",

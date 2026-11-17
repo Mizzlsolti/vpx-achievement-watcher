@@ -10,8 +10,9 @@
 ; During silent/upgrade installs the paths page is skipped and any
 ; existing config.json is preserved.
 
+; Normally passed in by the build workflow (tag name or WATCHER_VERSION).
 #ifndef MyAppVersion
-  #define MyAppVersion "2.6"
+  #define MyAppVersion "3.1"
 #endif
 
 [Setup]

@@ -8,11 +8,11 @@ __all__ = [
     "duel_engine",
     "input_hook",
     "notifications",
-    "screen_capture_server",
+    "score_server",
     "sound",
     "theme",
     "watcher_core",
     "watcher_io",
     "watcher_migrate",
-    "webrtc_stream",
+    "vpx_env",
 ]

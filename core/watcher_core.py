@@ -201,6 +201,7 @@ from .badges import (
 class Watcher:
     MIN_SEGMENTS_FOR_CLASSIFICATION = 1
     SUMMARY_FILENAME = "session_latest.summary.json"
+    MULTIPLAYER_FILENAME = "multiplayer_latest.json"
     
     def __init__(self, cfg: AppConfig, bridge: "Bridge"):
         self.cfg = cfg
@@ -3164,9 +3165,93 @@ class Watcher:
         except Exception:
             pass
   
+    # ── ROM alias resolution (issue #880) ────────────────────────────────────
+    def _vpm_aliases(self) -> dict:
+        """VPinMAME alias file (VPMAlias.txt: 'alias,realrom'), lower-cased."""
+        out: dict = {}
+        try:
+            vpm_dir = os.path.dirname(os.path.normpath(self.cfg.NVRAM_DIR))
+            for fn in ("VPMAlias.txt", "vpmalias.txt"):
+                path = os.path.join(vpm_dir, fn)
+                if not os.path.isfile(path):
+                    continue
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.split("#", 1)[0].split(";", 1)[0].strip()
+                        if "," not in line:
+                            continue
+                        a, r = [x.strip() for x in line.split(",", 1)]
+                        if a and r:
+                            out[a.lower()] = r
+                break
+        except Exception:
+            pass
+        return out
+
+    def _index_has_rom(self, rom: str) -> bool:
+        if not rom:
+            return False
+        idx = self.INDEX or {}
+        if rom in idx or rom.lower() in idx:
+            return True
+        rl = rom.lower()
+        return any(str(k).lower() == rl for k in idx.keys())
+
+    def _nv_path_for(self, rom: str) -> str:
+        return os.path.join(self.cfg.NVRAM_DIR, rom + ".nv")
+
+    def _resolve_rom_alias(self, rom: str) -> str:
+        """Map a script ROM alias (cGameName, e.g. 'afm_113Serum') to the ROM that
+        VPinMAME really runs and writes NVRAM for (e.g. 'afm_113b').
+
+        A table whose own name already has an .nv file is left untouched.  Otherwise
+        VPMAlias.txt is consulted first, then the candidate list; a candidate is only
+        accepted if it has BOTH an NVRAM map and an existing .nv file, which avoids
+        false matches between unrelated ROMs that share a prefix.  Among several
+        matches the longest shared name wins, then the most recently written .nv.
+        """
+        name = (rom or "").strip()
+        if not name:
+            return name
+        try:
+            if os.path.isfile(self._nv_path_for(name)):
+                return name
+            target = self._vpm_aliases().get(name.lower())
+            if target and os.path.isfile(self._nv_path_for(target)):
+                log(self.cfg, f"[ROM] alias '{name}' resolved to '{target}' via VPMAlias.txt")
+                return target
+            nl = name.lower()
+            cands = list(self._all_rom_candidates(name))
+            # Base ROM + suffix aliases (godzillapup, tmnt_104STERN, cftbl_l4LW …):
+            # every indexed ROM name that is a prefix of the alias is a candidate.
+            for k in list((self.INDEX or {}).keys()):
+                kl = str(k).lower()
+                if len(kl) >= 3 and kl != nl and nl.startswith(kl) and kl not in [c.lower() for c in cands]:
+                    cands.append(str(k))
+            best, best_key = "", (-1, -1.0)
+            for cand in cands:
+                cl = cand.lower()
+                if cl == nl:
+                    continue
+                nv = self._nv_path_for(cand)
+                if not os.path.isfile(nv):
+                    continue
+                if not (self._index_has_rom(cand) or self._has_any_map(cand)):
+                    continue
+                common = len(os.path.commonprefix([nl, cl]))
+                key = (common, os.path.getmtime(nv))  # longest shared name first, then newest NVRAM
+                if key > best_key:
+                    best, best_key = cand, key
+            if best:
+                log(self.cfg, f"[ROM] alias '{name}' resolved to '{best}' (map + NVRAM file found)")
+                return best
+        except Exception as e:
+            log(self.cfg, f"[ROM] alias resolution failed for '{name}': {e}", "WARN")
+        return name
+
     def on_session_start(self, table_or_rom: str, is_rom: bool = False):
         if is_rom:
-            self.current_rom = table_or_rom
+            self.current_rom = self._resolve_rom_alias(table_or_rom)
             self.current_table = f"(ROM only: {self.current_rom})"
             self._table_load_ts = time.time()
         else:
@@ -3181,6 +3266,19 @@ class Watcher:
         self.start_time = time.time()
         self._custom_events_session_start = self.start_time
         self.game_active = True
+        self._mp_summary = None
+        try:
+            _mp_file = os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME)
+            if os.path.isfile(_mp_file):
+                os.remove(_mp_file)
+        except Exception:
+            pass
+        try:
+            _ssc = self._score_server_client()
+            if _ssc is not None:
+                _ssc.begin_session(self.start_time)
+        except Exception as e:
+            log(self.cfg, f"[SCORE_SERVER] begin session failed: {e}", "WARN")
         self.duel_active_for_current_table = False  # UI will set True if an active duel matches
         self.last_session_score = 0
         self.players.clear()
@@ -3207,6 +3305,16 @@ class Watcher:
                 self.bridge.session_started.emit(_rom, _table)
         except Exception:
             pass
+
+    def _score_server_client(self):
+        """Return the score-server client when the plugin is active, else None."""
+        if not getattr(self, "score_server_ready", False):
+            return None
+        try:
+            from .score_server import get_client
+            return get_client(log_fn=lambda m, lvl="INFO": log(self.cfg, m, lvl))
+        except Exception:
+            return None
 
     def _ensure_singleplayer_min_playtime(self, nplayers: int, duration_sec: int) -> None:
         try:
@@ -3253,6 +3361,27 @@ class Watcher:
 
             log(self.cfg, f"[SESSION END] Normal session finished: rom={self.current_rom}, duration={duration_str}")
 
+            # Multiplayer detection (score-server plugin, VPX 10.8.1+).
+            # More than one player in this session -> no achievements at all,
+            # the overlay shows the player comparison instead.
+            _is_multiplayer = False
+            self._mp_summary = None
+            try:
+                _ssc = self._score_server_client()
+                if _ssc is not None:
+                    _mp = _ssc.session_summary()
+                    if _mp.get("multiplayer"):
+                        _is_multiplayer = True
+                        _mp["rom"] = self.current_rom or ""
+                        _mp["table"] = self.current_table or ""
+                        _mp["end_ts"] = time.time()
+                        self._mp_summary = _mp
+                        save_json(os.path.join(p_highlights(self.cfg), self.MULTIPLAYER_FILENAME), _mp)
+                        log(self.cfg, f"[MULTIPLAYER] {_mp.get('max_players')} players, {len(_mp.get('games') or [])} game(s) – achievements disabled for this session")
+                    _ssc.end_session()
+            except Exception as e:
+                log(self.cfg, f"[MULTIPLAYER] summary failed: {e}", "WARN")
+
             # Save the session score so the duel handler can submit it.
             try:
                 self.last_session_score = int(self._find_score_from_audits(end_audits, pid=1) or 0)
@@ -3295,12 +3424,15 @@ class Watcher:
                 except Exception as e:
                     log(self.cfg, f"[OVERLAY] auto-show emit failed: {e}", "WARN")
 
-                try:
-                    self._persist_and_toast_achievements(end_audits, duration_sec)
-                except Exception as e:
-                    log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
+                if _is_multiplayer:
+                    log(self.cfg, "[ACH] Evaluation skipped: multiplayer game")
+                else:
+                    try:
+                        self._persist_and_toast_achievements(end_audits, duration_sec)
+                    except Exception as e:
+                        log(self.cfg, f"[ACHIEVEMENTS] persist/toast failed: {e}", "WARN")
 
-                if self.current_rom and self._has_any_map(self.current_rom):
+                if (not _is_multiplayer) and self.current_rom and self._has_any_map(self.current_rom):
                     try:
                         s_rules = self._collect_player_rules_for_rom(self.current_rom)
                         
@@ -3651,9 +3783,9 @@ class Watcher:
                     else:
                         self.on_session_start(table, is_rom=False)
                     active_rom = session_key
-                    self._emit_mini_info_if_missing_map(rom, 5, table=table)
+                    self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
-                        self._emit_mini_info_if_missing_vps_id(rom, 8)
+                        self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
 
                 elif active_rom and session_key and session_key != active_rom:
                     self.on_session_end()
@@ -3663,9 +3795,9 @@ class Watcher:
                     else:
                         self.on_session_start(table, is_rom=False)
                     active_rom = session_key
-                    self._emit_mini_info_if_missing_map(rom, 5, table=table)
+                    self._emit_mini_info_if_missing_map((self.current_rom or rom) if rom else rom, 5, table=table)
                     if rom:
-                        self._emit_mini_info_if_missing_vps_id(rom, 8)
+                        self._emit_mini_info_if_missing_vps_id(self.current_rom or rom, 8)
 
                 if active_rom:
                     audits, _, _ = self.read_nvram_audits_with_autofix(self.current_rom)
@@ -3763,24 +3895,6 @@ class Watcher:
         self.thread = threading.Thread(target=self._thread_main, daemon=True, name="WatcherThread")
         self.thread.start()
 
-        # Start screen capture server (best-effort — watcher runs fine without it)
-        self._screen_capture_server = None
-        try:
-            from core.screen_capture_server import ScreenCaptureServer
-            scs = ScreenCaptureServer(
-                port=getattr(self.cfg, "SCREEN_CAPTURE_PORT", 9876),
-                fps_cfg=getattr(self.cfg, "SCREEN_CAPTURE_FPS", "auto"),
-                quality_cfg=getattr(self.cfg, "SCREEN_CAPTURE_QUALITY", "auto"),
-            )
-            if scs.start():
-                self._screen_capture_server = scs
-                log(self.cfg, "[SCS] Screen capture server started")
-            else:
-                log(self.cfg, "[SCS] Screen capture server unavailable (mss/Pillow missing?)", "WARN")
-        except Exception as exc:
-            log(self.cfg, f"[SCS] Screen capture server start failed: {exc}", "WARN")
-            self._screen_capture_server = None
-
     def stop(self):
         try:
             self._stop.set()
@@ -3788,13 +3902,6 @@ class Watcher:
                 self.thread.join(timeout=3)
         except Exception:
             pass
-
-        if getattr(self, "_screen_capture_server", None) is not None:
-            try:
-                self._screen_capture_server.stop()
-            except Exception:
-                pass
-            self._screen_capture_server = None
 
         if self.game_active:
             try:

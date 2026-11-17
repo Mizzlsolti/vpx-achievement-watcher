@@ -386,7 +386,7 @@ class SetupWizardDialog(QDialog):
 
         lbl_required = QLabel(
             "Required for:\n"
-            "  • Score Duels & Tournaments\n"
+            "  • Score Duels\n"
             "  • Global Leaderboards\n"
             "  • Sharing progress with others"
         )

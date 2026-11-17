@@ -60,6 +60,27 @@ class OverlayCtrlMixin:
         finally:
             self._overlay_busy = False
 
+    def _load_multiplayer_summary(self, rom: str):
+        """Multiplayer result of the last session (score-server plugin), or None."""
+        mp = None
+        try:
+            mp = getattr(self.watcher, "_mp_summary", None)
+        except Exception:
+            mp = None
+        if not mp:
+            try:
+                path = os.path.join(self.cfg.BASE, "session_stats", "Highlights", "multiplayer_latest.json")
+                if os.path.isfile(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        mp = json.load(f)
+            except Exception:
+                mp = None
+        if not isinstance(mp, dict) or not mp.get("multiplayer"):
+            return None
+        if rom and mp.get("rom") and str(mp.get("rom")).lower() != str(rom).lower():
+            return None
+        return mp
+
     def _has_highlights(self, entry: dict) -> bool:
         h = entry.get("highlights", {}) or {}
         for cat in ("Power", "Precision", "Fun"):
@@ -163,6 +184,7 @@ class OverlayCtrlMixin:
                 "players": combined_players,
                 "title": "Session Overview",
                 "rom_name": resolved_rom,
+                "multiplayer": self._load_multiplayer_summary(resolved_rom),
             })
             
         self._overlay_cycle = {"sections": sections, "idx": -1}
@@ -215,6 +237,9 @@ class OverlayCtrlMixin:
 
         if kind == "combined_players":
             combined = {"players": payload.get("players", []), "rom_name": payload.get("rom_name", "")}
+            if payload.get("multiplayer"):
+                combined["multiplayer"] = payload.get("multiplayer")
+                title = "Multiplayer Session"
             _update_and_show(lambda: self.overlay.set_combined(
                 combined, session_title=title or "Active Player Highlights"))
             return
