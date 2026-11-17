@@ -193,7 +193,8 @@ class ScoreServerClient:
         with self._lock:
             self._session_start = float(ts or time.time()) - 90.0  # plugin queues ~60 s
             self._games = [g for g in self._games if (g.ended is None) or (g.ended >= self._session_start)]
-            self._events.clear()
+            # Events are kept: a game may already have started before the
+            # Watcher noticed the table window (end_session clears them).
 
     def session_summary(self, include_snapshots: bool = False) -> dict:
         """Games recorded since :meth:`begin_session` (running game included).
