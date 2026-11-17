@@ -1351,6 +1351,20 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
             "primary": primary, "accent": accent,
         }
 
+    def _p1_rows_fit_width(self, rows: list) -> bool:
+        """True when these grid rows fit the page width without squeezing."""
+        try:
+            avail_w, _ = self._p1_area()
+            body_pt = getattr(self, "_body_pt", 20)
+            css = f"font-size:{body_pt}pt;font-family:'{self.font_family}';color:#FFFFFF;"
+            probe = QLabel()
+            probe.setFont(self.body.font())
+            probe.setText(f"<div style='{css}'><table width='100%' cellspacing='0' cellpadding='0' "
+                          f"style='border-collapse:collapse;'>{''.join(rows)}</table></div>")
+            return probe.sizeHint().width() <= avail_w
+        except Exception:
+            return True
+
     def _single_player_rows(self, hld: dict, deltas: dict, limit: int, esc) -> list:
         """Rows below the score on a 6-column grid: highlight categories side
         by side, then the NVRAM actions in two columns."""
@@ -1376,18 +1390,28 @@ class OverlayWindow(_OverlayFxMixin, QWidget):
 
         if cats:
             sp = spans[len(cats)]
-            rows.append("<tr>" + "".join(
+            head = "<tr>" + "".join(
                 f"<td colspan='{ns + vs}' style='{st['th']}{'' if i == 0 else st['sep']}'>{esc(c)}</td>"
-                for i, ((c, _), (ns, vs)) in enumerate(zip(cats, sp))) + "</tr>")
+                for i, ((c, _), (ns, vs)) in enumerate(zip(cats, sp))) + "</tr>"
+            side, stacked = [head], [head]
             for k in range(max(len(items) for _, items in cats)):
-                cells = []
+                cells, top, bottom = [], [], []
                 for i, ((_, items), (ns, vs)) in enumerate(zip(cats, sp)):
+                    sep = "" if i == 0 else st["sep"]
                     if k < len(items):
                         n, v = split(items[k])
                         cells.append(pair_cells(n, v, ns, vs, i == 0))
+                        top.append(f"<td colspan='{ns + vs}' nowrap style='{st['ln']}{sep}'>{nb(esc(n))}</td>")
+                        bottom.append(f"<td colspan='{ns + vs}' nowrap style='{st['r']}{sep}'>{nb(esc(v))}</td>")
                     else:
                         cells.append(pair_cells(None, None, ns, vs, i == 0))
-                rows.append("<tr>" + "".join(cells) + "</tr>")
+                        top.append(f"<td colspan='{ns + vs}' style='{sep}'></td>")
+                        bottom.append(f"<td colspan='{ns + vs}' style='{sep}'></td>")
+                side.append("<tr>" + "".join(cells) + "</tr>")
+                stacked.append("<tr>" + "".join(top) + "</tr><tr>" + "".join(bottom) + "</tr>")
+            # Name and value side by side when the columns fit (landscape);
+            # otherwise (e.g. portrait) the value goes below the name.
+            rows.extend(side if self._p1_rows_fit_width(side) else stacked)
         else:
             rows.append("<tr><td colspan='6' style='text-align:center; color:#888;'>(No Highlights yet)</td></tr>")
 
