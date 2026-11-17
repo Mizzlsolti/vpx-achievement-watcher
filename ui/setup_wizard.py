@@ -631,6 +631,7 @@ class SetupWizardDialog(QDialog):
             try:
                 from core.cloud_sync import CloudSync
                 CloudSync.set_node(cfg_ref, f"players/{pid}/achievements/name", name)
+                CloudSync.claim_name(cfg_ref, name)
             except Exception:
                 pass
 

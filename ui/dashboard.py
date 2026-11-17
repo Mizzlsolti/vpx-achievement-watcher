@@ -956,25 +956,8 @@ class DashboardMixin:
 
         def _bg():
             try:
-                player_ids = CloudSync.fetch_player_ids(self.cfg)
-                if not player_ids:
-                    return
-                paths = [f"players/{p}/progress/{rom}" for p in player_ids]
-                batch = CloudSync.fetch_parallel(self.cfg, paths)
-
-                scores = []
-                for path, entry in batch.items():
-                    if entry and isinstance(entry, dict):
-                        pct = float(entry.get("percentage", 0))
-                        p_id = path.split("/")[1] if "/" in path else ""
-                        scores.append((pct, p_id))
-                scores.sort(reverse=True)
-
-                rank = None
-                for i, (_, p_id) in enumerate(scores, start=1):
-                    if p_id == pid:
-                        rank = i
-                        break
+                # Own place in the ROM leaderboard index (only the top 5 matter here).
+                rank, _own = CloudSync.fetch_lb_rank(self.cfg, f"lb/{rom}", "p", pid, cap=5)
 
                 if rank is not None and rank <= 5:
                     from PyQt6.QtCore import QMetaObject, Qt, Q_ARG

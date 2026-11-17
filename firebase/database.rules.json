@@ -1,0 +1,211 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "meta": {
+      ".read": true,
+      ".write": false
+    },
+
+    "owners": {
+      "$pid": {
+        ".read": false,
+        ".write": "auth != null && $pid.matches(/^[a-z0-9]{4}$/) && newData.child('uid').val() === auth.uid && newData.child('key').isString() && newData.child('key').val().length >= 24 && newData.child('key').val().length <= 64 && (!data.exists() || data.child('key').val() === newData.child('key').val())",
+        ".validate": "newData.hasChildren(['uid', 'key']) && newData.parent().parent().child('uids').child(auth.uid).val() === $pid",
+        "uid": { ".validate": "newData.isString()" },
+        "key": { ".validate": "newData.isString()" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "uids": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isString() && newData.parent().parent().child('owners').child(newData.val()).child('uid').val() === auth.uid"
+      }
+    },
+
+    "names": {
+      "$name": {
+        ".read": true,
+        ".write": "auth != null && root.child('uids').child(auth.uid).exists() && ((newData.exists() && newData.val() === root.child('uids').child(auth.uid).val() && (!data.exists() || data.val() === newData.val())) || (!newData.exists() && data.val() === root.child('uids').child(auth.uid).val()))",
+        ".validate": "newData.isString() && $name.length >= 1 && $name.length <= 32"
+      }
+    },
+
+    "players": {
+      "$pid": {
+        ".read": true,
+        ".write": "auth != null && root.child('owners').child($pid).child('uid').val() === auth.uid",
+
+        "achievements": {
+          "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32 && newData.val().toLowerCase() !== 'player'" },
+          "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "sts": { ".validate": "newData.val() === now" },
+          "player_level": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+          "player_level_name": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "player_prestige": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+          "player_prestige_display": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "player_fully_maxed": { ".validate": "newData.isBoolean()" },
+          "badge_count": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 500" },
+          "selected_badge": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "badges": { "$i": { ".validate": "$i.length <= 3 && newData.isString() && newData.val().length <= 64" } },
+          "roms_played": { "$i": { ".validate": "$i.length <= 4 && newData.isString() && newData.val().length <= 64" } },
+          "global": {
+            "$i": {
+              ".validate": "$i.length <= 4 && newData.hasChildren(['title'])",
+              "title": { ".validate": "newData.isString() && newData.val().length <= 200" },
+              "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+              "origin": { ".validate": "newData.isString() && newData.val().length <= 40" },
+              "vps_id": { ".validate": "newData.isString() && newData.val().length <= 40" },
+              "$other": { ".validate": false }
+            }
+          },
+          "session": {
+            "$rom": {
+              ".validate": "$rom.length <= 64",
+              "$i": {
+                ".validate": "$i.length <= 4 && newData.hasChildren(['title'])",
+                "title": { ".validate": "newData.isString() && newData.val().length <= 200" },
+                "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+                "vps_id": { ".validate": "newData.isString() && newData.val().length <= 40" },
+                "$other": { ".validate": false }
+              }
+            }
+          },
+          "$other": { ".validate": false }
+        },
+
+        "progress": {
+          "$rom": {
+            ".validate": "$rom.matches(/^[a-z0-9_]{1,40}$/) && newData.hasChildren(['name', 'unlocked', 'total', 'percentage', 'sts']) && (!data.child('sts').exists() || now - data.child('sts').val() >= 5000)",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32" },
+            "unlocked": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('total').val()" },
+            "total": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5000" },
+            "percentage": { ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('unlocked').val() * 100 / newData.parent().child('total').val() - 0.5 && newData.val() <= newData.parent().child('unlocked').val() * 100 / newData.parent().child('total').val() + 0.5" },
+            "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "sts": { ".validate": "newData.val() === now" },
+            "selected_badge": { ".validate": "newData.isString() && newData.val().length <= 64" },
+            "vps_id": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "table_name": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "version": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "author": { ".validate": "newData.isString() && newData.val().length <= 400" },
+            "vps_id_breakdown": { "$vid": { ".validate": "$vid.length <= 40 && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" } },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "progress_cat": {
+          "$key": {
+            ".validate": "$key.matches(/^[A-Za-z0-9_]{1,64}$/) && newData.hasChildren(['name', 'unlocked', 'total', 'percentage', 'sts']) && (!data.child('sts').exists() || now - data.child('sts').val() >= 5000)",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32" },
+            "display_name": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "unlocked": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('total').val()" },
+            "total": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5000" },
+            "percentage": { ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('unlocked').val() * 100 / newData.parent().child('total').val() - 0.5 && newData.val() <= newData.parent().child('unlocked').val() * 100 / newData.parent().child('total').val() + 0.5" },
+            "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "sts": { ".validate": "newData.val() === now" },
+            "unlocked_titles": { "$i": { ".validate": "$i.length <= 4 && newData.isString() && newData.val().length <= 200" } },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "vps_mapping": {
+          "$rom": { ".validate": "$rom.length <= 64 && newData.isString() && newData.val().length <= 40" }
+        },
+
+        "$other": { ".validate": false }
+      }
+    },
+
+    "lb": {
+      "$rom": {
+        ".read": true,
+        ".indexOn": ["p"],
+        "$pid": {
+          ".write": "auth != null && root.child('owners').child($pid).child('uid').val() === auth.uid",
+          ".validate": "newData.hasChildren(['n', 'u', 't', 'p', 'sts']) && newData.child('u').val() === newData.parent().parent().parent().child('players').child($pid).child('progress').child($rom).child('unlocked').val() && newData.child('t').val() === newData.parent().parent().parent().child('players').child($pid).child('progress').child($rom).child('total').val() && (!data.child('sts').exists() || now - data.child('sts').val() >= 5000)",
+          "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32" },
+          "u": { ".validate": "newData.isNumber()" },
+          "t": { ".validate": "newData.isNumber()" },
+          "p": { ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('u').val() * 100 / newData.parent().child('t').val() - 0.5 && newData.val() <= newData.parent().child('u').val() * 100 / newData.parent().child('t').val() + 0.5" },
+          "b": { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "vid": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "tn": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "ver": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "au": { ".validate": "newData.isString() && newData.val().length <= 400" },
+          "bd": { "$vid": { ".validate": "$vid.length <= 40 && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" } },
+          "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "sts": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "lb_cat": {
+      "$key": {
+        ".read": true,
+        ".indexOn": ["p"],
+        "$pid": {
+          ".write": "auth != null && root.child('owners').child($pid).child('uid').val() === auth.uid",
+          ".validate": "newData.hasChildren(['n', 'u', 't', 'p', 'sts']) && newData.child('u').val() === newData.parent().parent().parent().child('players').child($pid).child('progress_cat').child($key).child('unlocked').val() && (!data.child('sts').exists() || now - data.child('sts').val() >= 5000)",
+          "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32" },
+          "u": { ".validate": "newData.isNumber()" },
+          "t": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5000" },
+          "p": { ".validate": "newData.isNumber() && newData.val() >= newData.parent().child('u').val() * 100 / newData.parent().child('t').val() - 0.5 && newData.val() <= newData.parent().child('u').val() * 100 / newData.parent().child('t').val() + 0.5" },
+          "dn": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "sts": { ".validate": "newData.val() === now" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
+
+    "lb_global": {
+      ".read": true,
+      ".indexOn": ["t"],
+      "$pid": {
+        ".write": "auth != null && root.child('owners').child($pid).child('uid').val() === auth.uid",
+        ".validate": "newData.hasChildren(['n', 't', 'sts']) && (!data.child('sts').exists() || now - data.child('sts').val() >= 5000)",
+        "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 32" },
+        "t": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "b": { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "ts": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "sts": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "rarity": {
+      "$rom": {
+        ".read": true,
+        ".validate": "$rom.length <= 70",
+        "players": {
+          ".write": "auth != null && root.child('uids').child(auth.uid).exists()",
+          ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1 && !root.child('rarity_claims').child($rom).child(root.child('uids').child(auth.uid).val()).child('_p').exists() && newData.parent().parent().parent().child('rarity_claims').child($rom).child(root.child('uids').child(auth.uid).val()).child('_p').exists()"
+        },
+        "c": {
+          "$k": {
+            ".write": "auth != null && root.child('uids').child(auth.uid).exists()",
+            ".validate": "$k.matches(/^[0-9a-f]{12}$/) && newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1 && !root.child('rarity_claims').child($rom).child(root.child('uids').child(auth.uid).val()).child($k).exists() && newData.parent().parent().parent().parent().child('rarity_claims').child($rom).child(root.child('uids').child(auth.uid).val()).child($k).exists()"
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    },
+
+    "rarity_claims": {
+      "$rom": {
+        "$pid": {
+          ".read": "auth != null && root.child('uids').child(auth.uid).val() === $pid",
+          "$k": {
+            ".write": "auth != null && root.child('uids').child(auth.uid).val() === $pid && !data.exists()",
+            ".validate": "newData.val() === true && ($k === '_p' ? newData.parent().parent().parent().parent().child('rarity').child($rom).child('players').val() === (root.child('rarity').child($rom).child('players').exists() ? root.child('rarity').child($rom).child('players').val() : 0) + 1 : newData.parent().parent().parent().parent().child('rarity').child($rom).child('c').child($k).val() === (root.child('rarity').child($rom).child('c').child($k).exists() ? root.child('rarity').child($rom).child('c').child($k).val() : 0) + 1)"
+          }
+        }
+      }
+    }
+  }
+}

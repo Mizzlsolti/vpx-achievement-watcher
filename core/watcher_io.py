@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 import json
 import os
 import re
@@ -496,17 +497,88 @@ def _is_secure_path(path: str) -> bool:
 # JSON helpers (with signature support)
 # ---------------------------------------------------------------------------
 
+# Local integrity state. A protected file that is unsigned or whose signature
+# does not match blocks cloud uploads (the data itself is still loaded, nothing
+# is thrown away). The marker file keeps the block across restarts until the
+# player restores from the cloud or from a backup.
+_INTEGRITY_MARKER_NAME = "integrity_check_failed.flag"
+_integrity_base = None
+_integrity_failed = False
+
+
+def _integrity_marker_path(path_hint: str):
+    """<BASE>/integrity_check_failed.flag, derived from a protected file path."""
+    p = os.path.abspath(path_hint)
+    low = p.lower().replace("\\", "/")
+    for token in ("/achievements/", "/session_stats/"):
+        idx = low.rfind(token)
+        if idx >= 0:
+            return os.path.join(p[:idx], _INTEGRITY_MARKER_NAME)
+    return os.path.join(os.path.dirname(p), _INTEGRITY_MARKER_NAME)
+
+
+def _flag_integrity_failure(path: str, reason: str) -> None:
+    global _integrity_failed, _integrity_base
+    _integrity_failed = True
+    try:
+        marker = _integrity_marker_path(path)
+        _integrity_base = os.path.dirname(marker)
+        with open(marker, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat()} {reason}: {path}\n")
+    except Exception:
+        pass
+    print(f"[SECURITY] {reason}: {path} – cloud uploads are blocked until you restore from the cloud or a backup.")
+
+
+def integrity_upload_blocked(base: str = None) -> bool:
+    """True when a protected save file failed its integrity check."""
+    if _integrity_failed:
+        return True
+    for b in [base, _integrity_base]:
+        if b and os.path.isfile(os.path.join(b, _INTEGRITY_MARKER_NAME)):
+            return True
+    return False
+
+
+def clear_integrity_failure(base: str) -> None:
+    """Called after a successful restore (cloud or backup)."""
+    global _integrity_failed
+    _integrity_failed = False
+    try:
+        os.remove(os.path.join(base, _INTEGRITY_MARKER_NAME))
+    except Exception:
+        pass
+
+
+def init_integrity(base: str) -> None:
+    global _integrity_base
+    _integrity_base = base
+
+
 def load_json(path, default=None):
     data = _raw_load_json(path, None)
     if data is None:
-        return default
+        if _is_secure_path(path) and os.path.isfile(path):
+            # Unreadable protected file (e.g. damaged disk): fall back to the last
+            # good copy instead of starting empty and overwriting the progress.
+            bak = _raw_load_json(path + ".bak", None)
+            if isinstance(bak, dict):
+                print(f"[SECURITY] {path} is unreadable – using the last good copy (.bak).")
+                try:
+                    import shutil
+                    shutil.copy2(path, path + f".broken-{int(time.time())}")
+                except Exception:
+                    pass
+                data = bak
+            else:
+                return default
+        else:
+            return default
 
     if _is_secure_path(path) and isinstance(data, dict):
         sig = data.pop("_signature", None)
         if not sig:
-            # Unsigned legacy file (e.g. from v2.5) – do not block; migrate to v2.6 protection now.
-            print(f"[SECURITY] Unsigned legacy file detected: {path}. Upgrading to v2.6 protection now.")
-            save_json(path, data)
+            _flag_integrity_failure(path, "Unsigned save file")
             return data
 
         expected_new = _generate_signature(data)
@@ -521,9 +593,9 @@ def load_json(path, default=None):
             data["_signature"] = sig
             save_json(path, data)
         else:
-            print(f"\n[SECURITY] TAMPERING DETECTED IN: {path}")
-            print("[SECURITY] The file has been blocked and will not be loaded!\n")
-            return default
+            # Keep the data (nothing is lost) but block cloud uploads.
+            _flag_integrity_failure(path, "Signature mismatch (file was modified outside the Watcher)")
+            return data
 
     return data
 
@@ -534,6 +606,14 @@ def save_json(path, obj):
             obj["_signature"] = _generate_signature(obj)
         except Exception:
             pass
+        ok = _raw_save_json(path, obj)
+        # Second copy of the last good version (used if the file gets damaged).
+        if ok:
+            try:
+                _raw_save_json(path + ".bak", obj)
+            except Exception:
+                pass
+        return ok
     return _raw_save_json(path, obj)
 
 

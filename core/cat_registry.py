@@ -112,6 +112,8 @@ def upload_cat_progress(
         return False
     if not cfg.CLOUD_URL:
         return False
+    if not CloudSync._can_write(cfg):
+        return False
 
     # 3. Player name check (reuse existing helper)
     if CloudSync._warn_missing_player_name(cfg):
@@ -162,8 +164,6 @@ def upload_cat_progress(
         _recent_cat_uploads[_dedup_key] = _now
 
     # 7. Fire HTTP request in background thread
-    url = cfg.CLOUD_URL.strip().rstrip("/")
-    endpoint = f"{url}/players/{pid}/progress_cat/{firebase_key}.json"
 
     _cfg = cfg
     _pid = pid
@@ -186,22 +186,23 @@ def upload_cat_progress(
             "unlocked_titles": [str(e.get("title", "")).strip() for e in _unlocked_list if isinstance(e, dict)],
             "ts": datetime.now(timezone.utc).isoformat(),
         }
-        put_req = urllib.request.Request(
-            endpoint,
-            data=json.dumps(payload).encode(),
-            method="PUT",
-        )
-        put_req.add_header("Content-Type", "application/json")
-        try:
-            with urllib.request.urlopen(put_req, timeout=5) as resp:
-                resp.read()
+        if not CloudSync._ensure_owner(_cfg):
+            return
+        from core.cloud_sync import SERVER_TS
+        payload["sts"] = SERVER_TS
+        lb_entry = {"n": _pname, "u": _unlocked, "t": _total, "p": percentage,
+                    "dn": _display_name, "ts": payload["ts"], "sts": SERVER_TS}
+        status = CloudSync.write_paths(_cfg, {f"players/{_pid}/progress_cat/{_firebase_key}": payload,
+                                              f"lb_cat/{_firebase_key}/{_pid}": lb_entry})
+        if status == 200:
             log(
                 _cfg,
                 f"[CAT] Uploaded progress for '{_table_key}' ({_firebase_key}): "
                 f"{_unlocked}/{_total} ({percentage}%)",
             )
-        except Exception as e:
-            log(_cfg, f"[CAT] Progress upload failed for '{_table_key}': {e}", "WARN")
+            CloudSync.contribute_rarity(_cfg, f"cat_{_firebase_key}", payload.get("unlocked_titles") or [])
+        else:
+            log(_cfg, f"[CAT] Progress upload for '{_table_key}' rejected (HTTP {status})", "WARN")
 
     threading.Thread(target=_task, daemon=True).start()
     return True

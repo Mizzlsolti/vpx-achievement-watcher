@@ -61,6 +61,92 @@ def _sanitize_firebase_keys(d: dict) -> dict:
     in the keys replaced by underscores."""
     return {_FIREBASE_ILLEGAL_CHARS_RE.sub("_", k): v for k, v in d.items()}
 
+# Cloud areas the Watcher no longer uses (score duels / tournaments are hidden).
+_BLOCKED_PREFIXES = ("duels", "tournaments", "tournament_chat")
+
+
+def _is_blocked_path(node_path: str) -> bool:
+    p = str(node_path or "").strip("/").split("/", 1)[0]
+    return p in _BLOCKED_PREFIXES
+
+
+def _db_url(cfg, node_path: str, params: Optional[dict] = None, auth: bool = True) -> str:
+    """Full REST URL for *node_path* (auth token, emulator namespace, extra params)."""
+    import urllib.parse as _up
+    base = cfg.CLOUD_URL.strip().rstrip('/')
+    path = str(node_path or "").strip("/")
+    url = f"{base}/{path}.json" if path else f"{base}/.json"
+    q = dict(params or {})
+    ns = os.environ.get("VPXAW_DB_NS", "").strip()
+    if ns:
+        q["ns"] = ns
+    if auth:
+        try:
+            from . import cloud_auth
+            tok = cloud_auth.get_token(cfg)
+            if tok:
+                q["auth"] = tok
+        except Exception:
+            pass
+    if q:
+        url += "?" + _up.urlencode(q)
+    return url
+
+
+def _db_request(cfg, method: str, node_path: str, data=None, params: Optional[dict] = None,
+                timeout: int = 10, retries: int = 3):
+    """Perform one REST request. Returns (status, parsed_body_or_None).
+
+    status 0 means a network error. Retries transient TLS EOF errors.
+    """
+    import urllib.error
+    if not cfg.CLOUD_URL:
+        return 0, None
+    if _is_blocked_path(node_path):
+        return 403, None
+    body = None if method in ("GET", "DELETE") else json.dumps(data).encode("utf-8")
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(_db_url(cfg, node_path, params), data=body, method=method,
+                                         headers={"User-Agent": f"AchievementWatcher/{WATCHER_VERSION}"})
+            if body is not None:
+                req.add_header("Content-Type", "application/json")
+            with _urlopen_ssl_aware(cfg, req, timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                return resp.status, (json.loads(raw) if raw else None)
+        except urllib.error.HTTPError as e:
+            return e.code, None
+        except Exception as e:
+            if "UNEXPECTED_EOF_WHILE_READING" in str(e) and attempt < retries - 1:
+                time.sleep(1 * (attempt + 1))
+                continue
+            log(cfg, f"[CLOUD] {method} {node_path} failed: {e}", "WARN")
+            return 0, None
+    return 0, None
+
+
+SERVER_TS = {".sv": "timestamp"}
+
+
+class RarityMap(dict):
+    """Rarity info keyed by achievement-title hash; look-ups take the title."""
+
+    def get(self, title, default=None):
+        if not title:
+            return default
+        from_hash = dict.get(self, CloudSync.rarity_key(title))
+        return from_hash if from_hash is not None else dict.get(self, title, default)
+
+    def __contains__(self, title):
+        return self.get(title) is not None
+
+    def __getitem__(self, title):
+        v = self.get(title)
+        if v is None:
+            raise KeyError(title)
+        return v
+
+
 class CloudSync:
     _upload_skip_warned: bool = False
     _upload_skip_warned_lock = threading.Lock()
@@ -83,7 +169,6 @@ class CloudSync:
     # Local disk cache TTL for rarity data (seconds). Rarity changes slowly; 1 hour
     # is sufficient to keep comparisons reasonably fresh while drastically reducing
     # cloud read traffic.
-    _RARITY_DISK_CACHE_TTL_SEC: int = 3600  # 1 hour
 
     # Notification message shown when a cloud upload is blocked due to missing VPS-ID.
 
@@ -96,6 +181,12 @@ class CloudSync:
     # Once-per-session warning flag for version-blocked write attempts.
     _blocked_warned: bool = False
     _blocked_warned_lock = threading.Lock()
+
+    # Once-per-session warning flag for uploads blocked by a failed integrity check.
+    _integrity_warned: bool = False
+    _integrity_warned_lock = threading.Lock()
+
+    _claims_lock = threading.Lock()
 
     @staticmethod
     def fetch_min_client_version(cfg: "AppConfig") -> Optional[str]:
@@ -115,12 +206,9 @@ class CloudSync:
         try:
             if not cfg.CLOUD_URL:
                 return None
-            url = cfg.CLOUD_URL.strip().rstrip('/')
-            endpoint = f"{url}/meta/min_client_version.json"
-            req = urllib.request.Request(endpoint, headers={"User-Agent": f"AchievementWatcher/{WATCHER_VERSION}"})
-            with _urlopen_ssl_aware(cfg, req, 5) as resp:
-                raw = resp.read().decode('utf-8')
-            value = json.loads(raw)
+            status, value = _db_request(cfg, "GET", "meta/min_client_version", timeout=5, retries=1)
+            if status != 200:
+                raise RuntimeError(f"HTTP {status}")
             if value is None:
                 CloudSync._min_client_version = None
                 return None
@@ -193,57 +281,59 @@ class CloudSync:
         if not cfg.CLOUD_URL or not cfg.CLOUD_ENABLED:
             return {"ok": True}
 
-        existing_ids = CloudSync.fetch_player_ids(cfg)
-
-        # Build a lowercase → actual-key mapping for case-insensitive lookup.
-        existing_ids_lower = {pid.lower(): pid for pid in existing_ids}
         player_id_lower = player_id.lower()
 
-        # Check 1: if this ID already exists (case-insensitive), verify the stored name matches.
-        if player_id_lower in existing_ids_lower:
-            cloud_key = existing_ids_lower[player_id_lower]
-            stored_name = CloudSync.fetch_node(cfg, f"players/{cloud_key}/achievements/name")
-            if not isinstance(stored_name, str) or not stored_name.strip():
-                # Fall back to a progress entry for the stored name.
-                try:
-                    progress = CloudSync.fetch_node(cfg, f"players/{cloud_key}/progress")
-                    if isinstance(progress, dict) and progress:
-                        first_entry = next(iter(progress.values()), None)
-                        if isinstance(first_entry, dict):
-                            stored_name = first_entry.get("name", "")
-                except Exception as _e:
-                    log(cfg, f"[CLOUD] validate_player_identity: progress fallback error for {cloud_key}: {_e}", "WARN")
-                    stored_name = ""
+        # Check 1: the name an existing ID is registered with must match.
+        stored_name = CloudSync.fetch_node(cfg, f"players/{player_id_lower}/achievements/name")
+        if isinstance(stored_name, str) and stored_name.strip():
+            if stored_name.strip().lower() != player_name.lower():
+                return {
+                    "ok": False,
+                    "reason": "id_conflict",
+                    "msg": (
+                        "⛔ Player ID Conflict — This Player ID is already registered to a "
+                        "different player name. Please choose a different Player ID or enter "
+                        "the correct name."
+                    ),
+                }
 
-            if isinstance(stored_name, str) and stored_name.strip():
-                if stored_name.strip().lower() != player_name.lower():
-                    return {
-                        "ok": False,
-                        "reason": "id_conflict",
-                        "msg": (
-                            "⛔ Player ID Conflict — This Player ID is already registered to a "
-                            "different player name. Please choose a different Player ID or enter "
-                            "the correct name."
-                        ),
-                    }
-
-        # Check 2: if the entered name is already used by a different player ID (case-insensitive).
-        other_ids = [pid for pid in existing_ids if pid.lower() != player_id_lower]
-        if other_ids:
-            paths = [f"players/{pid}/achievements/name" for pid in other_ids]
-            batch = CloudSync.fetch_parallel(cfg, paths, max_workers=20)
-            for _path, name_data in batch.items():
-                if isinstance(name_data, str) and name_data.strip().lower() == player_name.lower():
-                    return {
-                        "ok": False,
-                        "reason": "name_conflict",
-                        "msg": (
-                            "⛔ Duplicate Player Name — This player name is already in use by "
-                            "another player. Please choose a different name."
-                        ),
-                    }
+        # Check 2: the name must not belong to another ID (one read of the name index).
+        owner = CloudSync.fetch_node(cfg, f"names/{CloudSync.name_key(player_name)}")
+        if isinstance(owner, str) and owner and owner.lower() != player_id_lower:
+            return {
+                "ok": False,
+                "reason": "name_conflict",
+                "msg": (
+                    "⛔ Duplicate Player Name — This player name is already in use by "
+                    "another player. Please choose a different name."
+                ),
+            }
 
         return {"ok": True}
+
+    @staticmethod
+    def name_key(name: str) -> str:
+        """Key of a player name in the 'names' index (case-insensitive, unique)."""
+        return _FIREBASE_ILLEGAL_CHARS_RE.sub("_", str(name or "").strip().lower())[:32]
+
+    @staticmethod
+    def claim_name(cfg: AppConfig, name: str, old_name: str = "") -> bool:
+        """Reserve *name* for the own Player ID (and release *old_name*)."""
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
+        key = CloudSync.name_key(name)
+        if not pid or not key or key == "player":
+            return False
+        if not CloudSync._can_write(cfg) or not CloudSync._ensure_owner(cfg):
+            return False
+        status = CloudSync.write_paths(cfg, {f"names/{key}": pid})
+        if status != 200:
+            log(cfg, f"[CLOUD] name '{name}' could not be reserved (HTTP {status})", "WARN")
+            return False
+        old_key = CloudSync.name_key(old_name)
+        if old_key and old_key != key:
+            if CloudSync.fetch_node(cfg, f"names/{old_key}") == pid:
+                CloudSync.write_paths(cfg, {f"names/{old_key}": None})
+        return True
 
     @staticmethod
     def cleanup_legacy_progress(cfg: AppConfig) -> None:
@@ -286,11 +376,10 @@ class CloudSync:
                     if vps_id:
                         continue
                     # Delete legacy entry
-                    endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
                     try:
-                        del_req = urllib.request.Request(endpoint, method="DELETE")
-                        with _urlopen_ssl_aware(cfg, del_req, 5):
-                            pass
+                        if not CloudSync.set_node(cfg, f"players/{pid}/progress/{rom}", None):
+                            raise RuntimeError("rejected")
+                        CloudSync.set_node(cfg, f"lb/{rom}/{pid}", None)
                         log(cfg, f"[CLOUD] Deleted legacy progress entry for {rom}: missing vps_id")
                     except Exception as e:
                         log(cfg, f"[CLOUD] Failed to delete legacy progress for {rom}: {e}", "WARN")
@@ -337,11 +426,9 @@ class CloudSync:
                     if rom == rom.lower():
                         continue  # already lowercase, skip
                     # Delete the uppercase ROM entry from cloud
-                    endpoint = f"{_url}/players/{pid}/progress/{rom}.json"
                     try:
-                        del_req = urllib.request.Request(endpoint, method="DELETE")
-                        with _urlopen_ssl_aware(cfg, del_req, 5):
-                            pass
+                        if not CloudSync.set_node(cfg, f"players/{pid}/progress/{rom}", None):
+                            raise RuntimeError("rejected")
                         log(cfg, f"[CLOUD] Deleted uppercase ROM progress entry: {rom}")
                     except Exception as e:
                         log(cfg, f"[CLOUD] Failed to delete uppercase ROM progress for {rom}: {e}", "WARN")
@@ -353,9 +440,12 @@ class CloudSync:
     @staticmethod
     def upload_achievement_progress(cfg: AppConfig, rom: str, unlocked: int, total: int, bridge: Optional["Bridge"] = None):
         pname = cfg.OVERLAY.get("player_name", "Player").strip()
-        if CloudSync._is_write_blocked(cfg):
+        if not CloudSync._can_write(cfg):
             return
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL or not rom or total <= 0:
+            return
+        if unlocked < 0 or unlocked > total:
+            log(cfg, f"[CLOUD] upload_achievement_progress blocked for {rom}: implausible {unlocked}/{total}", "WARN")
             return
         # Block upload for custom achievement tables (names with spaces/special chars are not
         # valid VPinMAME ROM names and must not be used as Firebase path segments).
@@ -397,8 +487,6 @@ class CloudSync:
                 return
             CloudSync._recent_progress_uploads[_dedup_key] = _now
 
-        endpoint = f"{url}/players/{pid}/progress/{rom}.json?client_version={WATCHER_VERSION}"
-        
         def _task():
             percentage = round((unlocked / total) * 100, 1)
             payload = {
@@ -460,93 +548,60 @@ class CloudSync:
                     payload["vps_id_breakdown"] = breakdown
             except Exception:
                 pass
-            put_req = urllib.request.Request(endpoint, data=json.dumps(payload).encode(), method='PUT')
-            put_req.add_header('Content-Type', 'application/json')
-            try:
-                with urllib.request.urlopen(put_req, timeout=5) as resp:
-                    resp_body = resp.read().decode()
-                    log(cfg, f"[CLOUD] Uploaded Achievement Progress for {rom}: {unlocked}/{total} ({percentage}%)")
-            except Exception as e:
-                log(cfg, f"[CLOUD] Progress upload failed: {e}", "WARN")
+            if not CloudSync._ensure_owner(cfg):
+                return
+            payload["sts"] = SERVER_TS
+            lb_entry = {"n": pname, "u": unlocked, "t": total, "p": percentage, "ts": payload["ts"], "sts": SERVER_TS}
+            for src, dst in (("selected_badge", "b"), ("vps_id", "vid"), ("table_name", "tn"),
+                             ("version", "ver"), ("author", "au"), ("vps_id_breakdown", "bd")):
+                if payload.get(src):
+                    lb_entry[dst] = payload[src]
+            status = CloudSync.write_paths(cfg, {f"players/{pid}/progress/{rom}": payload,
+                                                 f"lb/{rom}/{pid}": lb_entry})
+            if status == 200:
+                log(cfg, f"[CLOUD] Uploaded Achievement Progress for {rom}: {unlocked}/{total} ({percentage}%)")
+            else:
+                log(cfg, f"[CLOUD] Progress upload for {rom} rejected (HTTP {status})", "WARN")
         threading.Thread(target=_task, daemon=True).start()
 
     @staticmethod
     def fetch_data(cfg: AppConfig, node_path: str) -> list:
-        if not cfg.CLOUD_URL or not node_path: 
+        if not cfg.CLOUD_URL or not node_path:
             return []
-        url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json"
-        _MAX_RETRIES = 3
-        for _attempt in range(_MAX_RETRIES):
-            try:
-                import urllib.request
-                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                with _urlopen_ssl_aware(cfg, req, 7) as resp:
-                    raw_data = resp.read().decode('utf-8')
-                    data = json.loads(raw_data)
-                if not data: return []
-                if isinstance(data, dict): return list(data.values())
-                elif isinstance(data, list): return [x for x in data if x is not None]
-                return []
-            except Exception as e:
-                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
-                    time.sleep(1 * (_attempt + 1))
-                    continue
-                log(cfg, f"[CLOUD] Fetch error for {endpoint}: {e}", "ERROR")
-                return []
-
-    @staticmethod
-    def fetch_player_ids(cfg: AppConfig) -> list:
-        """Return the list of all player IDs stored under /players/ using a shallow fetch."""
-        if not cfg.CLOUD_URL:
+        status, data = _db_request(cfg, "GET", node_path)
+        if status != 200 or not data:
             return []
-        url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/players.json?shallow=true"
-        _MAX_RETRIES = 3
-        for _attempt in range(_MAX_RETRIES):
-            try:
-                import urllib.request
-                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                with _urlopen_ssl_aware(cfg, req, 7) as resp:
-                    data = json.loads(resp.read().decode('utf-8'))
-                if isinstance(data, dict):
-                    return list(data.keys())
-                return []
-            except Exception as e:
-                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
-                    time.sleep(1 * (_attempt + 1))
-                    continue
-                log(cfg, f"[CLOUD] fetch_player_ids error: {e}", "ERROR")
-                return []
+        if isinstance(data, dict):
+            return list(data.values())
+        if isinstance(data, list):
+            return [x for x in data if x is not None]
+        return []
 
     @staticmethod
     def fetch_node(cfg: AppConfig, node_path: str):
         """Fetch a single Firebase node and return the raw parsed object (dict, list, or None)."""
         if not cfg.CLOUD_URL or not node_path:
             return None
-        url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json"
-        _MAX_RETRIES = 3
-        for _attempt in range(_MAX_RETRIES):
-            try:
-                import urllib.request
-                req = urllib.request.Request(endpoint, headers={"User-Agent": "AchievementWatcher/2.0"})
-                with _urlopen_ssl_aware(cfg, req, 7) as resp:
-                    return json.loads(resp.read().decode('utf-8'))
-            except Exception as e:
-                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
-                    time.sleep(1 * (_attempt + 1))
-                    continue
-                log(cfg, f"[CLOUD] fetch_node error for {endpoint}: {e}", "ERROR")
-                return None
+        status, data = _db_request(cfg, "GET", node_path)
+        return data if status == 200 else None
+
+    @staticmethod
+    def query(cfg: AppConfig, node_path: str, order_by: str, limit_to_last: int = 0,
+              limit_to_first: int = 0, start_at=None) -> dict:
+        """Ordered query on an indexed node (leaderboards). Returns {key: value}."""
+        params = {"orderBy": json.dumps(order_by)}
+        if limit_to_last:
+            params["limitToLast"] = int(limit_to_last)
+        if limit_to_first:
+            params["limitToFirst"] = int(limit_to_first)
+        if start_at is not None:
+            params["startAt"] = json.dumps(start_at)
+        status, data = _db_request(cfg, "GET", node_path, params=params)
+        return data if (status == 200 and isinstance(data, dict)) else {}
 
     @staticmethod
     def fetch_parallel(cfg: AppConfig, node_paths: list, max_workers: int = 10) -> dict:
-        """Fetch multiple Firebase nodes in parallel using ThreadPoolExecutor.
-
-        Returns a dict mapping each node_path to its fetched data (or None on error).
-        Turns N sequential requests into ~1 round-trip of parallel requests.
-        """
+        """Fetch multiple Firebase nodes in parallel. Returns {node_path: data_or_None}."""
         import concurrent.futures
         if not node_paths:
             return {}
@@ -567,72 +622,82 @@ class CloudSync:
         return results
 
     @staticmethod
-    def set_node(cfg: AppConfig, node_path: str, data) -> bool:
-        """Write (PUT) arbitrary data to a Firebase node. Returns True on success.
-
-        Retries up to 3 times on transient ``UNEXPECTED_EOF_WHILE_READING``
-        errors, matching the retry pattern used in ``fetch_node()`` and
-        ``fetch_data()``.
-        """
+    def _can_write(cfg: AppConfig, node_path: str = "") -> bool:
         if CloudSync._is_write_blocked(cfg):
             return False
-        if not cfg.CLOUD_URL or not node_path:
+        if not cfg.CLOUD_URL:
             return False
-        url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json?client_version={WATCHER_VERSION}"
-        payload = None
-        _MAX_RETRIES = 3
-        for _attempt in range(_MAX_RETRIES):
-            try:
-                payload = json.dumps(data).encode('utf-8')
-                put_req = urllib.request.Request(endpoint, data=payload, method='PUT')
-                put_req.add_header('Content-Type', 'application/json')
-                with _urlopen_ssl_aware(cfg, put_req, 10):
-                    pass
-                return True
-            except Exception as e:
-                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
-                    time.sleep(1 * (_attempt + 1))
-                    continue
-                size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
-                log(cfg, f"[CLOUD] set_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
+        if node_path and _is_blocked_path(node_path):
+            return False
+        try:
+            from .watcher_io import integrity_upload_blocked
+            if integrity_upload_blocked():
+                with CloudSync._integrity_warned_lock:
+                    if not CloudSync._integrity_warned:
+                        log(cfg, "[CLOUD] Upload blocked: a local save file failed its integrity check "
+                                 "(restore from cloud or from a backup to re-enable uploads).", "WARN")
+                        CloudSync._integrity_warned = True
                 return False
-        return False
+        except Exception:
+            pass
+        return True
+
+    @staticmethod
+    def _ensure_owner(cfg: AppConfig) -> bool:
+        """Make sure this installation owns the configured Player ID (claims it once)."""
+        try:
+            from . import cloud_auth
+            if not cloud_auth.available():
+                return True          # sign-in not configured: legacy behaviour
+            pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
+            if cloud_auth.is_owner(cfg, pid):
+                return True
+            if getattr(cfg, "_cloud_claim_failed", False):
+                return False          # waiting for the recovery key (System → General)
+            ok, reason = cloud_auth.claim(cfg, pid)
+            if not ok and reason == "owned":
+                try:
+                    cfg._cloud_claim_failed = True
+                except Exception:
+                    pass
+            return ok
+        except Exception as e:
+            log(cfg, f"[CLOUD] ownership check failed: {e}", "WARN")
+            return False
+
+    @staticmethod
+    def write_paths(cfg: AppConfig, updates: dict) -> int:
+        """Atomic multi-path update at the database root. Returns the HTTP status (0 = offline)."""
+        if not updates:
+            return 200
+        if any(_is_blocked_path(k) for k in updates):
+            return 403
+        status, _ = _db_request(cfg, "PATCH", "", updates, retries=2)
+        return status
+
+    @staticmethod
+    def set_node(cfg: AppConfig, node_path: str, data) -> bool:
+        """Write (PUT) data to a node of the own player (or delete with None)."""
+        if not CloudSync._can_write(cfg, node_path) or not node_path:
+            return False
+        if not CloudSync._ensure_owner(cfg):
+            return False
+        status, _ = _db_request(cfg, "DELETE" if data is None else "PUT", node_path, data)
+        if status != 200:
+            log(cfg, f"[CLOUD] set_node {node_path} rejected (HTTP {status})", "WARN")
+        return status == 200
 
     @staticmethod
     def patch_node(cfg: AppConfig, node_path: str, data) -> bool:
-        """Update (PATCH) fields on a Firebase node without deleting unmentioned children.
-
-        Uses HTTP PATCH instead of PUT so that existing child nodes (e.g. ``session/``
-        sub-nodes) are preserved when only metadata fields are updated.
-        Retries up to 3 times on transient ``UNEXPECTED_EOF_WHILE_READING`` errors,
-        matching the retry pattern used in ``set_node()``.
-        Returns True on success.
-        """
-        if CloudSync._is_write_blocked(cfg):
+        """Update (PATCH) fields of a node without deleting unmentioned children."""
+        if not CloudSync._can_write(cfg, node_path) or not node_path:
             return False
-        if not cfg.CLOUD_URL or not node_path:
+        if not CloudSync._ensure_owner(cfg):
             return False
-        url = cfg.CLOUD_URL.strip().rstrip('/')
-        endpoint = f"{url}/{node_path}.json?client_version={WATCHER_VERSION}"
-        payload = None
-        _MAX_RETRIES = 3
-        for _attempt in range(_MAX_RETRIES):
-            try:
-                payload = json.dumps(data).encode('utf-8')
-                patch_req = urllib.request.Request(endpoint, data=payload, method='PATCH')
-                patch_req.add_header('Content-Type', 'application/json')
-                with _urlopen_ssl_aware(cfg, patch_req, 10):
-                    pass
-                return True
-            except Exception as e:
-                if "UNEXPECTED_EOF_WHILE_READING" in str(e) and _attempt < _MAX_RETRIES - 1:
-                    time.sleep(1 * (_attempt + 1))
-                    continue
-                size_info = f"{len(payload)} bytes" if payload is not None else "serialization failed"
-                log(cfg, f"[CLOUD] patch_node error for {endpoint} (payload size: {size_info}): {e}", "WARN")
-                return False
-        return False
+        status, _ = _db_request(cfg, "PATCH", node_path, data)
+        if status != 200:
+            log(cfg, f"[CLOUD] patch_node {node_path} rejected (HTTP {status})", "WARN")
+        return status == 200
 
     @staticmethod
     def restore_from_cloud(cfg: AppConfig) -> bool:
@@ -839,6 +904,11 @@ class CloudSync:
         # ── 4. Save the enriched state and recompute level ────────────────────
         try:
             secure_save_json(f_achievements_state(cfg), state)
+            try:
+                from .watcher_io import clear_integrity_failure
+                clear_integrity_failure(cfg.BASE)
+            except Exception:
+                pass
             lv = compute_player_level(state)
             log(
                 cfg,
@@ -873,7 +943,7 @@ class CloudSync:
         When *changed_rom* is None (session end): the full session batch is uploaded as a
         safety net to ensure all ROMs are in sync.
         """
-        if CloudSync._is_write_blocked(cfg):
+        if not CloudSync._can_write(cfg):
             return
         if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
             return
@@ -930,6 +1000,7 @@ class CloudSync:
                 "badge_count": len(badges),
                 "selected_badge": selected_badge,
             }
+            metadata_payload["sts"] = SERVER_TS
             if CloudSync.patch_node(cfg, f"players/{pid}/achievements", metadata_payload):
                 log(cfg, "[CLOUD] Full achievements metadata uploaded")
             else:
@@ -948,140 +1019,253 @@ class CloudSync:
                     if not CloudSync.patch_node(cfg, f"players/{pid}/achievements/session", session_batch):
                         log(cfg, "[CLOUD] upload_full_achievements: session batch upload failed", "WARN")
 
+            # Global overview entry: number of different achievements unlocked.
+            try:
+                seen = set()
+                for e in global_entries:
+                    t = str(e.get("title", "") if isinstance(e, dict) else e).strip()
+                    if t:
+                        seen.add(t)
+                for entries in session_entries.values():
+                    for e in entries or []:
+                        t = str(e.get("title", "") if isinstance(e, dict) else e).strip()
+                        if t:
+                            seen.add(t)
+                CloudSync.write_paths(cfg, {f"lb_global/{pid}": {
+                    "n": pname, "t": len(seen), "b": str(selected_badge or ""),
+                    "ts": metadata_payload["ts"], "sts": SERVER_TS}})
+            except Exception as e:
+                log(cfg, f"[CLOUD] global overview entry failed: {e}", "WARN")
+
+            # Shared rarity counters (each achievement counts once per player).
+            roms = [changed_rom] if changed_rom else list(session_entries.keys())
+            for rom in roms:
+                titles = [str(e.get("title", "") if isinstance(e, dict) else e) for e in (session_entries.get(rom) or [])]
+                if titles:
+                    CloudSync.contribute_rarity(cfg, rom, titles)
+
         threading.Thread(target=_task, daemon=True).start()
+
+    # ── Rarity (shared counters, VPX Achievement Watcher 3.2+) ─────────────
+    #
+    # rarity/<key>/players      – players with at least one achievement there
+    # rarity/<key>/c/<hash>     – players that unlocked the achievement <hash>
+    # rarity_claims/<key>/<pid>/<hash|_p> – what this player already counted
+    #
+    # <key> is the ROM name, or "cat_<firebase_key>" for custom tables.
+    # Each player adds +1 once per achievement; the database rules enforce it.
+
+    _RARITY_DISK_CACHE_TTL_SEC: int = 24 * 3600
+
+    @staticmethod
+    def rarity_key(title: str) -> str:
+        import hashlib
+        return hashlib.sha1(str(title or "").strip().encode("utf-8")).hexdigest()[:12]
+
+    @staticmethod
+    def _rarity_from_counts(node) -> tuple:
+        node = node if isinstance(node, dict) else {}
+        total = int(node.get("players") or 0)
+        result = RarityMap()
+        for k, n in (node.get("c") or {}).items():
+            try:
+                dict.__setitem__(result, k, compute_rarity(int(n), total))
+            except Exception:
+                continue
+        return result, total
+
+    @staticmethod
+    def _fetch_rarity(cfg: AppConfig, key: str) -> tuple:
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", key)
+        cache_dir = os.path.join(cfg.BASE, "tools", "rarity_cache")
+        cache_file = os.path.join(cache_dir, f"{safe}.json")
+        try:
+            if os.path.isfile(cache_file) and time.time() - os.path.getmtime(cache_file) < CloudSync._RARITY_DISK_CACHE_TTL_SEC:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                if isinstance(cached, dict) and "c" in cached:
+                    return CloudSync._rarity_from_counts(cached)
+        except Exception:
+            pass
+        status, node = _db_request(cfg, "GET", f"rarity/{key}")
+        if status != 200:
+            return RarityMap(), 0
+        node = node if isinstance(node, dict) else {"players": 0, "c": {}}
+        try:
+            ensure_dir(cache_dir)
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump({"players": node.get("players") or 0, "c": node.get("c") or {}}, f)
+        except Exception:
+            pass
+        return CloudSync._rarity_from_counts(node)
 
     @staticmethod
     def fetch_rarity_for_rom(cfg: AppConfig, rom: str) -> tuple:
-        """
-        Fetch all players' achievement data from cloud and compute rarity for each
-        achievement title of the given ROM.
-
-        Returns: ({achievement_title: {tier, color, pct}, ...}, total_players)
-
-        Results are cached locally on disk for 1 hour to reduce cloud traffic.
-        The cache lives at {cfg.BASE}/tools/rarity_cache/{rom}.json.
-        The cloud fetch still queries all players when it runs — rarity comparison
-        requires other players' data; only the computed result is cached.
-        """
-        # Check local disk cache before hitting the cloud.
-        _cache_key = rom.replace("/", "_").replace(".", "_")
-        _cache_dir = os.path.join(cfg.BASE, "tools", "rarity_cache")
-        _cache_file = os.path.join(_cache_dir, f"{_cache_key}.json")
-        try:
-            if os.path.isfile(_cache_file):
-                _age = time.time() - os.path.getmtime(_cache_file)
-                if _age < CloudSync._RARITY_DISK_CACHE_TTL_SEC:
-                    with open(_cache_file, "r", encoding="utf-8") as _f:
-                        _cached = json.load(_f)
-                    return _cached.get("data", {}), _cached.get("total_players", 0)
-        except Exception:
-            pass
-
-        player_ids = CloudSync.fetch_player_ids(cfg)
-        if not player_ids:
-            return {}, 0
-
-        # Fetch only the per-ROM session node instead of the entire achievements node
-        # to reduce download traffic (shallow per-ROM path).
-        paths = [f"players/{pid}/achievements/session/{rom}" for pid in player_ids]
-        batch = CloudSync.fetch_parallel(cfg, paths)
-
-        total_players = 0
-        title_counts: dict = {}
-
-        for path, rom_entries in batch.items():
-            if not rom_entries:
-                continue
-            # rom_entries is the direct list (or sparse object) for this ROM
-            if isinstance(rom_entries, dict):
-                rom_entries = list(rom_entries.values())
-            if not isinstance(rom_entries, list):
-                continue
-            total_players += 1
-            seen_titles: set = set()
-            for e in rom_entries:
-                t = str(e.get("title", "")).strip() if isinstance(e, dict) else str(e).strip()
-                if t and t not in seen_titles:
-                    seen_titles.add(t)
-                    title_counts[t] = title_counts.get(t, 0) + 1
-
-        result: dict = {}
-        for title, count in title_counts.items():
-            result[title] = compute_rarity(count, total_players)
-
-        # Save computed result to local disk cache.
-        try:
-            ensure_dir(_cache_dir)
-            with open(_cache_file, "w", encoding="utf-8") as _f:
-                json.dump({"data": result, "total_players": total_players}, _f)
-        except Exception:
-            pass
-
-        return result, total_players
+        """({title: {tier, color, pct}}, total_players) for a ROM – one small read per day."""
+        if not rom:
+            return RarityMap(), 0
+        return CloudSync._fetch_rarity(cfg, rom)
 
     @staticmethod
     def fetch_rarity_for_cat(cfg: AppConfig, firebase_key: str) -> tuple:
-        """Fetch all players' CAT progress from cloud and compute rarity for each
-        achievement title of the given custom table.
-
-        Returns: ({achievement_title: {tier, color, pct}, ...}, total_players)
-        """
-        player_ids = CloudSync.fetch_player_ids(cfg)
-        if not player_ids:
-            return {}, 0
-
-        paths = [f"players/{pid}/progress_cat/{firebase_key}" for pid in player_ids]
-        batch = CloudSync.fetch_parallel(cfg, paths)
-
-        total_players = 0
-        title_counts: dict = {}
-
-        for path, data in batch.items():
-            if not data or not isinstance(data, dict):
-                continue
-            unlocked_titles = data.get("unlocked_titles", [])
-            if not unlocked_titles:
-                continue
-            total_players += 1
-            seen_titles: set = set()
-            for t in unlocked_titles:
-                t = str(t).strip()
-                if t and t not in seen_titles:
-                    seen_titles.add(t)
-                    title_counts[t] = title_counts.get(t, 0) + 1
-
-        result: dict = {}
-        for title, count in title_counts.items():
-            result[title] = compute_rarity(count, total_players)
-
-        return result, total_players
-
-    # ── App signals polling ─────────────────────────────────────────────────
+        """Same as fetch_rarity_for_rom for a custom achievement table."""
+        if not firebase_key:
+            return RarityMap(), 0
+        return CloudSync._fetch_rarity(cfg, f"cat_{firebase_key}")
 
     @staticmethod
-    def poll_app_signals(cfg: AppConfig) -> list:
-        """Read and process app_signals from Firebase.
-        Path: players/{pid}/app_signals/
-        Returns list of signal dicts, then deletes processed signals.
-        """
-        if not cfg.CLOUD_ENABLED or not cfg.CLOUD_URL:
-            return []
-        pid = str(cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-        if pid == "unknown":
-            return []
+    def _claims_cache_file(cfg: AppConfig) -> str:
+        return os.path.join(cfg.BASE, "tools", "rarity_claims.json")
+
+    @staticmethod
+    def contribute_rarity(cfg: AppConfig, key: str, titles) -> None:
+        """Count this player's unlocked *titles* once in the shared rarity counters."""
         try:
-            data = CloudSync.fetch_node(cfg, f"players/{pid}/app_signals")
-            if not data or not isinstance(data, dict):
-                return []
-            signals = []
-            for signal_id, signal_data in data.items():
-                if isinstance(signal_data, dict):
-                    signal_data["_signal_id"] = signal_id
-                    signals.append(signal_data)
-                    # Delete processed signal
-                    CloudSync.set_node(cfg, f"players/{pid}/app_signals/{signal_id}", None)
-            return signals
-        except Exception:
-            return []
+            from . import cloud_auth
+            if not cloud_auth.available() or not key:
+                return
+            pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
+            if not pid or not CloudSync._can_write(cfg) or not CloudSync._ensure_owner(cfg):
+                return
+            hashes = sorted({CloudSync.rarity_key(t) for t in (titles or []) if str(t or "").strip()})
+            if not hashes:
+                return
+            with CloudSync._claims_lock:
+                cache_path = CloudSync._claims_cache_file(cfg)
+                try:
+                    with open(cache_path, "r", encoding="utf-8") as f:
+                        cache = json.load(f)
+                except Exception:
+                    cache = {}
+                mine = cache.get(pid) if isinstance(cache.get(pid), dict) else {}
+                done = set(mine.get(key) or [])
+                if key not in mine:
+                    status, claimed = _db_request(cfg, "GET", f"rarity_claims/{key}/{pid}", params={"shallow": "true"})
+                    if status != 200:
+                        return
+                    done = set((claimed or {}).keys()) if isinstance(claimed, dict) else set()
+                todo = [h for h in hashes if h not in done]
+                need_player = "_p" not in done
+                if not todo and not need_player:
+                    mine[key] = sorted(done); cache[pid] = mine
+                    save_json(cache_path, cache)
+                    return
+                ok = False
+                for _attempt in range(4):
+                    status, node = _db_request(cfg, "GET", f"rarity/{key}")
+                    if status != 200:
+                        break
+                    node = node if isinstance(node, dict) else {}
+                    counts = node.get("c") or {}
+                    upd = {}
+                    for h in todo:
+                        upd[f"rarity/{key}/c/{h}"] = int(counts.get(h) or 0) + 1
+                        upd[f"rarity_claims/{key}/{pid}/{h}"] = True
+                    if need_player:
+                        upd[f"rarity/{key}/players"] = int(node.get("players") or 0) + 1
+                        upd[f"rarity_claims/{key}/{pid}/_p"] = True
+                    if CloudSync.write_paths(cfg, upd) == 200:
+                        ok = True
+                        break
+                    time.sleep(0.5 + _attempt)   # another player counted at the same time
+                if ok:
+                    done.update(todo)
+                    done.add("_p")
+                    mine[key] = sorted(done); cache[pid] = mine
+                    save_json(cache_path, cache)
+                    log(cfg, f"[CLOUD] rarity: counted {len(todo)} achievement(s) for {key}")
+        except Exception as e:
+            log(cfg, f"[CLOUD] rarity contribution failed for {key}: {e}", "WARN")
+
+    # ── Leaderboards (small index, read with a top-N query) ────────────────
+
+    LB_TOP_ROM = 25
+    LB_TOP_GLOBAL = 50
+
+    @staticmethod
+    def fetch_lb_top(cfg: AppConfig, node: str, order_by: str, top: int) -> list:
+        """[(pid, entry)] best first."""
+        data = CloudSync.query(cfg, node, order_by, limit_to_last=top)
+        rows = [(k, v) for k, v in data.items() if isinstance(v, dict)]
+        rows.sort(key=lambda kv: float(kv[1].get(order_by) or 0), reverse=True)
+        return rows
+
+    @staticmethod
+    def fetch_lb_rank(cfg: AppConfig, node: str, order_by: str, pid: str, cap: int = 100) -> tuple:
+        """(rank or None, own entry or None). Rank is None when it is worse than *cap*."""
+        pid = (pid or "").strip().lower()
+        own = CloudSync.fetch_node(cfg, f"{node}/{pid}") if pid else None
+        if not isinstance(own, dict):
+            return None, None
+        mine = float(own.get(order_by) or 0)
+        better = CloudSync.query(cfg, node, order_by, start_at=mine, limit_to_first=cap + 1)
+        above = sum(1 for k, v in better.items()
+                    if k != pid and isinstance(v, dict) and float(v.get(order_by) or 0) > mine)
+        if len(better) > cap and above >= cap:
+            return None, own
+        return above + 1, own
+
+    @staticmethod
+    def lb_to_progress(entry: dict) -> dict:
+        """Leaderboard index entry -> the progress-entry format the views use."""
+        e = entry or {}
+        out = {"name": e.get("n", ""), "unlocked": e.get("u", 0), "total": e.get("t", 0),
+               "percentage": e.get("p", 0), "ts": e.get("ts", ""), "selected_badge": e.get("b", "")}
+        for src, dst in (("vid", "vps_id"), ("tn", "table_name"), ("ver", "version"),
+                         ("au", "author"), ("bd", "vps_id_breakdown"), ("dn", "display_name")):
+            if e.get(src):
+                out[dst] = e[src]
+        return out
+
+    @staticmethod
+    def _top_with_own(cfg: AppConfig, node: str, order_by: str, top: int) -> list:
+        rows = CloudSync.fetch_lb_top(cfg, node, order_by, top)
+        pid = str(cfg.OVERLAY.get("player_id", "")).strip().lower()
+        out = [dict(v, _pid=k) for k, v in rows]
+        if pid and pid not in {k for k, _ in rows}:
+            rank, own = CloudSync.fetch_lb_rank(cfg, node, order_by, pid, cap=1000)
+            if isinstance(own, dict):
+                out.append(dict(own, _pid=pid, _rank=rank or 0))
+        return out
+
+    @staticmethod
+    def fetch_rom_leaderboard(cfg: AppConfig, rom: str) -> list:
+        """Top 25 of a ROM (+ own entry), in the progress-entry format."""
+        out = []
+        for e in CloudSync._top_with_own(cfg, f"lb/{rom}", "p", CloudSync.LB_TOP_ROM):
+            row = CloudSync.lb_to_progress(e)
+            if e.get("_rank") is not None and "_rank" in e:
+                row["_rank"] = e["_rank"] or ">1000"
+            out.append(row)
+        return out
+
+    @staticmethod
+    def fetch_cat_leaderboard(cfg: AppConfig, firebase_key: str) -> list:
+        out = []
+        for e in CloudSync._top_with_own(cfg, f"lb_cat/{firebase_key}", "p", CloudSync.LB_TOP_ROM):
+            row = CloudSync.lb_to_progress(e)
+            if "_rank" in e:
+                row["_rank"] = e["_rank"] or ">1000"
+            out.append(row)
+        return out
+
+    @staticmethod
+    def fetch_global_leaderboard(cfg: AppConfig) -> list:
+        """Top 50 by number of different achievements (+ own entry)."""
+        out = []
+        for e in CloudSync._top_with_own(cfg, "lb_global", "t", CloudSync.LB_TOP_GLOBAL):
+            row = {"name": e.get("n", ""), "badge_id": e.get("b", ""), "total": int(e.get("t") or 0)}
+            if "_rank" in e:
+                row["_rank"] = e["_rank"] or ">1000"
+            if row["total"] > 0:
+                out.append(row)
+        return out
+
+    @staticmethod
+    def fetch_player_ids(cfg: AppConfig) -> list:
+        """No longer available (the player list is not readable any more)."""
+        return []
+
+
 
 

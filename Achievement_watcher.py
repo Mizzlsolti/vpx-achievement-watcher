@@ -214,29 +214,18 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
         self._mini_test_idx = 0
         self._duel_overlay_test_idx = 0
 
-        # Periodic app-signals poll timer: picks up duel accept/decline signals from
-        # the Android app (30s). Only started when the Android app is actively open
-        # (app_active flag in Firebase). Lifecycle management is handled by
-        # _check_app_active (startup check) and _app_lifecycle_timer (periodic check).
-        # The Android app sets players/{pid}/app_active: true on open and false on close.
-        self._app_signals_timer = QTimer(self)
-        self._app_signals_timer.setInterval(30000)
-        self._app_signals_timer.timeout.connect(self._poll_app_signals)
-
-        # Slower lifecycle check (60s): reads app_active and starts/stops _app_signals_timer.
-        self._app_lifecycle_timer = QTimer(self)
-        self._app_lifecycle_timer.setInterval(60000)
-        self._app_lifecycle_timer.timeout.connect(self._check_app_active)
-        if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
-            self._app_lifecycle_timer.start()
-            # One-time startup check after a short delay so the UI is ready.
-            QTimer.singleShot(5000, self._check_app_active)
 
         self.watcher.start()
         # Multiplayer plugins (VPX 10.8.1+): install/repair in the background.
         QTimer.singleShot(4000, self._check_vpx_plugins)
 
+        try:
+            from core.watcher_io import init_integrity
+            init_integrity(self.cfg.BASE)
+        except Exception:
+            pass
         if self.cfg.CLOUD_ENABLED and self.cfg.CLOUD_URL:
+            QTimer.singleShot(3000, self._cloud_identity_startup)
             CloudSync.cleanup_legacy_progress(self.cfg)
             CloudSync.cleanup_uppercase_rom_progress(self.cfg)
 
@@ -741,10 +730,11 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
             "Cloud Sync must be turned on in System → General, otherwise no data will be transmitted.<br><br>"
 
             "<b>4. Anti-Cheat &amp; Validation</b><br>"
-            "Every upload is validated server-side. Submissions can receive the following status:<br>"
-            "• 🟢 <b>Accepted</b> – All good, score counts on the leaderboard<br>"
-            "• 🟠 <b>Flagged</b> – Suspicious, held for manual review (not visible on the leaderboard until cleared)<br>"
-            "• 🔴 <b>Rejected</b> – Invalid (missing data, duplicate, outdated version, etc.)<br><br>"
+            "Your Player ID is linked to this PC. Only this PC can upload for it; the cloud checks every "
+            "upload (valid values, matching leaderboard entry, upload rate). To move to another PC, use the "
+            "<b>Recovery Key</b> from System → General (it is also stored in Backup to ZIP).<br>"
+            "If a local save file was modified outside the Watcher, uploads pause until you restore from the "
+            "cloud or from a backup.<br><br>"
 
             "<b>5. Keep Your Watcher Version Up To Date</b><br>"
             "Outdated Watcher versions will be rejected by the server. Always keep the app updated.<br><br>"
@@ -2345,80 +2335,6 @@ class MainWindow(QMainWindow, HotkeysMixin, OverlayCtrlMixin, TrayMixin, CloudSt
                 threading.Thread(target=_bg_prescan, daemon=True).start()
         except Exception:
             pass
-
-    def _fetch_app_active(self) -> bool:
-        """Return True if players/{pid}/app_active is truthy in Firebase, False otherwise.
-        This is a blocking call — always invoke from a background thread."""
-        try:
-            pid = str(self.cfg.OVERLAY.get("player_id", "unknown")).strip().lower()
-            if not pid or pid == "unknown":
-                return False
-            return bool(CloudSync.fetch_node(self.cfg, f"players/{pid}/app_active"))
-        except Exception:
-            return False
-
-    def _check_app_active(self):
-        """Check players/{pid}/app_active in Firebase and start/stop _app_signals_timer
-        accordingly.  Called once on startup (after a short delay) and every 60 seconds
-        by _app_lifecycle_timer.  The Android app sets this flag to true when it opens
-        and to false (or removes it) when it closes."""
-        if not self.cfg.CLOUD_ENABLED or not self.cfg.CLOUD_URL:
-            return
-
-        def _bg():
-            try:
-                from PyQt6.QtCore import QMetaObject, Qt
-                if self._fetch_app_active():
-                    QMetaObject.invokeMethod(self, "_start_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-                else:
-                    QMetaObject.invokeMethod(self, "_stop_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-            except Exception:
-                pass
-
-        threading.Thread(target=_bg, daemon=True, name="AppActiveCheck").start()
-
-    @pyqtSlot()
-    def _start_app_signals_timer(self):
-        """Start _app_signals_timer if not already running (called from UI thread)."""
-        if not self._app_signals_timer.isActive():
-            self._app_signals_timer.start()
-
-    @pyqtSlot()
-    def _stop_app_signals_timer(self):
-        """Stop _app_signals_timer if running (called from UI thread)."""
-        if self._app_signals_timer.isActive():
-            self._app_signals_timer.stop()
-
-    def _poll_app_signals(self):
-        """Poll Firebase for app signals (duel accept/decline, backup/restore triggers).
-        Runs the network IO in a background thread to avoid blocking the UI.
-        Also checks app_active: if the Android app has closed, stops the poll timer."""
-        def _bg():
-            try:
-                signals = CloudSync.poll_app_signals(self.cfg)
-                for sig in signals:
-                    action = sig.get("action", "")
-                    if action == "backup":
-                        try:
-                            state = self.watcher._ach_state_load() if hasattr(self.watcher, "_ach_state_load") else {}
-                            pname = (self.cfg.OVERLAY or {}).get("player_name", "Player")
-                            CloudSync.upload_full_achievements(self.cfg, state, pname)
-                        except Exception:
-                            pass
-                    elif action == "restore":
-                        try:
-                            CloudSync.restore_from_cloud(self.cfg)
-                        except Exception:
-                            pass
-                # After processing signals, verify the Android app is still active.
-                # If app_active is falsy the Android app has closed — stop polling to save traffic.
-                if not self._fetch_app_active():
-                    from PyQt6.QtCore import QMetaObject, Qt
-                    QMetaObject.invokeMethod(self, "_stop_app_signals_timer", Qt.ConnectionType.QueuedConnection)
-            except Exception:
-                pass
-
-        threading.Thread(target=_bg, daemon=True, name="AppSignalsPoll").start()
 
     def _reset_status_label(self):
         self.status_label.setText("🟢 Watcher: RUNNING...")
