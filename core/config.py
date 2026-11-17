@@ -105,13 +105,6 @@ DEFAULT_OVERLAY.setdefault("fx_toast_shockwave_intensity", 80)
 DEFAULT_OVERLAY.setdefault("overlay_page2_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page3_enabled", True)
 DEFAULT_OVERLAY.setdefault("overlay_page4_enabled", True)
-DEFAULT_OVERLAY.setdefault("status_overlay_enabled", True)
-DEFAULT_OVERLAY.setdefault("status_overlay_rotate_ccw", False)
-DEFAULT_OVERLAY.setdefault("status_overlay_x_portrait", 100)
-DEFAULT_OVERLAY.setdefault("status_overlay_y_portrait", 100)
-DEFAULT_OVERLAY.setdefault("status_overlay_x_landscape", 100)
-DEFAULT_OVERLAY.setdefault("status_overlay_y_landscape", 100)
-DEFAULT_OVERLAY.setdefault("status_overlay_saved", False)
 
 # Duel Overlay position
 # Tournament mode is hidden for now. The code stays in place so it can be
@@ -185,9 +178,6 @@ _ALLOWED_OVERLAY_KEYS = [
     "notifications_portrait", "notifications_rotate_ccw", "notifications_saved",
     "notifications_x_landscape", "notifications_y_landscape", "notifications_x_portrait", "notifications_y_portrait",
     
-    "status_overlay_enabled", "status_overlay_portrait", "status_overlay_rotate_ccw",
-    "status_overlay_saved", "status_overlay_x_landscape", "status_overlay_y_landscape",
-    "status_overlay_x_portrait", "status_overlay_y_portrait",
 
     "duel_overlay_portrait", "duel_overlay_rotate_ccw", "duel_overlay_saved",
     "duel_overlay_x_portrait", "duel_overlay_y_portrait",

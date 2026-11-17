@@ -22,7 +22,6 @@ class Bridge(QObject):
     prefetch_progress = pyqtSignal(str)
     prefetch_finished = pyqtSignal(str)
     level_up_show = pyqtSignal(str, int)   # (level_name, level_number)
-    status_overlay_show = pyqtSignal(str, int, str)  # (message, seconds, color_hex)
     close_secondary_overlays = pyqtSignal()
     session_ended = pyqtSignal(str)  # (rom)
     session_started = pyqtSignal(str, str)  # (rom, table_name)
